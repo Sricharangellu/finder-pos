@@ -10,9 +10,11 @@
  */
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { getUser } from "@/lib/auth";
 
 export default function ProtectedLayout({
   children,
@@ -46,9 +48,32 @@ export default function ProtectedLayout({
     return null;
   }
 
+  const role = getUser()?.role ?? "cashier";
+  const canSeeReports = role === "owner" || role === "manager";
+
   return (
     <div className="flex min-h-screen flex-col">
       <OfflineBanner />
+      <nav
+        aria-label="Primary"
+        className="flex items-center gap-1 border-b border-gray-200 bg-white px-4 py-2"
+      >
+        <span className="mr-2 font-bold text-brand-600">Finder POS</span>
+        <Link
+          href="/terminal"
+          className="rounded px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+        >
+          Terminal
+        </Link>
+        {canSeeReports ? (
+          <Link
+            href="/reports"
+            className="rounded px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            Reports
+          </Link>
+        ) : null}
+      </nav>
       {children}
     </div>
   );

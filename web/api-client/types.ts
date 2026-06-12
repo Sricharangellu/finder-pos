@@ -260,3 +260,24 @@ export interface paths {
     };
   };
 }
+
+// ── Reports (Wave 2 analytics) ──────────────────────────────────────────────
+export interface SalesSummary {
+  orders: {
+    open: number;
+    completed: number;
+    refunded: number;
+    voided: number;
+    total: number;
+  };
+  revenue: {
+    grossCents: number;
+    taxCents: number;
+    netCents: number;
+  };
+  payments: {
+    capturedCount: number;
+    capturedCents: number;
+    byMethod: Record<string, number>;
+  };
+}

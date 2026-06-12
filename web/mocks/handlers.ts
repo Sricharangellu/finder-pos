@@ -25,6 +25,7 @@ import type {
   CreateOrderRequest,
   UpdateOrderRequest,
   CapturePaymentRequest,
+  SalesSummary,
 } from "@/api-client/types";
 
 // Match both relative (browser) and absolute (Node/test) URL forms.
@@ -697,6 +698,17 @@ export const handlers = [
     orderStore.set(id, voided);
 
     return HttpResponse.json(voided, { status: 200 });
+  }),
+
+  // ── GET /api/v1/reports/summary ──────────────────────────────────────────
+  http.get(`${V1}/reports/summary`, async () => {
+    await latency();
+    const response: SalesSummary = {
+      orders: { open: 1, completed: 3, refunded: 0, voided: 0, total: 4 },
+      revenue: { grossCents: 6497, taxCents: 497, netCents: 6000 },
+      payments: { capturedCount: 3, capturedCents: 6497, byMethod: { cash: 3247, card: 3250 } },
+    };
+    return HttpResponse.json(response, { status: 200 });
   }),
 ];
 
