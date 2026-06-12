@@ -327,3 +327,66 @@ test("GET /?orderId= lists payments for an order", async () => {
   const listB = await request(app, "GET", "/api/payments/?orderId=ord_list_b");
   assert.equal(listB.body.length, 1);
 });
+
+/** Count the payment rows for an order (asserts no duplicate charge). */
+async function paymentCount(app: App, orderId: string): Promise<number> {
+  const row = await app.db.one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM payments WHERE order_id = ? AND tenant_id = 'tnt_demo'",
+    [orderId],
+  );
+  return Number(row?.n ?? 0);
+}
+
+test("retried capture with same idempotency key returns the cached payment and does NOT re-charge", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_idem", totalCents: 1000 });
+
+  const first = await capture(app, {
+    orderId: "ord_idem",
+    method: "cash",
+    tenderedCents: 1000,
+    idempotencyKey: "idem-key-1",
+  });
+  assert.equal(first.status, 201);
+  assert.equal(first.body.status, "captured");
+  assert.equal(await paymentCount(app, "ord_idem"), 1);
+
+  // Replay the exact same request (e.g. a network retry). The capture must
+  // short-circuit on the idempotency key and return the original record byte
+  // for byte — crucially without inserting a second payments row.
+  const retry = await capture(app, {
+    orderId: "ord_idem",
+    method: "cash",
+    tenderedCents: 1000,
+    idempotencyKey: "idem-key-1",
+  });
+  assert.equal(retry.status, 201);
+  assert.equal(retry.body.id, first.body.id, "retry must return the same payment id");
+  assert.deepEqual(retry.body, first.body, "retry must return the identical record");
+  assert.equal(await paymentCount(app, "ord_idem"), 1, "no second payment may be created");
+});
+
+test("a fresh idempotency key on an already-paid order is not served from cache (409)", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_idem2", totalCents: 1000 });
+
+  const first = await capture(app, {
+    orderId: "ord_idem2",
+    method: "cash",
+    tenderedCents: 1000,
+    idempotencyKey: "idem-A",
+  });
+  assert.equal(first.status, 201);
+
+  // The first capture completed the order. A DIFFERENT key is a distinct
+  // request, so it must miss the cache and hit the closed-order guard rather
+  // than silently returning the prior payment.
+  const other = await capture(app, {
+    orderId: "ord_idem2",
+    method: "cash",
+    tenderedCents: 1000,
+    idempotencyKey: "idem-B",
+  });
+  assert.equal(other.status, 409);
+  assert.equal(await paymentCount(app, "ord_idem2"), 1);
+});
