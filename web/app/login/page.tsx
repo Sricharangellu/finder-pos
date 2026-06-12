@@ -23,7 +23,7 @@ export default function LoginPage() {
   // Redirect already-authenticated users away from /login
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/(protected)/terminal");
+      router.replace("/terminal");
     }
   }, [status, router]);
 

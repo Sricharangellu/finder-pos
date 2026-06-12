@@ -83,7 +83,7 @@ export function useAuth(): UseAuthReturn {
         setSession(data.accessToken, data.expiresIn, data.refreshToken, data.user);
         setUser(data.user);
         setStatus("authenticated");
-        router.replace("/(protected)/terminal");
+        router.replace("/terminal");
       } catch (err) {
         if (err instanceof ApiResponseError) {
           if (err.status === 401) {

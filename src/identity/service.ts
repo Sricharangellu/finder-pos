@@ -20,6 +20,19 @@ export interface TokenPair {
   expiresIn: number; // seconds
 }
 
+/** User summary returned to the client on login (matches the frontend contract). */
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  tenantId: string;
+}
+
+/** Demo tenant + credentials seeded on first boot (idempotent). */
+export const DEMO_TENANT_ID = "tnt_demo";
+export const DEMO_PASSWORD = "FinderDemo!2026";
+
 export interface AuditWriteInput {
   tenantId: string;
   actorId: string;
@@ -67,7 +80,7 @@ export class IdentityService {
    * if the hash column is unavailable we fall back to a dev-only plaintext
    * comparison (must not reach production).
    */
-  async login(input: LoginInput): Promise<TokenPair> {
+  async login(input: LoginInput): Promise<TokenPair & { user: AuthUser }> {
     const user = await this.db.one<UserRow>(
       "SELECT * FROM users WHERE email = @email",
       { email: input.email.toLowerCase().trim() },
@@ -90,7 +103,47 @@ export class IdentityService {
       user.id,
     );
 
-    return pair;
+    return {
+      ...pair,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.email.split("@")[0] ?? user.email,
+        role: user.role,
+        tenantId: user.tenant_id,
+      },
+    };
+  }
+
+  /**
+   * Seed a demo tenant + owner/cashier users on first boot. Idempotent:
+   * only runs when the users table is empty; concurrent cold-start races are
+   * tolerated via ON CONFLICT DO NOTHING. Passwords are bcrypt-hashed.
+   */
+  async seedDemo(): Promise<void> {
+    const existing = await this.db.one<{ c: number }>(
+      "SELECT COUNT(*)::int AS c FROM users",
+    );
+    if (existing && Number(existing.c) > 0) return;
+
+    const now = Date.now();
+    await this.db.query(
+      "INSERT INTO tenants (id, name, slug, created_at, updated_at) VALUES (@id, @name, @slug, @c, @u) ON CONFLICT (id) DO NOTHING",
+      { id: DEMO_TENANT_ID, name: "Demo Store", slug: "demo", c: now, u: now },
+    );
+
+    const { default: bcrypt } = await import("bcryptjs");
+    const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
+    const demoUsers: Array<{ id: string; email: string; role: Role }> = [
+      { id: "usr_demo_owner", email: "owner@finder-pos.dev", role: "owner" },
+      { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier" },
+    ];
+    for (const u of demoUsers) {
+      await this.db.query(
+        "INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at) VALUES (@id, @t, @e, @h, @r, @c, @u) ON CONFLICT (tenant_id, email) DO NOTHING",
+        { id: u.id, t: DEMO_TENANT_ID, e: u.email, h: hash, r: u.role, c: now, u: now },
+      );
+    }
   }
 
   /**

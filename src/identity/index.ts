@@ -8,6 +8,8 @@ export const identityModule: PosModule = {
   migrations: IDENTITY_MIGRATIONS,
   async register({ db, events, router }) {
     const service = new IdentityService(db, events);
+    // Idempotent demo seed (only runs when the users table is empty).
+    await service.seedDemo();
     registerIdentityRoutes(router, service);
   },
 };

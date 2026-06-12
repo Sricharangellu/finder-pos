@@ -5,5 +5,5 @@
 import { redirect } from "next/navigation";
 
 export default function RootPage() {
-  redirect("/(protected)/terminal");
+  redirect("/terminal");
 }

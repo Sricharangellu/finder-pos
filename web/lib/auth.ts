@@ -123,8 +123,6 @@ export async function silentRefresh(): Promise<boolean> {
   try {
     // Import lazily to avoid circular deps (client imports auth)
     const { apiPost } = await import("@/api-client/client");
-    const { RefreshResponse } = await import("@/api-client/types");
-    void RefreshResponse; // type-only import guard
 
     const data = await apiPost<import("@/api-client/types").RefreshResponse>(
       "/api/identity/refresh",
