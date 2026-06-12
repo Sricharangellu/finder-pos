@@ -1,6 +1,7 @@
 import type { PosModule } from "../types.js";
 import { CatalogService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 // tenant_id TEXT NOT NULL: every commerce row is scoped to a tenant (tnt_* prefix).
@@ -29,7 +30,7 @@ CREATE INDEX IF NOT EXISTS products_tenant_category_idx ON products (tenant_id, 
 
 export const catalogModule: PosModule = {
   name: "catalog",
-  migrations: [CREATE_PRODUCTS_TABLE, CREATE_PRODUCTS_INDEXES],
+  migrations: [dropLegacyNoTenant("products"), CREATE_PRODUCTS_TABLE, CREATE_PRODUCTS_INDEXES],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);
     // Idempotent demo seed (only runs when the table is empty for tnt_demo).

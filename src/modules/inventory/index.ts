@@ -1,6 +1,7 @@
 import type { PosModule } from "../types.js";
 import { InventoryService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 // inventory PK is (tenant_id, product_id) since product_ids are tenant-scoped.
@@ -47,7 +48,7 @@ interface OrderRefundedPayload {
 
 export const inventoryModule: PosModule = {
   name: "inventory",
-  migrations: [CREATE_INVENTORY_TABLE, CREATE_MOVEMENTS_TABLE],
+  migrations: [dropLegacyNoTenant("inventory_movements"), dropLegacyNoTenant("inventory"), CREATE_INVENTORY_TABLE, CREATE_MOVEMENTS_TABLE],
   register({ db, events, router }) {
     const service = new InventoryService(db, events);
     registerRoutes(router, service);

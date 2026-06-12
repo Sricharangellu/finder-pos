@@ -1,6 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { OrdersService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 const CREATE_ORDERS_TABLE = `
@@ -40,7 +41,7 @@ CREATE INDEX IF NOT EXISTS oln_tenant_order_idx ON order_lines (tenant_id, order
 
 export const ordersModule: PosModule = {
   name: "orders",
-  migrations: [CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE],
+  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE],
   register(ctx: ModuleContext): void {
     const service = new OrdersService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);

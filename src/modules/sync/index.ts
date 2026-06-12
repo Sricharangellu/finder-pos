@@ -1,6 +1,7 @@
 import type { PosModule } from "../types.js";
 import { SyncEngine } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 const CREATE_SYNC_QUEUE_TABLE = `
@@ -25,7 +26,7 @@ export function getSyncEngine(): SyncEngine | undefined {
 
 export const syncModule: PosModule = {
   name: "sync",
-  migrations: [CREATE_SYNC_QUEUE_TABLE],
+  migrations: [dropLegacyNoTenant("sync_queue"), CREATE_SYNC_QUEUE_TABLE],
   register({ db, events, router }) {
     const engine = new SyncEngine(db, events);
     lastEngine = engine;

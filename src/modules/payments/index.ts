@@ -1,6 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { PaymentsService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 const MIGRATION = `
@@ -23,7 +24,7 @@ CREATE INDEX IF NOT EXISTS payments_tenant_order_idx ON payments (tenant_id, ord
 
 export const paymentsModule: PosModule = {
   name: "payments",
-  migrations: [MIGRATION],
+  migrations: [dropLegacyNoTenant("payments"), MIGRATION],
   register(ctx: ModuleContext): void {
     const service = new PaymentsService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);
