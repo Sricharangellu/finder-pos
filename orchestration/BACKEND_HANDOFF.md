@@ -108,6 +108,24 @@ Item locations, product→location placement, and order pick/pack. Answers "item
 - Status flow: `picking → picked → packed`. MSW mocks added (locations, assign, pick-lists, pick line, pack — with pick-path sort).
 - Suggested UI: an **Operations → Locations** grid (assign products to bins) and a **Pick & Pack** queue (open order → generate pick list in path order → check off lines → Pack).
 
+## Benchmark update → Wholesale/Distribution ERP
+New benchmark `ERP-Prompt-Guide.html` (erp.fairtradetx.com, 18 prompts) supersedes the Lightspeed POS
+target. See **`orchestration/ERP_BENCHMARK.md`** for the full parity matrix (built/partial/missing across
+all 18 areas) and the Wave A–H roadmap. Headline gaps still open: Accounting/COA + batch deposits (#9),
+Shipping orders from invoices (#8), Discounts engine (#11), 60+ reports build-out (#10), Settings + RBAC
+enforcement (#12/#13), multi-store `storeIds[]` filter (#18). Frontend owns the DataTable, all module
+pages, global search palette, and the tablet fulfillment UI.
+
+## Sales — Quotations + Sales Orders (Wave A) — LIVE
+B2B order-to-cash front half: Quotation → Sales Order → (approve) → Invoice. Tenant-scoped, money in cents.
+- **Quotations:** `POST /api/v1/sales/quotations {customerId, lines:[{productId, quantity, unitCents?}], salesRepId?, storeId?, validUntil?}` → resolves catalog prices, applies customer **tier discount** (Tier 1=best: 10/7.5/5/2.5/0% for tiers 1–5), computes subtotal/discount/total. `GET /quotations[?status]`, `GET /quotations/:id`. Transitions: `POST /quotations/:id/send` (draft→sent), `/accept` (sent→accepted), `/cancel`. Statuses: draft|sent|accepted|expired|cancelled. Numbered QT-#####.
+- **Convert:** `POST /quotations/:id/convert` → creates a Sales Order (pending_approve) copying lines; **idempotent per quotation** (re-POST returns the same SO); marks the quote accepted.
+- **Sales orders:** `POST /api/v1/sales/sales-orders {customerId, lines, quotationId?, salesRepId?, pickerId?, storeId?}` direct create. `GET /sales-orders[?status&salesRepId&pickerId]`, `GET /sales-orders/:id`. Numbered SO-#####. Statuses: pending_approve|approved|invoiced|partially_invoiced|cancelled.
+- **Workflow:** `POST /sales-orders/:id/approve` (pending_approve→approved, emits `sales_order.approved`) · `POST /sales-orders/:id/assign-picker {pickerId}` · `POST /sales-orders/:id/invoice` (requires approved; emits `sales_order.invoiced` → **billing auto-raises the AR invoice** for the SO total; 409 if not approved or already invoiced) · `POST /sales-orders/:id/cancel` (409 once invoiced).
+- **Customer tier:** `customers.tier` (1–5, default 5) added via idempotent ALTER; drives quote/SO pricing. Tier is not yet settable through the customers API (Wave B adds customer-detail fields + per-product tier prices); for now seed/adjust directly.
+- Verified live: QT-00001 → convert → SO-00001 → approve → invoice → AR invoice raised. MSW mocks added (quotations + sales-orders, tier math, idempotent convert, status guards).
+- **Picker tie-in:** `picker_id` on sales orders is the hook for the tablet fulfillment pick queue (benchmark #16); the existing fulfillment module builds pick lists from `orders` — unifying SO↔pick list is a follow-up.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 

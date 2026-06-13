@@ -58,6 +58,13 @@ export const billingModule: PosModule = {
       const p = event.payload as { tenantId?: string; poId?: string };
       if (p.tenantId && p.poId) await service.billFromPO(p.poId, p.tenantId);
     });
+    // A sales order converted to an invoice raises the matching AR invoice.
+    events.on("sales_order.invoiced", async (event) => {
+      const p = event.payload as { tenantId?: string; customerId?: string; totalCents?: number };
+      if (p.tenantId && p.customerId && p.totalCents && p.totalCents > 0) {
+        await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents }, p.tenantId);
+      }
+    });
     registerRoutes(router, service);
   },
 };

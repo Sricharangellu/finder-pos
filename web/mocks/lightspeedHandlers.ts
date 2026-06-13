@@ -21,6 +21,13 @@ let locations: any[] = [];
 const productLocations = new Map<string, string>(); // productId -> locationId
 let pickLists: any[] = [];
 const pickLines = new Map<string, any[]>(); // pickListId -> lines
+// Sales dev stores
+let quotations: any[] = [];
+const quoteLines = new Map<string, any[]>();
+let salesOrders: any[] = [];
+const soLines = new Map<string, any[]>();
+let qtSeq = 0, soSeq = 0;
+const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
 
 function seed() {
   if (customers.size === 0) {
@@ -380,3 +387,107 @@ function codeFor(productId: string): string | null {
   const locId = productLocations.get(productId);
   return locations.find((l) => l.id === locId)?.code ?? null;
 }
+
+// ── Sales mock handlers (appended to the exported `handlers` array) ──────────
+function resolveSalesLines(parentId: string, lines: any[], tier: number) {
+  const pct = TIER_PCT[tier] ?? 0;
+  let subtotal = 0, discount = 0;
+  const out = lines.map((l: any) => {
+    const unit = l.unitCents ?? 1000;
+    const gross = unit * l.quantity;
+    const lineDisc = Math.round((gross * pct) / 100);
+    subtotal += gross; discount += lineDisc;
+    return { id: `sln_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", parent_id: parentId, product_id: l.productId, name: l.name ?? "Item", quantity: l.quantity, unit_cents: unit, line_cents: gross - lineDisc };
+  });
+  return { out, subtotal, discount };
+}
+
+lightspeedHandlers.push(
+  http.post(`${V1}/sales/quotations`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const id = `qot_${Math.random().toString(36).slice(2, 12)}`;
+    const { out, subtotal, discount } = resolveSalesLines(id, b.lines ?? [], 5);
+    const now = Date.now();
+    const q = { id, tenant_id: "tnt_demo", quote_number: `QT-${String(++qtSeq).padStart(5, "0")}`, customer_id: b.customerId, status: "draft", subtotal_cents: subtotal, discount_cents: discount, total_cents: subtotal - discount, sales_rep_id: b.salesRepId ?? null, store_id: b.storeId ?? null, valid_until: now + 30 * 86400000, created_at: now, updated_at: now };
+    quotations.push(q); quoteLines.set(id, out);
+    return HttpResponse.json({ ...q, lines: out }, { status: 201 });
+  }),
+  http.get(`${V1}/sales/quotations`, async () => { await lat(); return HttpResponse.json({ items: [...quotations].sort((a, b) => b.created_at - a.created_at) }); }),
+  http.get(`${V1}/sales/quotations/:id`, async ({ params }) => {
+    await lat();
+    const q = quotations.find((x) => x.id === String(params.id));
+    if (!q) return HttpResponse.json({ error: { code: "not_found", message: "quotation not found", requestId: rid() } }, { status: 404 });
+    return HttpResponse.json({ ...q, lines: quoteLines.get(q.id) ?? [] });
+  }),
+  http.post(`${V1}/sales/quotations/:id/send`, async ({ params }) => { await lat(); const q = quotations.find((x) => x.id === String(params.id)); if (q) q.status = "sent"; return HttpResponse.json(q); }),
+  http.post(`${V1}/sales/quotations/:id/accept`, async ({ params }) => { await lat(); const q = quotations.find((x) => x.id === String(params.id)); if (q) q.status = "accepted"; return HttpResponse.json(q); }),
+  http.post(`${V1}/sales/quotations/:id/cancel`, async ({ params }) => { await lat(); const q = quotations.find((x) => x.id === String(params.id)); if (q) q.status = "cancelled"; return HttpResponse.json(q); }),
+  http.post(`${V1}/sales/quotations/:id/convert`, async ({ params }) => {
+    await lat();
+    const q = quotations.find((x) => x.id === String(params.id));
+    if (!q) return HttpResponse.json({ error: { code: "not_found", message: "quotation not found", requestId: rid() } }, { status: 404 });
+    let so = salesOrders.find((s) => s.quotation_id === q.id);
+    if (!so) {
+      const id = `sso_${Math.random().toString(36).slice(2, 12)}`;
+      const lines = (quoteLines.get(q.id) ?? []).map((l) => ({ ...l, id: `sln_${Math.random().toString(36).slice(2, 10)}`, parent_id: id }));
+      const now = Date.now();
+      so = { id, tenant_id: "tnt_demo", so_number: `SO-${String(++soSeq).padStart(5, "0")}`, quotation_id: q.id, customer_id: q.customer_id, status: "pending_approve", subtotal_cents: q.subtotal_cents, discount_cents: q.discount_cents, total_cents: q.total_cents, sales_rep_id: q.sales_rep_id, picker_id: null, store_id: q.store_id, created_at: now, updated_at: now };
+      salesOrders.push(so); soLines.set(id, lines); q.status = "accepted";
+    }
+    return HttpResponse.json({ ...so, lines: soLines.get(so.id) ?? [] }, { status: 201 });
+  }),
+  http.post(`${V1}/sales/sales-orders`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    const id = `sso_${Math.random().toString(36).slice(2, 12)}`;
+    const { out, subtotal, discount } = resolveSalesLines(id, b.lines ?? [], 5);
+    const now = Date.now();
+    const so = { id, tenant_id: "tnt_demo", so_number: `SO-${String(++soSeq).padStart(5, "0")}`, quotation_id: b.quotationId ?? null, customer_id: b.customerId, status: "pending_approve", subtotal_cents: subtotal, discount_cents: discount, total_cents: subtotal - discount, sales_rep_id: b.salesRepId ?? null, picker_id: b.pickerId ?? null, store_id: b.storeId ?? null, created_at: now, updated_at: now };
+    salesOrders.push(so); soLines.set(id, out);
+    return HttpResponse.json({ ...so, lines: out }, { status: 201 });
+  }),
+  http.get(`${V1}/sales/sales-orders`, async ({ request }) => {
+    await lat();
+    const u = new URL(request.url);
+    let items = [...salesOrders];
+    const st = u.searchParams.get("status"); if (st) items = items.filter((s) => s.status === st);
+    const rep = u.searchParams.get("salesRepId"); if (rep) items = items.filter((s) => s.sales_rep_id === rep);
+    const pk = u.searchParams.get("pickerId"); if (pk) items = items.filter((s) => s.picker_id === pk);
+    return HttpResponse.json({ items: items.sort((a, b) => b.created_at - a.created_at) });
+  }),
+  http.get(`${V1}/sales/sales-orders/:id`, async ({ params }) => {
+    await lat();
+    const so = salesOrders.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "sales order not found", requestId: rid() } }, { status: 404 });
+    return HttpResponse.json({ ...so, lines: soLines.get(so.id) ?? [] });
+  }),
+  http.post(`${V1}/sales/sales-orders/:id/approve`, async ({ params }) => {
+    await lat();
+    const so = salesOrders.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "sales order not found", requestId: rid() } }, { status: 404 });
+    if (so.status !== "pending_approve") return HttpResponse.json({ error: { code: "conflict", message: `cannot approve a ${so.status} sales order`, requestId: rid() } }, { status: 409 });
+    so.status = "approved"; return HttpResponse.json(so);
+  }),
+  http.post(`${V1}/sales/sales-orders/:id/assign-picker`, async ({ params, request }) => {
+    await lat();
+    const so = salesOrders.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "sales order not found", requestId: rid() } }, { status: 404 });
+    const b = (await request.json()) as any; so.picker_id = b.pickerId; return HttpResponse.json(so);
+  }),
+  http.post(`${V1}/sales/sales-orders/:id/invoice`, async ({ params }) => {
+    await lat();
+    const so = salesOrders.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "sales order not found", requestId: rid() } }, { status: 404 });
+    if (so.status === "invoiced") return HttpResponse.json({ error: { code: "conflict", message: "already invoiced", requestId: rid() } }, { status: 409 });
+    if (so.status === "pending_approve") return HttpResponse.json({ error: { code: "conflict", message: "approve before invoicing", requestId: rid() } }, { status: 409 });
+    so.status = "invoiced"; return HttpResponse.json(so);
+  }),
+  http.post(`${V1}/sales/sales-orders/:id/cancel`, async ({ params }) => {
+    await lat();
+    const so = salesOrders.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "sales order not found", requestId: rid() } }, { status: 404 });
+    if (so.status === "invoiced") return HttpResponse.json({ error: { code: "conflict", message: "cannot cancel an invoiced sales order", requestId: rid() } }, { status: 409 });
+    so.status = "cancelled"; return HttpResponse.json(so);
+  }),
+);
