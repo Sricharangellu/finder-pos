@@ -23,6 +23,15 @@ export interface CreateCustomerInput {
   phone?: string | null;
 }
 
+export interface CustomerSummary {
+  customer: { id: string; name: string; email: string | null; phone: string | null; points: number };
+  visits: number;
+  totalSpentCents: number;
+  avgOrderCents: number;
+  lastVisitAt: number | null;
+  recentOrders: Array<{ id: string; orderNumber: string; status: string; totalCents: number; createdAt: number }>;
+}
+
 /** Redemption rate: 100 points → 500 cents ($5.00). */
 export const POINTS_PER_REDEEM_BLOCK = 100;
 export const CENTS_PER_REDEEM_BLOCK = 500;
@@ -109,6 +118,36 @@ export class CustomersService {
       customerId,
     );
     return { pointsRemaining: remaining, valueCents };
+  }
+
+  /** CRM summary: lifetime spend, visits, last visit, and a recent-orders timeline.
+   *  Aggregates the shared orders table (completed orders) for this customer. */
+  async summary(customerId: string, tenantId: string): Promise<CustomerSummary> {
+    const customer = await this.get(customerId, tenantId);
+    if (!customer) throw new HttpError(404, "not_found", `customer '${customerId}' not found`);
+    const agg = await this.db.one<{ visits: number; spent: number; last: number | null }>(
+      `SELECT COUNT(*)::int AS visits, COALESCE(SUM(total_cents),0) AS spent, MAX(created_at) AS last
+         FROM orders WHERE tenant_id = @tenantId AND customer_id = @customerId AND status = 'completed'`,
+      { tenantId, customerId },
+    );
+    const recent = await this.db.query<{ id: string; order_number: string; status: string; total_cents: number; created_at: number }>(
+      `SELECT id, order_number, status, total_cents, created_at
+         FROM orders WHERE tenant_id = @tenantId AND customer_id = @customerId
+        ORDER BY created_at DESC LIMIT 10`,
+      { tenantId, customerId },
+    );
+    const visits = Number(agg?.visits ?? 0);
+    const totalSpentCents = Number(agg?.spent ?? 0);
+    return {
+      customer: { id: customer.id, name: customer.name, email: customer.email, phone: customer.phone, points: Number(customer.points) },
+      visits,
+      totalSpentCents,
+      avgOrderCents: visits > 0 ? Math.round(totalSpentCents / visits) : 0,
+      lastVisitAt: agg?.last != null ? Number(agg.last) : null,
+      recentOrders: recent.map((o) => ({
+        id: o.id, orderNumber: o.order_number, status: o.status, totalCents: Number(o.total_cents), createdAt: Number(o.created_at),
+      })),
+    };
   }
 
   /** Resolve which customer (if any) an order belongs to. Reads the shared orders table. */

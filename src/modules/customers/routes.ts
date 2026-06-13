@@ -44,6 +44,13 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     }),
   );
 
+  router.get(
+    "/:id/summary",
+    handler(async (req, res) => {
+      res.json(await service.summary(String(req.params.id), tenantId(res)));
+    }),
+  );
+
   router.post(
     "/:id/redeem",
     handler(async (req, res) => {
