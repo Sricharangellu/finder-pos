@@ -41,4 +41,12 @@ export function registerRoutes(router: Router, service: ReportsService): void {
       res.json({ items: await service.topProducts(tenantId(res), sinceFromRange(req), limit) });
     }),
   );
+
+  // GET /api/v1/reports/hourly?range=… — sales bucketed by hour of day.
+  router.get(
+    "/hourly",
+    handler(async (req, res) => {
+      res.json({ items: await service.hourly(tenantId(res), sinceFromRange(req)) });
+    }),
+  );
 }

@@ -18,6 +18,20 @@ export interface TopProduct {
   revenueCents: number;
 }
 
+export interface HourlyBucket {
+  hour: number;        // 0–23 (UTC)
+  label: string;       // "8 AM"
+  orderCount: number;
+  revenueCents: number;
+  value: number;       // 0–100 index relative to the busiest hour
+}
+
+function hourLabel(h: number): string {
+  const period = h < 12 ? "AM" : "PM";
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display} ${period}`;
+}
+
 export class ReportsService {
   constructor(private readonly db: DB) {}
 
@@ -86,5 +100,37 @@ export class ReportsService {
       units: Number(r.units),
       revenueCents: Number(r.revenue),
     }));
+  }
+
+  /** Sales bucketed by hour-of-day (UTC) from completed orders in the window.
+   *  Returns all 24 hours; `value` is a 0–100 index vs the busiest hour. */
+  async hourly(tenantId: string, sinceMs?: number): Promise<HourlyBucket[]> {
+    const since = sinceMs ?? 0;
+    const rows = await this.db.query<{ hour: number; orders: number; revenue: number }>(
+      `SELECT EXTRACT(HOUR FROM to_timestamp(created_at / 1000.0))::int AS hour,
+              COUNT(*)::int AS orders,
+              COALESCE(SUM(total_cents), 0) AS revenue
+         FROM orders
+        WHERE tenant_id = @tenantId AND status = 'completed' AND created_at >= @since
+        GROUP BY hour`,
+      { tenantId, since },
+    );
+    const byHour = new Map<number, { orders: number; revenue: number }>();
+    let max = 0;
+    for (const r of rows) {
+      const revenue = Number(r.revenue);
+      byHour.set(Number(r.hour), { orders: Number(r.orders), revenue });
+      if (revenue > max) max = revenue;
+    }
+    return Array.from({ length: 24 }, (_, hour) => {
+      const b = byHour.get(hour) ?? { orders: 0, revenue: 0 };
+      return {
+        hour,
+        label: hourLabel(hour),
+        orderCount: b.orders,
+        revenueCents: b.revenue,
+        value: max > 0 ? Math.round((b.revenue / max) * 100) : 0,
+      };
+    });
   }
 }
