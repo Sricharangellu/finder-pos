@@ -119,6 +119,63 @@ export class InventoryService {
     );
   }
 
+  /** Deplete a product's lots earliest-expiry-first (FEFO) by `qty` when it sells.
+   *  No-op for products without tracked lots. Returns the quantity actually drawn from lots. */
+  async depleteFefo(productId: string, qty: number, tenantId: string): Promise<number> {
+    let remaining = Math.abs(qty);
+    if (remaining <= 0) return 0;
+    return this.db.tx(async (tdb) => {
+      const lots = await tdb.query<{ id: string; qty_on_hand: number }>(
+        "SELECT id, qty_on_hand FROM inventory_lots WHERE tenant_id = @tenantId AND product_id = @productId AND qty_on_hand > 0 ORDER BY expiry_date ASC FOR UPDATE",
+        { tenantId, productId },
+      );
+      let drawn = 0;
+      for (const lot of lots) {
+        if (remaining <= 0) break;
+        const take = Math.min(Number(lot.qty_on_hand), remaining);
+        await tdb.query("UPDATE inventory_lots SET qty_on_hand = qty_on_hand - @take WHERE id = @id AND tenant_id = @tenantId", { take, id: lot.id, tenantId });
+        remaining -= take;
+        drawn += take;
+      }
+      return drawn;
+    });
+  }
+
+  /** Lots already past their expiry date but still on hand (must be pulled). */
+  async expired(tenantId: string): Promise<Array<InventoryLot & { name: string; days_overdue: number }>> {
+    const now = Date.now();
+    const rows = await this.db.query<InventoryLot & { name: string }>(
+      `SELECT l.*, p.name FROM inventory_lots l
+         JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+        WHERE l.tenant_id = @tenantId AND l.qty_on_hand > 0 AND l.expiry_date < @now
+        ORDER BY l.expiry_date ASC LIMIT 500`,
+      { tenantId, now },
+    );
+    return rows.map((r) => ({ ...r, days_overdue: Math.floor((now - Number(r.expiry_date)) / 86_400_000) }));
+  }
+
+  /** Expiry value-at-risk: counts + cost value of expired and soon-to-expire stock. */
+  async expirySummary(tenantId: string, soonDays = 30): Promise<{
+    expired: { lots: number; units: number; valueCents: number };
+    expiringSoon: { lots: number; units: number; valueCents: number; withinDays: number };
+  }> {
+    const now = Date.now();
+    const soon = now + soonDays * 86_400_000;
+    const agg = async (where: string, params: Record<string, unknown>) =>
+      this.db.one<{ lots: number; units: number; value: number }>(
+        `SELECT COUNT(*)::int AS lots, COALESCE(SUM(qty_on_hand),0) AS units,
+                COALESCE(SUM(qty_on_hand * COALESCE(unit_cost_cents,0)),0) AS value
+           FROM inventory_lots WHERE tenant_id = @tenantId AND qty_on_hand > 0 AND ${where}`,
+        { tenantId, ...params },
+      );
+    const ex = await agg("expiry_date < @now", { now });
+    const so = await agg("expiry_date >= @now AND expiry_date <= @soon", { now, soon });
+    return {
+      expired: { lots: Number(ex?.lots ?? 0), units: Number(ex?.units ?? 0), valueCents: Number(ex?.value ?? 0) },
+      expiringSoon: { lots: Number(so?.lots ?? 0), units: Number(so?.units ?? 0), valueCents: Number(so?.value ?? 0), withinDays: soonDays },
+    };
+  }
+
   /** Lots expiring within `days` (qty > 0), with product name — the near-expiry report. */
   async expiring(days: number, tenantId: string): Promise<Array<InventoryLot & { name: string; days_to_expiry: number }>> {
     const cutoff = Date.now() + Math.max(0, days) * 86_400_000;

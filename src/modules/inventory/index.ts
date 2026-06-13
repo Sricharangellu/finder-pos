@@ -80,6 +80,8 @@ export const inventoryModule: PosModule = {
       const lines = payload.lines ?? [];
       for (const line of lines) {
         await service.adjust(line.productId, -line.quantity, "sale", tenantId, orderId);
+        // FEFO: draw the sold quantity from the earliest-expiring lots (no-op if untracked).
+        await service.depleteFefo(line.productId, line.quantity, tenantId);
       }
     });
 

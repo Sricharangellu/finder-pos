@@ -6,6 +6,9 @@ import type { AuthPayload } from "../../gateway/auth.js";
 
 const receiveSchema = z.object({
   quantity: z.number().int().positive(),
+  expiryDate: z.number().int().positive().optional(),
+  lotCode: z.string().min(1).optional(),
+  unitCostCents: z.number().int().nonnegative().optional(),
 });
 
 const adjustSchema = z.object({
@@ -93,6 +96,23 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     }),
   );
 
+  // Already-expired but still on hand.
+  router.get(
+    "/expired",
+    handler(async (_req, res) => {
+      res.json({ items: await service.expired(tenantId(res)) });
+    }),
+  );
+
+  // Expiry value-at-risk summary (counts + cost value).
+  router.get(
+    "/expiry-summary",
+    handler(async (req, res) => {
+      const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
+      res.json(await service.expirySummary(tenantId(res), Number.isFinite(days) ? days : 30));
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
@@ -119,7 +139,16 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     "/:productId/receive",
     handler(async (req, res) => {
       const body = parseBody(receiveSchema, req.body);
-      const row = await service.adjust(String(req.params.productId), body.quantity, "receiving", tenantId(res));
+      const productId = String(req.params.productId);
+      const t = tenantId(res);
+      const row = await service.adjust(productId, body.quantity, "receiving", t);
+      // Manual receive with an expiry creates a lot too (FEFO / shelf-life tracking).
+      if (body.expiryDate) {
+        await service.createLot(
+          { productId, expiryDate: body.expiryDate, quantity: body.quantity, lotCode: body.lotCode ?? null, unitCostCents: body.unitCostCents ?? null },
+          t,
+        );
+      }
       res.status(201).json(present(row));
     }),
   );
