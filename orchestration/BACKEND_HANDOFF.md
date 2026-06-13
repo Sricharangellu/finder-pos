@@ -77,6 +77,12 @@ Lightspeed-style restock flow. Receiving emits `purchase_order.received`; invent
 - `POST /api/v1/billing/invoices {customerId, orderId?, totalCents?, dueDate?}`, `GET /billing/invoices?status=`, `POST /billing/invoices/:id/pay`. Invoice can derive its total from an order.
 - Sequential `BILL-#####` / `INV-#####` numbers. MSW mocks for bills/invoices added. UI: an AP/AR (accounts) surface with aging.
 
+## Vendor returns / write-offs (damaged + expired) — LIVE
+The damaged/expired → return → credit loop, anchored on the near-expiry report.
+- `POST /api/v1/purchasing/returns {supplierId?, reason:"damaged"|"expired"|"other", createCredit?, lines:[{productId, quantity, unitCostCents?, lotId?}]}` → records the return, **decrements aggregate stock + the specific lot** (via `stock.written_off` event), and if `createCredit` raises a vendor **credit_memo** for the value. Returns `{ total_cost_cents, credit_id }`.
+- `GET /api/v1/purchasing/returns` (list). MSW mocks added.
+- Suggested UI: from the **near-expiry report** (`GET /api/v1/inventory/expiring`), let a manager select expiring lots → "Return to vendor" → posts a return with `createCredit:true`. (Pure shrinkage write-off = omit supplierId/createCredit.)
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
