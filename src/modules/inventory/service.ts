@@ -29,6 +29,23 @@ export interface ListInventoryQuery {
   offset?: number;
 }
 
+/** Inventory level row in the shape the frontend requested. */
+export interface InventoryLevel {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  status: string;
+  priceCents: number;
+  onHand: number;
+  committed: number;
+  available: number;
+  reorderPoint: number;
+  lowStock: boolean;
+  costCents: number | null;
+  velocity: number;
+}
+
 /** Product joined with its stock — the row an inventory management grid renders. */
 export interface ProductStock {
   id: string;
@@ -71,6 +88,58 @@ export class InventoryService {
       reorder_pt: Number(r.reorder_pt),
       low_stock: Number(r.reorder_pt) > 0 && Number(r.stock_qty) <= Number(r.reorder_pt),
     }));
+  }
+
+  /**
+   * Inventory levels — the shape the frontend (Codex) requested for the
+   * `/inventory` operations screen: product identity + onHand/committed/
+   * reorderPoint/costCents/velocity/status, with search + filters.
+   * `committed`, `costCents`, `velocity` are 0/null until reservations, cost
+   * tracking, and sales-velocity analytics land (documented stubs, not fabricated).
+   */
+  async levels(
+    query: { query?: string; category?: string; status?: string; pageSize?: number },
+    tenantId: string,
+  ): Promise<{ items: InventoryLevel[]; pageSize: number }> {
+    const where: string[] = ["p.tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId };
+    if (query.category) { where.push("p.category = @category"); params["category"] = query.category; }
+    if (query.status) { where.push("p.status = @status"); params["status"] = query.status; }
+    if (query.query) {
+      where.push("(p.name ILIKE @q OR p.sku ILIKE @q)");
+      params["q"] = `%${query.query}%`;
+    }
+    const pageSize = Math.min(Math.max(query.pageSize ?? 100, 1), 500);
+    params["limit"] = pageSize;
+    const rows = await this.db.query<{
+      id: string; sku: string; name: string; category: string; status: string;
+      price_cents: number; stock_qty: number; reorder_pt: number;
+    }>(
+      `SELECT p.id, p.sku, p.name, p.category, p.status, p.price_cents,
+              COALESCE(i.stock_qty, 0) AS stock_qty, COALESCE(i.reorder_pt, 0) AS reorder_pt
+         FROM products p
+         LEFT JOIN inventory i ON i.product_id = p.id AND i.tenant_id = p.tenant_id
+        WHERE ${where.join(" AND ")}
+        ORDER BY p.name ASC
+        LIMIT @limit`,
+      params,
+    );
+    const items: InventoryLevel[] = rows.map((r) => {
+      const onHand = Number(r.stock_qty);
+      const reorderPoint = Number(r.reorder_pt);
+      return {
+        id: r.id, sku: r.sku, name: r.name, category: r.category, status: r.status,
+        priceCents: Number(r.price_cents),
+        onHand,
+        committed: 0,
+        available: onHand,
+        reorderPoint,
+        lowStock: reorderPoint > 0 && onHand <= reorderPoint,
+        costCents: null,
+        velocity: 0,
+      };
+    });
+    return { items, pageSize };
   }
 
   /**

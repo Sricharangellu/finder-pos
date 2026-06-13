@@ -69,6 +69,20 @@ export function registerRoutes(router: Router, service: InventoryService): void 
     }),
   );
 
+  // Inventory levels in the frontend's requested shape (search + filters).
+  router.get(
+    "/levels",
+    handler(async (req, res) => {
+      const q = {
+        query: typeof req.query.query === "string" ? req.query.query : undefined,
+        category: typeof req.query.category === "string" ? req.query.category : undefined,
+        status: typeof req.query.status === "string" ? req.query.status : undefined,
+        pageSize: typeof req.query.pageSize === "string" ? Number(req.query.pageSize) : undefined,
+      };
+      res.json(await service.levels(q, tenantId(res)));
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
