@@ -10,6 +10,7 @@ import { webhooksModule } from "./webhooks/index.js";
 import { teamModule } from "./team/index.js";
 import { outletsModule } from "./outlets/index.js";
 import { purchasingModule } from "./purchasing/index.js";
+import { billingModule } from "./billing/index.js";
 import { reportsModule } from "./reports/index.js";
 
 /**
@@ -28,5 +29,6 @@ export const modules: PosModule[] = [
   teamModule,
   outletsModule,
   purchasingModule,
+  billingModule,
   reportsModule,
 ];
