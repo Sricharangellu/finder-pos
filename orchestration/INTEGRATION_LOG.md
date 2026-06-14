@@ -79,3 +79,8 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** `/login/reset-password` (token-gated new-password form with strength meter, invalid-link state, success state); `/login/device-verification` ("verify it's you" prompt with mock device/location, confirm or escalate); `/login/security-alert` (flagged sign-in notice routing to password reset). Extended `/login/mfa` with a method switcher (authenticator app / email code / backup code) including a dedicated backup-code input. Added a "Security" section to `/settings` with MFA status (disabled, setup CTA), active sessions list, and login history table.
 - **Consumes:** no new backend endpoints. All flows remain UI-only/mocked pending device-trust, MFA-enrollment, session-management, and login-audit endpoints.
 - **Verified:** typecheck clean; npm test pass (83/83); test:components pass (21/21); manual `curl` 200 on all new routes plus /settings.
+
+## 2026-06-14 — Frontend cycle: FE-2
+- **Shipped:** Added Accounts Receivable and Accounts Payable cards to `/accounting`, each with an aging summary (current/1-30/31-60/61-90/90+/total) and a bills/invoices table showing status, due date, total/paid/due amounts, plus a manager-gated inline "Pay" action.
+- **Consumes:** `GET /api/v1/billing/bills`, `GET /api/v1/billing/invoices`, `GET /api/v1/reports/ap-aging`, `GET /api/v1/reports/ar-aging` (mocked), and new `POST /api/v1/billing/bills/:id/pay` / `POST /api/v1/billing/invoices/:id/pay` (mocked, stateful).
+- **Verified:** typecheck clean; npm test pass (83/83); test:components pass (21/21); manual `curl` 200 on /accounting.
