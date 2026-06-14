@@ -257,6 +257,26 @@ test("lowStock filter returns only items at/below reorder point", async () => {
   assert.ok(!json.items.some((i: any) => i.product_id === "prod_high"));
 });
 
+test("lowStock filter excludes untracked products (reorder point 0)", async () => {
+  // Regression: an untracked product (reorder_pt = 0) with 0 stock satisfies
+  // "stock_qty <= reorder_pt" (0 <= 0) and used to be flagged as low-stock,
+  // inconsistent with overview()/levels() which exclude reorder_pt = 0. A
+  // product is only "low" once it has a SET (positive) reorder point.
+  const app = await freshApp();
+  // prod_untracked: an inventory row at 0 stock with NO reorder point set.
+  // (Receive then sell back to 0 so the row exists with reorder_pt = 0.)
+  await call(app, "POST", "/api/inventory/prod_untracked/receive", { quantity: 3 });
+  await call(app, "POST", "/api/inventory/prod_untracked/adjust", { delta: -3, reason: "adjustment" });
+  // prod_tracked: genuinely low against a positive reorder point.
+  await call(app, "POST", "/api/inventory/prod_tracked/receive", { quantity: 1 });
+  await call(app, "PUT", "/api/inventory/prod_tracked/reorder-point", { reorderPt: 5 });
+
+  const { status, json } = await call(app, "GET", "/api/inventory/?lowStock=true");
+  assert.equal(status, 200);
+  assert.ok(json.items.some((i: any) => i.product_id === "prod_tracked"));
+  assert.ok(!json.items.some((i: any) => i.product_id === "prod_untracked"));
+});
+
 test("list returns Page<T> shape", async () => {
   const app = await freshApp();
   await call(app, "POST", "/api/inventory/prod_p/receive", { quantity: 1 });

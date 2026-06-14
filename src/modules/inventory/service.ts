@@ -391,7 +391,10 @@ export class InventoryService {
 
     const where: string[] = ["tenant_id = @tenantId"];
     const params: Record<string, unknown> = { tenantId };
-    if (query.lowStock) where.push("stock_qty <= reorder_pt");
+    // Low-stock means at/below a SET reorder point. A reorder point of 0 means
+    // "untracked" (consistent with overview() and levels()), so those products
+    // are excluded rather than flagging every zero-stock untracked item as low.
+    if (query.lowStock) where.push("reorder_pt > 0 AND stock_qty <= reorder_pt");
     const whereSql = `WHERE ${where.join(" AND ")}`;
 
     const totalRow = await this.db.one<{ n: number }>(
