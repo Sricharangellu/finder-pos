@@ -198,6 +198,47 @@ export const lightspeedHandlers = [
       items: peak.map((rev, hour) => ({ hour, label: fmt(hour), orderCount: Math.round(rev / 8), revenueCents: rev * 100, value: Math.round((rev / max) * 100) })),
     });
   }),
+  // ── ERP reports: AR/AP aging, sales-by-X, valuation ───────────────────────
+  http.get(`${V1}/reports/ar-aging`, async () => {
+    await lat();
+    return HttpResponse.json({
+      totals: { current: 120000, d1_30: 45000, d31_60: 18000, d61_90: 9000, d90_plus: 5000, total: 197000 },
+      parties: [
+        { partyId: "cus_demo_1", buckets: { current: 80000, d1_30: 20000, d31_60: 0, d61_90: 0, d90_plus: 5000, total: 105000 } },
+        { partyId: "cus_demo_2", buckets: { current: 40000, d1_30: 25000, d31_60: 18000, d61_90: 9000, d90_plus: 0, total: 92000 } },
+      ],
+    });
+  }),
+  http.get(`${V1}/reports/ap-aging`, async () => {
+    await lat();
+    return HttpResponse.json({
+      totals: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 },
+      parties: [{ partyId: "sup_demo_1", buckets: { current: 60000, d1_30: 22000, d31_60: 0, d61_90: 0, d90_plus: 0, total: 82000 } }],
+    });
+  }),
+  http.get(`${V1}/reports/sales-by-category`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { key: "Beverages", name: "Beverages", units: 320, revenueCents: 480000 },
+      { key: "Snacks", name: "Snacks", units: 540, revenueCents: 270000 },
+      { key: "Tobacco", name: "Tobacco", units: 110, revenueCents: 198000 },
+    ] });
+  }),
+  http.get(`${V1}/reports/sales-by-customer`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { key: "cus_demo_1", name: "Ada Lovelace", units: 18, revenueCents: 410000 },
+      { key: "cus_demo_2", name: "Grace Hopper", units: 12, revenueCents: 286000 },
+    ] });
+  }),
+  http.get(`${V1}/reports/inventory-valuation`, async () => {
+    await lat();
+    const rows = [
+      { productId: "prod_demo_a", name: "Apple", stockQty: 95, costCents: 600, retailCents: 1000, costValueCents: 57000, retailValueCents: 95000 },
+      { productId: "prod_demo_b", name: "Chips", stockQty: 90, costCents: 300, retailCents: 500, costValueCents: 27000, retailValueCents: 45000 },
+    ];
+    return HttpResponse.json({ rows, totalCostCents: 84000, totalRetailCents: 140000 });
+  }),
 
   // ── Outlets + registers (store/register selector) ─────────────────────────
   http.get(`${V1}/outlets`, async () => {

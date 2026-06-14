@@ -142,6 +142,16 @@ ERP benchmark #8. Tenant-scoped.
 - Verified live: invoice (linked to order) → SHP-00001 with 2 lines → pack → ship (UPS/1Z999) → deliver → guards. MSW mocks added.
 - Suggested UI: Shipping list (from invoices, no Create button per benchmark) + detail with Mark Shipped / Mark Delivered / Print Packing Slip.
 
+## Reports build-out (Wave E) — LIVE
+ERP benchmark #10 — new read-only reports over existing data (reports owns no tables).
+- `GET /api/v1/reports/ar-aging` → Accounts Receivable aging: `{ totals, parties:[{partyId(customerId), buckets}] }` with buckets `current / d1_30 / d31_60 / d61_90 / d90_plus / total` (from open invoice balances vs due_date).
+- `GET /api/v1/reports/ap-aging` → Accounts Payable aging, same shape from supplier bill balances.
+- `GET /api/v1/reports/sales-by-category?range=today|7d|30d|all` → `{ items:[{key, name, units, revenueCents}] }` (completed orders × product category).
+- `GET /api/v1/reports/sales-by-customer?range=…` → revenue + order count per customer.
+- `GET /api/v1/reports/inventory-valuation` → `{ rows:[{productId, name, stockQty, costCents, retailCents, costValueCents, retailValueCents}], totalCostCents, totalRetailCents }` (on-hand × cost/price).
+- Existing: `/summary`, `/top-products`, `/hourly` (all take `?range=`). Verified live: AR aging bucketed a 90+ day balance; sales-by-category split Beverages/Snacks; valuation reflected depleted stock. MSW mocks added with representative figures.
+- Still missing from #10's 60+: per-rep/vendor/product pivots, P&L, tax/MSA — incremental follow-ups.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 

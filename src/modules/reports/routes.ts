@@ -49,4 +49,29 @@ export function registerRoutes(router: Router, service: ReportsService): void {
       res.json({ items: await service.hourly(tenantId(res), sinceFromRange(req)) });
     }),
   );
+
+  // GET /api/v1/reports/ar-aging — Accounts Receivable aging buckets.
+  router.get("/ar-aging", handler(async (_req, res) => {
+    res.json(await service.arAging(tenantId(res)));
+  }));
+
+  // GET /api/v1/reports/ap-aging — Accounts Payable aging buckets.
+  router.get("/ap-aging", handler(async (_req, res) => {
+    res.json(await service.apAging(tenantId(res)));
+  }));
+
+  // GET /api/v1/reports/sales-by-category?range=…
+  router.get("/sales-by-category", handler(async (req, res) => {
+    res.json({ items: await service.salesByCategory(tenantId(res), sinceFromRange(req)) });
+  }));
+
+  // GET /api/v1/reports/sales-by-customer?range=…
+  router.get("/sales-by-customer", handler(async (req, res) => {
+    res.json({ items: await service.salesByCustomer(tenantId(res), sinceFromRange(req)) });
+  }));
+
+  // GET /api/v1/reports/inventory-valuation — on-hand value at cost and retail.
+  router.get("/inventory-valuation", handler(async (_req, res) => {
+    res.json(await service.inventoryValuation(tenantId(res)));
+  }));
 }

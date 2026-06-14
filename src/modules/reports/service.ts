@@ -32,6 +32,61 @@ function hourLabel(h: number): string {
   return `${display} ${period}`;
 }
 
+export interface AgingBuckets {
+  current: number;
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  d90_plus: number;
+  total: number;
+}
+
+export interface AgingRow {
+  partyId: string; // customer_id (AR) or supplier_id (AP)
+  buckets: AgingBuckets;
+}
+
+export interface AgingReport {
+  totals: AgingBuckets;
+  parties: AgingRow[];
+}
+
+export interface SalesByGroup {
+  key: string;
+  name: string;
+  units: number;
+  revenueCents: number;
+}
+
+export interface ValuationRow {
+  productId: string;
+  name: string;
+  stockQty: number;
+  costCents: number;
+  retailCents: number;
+  costValueCents: number;
+  retailValueCents: number;
+}
+
+export interface Valuation {
+  rows: ValuationRow[];
+  totalCostCents: number;
+  totalRetailCents: number;
+}
+
+const emptyBuckets = (): AgingBuckets => ({ current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, total: 0 });
+
+/** Place an outstanding balance into an aging bucket by days overdue. */
+function addToBucket(b: AgingBuckets, balance: number, dueDate: number | null, now: number): void {
+  const daysOverdue = dueDate ? Math.floor((now - dueDate) / 86_400_000) : 0;
+  if (daysOverdue <= 0) b.current += balance;
+  else if (daysOverdue <= 30) b.d1_30 += balance;
+  else if (daysOverdue <= 60) b.d31_60 += balance;
+  else if (daysOverdue <= 90) b.d61_90 += balance;
+  else b.d90_plus += balance;
+  b.total += balance;
+}
+
 export class ReportsService {
   constructor(private readonly db: DB) {}
 
@@ -132,5 +187,94 @@ export class ReportsService {
         value: max > 0 ? Math.round((b.revenue / max) * 100) : 0,
       };
     });
+  }
+
+  /** Accounts Receivable aging — open invoice balances bucketed by days overdue. */
+  async arAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
+    const rows = await this.db.query<{ customer_id: string; balance: number; due_date: number | null }>(
+      `SELECT customer_id, (total_cents - paid_cents) AS balance, due_date
+         FROM invoices
+        WHERE tenant_id = @t AND status <> 'void' AND (total_cents - paid_cents) > 0`,
+      { t: tenantId },
+    );
+    return this.buildAging(rows.map((r) => ({ partyId: r.customer_id, balance: Number(r.balance), dueDate: r.due_date })), now);
+  }
+
+  /** Accounts Payable aging — open supplier bill balances bucketed by days overdue. */
+  async apAging(tenantId: string, now = Date.now()): Promise<AgingReport> {
+    const rows = await this.db.query<{ supplier_id: string; balance: number; due_date: number | null }>(
+      `SELECT supplier_id, (total_cents - paid_cents) AS balance, due_date
+         FROM bills
+        WHERE tenant_id = @t AND status <> 'void' AND (total_cents - paid_cents) > 0`,
+      { t: tenantId },
+    );
+    return this.buildAging(rows.map((r) => ({ partyId: r.supplier_id, balance: Number(r.balance), dueDate: r.due_date })), now);
+  }
+
+  private buildAging(rows: Array<{ partyId: string; balance: number; dueDate: number | null }>, now: number): AgingReport {
+    const totals = emptyBuckets();
+    const byParty = new Map<string, AgingBuckets>();
+    for (const r of rows) {
+      if (!byParty.has(r.partyId)) byParty.set(r.partyId, emptyBuckets());
+      addToBucket(byParty.get(r.partyId)!, r.balance, r.dueDate, now);
+      addToBucket(totals, r.balance, r.dueDate, now);
+    }
+    return { totals, parties: Array.from(byParty, ([partyId, buckets]) => ({ partyId, buckets })).sort((a, b) => b.buckets.total - a.buckets.total) };
+  }
+
+  /** Revenue + units grouped by product category (completed orders in window). */
+  async salesByCategory(tenantId: string, sinceMs?: number): Promise<SalesByGroup[]> {
+    const since = sinceMs ?? 0;
+    const rows = await this.db.query<{ key: string; units: number; revenue: number }>(
+      `SELECT COALESCE(p.category, 'Uncategorized') AS key,
+              SUM(ol.quantity)::int AS units, SUM(ol.line_cents) AS revenue
+         FROM order_lines ol
+         JOIN orders o ON o.id = ol.order_id AND o.tenant_id = ol.tenant_id
+         LEFT JOIN products p ON p.id = ol.product_id AND p.tenant_id = ol.tenant_id
+        WHERE ol.tenant_id = @t AND o.status = 'completed' AND o.created_at >= @since
+        GROUP BY key ORDER BY revenue DESC`,
+      { t: tenantId, since },
+    );
+    return rows.map((r) => ({ key: r.key, name: r.key, units: Number(r.units), revenueCents: Number(r.revenue) }));
+  }
+
+  /** Revenue + order units grouped by customer (completed orders in window). */
+  async salesByCustomer(tenantId: string, sinceMs?: number): Promise<SalesByGroup[]> {
+    const since = sinceMs ?? 0;
+    const rows = await this.db.query<{ key: string; name: string; units: number; revenue: number }>(
+      `SELECT o.customer_id AS key, COALESCE(MAX(c.name), 'Walk-in') AS name,
+              COUNT(*)::int AS units, SUM(o.total_cents) AS revenue
+         FROM orders o
+         LEFT JOIN customers c ON c.id = o.customer_id AND c.tenant_id = o.tenant_id
+        WHERE o.tenant_id = @t AND o.status = 'completed' AND o.created_at >= @since AND o.customer_id IS NOT NULL
+        GROUP BY o.customer_id ORDER BY revenue DESC`,
+      { t: tenantId, since },
+    );
+    return rows.map((r) => ({ key: r.key, name: r.name, units: Number(r.units), revenueCents: Number(r.revenue) }));
+  }
+
+  /** Inventory valuation at cost and retail (on-hand qty × cost / price). */
+  async inventoryValuation(tenantId: string): Promise<Valuation> {
+    const rows = await this.db.query<{ product_id: string; name: string; stock_qty: number; cost_cents: number | null; price_cents: number | null }>(
+      `SELECT i.product_id, COALESCE(p.name, i.product_id) AS name, i.stock_qty,
+              pc.cost_cents, p.price_cents
+         FROM inventory i
+         LEFT JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
+         LEFT JOIN product_costs pc ON pc.product_id = i.product_id AND pc.tenant_id = i.tenant_id
+        WHERE i.tenant_id = @t AND i.stock_qty > 0
+        ORDER BY i.stock_qty DESC`,
+      { t: tenantId },
+    );
+    let totalCost = 0, totalRetail = 0;
+    const out: ValuationRow[] = rows.map((r) => {
+      const qty = Number(r.stock_qty);
+      const cost = Number(r.cost_cents ?? 0);
+      const retail = Number(r.price_cents ?? 0);
+      const costValue = cost * qty;
+      const retailValue = retail * qty;
+      totalCost += costValue; totalRetail += retailValue;
+      return { productId: r.product_id, name: r.name, stockQty: qty, costCents: cost, retailCents: retail, costValueCents: costValue, retailValueCents: retailValue };
+    });
+    return { rows: out, totalCostCents: totalCost, totalRetailCents: totalRetail };
   }
 }
