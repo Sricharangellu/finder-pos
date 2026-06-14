@@ -124,7 +124,19 @@ export class SalesService {
     return tier >= 1 && tier <= 5 ? tier : 5;
   }
 
-  /** Resolve catalog prices, apply tier discount, and compute line totals. */
+  /** Resolve a unit price for (product, tier): an explicit per-product tier
+   *  price wins; otherwise the list price minus the tier discount schedule. */
+  private async tierPrice(productId: string, tier: number, basePrice: number, tenantId: string): Promise<{ unit: number; discounted: boolean }> {
+    const row = await this.db.one<{ price_cents: number }>(
+      "SELECT price_cents FROM product_tier_prices WHERE tenant_id = @t AND product_id = @p AND tier = @tier",
+      { t: tenantId, p: productId, tier },
+    );
+    if (row) return { unit: Number(row.price_cents), discounted: false };
+    return { unit: basePrice, discounted: true };
+  }
+
+  /** Resolve catalog prices, apply tier pricing, and compute line totals.
+   *  Discount reported = list-vs-charged delta (from the tier schedule fallback). */
   private async resolveLines(lines: LineInput[], tier: number, tenantId: string): Promise<{ resolved: ResolvedLine[]; subtotal: number; discount: number }> {
     if (lines.length === 0) throw badRequest("at least one line is required");
     const pct = TIER_DISCOUNT_PCT[tier] ?? 0;
@@ -138,15 +150,57 @@ export class SalesService {
         { p: l.productId, t: tenantId },
       );
       if (!p) throw notFound(`product '${l.productId}' not found`);
-      const baseUnit = l.unitCents ?? Number(p.price_cents);
-      const grossLine = baseUnit * l.quantity;
-      const lineDiscount = Math.round((grossLine * pct) / 100);
-      const netLine = grossLine - lineDiscount;
+      const listUnit = Number(p.price_cents);
+      // Explicit override on the line always wins; else resolve tier pricing.
+      let chargedUnit: number;
+      let applyScheduleDiscount = false;
+      if (l.unitCents !== undefined) {
+        chargedUnit = l.unitCents;
+      } else {
+        const tp = await this.tierPrice(l.productId, tier, listUnit, tenantId);
+        chargedUnit = tp.unit;
+        applyScheduleDiscount = tp.discounted;
+      }
+      const grossLine = listUnit * l.quantity;
+      let netLine: number;
+      let lineDiscount: number;
+      if (applyScheduleDiscount) {
+        lineDiscount = Math.round((chargedUnit * l.quantity * pct) / 100);
+        netLine = chargedUnit * l.quantity - lineDiscount;
+      } else {
+        netLine = chargedUnit * l.quantity;
+        lineDiscount = Math.max(0, grossLine - netLine);
+      }
       subtotal += grossLine;
       discount += lineDiscount;
-      resolved.push({ product_id: l.productId, name: p.name, quantity: l.quantity, unit_cents: baseUnit, line_cents: netLine });
+      resolved.push({ product_id: l.productId, name: p.name, quantity: l.quantity, unit_cents: chargedUnit, line_cents: netLine });
     }
     return { resolved, subtotal, discount };
+  }
+
+  // ── Per-product tier prices (Wave B) ─────────────────────────────────────
+  async setTierPrices(productId: string, prices: Record<number, number>, tenantId: string): Promise<{ productId: string; prices: Array<{ tier: number; priceCents: number }> }> {
+    const now = Date.now();
+    for (const [tierStr, price] of Object.entries(prices)) {
+      const tier = Number(tierStr);
+      if (tier < 1 || tier > 5) throw badRequest("tier must be 1–5");
+      if (price < 0) throw badRequest("price must be non-negative");
+      await this.db.query(
+        `INSERT INTO product_tier_prices (tenant_id, product_id, tier, price_cents, updated_at)
+         VALUES (@t,@p,@tier,@price,@now)
+         ON CONFLICT (tenant_id, product_id, tier) DO UPDATE SET price_cents = EXCLUDED.price_cents, updated_at = EXCLUDED.updated_at`,
+        { t: tenantId, p: productId, tier, price, now },
+      );
+    }
+    return this.getTierPrices(productId, tenantId);
+  }
+
+  async getTierPrices(productId: string, tenantId: string): Promise<{ productId: string; prices: Array<{ tier: number; priceCents: number }> }> {
+    const rows = await this.db.query<{ tier: number; price_cents: number }>(
+      "SELECT tier, price_cents FROM product_tier_prices WHERE tenant_id = @t AND product_id = @p ORDER BY tier",
+      { t: tenantId, p: productId },
+    );
+    return { productId, prices: rows.map((r) => ({ tier: Number(r.tier), priceCents: Number(r.price_cents) })) };
   }
 
   private async insertLines(table: string, parentCol: string, parentId: string, lines: ResolvedLine[], tenantId: string, tdb: DB): Promise<SalesLine[]> {

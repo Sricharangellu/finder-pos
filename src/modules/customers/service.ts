@@ -13,6 +13,19 @@ export interface Customer {
   email: string | null;
   phone: string | null;
   points: number;
+  tier: number;
+  company: string | null;
+  dba: string | null;
+  tax_id: string | null;
+  license_no: string | null;
+  state: string | null;
+  billing_address: string | null;
+  shipping_address: string | null;
+  sales_rep_id: string | null;
+  store_credit_cents: number;
+  excess_cents: number;
+  status: string;
+  verified: number;
   created_at: number;
   updated_at: number;
 }
@@ -21,6 +34,32 @@ export interface CreateCustomerInput {
   name: string;
   email?: string | null;
   phone?: string | null;
+}
+
+/** Editable customer profile fields (Wave B). */
+export interface UpdateCustomerInput {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  tier?: number;
+  company?: string | null;
+  dba?: string | null;
+  taxId?: string | null;
+  licenseNo?: string | null;
+  state?: string | null;
+  billingAddress?: string | null;
+  shippingAddress?: string | null;
+  salesRepId?: string | null;
+  status?: string;
+  verified?: boolean;
+}
+
+export interface CustomerFinancials {
+  customerId: string;
+  dueCents: number;        // open AR balance across invoices
+  excessCents: number;     // overpayment credit on account
+  storeCreditCents: number;
+  openInvoices: number;
 }
 
 export interface CustomerSummary {
@@ -44,23 +83,15 @@ export class CustomersService {
 
   async create(input: CreateCustomerInput, tenantId: string): Promise<Customer> {
     const now = Date.now();
-    const row: Customer = {
-      id: `cus_${uuidv7()}`,
-      tenant_id: tenantId,
-      name: input.name,
-      email: input.email ?? null,
-      phone: input.phone ?? null,
-      points: 0,
-      created_at: now,
-      updated_at: now,
-    };
+    const id = `cus_${uuidv7()}`;
     await this.db.query(
       `INSERT INTO customers (id, tenant_id, name, email, phone, points, created_at, updated_at)
-       VALUES (@id, @tenant_id, @name, @email, @phone, @points, @created_at, @updated_at)`,
-      row as unknown as Record<string, unknown>,
+       VALUES (@id, @tenant_id, @name, @email, @phone, 0, @created_at, @updated_at)`,
+      { id, tenant_id: tenantId, name: input.name, email: input.email ?? null, phone: input.phone ?? null, created_at: now, updated_at: now },
     );
-    await this.events.publish("customer.created", { id: row.id, tenantId }, row.id);
-    return row;
+    await this.events.publish("customer.created", { id, tenantId }, id);
+    // Re-read so default-backed profile columns (tier, credit, status, …) are populated.
+    return (await this.get(id, tenantId))!;
   }
 
   async get(id: string, tenantId: string): Promise<Customer | undefined> {
@@ -75,6 +106,46 @@ export class CustomersService {
       "SELECT * FROM customers WHERE tenant_id = @tenantId ORDER BY created_at DESC LIMIT 200",
       { tenantId },
     );
+  }
+
+  /** Update editable profile fields. Only provided keys change. */
+  async update(id: string, patch: UpdateCustomerInput, tenantId: string): Promise<Customer> {
+    const current = await this.get(id, tenantId);
+    if (!current) throw new HttpError(404, "not_found", `customer '${id}' not found`);
+    if (patch.tier !== undefined && (patch.tier < 1 || patch.tier > 5)) throw new HttpError(400, "bad_request", "tier must be 1–5");
+    const map: Record<string, unknown> = {
+      name: patch.name, email: patch.email, phone: patch.phone, tier: patch.tier,
+      company: patch.company, dba: patch.dba, tax_id: patch.taxId, license_no: patch.licenseNo,
+      state: patch.state, billing_address: patch.billingAddress, shipping_address: patch.shippingAddress,
+      sales_rep_id: patch.salesRepId, status: patch.status,
+      verified: patch.verified === undefined ? undefined : patch.verified ? 1 : 0,
+    };
+    const sets: string[] = [];
+    const params: Record<string, unknown> = { id, tenantId, now: Date.now() };
+    for (const [col, val] of Object.entries(map)) {
+      if (val !== undefined) { sets.push(`${col} = @${col}`); params[col] = val; }
+    }
+    if (sets.length === 0) return current;
+    await this.db.query(`UPDATE customers SET ${sets.join(", ")}, updated_at = @now WHERE id = @id AND tenant_id = @tenantId`, params);
+    return (await this.get(id, tenantId))!;
+  }
+
+  /** Financial summary: open AR due from invoices + on-account credit columns. */
+  async financials(id: string, tenantId: string): Promise<CustomerFinancials> {
+    const c = await this.get(id, tenantId);
+    if (!c) throw new HttpError(404, "not_found", `customer '${id}' not found`);
+    const row = await this.db.one<{ due: number; n: number }>(
+      `SELECT COALESCE(SUM(total_cents - paid_cents), 0) AS due, COUNT(*)::int AS n
+         FROM invoices WHERE tenant_id = @t AND customer_id = @c AND status <> 'void' AND (total_cents - paid_cents) > 0`,
+      { t: tenantId, c: id },
+    );
+    return {
+      customerId: id,
+      dueCents: Number(row?.due ?? 0),
+      excessCents: Number(c.excess_cents ?? 0),
+      storeCreditCents: Number(c.store_credit_cents ?? 0),
+      openInvoices: Number(row?.n ?? 0),
+    };
   }
 
   /** Add points to a customer (idempotency is the caller's concern). */

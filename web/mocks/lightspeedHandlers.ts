@@ -28,6 +28,7 @@ let salesOrders: any[] = [];
 const soLines = new Map<string, any[]>();
 let qtSeq = 0, soSeq = 0;
 const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
+const tierPrices = new Map<string, Array<{ tier: number; priceCents: number }>>();
 // Shipping dev stores
 let shipments: any[] = [];
 const shipLines = new Map<string, any[]>();
@@ -282,9 +283,38 @@ export const lightspeedHandlers = [
     await lat();
     const b = (await request.json()) as { name?: string; email?: string; phone?: string };
     if (!b.name) return HttpResponse.json({ error: { code: "VALIDATION_ERROR", message: "name required", requestId: rid() } }, { status: 400 });
-    const c = { id: `cus_${Math.random().toString(36).slice(2, 12)}`, tenant_id: "tnt_demo", name: b.name, email: b.email ?? null, phone: b.phone ?? null, points: 0, created_at: Date.now() };
+    const c = { id: `cus_${Math.random().toString(36).slice(2, 12)}`, tenant_id: "tnt_demo", name: b.name, email: b.email ?? null, phone: b.phone ?? null, points: 0, tier: 5, company: null, dba: null, tax_id: null, license_no: null, state: null, billing_address: null, shipping_address: null, sales_rep_id: null, store_credit_cents: 0, excess_cents: 0, status: "active", verified: 0, created_at: Date.now(), updated_at: Date.now() };
     customers.set(c.id, c);
     return HttpResponse.json(c, { status: 201 });
+  }),
+  http.patch(`${V1}/customers/:id`, async ({ params, request }) => {
+    await lat();
+    const c = customers.get(String(params.id));
+    if (!c) return HttpResponse.json({ error: { code: "not_found", message: "customer not found", requestId: rid() } }, { status: 404 });
+    const b = (await request.json()) as any;
+    const colMap: Record<string, string> = { taxId: "tax_id", licenseNo: "license_no", billingAddress: "billing_address", shippingAddress: "shipping_address", salesRepId: "sales_rep_id" };
+    for (const [k, v] of Object.entries(b)) {
+      if (k === "verified") { (c as any).verified = v ? 1 : 0; continue; }
+      (c as any)[colMap[k] ?? k] = v;
+    }
+    c.updated_at = Date.now();
+    return HttpResponse.json(c);
+  }),
+  http.get(`${V1}/customers/:id/financials`, async ({ params }) => {
+    await lat();
+    const c = customers.get(String(params.id));
+    return HttpResponse.json({ customerId: String(params.id), dueCents: 12500, excessCents: c?.excess_cents ?? 0, storeCreditCents: c?.store_credit_cents ?? 0, openInvoices: 2 });
+  }),
+  http.get(`${V1}/sales/products/:productId/tier-prices`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ productId: String(params.productId), prices: tierPrices.get(String(params.productId)) ?? [] });
+  }),
+  http.put(`${V1}/sales/products/:productId/tier-prices`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as { prices: Record<string, number> };
+    const list = Object.entries(b.prices).map(([tier, priceCents]) => ({ tier: Number(tier), priceCents })).sort((a, b2) => a.tier - b2.tier);
+    tierPrices.set(String(params.productId), list);
+    return HttpResponse.json({ productId: String(params.productId), prices: list });
   }),
   http.get(`${V1}/customers/:id/summary`, async ({ params }) => {
     await lat();

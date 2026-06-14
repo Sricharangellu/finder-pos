@@ -32,6 +32,9 @@ const soSchema = z.object({
 });
 
 const assignSchema = z.object({ pickerId: z.string().min(1) });
+const tierPricesSchema = z.object({
+  prices: z.record(z.string(), z.number().int().nonnegative()),
+});
 
 export function registerRoutes(router: Router, service: SalesService): void {
   // ── Quotations ─────────────────────────────────────────────────────────
@@ -86,5 +89,16 @@ export function registerRoutes(router: Router, service: SalesService): void {
   }));
   router.post("/sales-orders/:id/cancel", handler(async (req, res) => {
     res.json(await service.cancelSalesOrder(String(req.params.id), tenantId(res)));
+  }));
+
+  // ── Per-product tier prices ──────────────────────────────────────────────
+  router.get("/products/:productId/tier-prices", handler(async (req, res) => {
+    res.json(await service.getTierPrices(String(req.params.productId), tenantId(res)));
+  }));
+  router.put("/products/:productId/tier-prices", handler(async (req, res) => {
+    const b = parseBody(tierPricesSchema, req.body);
+    const prices: Record<number, number> = {};
+    for (const [k, v] of Object.entries(b.prices)) prices[Number(k)] = v;
+    res.json(await service.setTierPrices(String(req.params.productId), prices, tenantId(res)));
   }));
 }

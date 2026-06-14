@@ -152,6 +152,13 @@ ERP benchmark #10 — new read-only reports over existing data (reports owns no 
 - Existing: `/summary`, `/top-products`, `/hourly` (all take `?range=`). Verified live: AR aging bucketed a 90+ day balance; sales-by-category split Beverages/Snacks; valuation reflected depleted stock. MSW mocks added with representative figures.
 - Still missing from #10's 60+: per-rep/vendor/product pivots, P&L, tax/MSA — incremental follow-ups.
 
+## Customer depth + per-product tier prices (Wave B) — LIVE
+ERP benchmark #6 + real tier pricing for the sales module.
+- **Customer profile:** `customers` gains `tier`(1–5), `company`, `dba`, `tax_id`, `license_no`, `state`, `billing_address`, `shipping_address`, `sales_rep_id`, `store_credit_cents`, `excess_cents`, `status`, `verified` (idempotent ALTERs). `PATCH /api/v1/customers/:id {name?,email?,phone?,tier?,company?,dba?,taxId?,licenseNo?,state?,billingAddress?,shippingAddress?,salesRepId?,status?,verified?}` — partial update; tier validated 1–5.
+- **Financial summary:** `GET /api/v1/customers/:id/financials` → `{ dueCents (open AR from invoices), excessCents, storeCreditCents, openInvoices }`.
+- **Per-product tier prices:** `PUT /api/v1/sales/products/:productId/tier-prices {prices:{ "1":800, "2":850, … }}` and `GET …/tier-prices`. When an explicit (product,tier) price exists the sales module charges it directly; otherwise it falls back to the tier **discount schedule** (10/7.5/5/2.5/0%) on list price. Quotes/SOs now report `subtotal` at list, `discount` = list−charged, `total` = charged.
+- Verified live: PATCH tier→2 + profile; tier prices set; a tier-2 quote used the explicit price for one line and the schedule for another (total 3550 on 4000 list); financials due computed from invoices.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 

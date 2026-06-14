@@ -76,10 +76,23 @@ CREATE INDEX IF NOT EXISTS so_lines_parent_idx ON sales_order_lines (tenant_id, 
 // tier-aware pricing without a hard dependency on the customers module's DDL.
 const ADD_CUSTOMER_TIER = `ALTER TABLE customers ADD COLUMN IF NOT EXISTS tier INTEGER NOT NULL DEFAULT 5;`;
 
+// Wave B — explicit per-product tier prices. When a row exists for
+// (product, tier) it is used directly; otherwise sales falls back to the
+// tier discount schedule on the product's base price.
+const CREATE_TIER_PRICES = `
+CREATE TABLE IF NOT EXISTS product_tier_prices (
+  tenant_id  TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  tier       INTEGER NOT NULL,
+  price_cents BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  PRIMARY KEY (tenant_id, product_id, tier)
+);`;
+
 /** Sales — quotations + sales orders (B2B order-to-cash front half). */
 export const salesModule: PosModule = {
   name: "sales",
-  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_CUSTOMER_TIER],
+  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES],
   register({ db, events, router }) {
     registerRoutes(router, new SalesService(db, events));
   },

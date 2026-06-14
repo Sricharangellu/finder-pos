@@ -20,6 +20,23 @@ CREATE INDEX IF NOT EXISTS customers_tenant_created_idx ON customers (tenant_id,
 CREATE INDEX IF NOT EXISTS customers_tenant_email_idx ON customers (tenant_id, email);
 `;
 
+// Wave B — B2B customer profile + financial fields (idempotent ALTERs).
+const ADD_PROFILE_COLUMNS = `
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS tier INTEGER NOT NULL DEFAULT 5;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS company TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS dba TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS tax_id TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS license_no TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS billing_address TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS shipping_address TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS sales_rep_id TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS store_credit_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS excess_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS verified INTEGER NOT NULL DEFAULT 0;
+`;
+
 /**
  * Customers + loyalty. Tenant-scoped. Reacts to `payment.captured`: looks up the
  * paid order's customer and awards loyalty points ($1 net spent = 1 point).
@@ -27,7 +44,7 @@ CREATE INDEX IF NOT EXISTS customers_tenant_email_idx ON customers (tenant_id, e
  */
 export const customersModule: PosModule = {
   name: "customers",
-  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES],
+  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS],
   async register({ db, events, router }) {
     const service = new CustomersService(db, events);
 

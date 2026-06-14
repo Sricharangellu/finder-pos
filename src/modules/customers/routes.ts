@@ -18,6 +18,23 @@ const redeemSchema = z.object({
   points: z.number().int().positive(),
 });
 
+const updateSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().min(1).nullable().optional(),
+  tier: z.number().int().min(1).max(5).optional(),
+  company: z.string().nullable().optional(),
+  dba: z.string().nullable().optional(),
+  taxId: z.string().nullable().optional(),
+  licenseNo: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  billingAddress: z.string().nullable().optional(),
+  shippingAddress: z.string().nullable().optional(),
+  salesRepId: z.string().nullable().optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+  verified: z.boolean().optional(),
+});
+
 export function registerRoutes(router: Router, service: CustomersService): void {
   router.post(
     "/",
@@ -44,10 +61,25 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     }),
   );
 
+  router.patch(
+    "/:id",
+    handler(async (req, res) => {
+      const body = parseBody(updateSchema, req.body);
+      res.json(await service.update(String(req.params.id), body, tenantId(res)));
+    }),
+  );
+
   router.get(
     "/:id/summary",
     handler(async (req, res) => {
       res.json(await service.summary(String(req.params.id), tenantId(res)));
+    }),
+  );
+
+  router.get(
+    "/:id/financials",
+    handler(async (req, res) => {
+      res.json(await service.financials(String(req.params.id), tenantId(res)));
     }),
   );
 
