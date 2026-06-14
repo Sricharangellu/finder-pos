@@ -133,6 +133,15 @@ ERP benchmark #9. Tenant-scoped, cents.
 - Verified live: seed 14 → tree/type filter → deposit DEP-00001 summing 2 payments to $50.00 → approve → re-approve guarded. MSW mocks added.
 - Suggested UI: Settings→COA tree editor; Accounting→Batch Deposit list + create (multi-select pending payments) + approve/reject (role-gate to Super Admin on the frontend).
 
+## Shipping — shipping orders from invoices (Wave D) — LIVE
+ERP benchmark #8. Tenant-scoped.
+- **Create from invoice:** `POST /api/v1/shipping {invoiceId, method?:delivery|pickup, expectedDate?, notes?, lines?}` → creates a shipping order; lines resolved from `lines[]` if given, else from the invoice's linked order's `order_lines`. **Idempotent per invoice** (re-POST returns the existing order). Numbered SHP-#####.
+- `GET /shipping[?status]`, `GET /shipping/:id` (with lines).
+- **Packing slip:** `POST /shipping/:id/lines/:lineId/pack` flips a line `packed=1`.
+- **Fulfillment:** `POST /shipping/:id/ship {carrier?, trackingNumber?, shippedDate?}` (pending_shipment→shipped) · `POST /shipping/:id/deliver` (shipped→delivered, stamps delivered_date; 409 if not shipped) · `POST /shipping/:id/cancel` (409 once delivered). Statuses: pending_shipment|shipped|delivered|cancelled.
+- Verified live: invoice (linked to order) → SHP-00001 with 2 lines → pack → ship (UPS/1Z999) → deliver → guards. MSW mocks added.
+- Suggested UI: Shipping list (from invoices, no Create button per benchmark) + detail with Mark Shipped / Mark Delivered / Print Packing Slip.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 

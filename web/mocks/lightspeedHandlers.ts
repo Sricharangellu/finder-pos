@@ -28,6 +28,10 @@ let salesOrders: any[] = [];
 const soLines = new Map<string, any[]>();
 let qtSeq = 0, soSeq = 0;
 const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
+// Shipping dev stores
+let shipments: any[] = [];
+const shipLines = new Map<string, any[]>();
+let shpSeq = 0;
 // Accounting dev stores
 let accounts: any[] = [];
 let deposits: any[] = [];
@@ -580,5 +584,65 @@ lightspeedHandlers.push(
     if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
     if (d.status !== "pending_approval") return HttpResponse.json({ error: { code: "conflict", message: `batch deposit is already ${d.status}`, requestId: rid() } }, { status: 409 });
     d.status = "rejected"; d.decided_at = Date.now(); return HttpResponse.json(d);
+  }),
+);
+
+// ── Shipping mock handlers (shipping orders from invoices) ──────────────────
+lightspeedHandlers.push(
+  http.post(`${V1}/shipping`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    let so = shipments.find((s) => s.invoice_id === b.invoiceId);
+    if (so) return HttpResponse.json({ ...so, lines: shipLines.get(so.id) ?? [] }, { status: 201 });
+    const id = `shp_${Math.random().toString(36).slice(2, 12)}`;
+    const lines = (b.lines ?? [{ productId: "prod_demo_a", name: "Item", quantity: 1 }]).map((l: any) => ({ id: `shl_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", shipping_order_id: id, product_id: l.productId, name: l.name ?? "Item", quantity: l.quantity, packed: 0 }));
+    const now = Date.now();
+    so = { id, tenant_id: "tnt_demo", ship_number: `SHP-${String(++shpSeq).padStart(5, "0")}`, invoice_id: b.invoiceId, customer_id: "cus_demo_1", status: "pending_shipment", method: b.method ?? "delivery", carrier: null, tracking_number: null, expected_date: b.expectedDate ?? null, shipped_date: null, delivered_date: null, notes: b.notes ?? null, created_at: now, updated_at: now };
+    shipments.push(so); shipLines.set(id, lines);
+    return HttpResponse.json({ ...so, lines }, { status: 201 });
+  }),
+  http.get(`${V1}/shipping`, async ({ request }) => {
+    await lat();
+    const status = new URL(request.url).searchParams.get("status");
+    let items = [...shipments].sort((a, b) => b.created_at - a.created_at);
+    if (status) items = items.filter((s) => s.status === status);
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${V1}/shipping/:id`, async ({ params }) => {
+    await lat();
+    const so = shipments.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "shipping order not found", requestId: rid() } }, { status: 404 });
+    return HttpResponse.json({ ...so, lines: shipLines.get(so.id) ?? [] });
+  }),
+  http.post(`${V1}/shipping/:id/lines/:lineId/pack`, async ({ params }) => {
+    await lat();
+    const so = shipments.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "shipping order not found", requestId: rid() } }, { status: 404 });
+    const line = (shipLines.get(so.id) ?? []).find((l) => l.id === String(params.lineId));
+    if (line) line.packed = 1;
+    return HttpResponse.json({ ...so, lines: shipLines.get(so.id) ?? [] });
+  }),
+  http.post(`${V1}/shipping/:id/ship`, async ({ params, request }) => {
+    await lat();
+    const so = shipments.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "shipping order not found", requestId: rid() } }, { status: 404 });
+    if (so.status === "cancelled" || so.status === "delivered") return HttpResponse.json({ error: { code: "conflict", message: `shipping order is ${so.status}`, requestId: rid() } }, { status: 409 });
+    const b = (await request.json().catch(() => ({}))) as any;
+    so.status = "shipped"; so.carrier = b.carrier ?? so.carrier; so.tracking_number = b.trackingNumber ?? so.tracking_number; so.shipped_date = b.shippedDate ?? Date.now();
+    return HttpResponse.json(so);
+  }),
+  http.post(`${V1}/shipping/:id/deliver`, async ({ params }) => {
+    await lat();
+    const so = shipments.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "shipping order not found", requestId: rid() } }, { status: 404 });
+    if (so.status !== "shipped") return HttpResponse.json({ error: { code: "conflict", message: `cannot deliver a ${so.status} shipping order`, requestId: rid() } }, { status: 409 });
+    so.status = "delivered"; so.delivered_date = Date.now(); return HttpResponse.json(so);
+  }),
+  http.post(`${V1}/shipping/:id/cancel`, async ({ params }) => {
+    await lat();
+    const so = shipments.find((x) => x.id === String(params.id));
+    if (!so) return HttpResponse.json({ error: { code: "not_found", message: "shipping order not found", requestId: rid() } }, { status: 404 });
+    if (so.status === "delivered") return HttpResponse.json({ error: { code: "conflict", message: "cannot cancel a delivered shipping order", requestId: rid() } }, { status: 409 });
+    so.status = "cancelled"; return HttpResponse.json(so);
   }),
 );
