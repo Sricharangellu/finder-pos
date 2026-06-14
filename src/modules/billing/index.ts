@@ -45,7 +45,10 @@ const INDEXES = `
 CREATE INDEX IF NOT EXISTS bills_tenant_status_idx ON bills (tenant_id, status, issued_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS bills_tenant_po_uidx ON bills (tenant_id, po_id) WHERE po_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS invoices_tenant_status_idx ON invoices (tenant_id, status, issued_at DESC);
-CREATE INDEX IF NOT EXISTS billing_payments_doc_idx ON billing_payments (tenant_id, doc_type, doc_id);`;
+CREATE INDEX IF NOT EXISTS billing_payments_doc_idx ON billing_payments (tenant_id, doc_type, doc_id);
+-- DB review: AR-by-customer (financials, portal, AR aging) + AP-by-vendor (vendor detail, AP aging).
+CREATE INDEX IF NOT EXISTS invoices_tenant_customer_idx ON invoices (tenant_id, customer_id);
+CREATE INDEX IF NOT EXISTS bills_tenant_supplier_idx ON bills (tenant_id, supplier_id);`;
 
 /** Billing — supplier bills (AP) + customer invoices (AR). A received PO
  *  auto-drafts a bill (via the purchase_order.received event). */

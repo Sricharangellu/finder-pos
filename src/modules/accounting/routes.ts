@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { AccountingService, AccountType, DepositStatus } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -55,10 +56,11 @@ export function registerRoutes(router: Router, service: AccountingService): void
   router.get("/deposits/:id", handler(async (req, res) => {
     res.json(await service.getDeposit(String(req.params.id), tenantId(res)));
   }));
-  router.post("/deposits/:id/approve", handler(async (req, res) => {
+  // Financial control: deposit approval/rejection requires manager+.
+  router.post("/deposits/:id/approve", requireRole("manager"), handler(async (req, res) => {
     res.json(await service.approveDeposit(String(req.params.id), tenantId(res)));
   }));
-  router.post("/deposits/:id/reject", handler(async (req, res) => {
+  router.post("/deposits/:id/reject", requireRole("manager"), handler(async (req, res) => {
     res.json(await service.rejectDeposit(String(req.params.id), tenantId(res)));
   }));
 }

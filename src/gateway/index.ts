@@ -13,7 +13,7 @@
 export { requestIdMiddleware } from "./requestId.js";
 export { rateLimitMiddleware, tenantRateLimitMiddleware, RATE_TIERS } from "./rateLimit.js";
 export type { TierLimit, TenantRateLimitOptions } from "./rateLimit.js";
-export { authMiddleware, tenantResolver } from "./auth.js";
+export { authMiddleware, tenantResolver, requireRole } from "./auth.js";
 export { errorEnvelopeMiddleware } from "./errorEnvelope.js";
 export { metricsMiddleware, renderMetrics, recordRequest, normalizePath, resetMetrics } from "./metrics.js";
 export type { AuthPayload } from "./auth.js";

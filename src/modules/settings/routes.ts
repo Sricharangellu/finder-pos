@@ -1,22 +1,12 @@
-import type { Router, Response, NextFunction, Request } from "express";
+import type { Router, Response } from "express";
 import { z } from "zod";
-import { handler, parseBody, forbidden } from "../../shared/http.js";
+import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
-import { hasRole } from "../../identity/types.js";
-import type { Role } from "../../identity/types.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { SettingsService } from "./service.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
-}
-
-/** Role guard: require at least `min` (cashier < manager < owner). */
-function requireRole(min: Role) {
-  return (_req: Request, res: Response, next: NextFunction) => {
-    const role = (res.locals["auth"] as AuthPayload)?.role ?? "cashier";
-    if (!hasRole(role, min)) return next(forbidden(`requires ${min} role`));
-    next();
-  };
 }
 
 const shippingSchema = z.object({

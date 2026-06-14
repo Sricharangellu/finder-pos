@@ -69,6 +69,7 @@ CREATE INDEX IF NOT EXISTS quotation_lines_parent_idx ON quotation_lines (tenant
 CREATE INDEX IF NOT EXISTS sales_orders_tenant_status_idx ON sales_orders (tenant_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS sales_orders_rep_idx ON sales_orders (tenant_id, sales_rep_id);
 CREATE INDEX IF NOT EXISTS sales_orders_picker_idx ON sales_orders (tenant_id, picker_id);
+CREATE INDEX IF NOT EXISTS sales_orders_customer_idx ON sales_orders (tenant_id, customer_id);
 CREATE UNIQUE INDEX IF NOT EXISTS sales_orders_quote_uidx ON sales_orders (tenant_id, quotation_id) WHERE quotation_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS so_lines_parent_idx ON sales_order_lines (tenant_id, sales_order_id);`;
 

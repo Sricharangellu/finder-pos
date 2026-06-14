@@ -84,9 +84,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   }));
 
   // ── Identity routes (/api/identity/login and /refresh are PUBLIC; /me is protected)
+  // Security: public auth endpoints are brute-force surfaces, so apply a strict
+  // per-IP limiter (≈20/min sustained, small burst) in front of the router.
   const identityRouter = Router();
   await identityModule.register({ db, events, router: identityRouter });
-  app.use("/api/identity", identityRouter);
+  app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33 }), identityRouter);
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes
   app.use("/api/v1", authMiddleware, tenantResolver, tenantRateLimitMiddleware());

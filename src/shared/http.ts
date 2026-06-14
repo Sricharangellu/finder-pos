@@ -52,6 +52,8 @@ export function errorMiddleware(
     res.status(err.status).json({ error: { code: err.code, message: err.message } });
     return;
   }
-  const message = err instanceof Error ? err.message : "internal error";
-  res.status(500).json({ error: { code: "internal", message } });
+  // Security: never echo raw error text (it can leak SQL/stack internals). Log
+  // the detail server-side; return a generic message to the client.
+  console.error("[unhandled]", err instanceof Error ? err.stack ?? err.message : err);
+  res.status(500).json({ error: { code: "internal", message: "internal error" } });
 }

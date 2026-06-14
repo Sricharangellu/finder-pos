@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { HttpError } from "../shared/http.js";
 import type { Role } from "../identity/types.js";
+import { hasRole } from "../identity/types.js";
 
 export interface AuthPayload {
   tenantId: string;
@@ -29,6 +30,22 @@ declare global {
  * The tenant-resolver middleware runs after this and uses `res.locals.auth.tenantId`
  * to scope every DB query.
  */
+/**
+ * Authorization guard factory: require at least `min` role (cashier < manager <
+ * owner). Mounts after authMiddleware so `res.locals.auth` is populated.
+ * Shared across modules for role-gating sensitive mutations.
+ */
+export function requireRole(min: Role) {
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    const role = (res.locals["auth"] as AuthPayload | undefined)?.role ?? "cashier";
+    if (!hasRole(role, min)) {
+      next(new HttpError(403, "forbidden", `requires ${min} role`));
+      return;
+    }
+    next();
+  };
+}
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {

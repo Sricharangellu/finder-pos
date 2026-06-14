@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS orders (
   UNIQUE (tenant_id, order_number)
 );
 CREATE INDEX IF NOT EXISTS orders_tenant_status_idx ON orders (tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS orders_tenant_customer_idx ON orders (tenant_id, customer_id);
 `;
 
 const CREATE_ORDER_LINES_TABLE = `
