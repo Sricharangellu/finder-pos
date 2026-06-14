@@ -13,6 +13,7 @@ import { purchasingModule } from "./purchasing/index.js";
 import { billingModule } from "./billing/index.js";
 import { fulfillmentModule } from "./fulfillment/index.js";
 import { salesModule } from "./sales/index.js";
+import { accountingModule } from "./accounting/index.js";
 import { reportsModule } from "./reports/index.js";
 
 /**
@@ -34,5 +35,6 @@ export const modules: PosModule[] = [
   billingModule,
   fulfillmentModule,
   salesModule,
+  accountingModule,
   reportsModule,
 ];

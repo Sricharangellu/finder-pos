@@ -28,6 +28,18 @@ let salesOrders: any[] = [];
 const soLines = new Map<string, any[]>();
 let qtSeq = 0, soSeq = 0;
 const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
+// Accounting dev stores
+let accounts: any[] = [];
+let deposits: any[] = [];
+const depositItems = new Map<string, any[]>();
+let depSeq = 0;
+const DEFAULT_COA = [
+  ["1000","Cash","asset"],["1010","Bank Checking","asset"],["1020","Bank Savings","asset"],
+  ["1100","Accounts Receivable","asset"],["1200","Inventory Asset","asset"],
+  ["2000","Accounts Payable","liability"],["2100","Sales Tax Payable","liability"],["2200","Credit Card","liability"],
+  ["4000","Sales Revenue","income"],["4100","Shipping Income","income"],["4200","Discount Given","income"],
+  ["5000","Cost of Goods Sold","expense"],["5100","Shipping Expense","expense"],["5200","Operating Expenses","expense"],
+];
 
 function seed() {
   if (customers.size === 0) {
@@ -489,5 +501,84 @@ lightspeedHandlers.push(
     if (!so) return HttpResponse.json({ error: { code: "not_found", message: "sales order not found", requestId: rid() } }, { status: 404 });
     if (so.status === "invoiced") return HttpResponse.json({ error: { code: "conflict", message: "cannot cancel an invoiced sales order", requestId: rid() } }, { status: 409 });
     so.status = "cancelled"; return HttpResponse.json(so);
+  }),
+);
+
+// ── Accounting mock handlers (Chart of Accounts + Batch Deposits) ───────────
+lightspeedHandlers.push(
+  http.post(`${V1}/accounting/accounts/seed`, async () => {
+    await lat();
+    if (accounts.length > 0) return HttpResponse.json({ seeded: 0 });
+    DEFAULT_COA.forEach(([code, name, type]) => accounts.push({ id: `acct_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", code, name, type, parent_id: null, is_active: 1, created_at: Date.now() }));
+    return HttpResponse.json({ seeded: accounts.length });
+  }),
+  http.post(`${V1}/accounting/accounts`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    if (accounts.some((a) => a.code === b.code)) return HttpResponse.json({ error: { code: "conflict", message: `account code '${b.code}' already exists`, requestId: rid() } }, { status: 409 });
+    const a = { id: `acct_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", code: b.code, name: b.name, type: b.type, parent_id: b.parentId ?? null, is_active: 1, created_at: Date.now() };
+    accounts.push(a); return HttpResponse.json(a, { status: 201 });
+  }),
+  http.get(`${V1}/accounting/accounts`, async ({ request }) => {
+    await lat();
+    const type = new URL(request.url).searchParams.get("type");
+    let items = [...accounts].sort((a, b) => a.code.localeCompare(b.code));
+    if (type) items = items.filter((a) => a.type === type);
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${V1}/accounting/accounts/tree`, async () => {
+    await lat();
+    const byId = new Map(accounts.map((a) => [a.id, { ...a, children: [] as any[] }]));
+    const roots: any[] = [];
+    for (const n of byId.values()) { if (n.parent_id && byId.has(n.parent_id)) byId.get(n.parent_id)!.children.push(n); else roots.push(n); }
+    return HttpResponse.json({ items: roots.sort((a, b) => a.code.localeCompare(b.code)) });
+  }),
+  http.patch(`${V1}/accounting/accounts/:id`, async ({ params, request }) => {
+    await lat();
+    const a = accounts.find((x) => x.id === String(params.id));
+    if (!a) return HttpResponse.json({ error: { code: "not_found", message: "account not found", requestId: rid() } }, { status: 404 });
+    const b = (await request.json()) as any;
+    if (b.name !== undefined) a.name = b.name;
+    if (b.isActive !== undefined) a.is_active = b.isActive ? 1 : 0;
+    return HttpResponse.json(a);
+  }),
+  http.post(`${V1}/accounting/deposits`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as any;
+    if (!accounts.some((a) => a.id === b.accountId)) return HttpResponse.json({ error: { code: "not_found", message: "account not found", requestId: rid() } }, { status: 404 });
+    const id = `dep_${Math.random().toString(36).slice(2, 12)}`;
+    // Mock: 2000 cents per payment id (real backend sums the ledger).
+    const items = (b.paymentIds ?? []).map((pid: string) => ({ id: `dpi_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", batch_id: id, payment_id: pid, amount_cents: 2000 }));
+    const total = items.reduce((s: number, i: any) => s + i.amount_cents, 0);
+    const dep = { id, tenant_id: "tnt_demo", batch_number: `DEP-${String(++depSeq).padStart(5, "0")}`, description: b.description ?? null, account_id: b.accountId, status: "pending_approval", total_cents: total, deposit_date: b.depositDate ?? null, created_at: Date.now(), decided_at: null };
+    deposits.push(dep); depositItems.set(id, items);
+    return HttpResponse.json({ ...dep, items }, { status: 201 });
+  }),
+  http.get(`${V1}/accounting/deposits`, async ({ request }) => {
+    await lat();
+    const status = new URL(request.url).searchParams.get("status");
+    let items = [...deposits].sort((a, b) => b.created_at - a.created_at);
+    if (status) items = items.filter((d) => d.status === status);
+    return HttpResponse.json({ items });
+  }),
+  http.get(`${V1}/accounting/deposits/:id`, async ({ params }) => {
+    await lat();
+    const d = deposits.find((x) => x.id === String(params.id));
+    if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
+    return HttpResponse.json({ ...d, items: depositItems.get(d.id) ?? [] });
+  }),
+  http.post(`${V1}/accounting/deposits/:id/approve`, async ({ params }) => {
+    await lat();
+    const d = deposits.find((x) => x.id === String(params.id));
+    if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
+    if (d.status !== "pending_approval") return HttpResponse.json({ error: { code: "conflict", message: `batch deposit is already ${d.status}`, requestId: rid() } }, { status: 409 });
+    d.status = "approved"; d.decided_at = Date.now(); return HttpResponse.json(d);
+  }),
+  http.post(`${V1}/accounting/deposits/:id/reject`, async ({ params }) => {
+    await lat();
+    const d = deposits.find((x) => x.id === String(params.id));
+    if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
+    if (d.status !== "pending_approval") return HttpResponse.json({ error: { code: "conflict", message: `batch deposit is already ${d.status}`, requestId: rid() } }, { status: 409 });
+    d.status = "rejected"; d.decided_at = Date.now(); return HttpResponse.json(d);
   }),
 );

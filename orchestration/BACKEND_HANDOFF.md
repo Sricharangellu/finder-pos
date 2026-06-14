@@ -126,6 +126,13 @@ B2B order-to-cash front half: Quotation → Sales Order → (approve) → Invoic
 - Verified live: QT-00001 → convert → SO-00001 → approve → invoice → AR invoice raised. MSW mocks added (quotations + sales-orders, tier math, idempotent convert, status guards).
 - **Picker tie-in:** `picker_id` on sales orders is the hook for the tablet fulfillment pick queue (benchmark #16); the existing fulfillment module builds pick lists from `orders` — unifying SO↔pick list is a follow-up.
 
+## Accounting — Chart of Accounts + Batch Deposits (Wave C) — LIVE
+ERP benchmark #9. Tenant-scoped, cents.
+- **Chart of Accounts:** `POST /api/v1/accounting/accounts/seed` → seeds the 14-account standard COA (idempotent; returns `{seeded}`). `POST /accounts {code, name, type:asset|liability|income|expense, parentId?}` (409 on dup code). `GET /accounts[?type]`, `GET /accounts/tree` (parent/child tree), `PATCH /accounts/:id {name?, isActive?}`. These accounts are the dropdown source for the product accounting tab, shipping config credit/debit accounts, and bills.
+- **Batch Deposits:** `POST /api/v1/accounting/deposits {accountId, paymentIds:[...], description?, depositDate?}` → groups `billing_payments` into a bank deposit, **total summed from the ledger** (400 if any payment id is unknown). Numbered DEP-#####. `GET /deposits[?status]`, `GET /deposits/:id` (with items). Workflow: `POST /deposits/:id/approve` · `/reject` (both 409 once decided). Statuses: pending_approval|approved|rejected.
+- Verified live: seed 14 → tree/type filter → deposit DEP-00001 summing 2 payments to $50.00 → approve → re-approve guarded. MSW mocks added.
+- Suggested UI: Settings→COA tree editor; Accounting→Batch Deposit list + create (multi-select pending payments) + approve/reject (role-gate to Super Admin on the frontend).
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
