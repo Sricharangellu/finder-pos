@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
@@ -45,6 +46,37 @@ function simulateCardRead(): { last4: string; authCode: string } {
   return { last4, authCode: `EMV-${token}` };
 }
 
+/**
+ * Stable fingerprint of the meaningful capture inputs (everything that affects
+ * the charge except the idempotency key itself). Reusing a key with a request
+ * whose fingerprint differs is a client error, not a safe retry.
+ */
+function captureFingerprint(input: CapturePaymentInput): string {
+  const canonical = JSON.stringify({
+    orderId: input.orderId,
+    method: input.method,
+    cashCents: input.cashCents ?? 0,
+    cardCents: input.cardCents ?? 0,
+    tenderedCents: input.tenderedCents ?? 0,
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
+/** Shape persisted in idempotency_keys.response. */
+interface IdempotencyEnvelope {
+  fingerprint: string;
+  record: PaymentRecord;
+}
+
+function isEnvelope(value: unknown): value is IdempotencyEnvelope {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { fingerprint?: unknown }).fingerprint === "string" &&
+    typeof (value as { record?: unknown }).record === "object"
+  );
+}
+
 export class PaymentsService {
   constructor(
     private readonly db: DB,
@@ -68,14 +100,29 @@ export class PaymentsService {
 
   async capture(input: CapturePaymentInput, tenantId: string): Promise<PaymentRecord> {
     // Payment idempotency: if a key is provided and we already processed it,
-    // return the cached result without re-charging (Wave 1 requirement).
+    // return the cached result without re-charging (Wave 1 requirement). The
+    // stored response is fingerprinted with the original request, so a key
+    // replayed with a DIFFERENT request (e.g. another order or amount) is
+    // rejected rather than silently served the wrong payment.
+    const fingerprint = input.idempotencyKey ? captureFingerprint(input) : undefined;
     if (input.idempotencyKey) {
       const existing = await this.db.one<{ response: string }>(
         "SELECT response FROM idempotency_keys WHERE tenant_id = @tenantId AND key = @key",
         { tenantId, key: input.idempotencyKey },
       );
       if (existing) {
-        return JSON.parse(existing.response) as PaymentRecord;
+        const parsed = JSON.parse(existing.response) as unknown;
+        if (isEnvelope(parsed)) {
+          if (parsed.fingerprint !== fingerprint) {
+            throw conflict(
+              `idempotency key '${input.idempotencyKey}' was already used with a different request`,
+            );
+          }
+          return parsed.record;
+        }
+        // Legacy rows stored the bare PaymentRecord (pre-fingerprint); honor
+        // them as a safe replay rather than failing.
+        return parsed as PaymentRecord;
       }
     }
 
@@ -168,7 +215,7 @@ export class PaymentsService {
     );
 
     // Store the idempotency key so retries return the same record.
-    if (input.idempotencyKey) {
+    if (input.idempotencyKey && fingerprint) {
       const now = Date.now();
       await this.db.query(
         `INSERT INTO idempotency_keys (id, tenant_id, key, response, created_at, expires_at)
@@ -178,7 +225,7 @@ export class PaymentsService {
           id: `idk_${uuidv7()}`,
           tenantId,
           key: input.idempotencyKey,
-          response: JSON.stringify(record),
+          response: JSON.stringify({ fingerprint, record } satisfies IdempotencyEnvelope),
           created_at: now,
           expires_at: now + 24 * 60 * 60 * 1000, // 24h TTL
         },

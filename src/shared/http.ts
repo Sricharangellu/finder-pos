@@ -15,6 +15,7 @@ export class HttpError extends Error {
 export const notFound = (msg: string) => new HttpError(404, "not_found", msg);
 export const badRequest = (msg: string) => new HttpError(400, "bad_request", msg);
 export const conflict = (msg: string) => new HttpError(409, "conflict", msg);
+export const forbidden = (msg: string) => new HttpError(403, "forbidden", msg);
 
 /** Wrap an async route handler so thrown errors hit the error middleware. */
 export function handler(
@@ -51,6 +52,8 @@ export function errorMiddleware(
     res.status(err.status).json({ error: { code: err.code, message: err.message } });
     return;
   }
-  const message = err instanceof Error ? err.message : "internal error";
-  res.status(500).json({ error: { code: "internal", message } });
+  // Security: never echo raw error text (it can leak SQL/stack internals). Log
+  // the detail server-side; return a generic message to the client.
+  console.error("[unhandled]", err instanceof Error ? err.stack ?? err.message : err);
+  res.status(500).json({ error: { code: "internal", message: "internal error" } });
 }

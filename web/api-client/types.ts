@@ -281,3 +281,82 @@ export interface SalesSummary {
     byMethod: Record<string, number>;
   };
 }
+
+// ── Lightspeed-style retail operations (Cycle 3 backend) ───────────────────
+export interface InventoryLevel {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  status: "active" | "draft" | "archived" | string;
+  priceCents: number;
+  onHand: number;
+  committed: number;
+  available: number;
+  reorderPoint: number;
+  lowStock: boolean;
+  costCents: number | null;
+  velocity: number;
+}
+
+export interface InventoryLevelsResponse {
+  pageSize: number;
+  items: InventoryLevel[];
+}
+
+export interface RetailCustomer {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  points: number;
+  created_at?: number;
+}
+
+export interface CustomersResponse {
+  items: RetailCustomer[];
+}
+
+export interface CustomerSummary {
+  customer: RetailCustomer;
+  visits: number;
+  totalSpentCents: number;
+  avgOrderCents: number;
+  lastVisitAt: number | null;
+  recentOrders: Array<{
+    id: string;
+    orderNumber: string;
+    status: string;
+    totalCents: number;
+    createdAt: number;
+  }>;
+}
+
+export interface TopProduct {
+  productId: string;
+  name: string;
+  units: number;
+  revenueCents: number;
+}
+
+export interface TopProductsResponse {
+  items: TopProduct[];
+}
+
+export interface Register {
+  id: string;
+  name: string;
+  status: "open" | "closed" | string;
+  outlet_id: string;
+}
+
+export interface Outlet {
+  id: string;
+  name: string;
+  timezone: string;
+  registers: Register[];
+}
+
+export interface OutletsResponse {
+  items: Outlet[];
+}

@@ -137,6 +137,84 @@ export class CatalogService {
     return product;
   }
 
+  /** Bulk upsert products by (tenant_id, sku). Used for catalog import.
+   *  Updates name/price/barcode/category on conflict; tenant-scoped. */
+  async bulkImport(
+    items: Array<{
+      sku: string; name: string; priceCents: number; barcode?: string | null; category?: string;
+      barcodes?: Array<{ barcode: string; kind?: string; packSize?: number }>;
+    }>,
+    tenantId: string,
+  ): Promise<{ imported: number; barcodes: number }> {
+    if (items.length === 0) return { imported: 0, barcodes: 0 };
+    const now = Date.now();
+    let barcodeCount = 0;
+    await this.db.tx(async (tdb) => {
+      for (const it of items) {
+        const category = it.category && it.category.trim() ? it.category.trim() : "general";
+        const taxClass = category.toLowerCase() === "groceries" ? "exempt" : "standard";
+        const rows = await tdb.query<{ id: string }>(
+          `INSERT INTO products (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
+           VALUES (@id, @t, @sku, @name, @price, @category, @tax, @barcode, 'active', @now, @now)
+           ON CONFLICT (tenant_id, sku) DO UPDATE SET
+             name = EXCLUDED.name, price_cents = EXCLUDED.price_cents,
+             barcode = EXCLUDED.barcode, category = EXCLUDED.category, updated_at = EXCLUDED.updated_at
+           RETURNING id`,
+          { id: `prod_${uuidv7()}`, t: tenantId, sku: it.sku, name: it.name, price: Math.max(0, Math.round(it.priceCents)), category, tax: taxClass, barcode: it.barcode ?? null, now },
+        );
+        const productId = rows[0]?.id;
+        if (!productId) continue;
+        const allBarcodes = [
+          ...(it.barcode ? [{ barcode: it.barcode, kind: "each", packSize: 1 }] : []),
+          ...(it.barcodes ?? []),
+        ];
+        for (const b of allBarcodes) {
+          if (!b.barcode) continue;
+          const r = await tdb.query<{ barcode: string }>(
+            `INSERT INTO product_barcodes (tenant_id, product_id, barcode, kind, pack_size)
+             VALUES (@t, @pid, @bc, @kind, @ps)
+             ON CONFLICT (tenant_id, barcode) DO NOTHING RETURNING barcode`,
+            { t: tenantId, pid: productId, bc: b.barcode, kind: b.kind ?? "alt", ps: b.packSize ?? 1 },
+          );
+          barcodeCount += r.length;
+        }
+      }
+    });
+    return { imported: items.length, barcodes: barcodeCount };
+  }
+
+  /** Look up a sellable product by ANY of its UPCs (each/single/box/case/vendor),
+   *  falling back to the legacy products.barcode column. Active products only. */
+  async getByBarcode(barcode: string, tenantId: string): Promise<Product | undefined> {
+    const viaTable = await this.db.one<Product>(
+      `SELECT p.* FROM products p
+         JOIN product_barcodes pb ON pb.product_id = p.id AND pb.tenant_id = p.tenant_id
+        WHERE pb.tenant_id = @tenantId AND pb.barcode = @barcode AND p.status = 'active'
+        LIMIT 1`,
+      { tenantId, barcode },
+    );
+    if (viaTable) return viaTable;
+    return this.db.one<Product>(
+      "SELECT * FROM products WHERE tenant_id = @tenantId AND barcode = @barcode AND status = 'active' LIMIT 1",
+      { tenantId, barcode },
+    );
+  }
+
+  /** All UPCs registered for a product. */
+  async listBarcodes(productId: string, tenantId: string): Promise<Array<{ barcode: string; kind: string; pack_size: number }>> {
+    return this.db.query("SELECT barcode, kind, pack_size FROM product_barcodes WHERE tenant_id = @tenantId AND product_id = @productId ORDER BY kind", { tenantId, productId });
+  }
+
+  /** Register an additional UPC for a product. */
+  async addBarcode(productId: string, barcode: string, kind: string, packSize: number, tenantId: string): Promise<void> {
+    await this.getOrThrow(productId, tenantId); // ensure product exists in-tenant
+    await this.db.query(
+      `INSERT INTO product_barcodes (tenant_id, product_id, barcode, kind, pack_size) VALUES (@t,@pid,@bc,@kind,@ps)
+       ON CONFLICT (tenant_id, barcode) DO UPDATE SET product_id = EXCLUDED.product_id, kind = EXCLUDED.kind, pack_size = EXCLUDED.pack_size`,
+      { t: tenantId, pid: productId, bc: barcode, kind, ps: packSize },
+    );
+  }
+
   async list(query: ListProductsQuery = {}, tenantId: string): Promise<Page<Product>> {
     const limit = clampLimit(query.limit);
     const offset = query.offset && query.offset > 0 ? Math.floor(query.offset) : 0;

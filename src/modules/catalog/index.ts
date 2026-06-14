@@ -28,9 +28,23 @@ CREATE INDEX IF NOT EXISTS products_tenant_status_idx ON products (tenant_id, st
 CREATE INDEX IF NOT EXISTS products_tenant_category_idx ON products (tenant_id, category);
 `;
 
+// Multiple UPCs per product (each/single/box/case/vendor/alt). A scan of any
+// barcode resolves to the product; pack_size lets box/case scans map to eaches.
+const CREATE_PRODUCT_BARCODES = `
+CREATE TABLE IF NOT EXISTS product_barcodes (
+  tenant_id  TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  barcode    TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT 'each',
+  pack_size  INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (tenant_id, barcode)
+);
+CREATE INDEX IF NOT EXISTS product_barcodes_product_idx ON product_barcodes (tenant_id, product_id);
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
-  migrations: [dropLegacyNoTenant("products"), CREATE_PRODUCTS_TABLE, CREATE_PRODUCTS_INDEXES],
+  migrations: [dropLegacyNoTenant("products"), CREATE_PRODUCTS_TABLE, CREATE_PRODUCTS_INDEXES, CREATE_PRODUCT_BARCODES],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);
     // Idempotent demo seed (only runs when the table is empty for tnt_demo).

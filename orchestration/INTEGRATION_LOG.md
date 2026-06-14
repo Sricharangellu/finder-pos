@@ -39,3 +39,28 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Frontend** → added a Lightspeed X-Series-inspired enterprise POS shell in `web/app/(protected)/terminal/page.tsx`: desktop rail, mobile bottom navigation, store/register selector, device online/offline status, user/role context, and placeholders for Inventory, Customers, Reports, and Settings.
 - **Rationale** → establishes the enterprise navigation frame before building the Wave 2 operations surfaces, while keeping the Register workflow as the first-screen task.
 - **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (80/80); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/terminal` returned 200.
+
+## Wave 1 — Lightspeed X-Series benchmark adoption (2026-06-12)
+- **Benchmark set for Frontend/Claude coordination** → use Lightspeed Retail X-Series as the UX reference for module framing and operational depth: register-first workflow, persistent operations navigation, store/register context, user/role context, device readiness, inventory control, customer profiles, reporting, and settings/security posture. This is a benchmark, not a visual copy.
+- **Frontend** → extracted the shell into `web/components/EnterpriseShell.tsx`; wired real navigation across `/terminal`, `/inventory`, `/customers`, `/reports`, and `/settings`; added first-pass enterprise Inventory, Customers, and Settings pages; refit Reports into the shared shell.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); local routes `/terminal`, `/inventory`, `/customers`, `/reports`, `/settings` returned 200 from the Next dev server.
+
+## Wave 1 — inventory operations frontend (2026-06-12)
+- **Frontend** → upgraded `/inventory` from static sample rows to a catalog-driven operations screen using `GET /api/v1/catalog` via the generated client/MSW. Added search, category/status filters, derived stock KPIs, low-stock triage, selected-SKU detail panel, and count/receive action affordances.
+- **Backend/API handoff for Claude** → frontend currently derives stock quantities locally from catalog SKUs. To go live cleanly, publish an inventory endpoint shaped like `GET /api/v1/inventory/levels?pageSize&query&category&status` returning product identity plus `onHand`, `committed`, `reorderPoint`, `costCents`, `velocity`, and `status`; count/receive/adjust actions can then wire to inventory mutation endpoints.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/inventory` returned 200.
+
+## Wave 1 — customer operations frontend (2026-06-12)
+- **Frontend** → upgraded `/customers` into an enterprise CRM/clienteling workspace: customer search, segment filter, selectable profile detail, loyalty/spend/visit metrics, recent purchase timeline, clienteling note, and customer-display readiness panel. Data remains frontend-seeded until the customer contract exists.
+- **Backend/API handoff for Claude** → future customer surface should include `GET /api/v1/customers?query&segment&pageSize`, `GET /api/v1/customers/:id`, and customer attach-to-sale support for the orders flow. Customer records should expose profile/contact fields, segment, visits, lifetime spend cents, loyalty points, last visit, notes, and recent purchases.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/customers` returned 200.
+
+## Wave 1 — settings/admin frontend (2026-06-12)
+- **Frontend** → upgraded `/settings` into an enterprise admin workspace with section navigation, store/register profile, checkout controls, connected device readiness, roles/access matrix, frontend-visible feature flags, and security posture panel. Controls are role-aware in the UI and remain non-mutating until backend endpoints exist.
+- **Backend/API handoff for Claude** → future settings surface should expose store/register profile, device registry/status, feature flag administration, role policy matrix, and checkout-control settings. Mutations should be role-gated owner/manager and audited.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/settings` returned 200.
+
+## Wave 1 — reporting operations frontend (2026-06-12)
+- **Frontend** → upgraded `/reports` with range controls, export/schedule actions, richer revenue KPIs, average order value, refund rate, hourly sales index, payment method bars, order-status table, and top-product list. Kept the existing `SalesSummary` contract and derived additional UI locally.
+- **Backend/API handoff for Claude** → future reporting endpoints should support date range filters and return hourly sales, top products, order status share, payment method breakdowns, and export/scheduled-report actions. Existing `GET /api/v1/reports/summary` remains sufficient for the current frontend fallback.
+- **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/reports` returned 200.

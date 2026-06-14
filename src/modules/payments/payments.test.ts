@@ -390,3 +390,41 @@ test("a fresh idempotency key on an already-paid order is not served from cache 
   assert.equal(other.status, 409);
   assert.equal(await paymentCount(app, "ord_idem2"), 1);
 });
+
+test("reusing an idempotency key with a DIFFERENT request is rejected (409) and does not re-charge", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_idem3a", totalCents: 1000 });
+  await seedOrder(app, { id: "ord_idem3b", totalCents: 2000 });
+
+  const first = await capture(app, {
+    orderId: "ord_idem3a",
+    method: "cash",
+    tenderedCents: 1000,
+    idempotencyKey: "idem-reuse",
+  });
+  assert.equal(first.status, 201);
+
+  // Same key, different order/amount: this is a client error (the key was
+  // already bound to a different request), not a safe replay. It must 409
+  // rather than silently returning the first order's payment, and must not
+  // create a payment against the second order.
+  const conflicting = await capture(app, {
+    orderId: "ord_idem3b",
+    method: "cash",
+    tenderedCents: 2000,
+    idempotencyKey: "idem-reuse",
+  });
+  assert.equal(conflicting.status, 409);
+  assert.equal(await paymentCount(app, "ord_idem3b"), 0);
+
+  // The genuine retry (identical request) still returns the original record.
+  const replay = await capture(app, {
+    orderId: "ord_idem3a",
+    method: "cash",
+    tenderedCents: 1000,
+    idempotencyKey: "idem-reuse",
+  });
+  assert.equal(replay.status, 201);
+  assert.equal(replay.body.id, first.body.id);
+  assert.equal(await paymentCount(app, "ord_idem3a"), 1);
+});

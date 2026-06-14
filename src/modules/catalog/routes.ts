@@ -63,7 +63,38 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+const importSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        sku: z.string().min(1),
+        name: z.string().min(1),
+        priceCents: z.number().int().nonnegative(),
+        barcode: z.string().min(1).nullable().optional(),
+        category: z.string().min(1).optional(),
+        barcodes: z
+          .array(z.object({ barcode: z.string().min(1), kind: z.string().min(1).optional(), packSize: z.number().int().positive().optional() }))
+          .optional(),
+      }),
+    )
+    .min(1)
+    .max(2000),
+});
+
 export function registerRoutes(router: Router, service: CatalogService): void {
+  // Bulk import / upsert by SKU (owner/manager only). For catalog onboarding.
+  router.post(
+    "/import",
+    handler(async (req, res) => {
+      const role = (res.locals["auth"] as AuthPayload).role;
+      if (role !== "owner" && role !== "manager") {
+        throw badRequest("catalog import requires owner or manager");
+      }
+      const body = parseBody(importSchema, req.body);
+      res.status(200).json(await service.bulkImport(body.items, (res.locals["auth"] as AuthPayload).tenantId));
+    }),
+  );
+
   router.post(
     "/",
     handler(async (req, res) => {
@@ -85,6 +116,36 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     handler(async (req, res) => {
       const page = await service.list(readQuery(req), tenantId(res));
       res.json(page);
+    }),
+  );
+
+  // Barcode scan lookup — registered before /:id so "barcode" isn't read as an id.
+  router.get(
+    "/barcode/:code",
+    handler(async (req, res) => {
+      const code = String(req.params.code);
+      const product = await service.getByBarcode(code, tenantId(res));
+      if (!product) throw notFound(`no active product with barcode '${code}'`);
+      res.json(product);
+    }),
+  );
+
+  router.get(
+    "/:id/barcodes",
+    handler(async (req, res) => {
+      res.json({ items: await service.listBarcodes(String(req.params.id), tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/:id/barcodes",
+    handler(async (req, res) => {
+      const b = parseBody(
+        z.object({ barcode: z.string().min(1), kind: z.string().min(1).optional(), packSize: z.number().int().positive().optional() }),
+        req.body,
+      );
+      await service.addBarcode(String(req.params.id), b.barcode, b.kind ?? "alt", b.packSize ?? 1, tenantId(res));
+      res.status(201).json({ ok: true });
     }),
   );
 

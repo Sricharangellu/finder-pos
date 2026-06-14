@@ -27,6 +27,7 @@ import type {
   CapturePaymentRequest,
   SalesSummary,
 } from "@/api-client/types";
+import { lightspeedHandlers } from "./lightspeedHandlers";
 
 // Match both relative (browser) and absolute (Node/test) URL forms.
 const IDENTITY = "*/api/identity";
@@ -710,6 +711,10 @@ export const handlers = [
     };
     return HttpResponse.json(response, { status: 200 });
   }),
+
+  // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
+  // Maintained in a separate file to avoid cross-agent edit collisions.
+  ...lightspeedHandlers,
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
