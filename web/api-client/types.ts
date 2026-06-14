@@ -405,3 +405,61 @@ export interface Outlet {
 export interface OutletsResponse {
   items: Outlet[];
 }
+
+export interface AgingBuckets {
+  current: number;
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  d90_plus: number;
+  total: number;
+}
+
+export interface AgingRow {
+  partyId: string;
+  buckets: AgingBuckets;
+}
+
+export interface AgingReport {
+  totals: AgingBuckets;
+  parties: AgingRow[];
+}
+
+export type BillingStatus = "open" | "partial" | "paid" | "void";
+
+export interface Bill {
+  id: string;
+  supplier_id: string;
+  po_id: string | null;
+  bill_number: string;
+  status: BillingStatus;
+  total_cents: number;
+  paid_cents: number;
+  due_date: number | null;
+  issued_at: number;
+}
+
+export interface BillsResponse {
+  items: Bill[];
+}
+
+export interface Invoice {
+  id: string;
+  customer_id: string;
+  order_id: string | null;
+  invoice_number: string;
+  status: BillingStatus;
+  total_cents: number;
+  paid_cents: number;
+  due_date: number | null;
+  issued_at: number;
+}
+
+export interface InvoicesResponse {
+  items: Invoice[];
+}
+
+export interface RecordPaymentRequest {
+  amountCents: number;
+  method?: string;
+}

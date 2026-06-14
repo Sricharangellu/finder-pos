@@ -15,6 +15,17 @@ const rid = () => `mock-${Math.random().toString(36).slice(2, 10)}`;
 // ── In-memory dev stores ────────────────────────────────────────────────────
 const customers = new Map<string, any>();
 const giftcards = new Map<string, any>();
+// Billing: tracks payment-mutated bills/invoices, keyed by id, layered over the base seed rows below.
+const billsStore = new Map<string, any>();
+const invoicesStore = new Map<string, any>();
+const BASE_BILLS: Record<string, any> = {
+  bil_1: { id: "bil_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", po_id: "po_1", bill_number: "BILL-00001", status: "open", total_cents: 24000, paid_cents: 0, due_date: Date.now() + 30 * 86400000, issued_at: Date.now() - 2 * 86400000 },
+  bil_2: { id: "bil_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", po_id: "po_2", bill_number: "BILL-00002", status: "partial", total_cents: 11250, paid_cents: 5000, due_date: Date.now() + 20 * 86400000, issued_at: Date.now() - 86400000 },
+};
+const BASE_INVOICES: Record<string, any> = {
+  inv_1: { id: "inv_1", tenant_id: "tnt_demo", customer_id: "cus_demo_1", order_id: "ord_a", invoice_number: "INV-00001", status: "paid", total_cents: 8600, paid_cents: 8600, due_date: Date.now() + 15 * 86400000, issued_at: Date.now() - 5 * 86400000 },
+  inv_2: { id: "inv_2", tenant_id: "tnt_demo", customer_id: "cus_demo_2", order_id: null, invoice_number: "INV-00002", status: "open", total_cents: 4200, paid_cents: 0, due_date: Date.now() + 30 * 86400000, issued_at: Date.now() },
+};
 let webhooks: any[] = [];
 // Fulfillment / WMS dev stores
 let locations: any[] = [];
@@ -186,19 +197,53 @@ export const lightspeedHandlers = [
   }),
 
   // ── Billing: bills (AP) + invoices (AR) ───────────────────────────────────
-  http.get(`${V1}/billing/bills`, async () => {
+  http.get(`${V1}/billing/bills`, async ({ request }) => {
     await lat();
-    return HttpResponse.json({ items: [
-      { id: "bil_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", po_id: "po_1", bill_number: "BILL-00001", status: "open", total_cents: 24000, paid_cents: 0, due_date: Date.now() + 30 * 86400000, issued_at: Date.now() - 2 * 86400000 },
-      { id: "bil_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", po_id: "po_2", bill_number: "BILL-00002", status: "partial", total_cents: 11250, paid_cents: 5000, due_date: Date.now() + 20 * 86400000, issued_at: Date.now() - 86400000 },
-    ] });
+    const status = new URL(request.url).searchParams.get("status");
+    const items = Object.keys(BASE_BILLS).map((id) => billsStore.get(id) ?? BASE_BILLS[id]);
+    return HttpResponse.json({ items: status ? items.filter((b) => b.status === status) : items });
   }),
-  http.get(`${V1}/billing/invoices`, async () => {
+  http.get(`${V1}/billing/invoices`, async ({ request }) => {
     await lat();
-    return HttpResponse.json({ items: [
-      { id: "inv_1", tenant_id: "tnt_demo", customer_id: "cus_demo_1", order_id: "ord_a", invoice_number: "INV-00001", status: "paid", total_cents: 8600, paid_cents: 8600, due_date: Date.now() + 15 * 86400000, issued_at: Date.now() - 5 * 86400000 },
-      { id: "inv_2", tenant_id: "tnt_demo", customer_id: "cus_demo_2", order_id: null, invoice_number: "INV-00002", status: "open", total_cents: 4200, paid_cents: 0, due_date: Date.now() + 30 * 86400000, issued_at: Date.now() },
-    ] });
+    const status = new URL(request.url).searchParams.get("status");
+    const items = Object.keys(BASE_INVOICES).map((id) => invoicesStore.get(id) ?? BASE_INVOICES[id]);
+    return HttpResponse.json({ items: status ? items.filter((i) => i.status === status) : items });
+  }),
+  http.post(`${V1}/billing/bills/:id/pay`, async ({ request, params }) => {
+    await lat();
+    const body = (await request.json()) as { amountCents: number; method?: string };
+    if (!body.amountCents || body.amountCents <= 0) {
+      return HttpResponse.json({ error: { code: "bad_request", message: "amountCents must be > 0", requestId: rid() } }, { status: 400 });
+    }
+    const base = billsStore.get(params.id as string) ?? BASE_BILLS[params.id as string];
+    if (!base) return HttpResponse.json({ error: { code: "not_found", message: "bill not found", requestId: rid() } }, { status: 404 });
+    if (base.status === "void") return HttpResponse.json({ error: { code: "conflict", message: "cannot pay a void bill", requestId: rid() } }, { status: 409 });
+    const remaining = base.total_cents - base.paid_cents;
+    if (body.amountCents > remaining) {
+      return HttpResponse.json({ error: { code: "bad_request", message: "payment exceeds amount due", requestId: rid() } }, { status: 400 });
+    }
+    const paid_cents = base.paid_cents + body.amountCents;
+    const updated = { ...base, paid_cents, status: paid_cents >= base.total_cents ? "paid" : "partial" };
+    billsStore.set(updated.id, updated);
+    return HttpResponse.json(updated);
+  }),
+  http.post(`${V1}/billing/invoices/:id/pay`, async ({ request, params }) => {
+    await lat();
+    const body = (await request.json()) as { amountCents: number; method?: string };
+    if (!body.amountCents || body.amountCents <= 0) {
+      return HttpResponse.json({ error: { code: "bad_request", message: "amountCents must be > 0", requestId: rid() } }, { status: 400 });
+    }
+    const base = invoicesStore.get(params.id as string) ?? BASE_INVOICES[params.id as string];
+    if (!base) return HttpResponse.json({ error: { code: "not_found", message: "invoice not found", requestId: rid() } }, { status: 404 });
+    if (base.status === "void") return HttpResponse.json({ error: { code: "conflict", message: "cannot pay a void invoice", requestId: rid() } }, { status: 409 });
+    const remaining = base.total_cents - base.paid_cents;
+    if (body.amountCents > remaining) {
+      return HttpResponse.json({ error: { code: "bad_request", message: "payment exceeds amount due", requestId: rid() } }, { status: 400 });
+    }
+    const paid_cents = base.paid_cents + body.amountCents;
+    const updated = { ...base, paid_cents, status: paid_cents >= base.total_cents ? "paid" : "partial" };
+    invoicesStore.set(updated.id, updated);
+    return HttpResponse.json(updated);
   }),
 
   // ── Reports: hourly sales rhythm ──────────────────────────────────────────
