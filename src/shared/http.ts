@@ -15,6 +15,7 @@ export class HttpError extends Error {
 export const notFound = (msg: string) => new HttpError(404, "not_found", msg);
 export const badRequest = (msg: string) => new HttpError(400, "bad_request", msg);
 export const conflict = (msg: string) => new HttpError(409, "conflict", msg);
+export const forbidden = (msg: string) => new HttpError(403, "forbidden", msg);
 
 /** Wrap an async route handler so thrown errors hit the error middleware. */
 export function handler(

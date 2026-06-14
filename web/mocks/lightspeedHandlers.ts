@@ -31,6 +31,13 @@ const TIER_PCT: Record<number, number> = { 1: 10, 2: 7.5, 3: 5, 4: 2.5, 5: 0 };
 const tierPrices = new Map<string, Array<{ tier: number; priceCents: number }>>();
 // Discounts dev store
 let discounts: any[] = [];
+// Settings dev stores
+let shippingMethods: any[] = [];
+let paymentTerms: any[] = [];
+let paymentModes: any[] = [];
+let taxRates: any[] = [];
+let featureFlags: Record<string, boolean> = { quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false, compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false, pickerFulfillment: true, batchDeposits: true };
+let businessProfile: Record<string, unknown> = {};
 // Shipping dev stores
 let shipments: any[] = [];
 const shipLines = new Map<string, any[]>();
@@ -657,6 +664,44 @@ lightspeedHandlers.push(
     if (!d) return HttpResponse.json({ error: { code: "not_found", message: "batch deposit not found", requestId: rid() } }, { status: 404 });
     if (d.status !== "pending_approval") return HttpResponse.json({ error: { code: "conflict", message: `batch deposit is already ${d.status}`, requestId: rid() } }, { status: 409 });
     d.status = "rejected"; d.decided_at = Date.now(); return HttpResponse.json(d);
+  }),
+);
+
+// ── Settings + global search ────────────────────────────────────────────────
+let smSeq = 0, ptSeq = 0, pmSeq = 0, txSeq = 0;
+lightspeedHandlers.push(
+  http.post(`${V1}/settings/seed`, async () => {
+    await lat();
+    if (shippingMethods.length === 0) {
+      shippingMethods.push({ id: `shm_${++smSeq}`, tenant_id: "tnt_demo", name: "Delivery", amount_cents: 1500, free_limit_cents: null, ecommerce: 1, sequence: 1, credit_account_id: null, debit_account_id: null, active: 1 });
+      shippingMethods.push({ id: `shm_${++smSeq}`, tenant_id: "tnt_demo", name: "In-store Pickup", amount_cents: 0, free_limit_cents: null, ecommerce: 1, sequence: 2, credit_account_id: null, debit_account_id: null, active: 1 });
+    }
+    if (paymentTerms.length === 0) [["COD",0],["Net 15",15],["Net 30",30]].forEach(([n,d]: any) => paymentTerms.push({ id: `pt_${++ptSeq}`, tenant_id: "tnt_demo", name: n, days_due: d, description: null, active: 1 }));
+    if (paymentModes.length === 0) ["Cash","Check","ACH","Credit Card","Wire"].forEach((n) => paymentModes.push({ id: `pm_${++pmSeq}`, tenant_id: "tnt_demo", name: n, active: 1 }));
+    return HttpResponse.json({ ok: true });
+  }),
+  http.get(`${V1}/settings/business`, async () => { await lat(); return HttpResponse.json(businessProfile); }),
+  http.put(`${V1}/settings/business`, async ({ request }) => { await lat(); businessProfile = { ...businessProfile, ...((await request.json()) as any) }; return HttpResponse.json(businessProfile); }),
+  http.get(`${V1}/settings/feature-flags`, async () => { await lat(); return HttpResponse.json(featureFlags); }),
+  http.put(`${V1}/settings/feature-flags`, async ({ request }) => { await lat(); featureFlags = { ...featureFlags, ...((await request.json()) as any) }; return HttpResponse.json(featureFlags); }),
+  http.get(`${V1}/settings/shipping-methods`, async () => { await lat(); return HttpResponse.json({ items: shippingMethods }); }),
+  http.post(`${V1}/settings/shipping-methods`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `shm_${++smSeq}`, tenant_id: "tnt_demo", name: b.name, amount_cents: b.amountCents, free_limit_cents: b.freeLimitCents ?? null, ecommerce: b.ecommerce ? 1 : 0, sequence: b.sequence ?? 0, credit_account_id: b.creditAccountId ?? null, debit_account_id: b.debitAccountId ?? null, active: 1 }; shippingMethods.push(r); return HttpResponse.json(r, { status: 201 }); }),
+  http.delete(`${V1}/settings/shipping-methods/:id`, async ({ params }) => { await lat(); shippingMethods = shippingMethods.filter((s) => s.id !== String(params.id)); return HttpResponse.json({ ok: true }); }),
+  http.get(`${V1}/settings/payment-terms`, async () => { await lat(); return HttpResponse.json({ items: paymentTerms }); }),
+  http.post(`${V1}/settings/payment-terms`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `pt_${++ptSeq}`, tenant_id: "tnt_demo", name: b.name, days_due: b.daysDue, description: b.description ?? null, active: 1 }; paymentTerms.push(r); return HttpResponse.json(r, { status: 201 }); }),
+  http.get(`${V1}/settings/payment-modes`, async () => { await lat(); return HttpResponse.json({ items: paymentModes }); }),
+  http.post(`${V1}/settings/payment-modes`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `pm_${++pmSeq}`, tenant_id: "tnt_demo", name: b.name, active: 1 }; paymentModes.push(r); return HttpResponse.json(r, { status: 201 }); }),
+  http.get(`${V1}/settings/tax-rates`, async () => { await lat(); return HttpResponse.json({ items: taxRates }); }),
+  http.post(`${V1}/settings/tax-rates`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `tax_${++txSeq}`, tenant_id: "tnt_demo", name: b.name, rate_bps: b.rateBps, apply_to_category: b.applyToCategory ?? null, state: b.state ?? null, active: 1 }; taxRates.push(r); return HttpResponse.json(r, { status: 201 }); }),
+  http.get(`${V1}/search`, async ({ request }) => {
+    await lat();
+    const q = (new URL(request.url).searchParams.get("q") ?? "").toLowerCase();
+    const match = (s?: string) => (s ?? "").toLowerCase().includes(q);
+    const products = Array.from({ length: 0 }); // products live server-side; demo a couple
+    const prodHits = [{ type: "product", id: "prod_demo_a", label: "Apple", sublabel: "SKU-A" }, { type: "product", id: "prod_demo_b", label: "Chips", sublabel: "SKU-B" }].filter((p) => match(p.label) || match(p.sublabel));
+    const custHits = Array.from(customers.values()).filter((c: any) => match(c.name) || match(c.company) || match(c.email)).slice(0, 8).map((c: any) => ({ type: "customer", id: c.id, label: c.name, sublabel: c.company ?? c.email }));
+    void products;
+    return HttpResponse.json({ query: q, results: { products: prodHits, customers: custHits } });
   }),
 );
 

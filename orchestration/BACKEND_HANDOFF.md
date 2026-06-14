@@ -166,6 +166,13 @@ ERP benchmark #11. Tenant-scoped, cents.
 - Verified live: stacked auto 10% + category volume 15% + buy-2-get-1 + tier-gated VIP20 + coupon; tier gating excluded VIP at tier 3; usage-limit redeem returned 409.
 - Suggested UI: Discount list + create form (per benchmark fields) + a checkout hook calling `/evaluate`.
 
+## Settings + global search + RBAC guard (Wave G) — LIVE
+ERP benchmark #13 + #15, and a reusable role guard (#12, partial).
+- **Settings** `/api/v1/settings`: `POST /seed` (defaults: Delivery/In-store Pickup, COD/Net15/Net30, 5 payment modes). `GET/PUT /business` (company profile KV), `GET/PUT /feature-flags` (10 flags incl. quotations/ecommerce/imeiTracking/batchDeposits — PUT merges over defaults). CRUD-ish: `GET/POST/DELETE /shipping-methods`, `GET/POST /payment-terms`, `GET/POST /payment-modes`, `GET/POST /tax-rates` (rate in basis points).
+- **RBAC:** mutating settings routes require **manager+** via a `requireRole` guard (cashier→403). Pattern (`requireRole(min)` using `hasRole`) is reusable for other modules' sensitive endpoints — full per-module matrix enforcement is the remaining #12 work. Roles: owner>manager>cashier (map to benchmark Super Admin/Sales Rep/Picker).
+- **Global search** `GET /api/v1/search?q=&type=` → `{ query, results:{ products, customers, vendors, invoices, salesOrders, quotations, purchaseOrders } }`, case-insensitive contains across name/sku/barcode, company/email, and document numbers. Backs the ⌘K palette (#15).
+- Verified live: seed + flags merge + business KV; cashier mutation 403 / owner 201; search returned products + customers. MSW mocks added.
+
 ## Latest backend commit
 - `backend-cycle3` @ **`fc513c2`** (tag `cycle3-backend`): cycle-3 modules + inventory overview + team. Clean fast-forward of `master` (`66af0a6`). Live on finder-pos-backend.vercel.app (11 modules).
 
