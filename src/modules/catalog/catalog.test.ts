@@ -200,3 +200,76 @@ test("demo products are seeded on init", async () => {
   assert.ok(json.items.some((p: any) => p.name === "Organic Dark Roast Beans" && p.tax_class === "exempt"));
   assert.ok(json.items.some((p: any) => p.name === "Wildflower Honey"));
 });
+
+test("create accepts and update changes product detail fields (BE-6)", async () => {
+  const app = await freshApp();
+  const created = await call(app, "POST", "/api/catalog/", {
+    sku: "DETAIL-1",
+    name: "Detailed Widget",
+    price_cents: 999,
+    description: "A widget with details",
+    brand: "Acme",
+    length_mm: 100,
+    width_mm: 50,
+    height_mm: 25,
+    weight_grams: 300,
+    image_url: "https://example.com/widget.png",
+    vendor_upc: "0000111122223",
+    min_qty_to_sell: 1,
+    max_qty_to_sell: 10,
+    qty_increment: 2,
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.json.brand, "Acme");
+  assert.equal(created.json.weight_grams, 300);
+  assert.equal(created.json.qty_increment, 2);
+
+  const updated = await call(app, "PATCH", `/api/catalog/${created.json.id}`, {
+    brand: "Acme Industrial",
+    image_url: null,
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.json.brand, "Acme Industrial");
+  assert.equal(updated.json.image_url, null);
+  assert.equal(updated.json.weight_grams, 300); // untouched fields persist
+});
+
+test("category tree: create, nest, assign to product, and delete reparents children", async () => {
+  const app = await freshApp();
+
+  const root = await call(app, "POST", "/api/catalog/categories", { name: "Beverages" });
+  assert.equal(root.status, 201);
+  assert.ok(root.json.id.startsWith("cat_"));
+  assert.equal(root.json.parent_id, null);
+
+  const child = await call(app, "POST", "/api/catalog/categories", { name: "Coffee", parent_id: root.json.id });
+  assert.equal(child.status, 201);
+  assert.equal(child.json.parent_id, root.json.id);
+
+  const list = await call(app, "GET", "/api/catalog/categories");
+  assert.equal(list.status, 200);
+  assert.ok(list.json.items.some((c: any) => c.id === root.json.id));
+  assert.ok(list.json.items.some((c: any) => c.id === child.json.id));
+
+  const product = await call(app, "POST", "/api/catalog/", { sku: "CAT-1", name: "Espresso Beans", price_cents: 1599 });
+  const assign = await call(app, "PUT", `/api/catalog/${product.json.id}/categories`, { categoryIds: [child.json.id] });
+  assert.equal(assign.status, 200);
+
+  const productCats = await call(app, "GET", `/api/catalog/${product.json.id}/categories`);
+  assert.deepEqual(productCats.json.items, [child.json.id]);
+
+  // Deleting the root reparents the child to null rather than orphaning it.
+  const del = await call(app, "DELETE", `/api/catalog/categories/${root.json.id}`);
+  assert.equal(del.status, 200);
+  const childAfter = await call(app, "GET", "/api/catalog/categories");
+  const reparented = childAfter.json.items.find((c: any) => c.id === child.json.id);
+  assert.equal(reparented.parent_id, null);
+});
+
+test("category mutations are manager/owner-gated", async () => {
+  const app = await freshApp();
+  const { default: request } = await import("./test-request.js");
+  const { status, json } = await request(app.express, "POST", "/api/catalog/categories", { name: "Should Fail" }, "cashier");
+  assert.equal(status, 403);
+  assert.equal(json.error.code, "forbidden");
+});

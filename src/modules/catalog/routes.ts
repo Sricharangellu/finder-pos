@@ -3,6 +3,7 @@ import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { CatalogService, ProductStatus, TaxClass } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 
 const taxClassSchema = z.enum(["standard", "exempt"]);
 const statusSchema = z.enum(["active", "draft", "archived"]);
@@ -19,6 +20,23 @@ function readStatusFilter(value: unknown): ProductStatus | undefined {
   return value as ProductStatus;
 }
 
+// BE-6: optional product detail fields (description/brand/dimensions/weight/image/
+// preferred vendor/qty-sell limits). Dimensions are millimeters, weight is grams.
+const detailFieldsSchema = {
+  description: z.string().nullable().optional(),
+  brand: z.string().nullable().optional(),
+  length_mm: z.number().int().positive().nullable().optional(),
+  width_mm: z.number().int().positive().nullable().optional(),
+  height_mm: z.number().int().positive().nullable().optional(),
+  weight_grams: z.number().int().positive().nullable().optional(),
+  image_url: z.string().url().nullable().optional(),
+  preferred_vendor_id: z.string().min(1).nullable().optional(),
+  vendor_upc: z.string().min(1).nullable().optional(),
+  min_qty_to_sell: z.number().int().positive().nullable().optional(),
+  max_qty_to_sell: z.number().int().positive().nullable().optional(),
+  qty_increment: z.number().int().positive().optional(),
+};
+
 const createSchema = z.object({
   sku: z.string().min(1),
   name: z.string().min(1),
@@ -27,6 +45,7 @@ const createSchema = z.object({
   tax_class: taxClassSchema.optional(),
   barcode: z.string().min(1).nullable().optional(),
   status: statusSchema.optional(),
+  ...detailFieldsSchema,
 });
 
 const updateSchema = z
@@ -37,10 +56,29 @@ const updateSchema = z
     tax_class: taxClassSchema.optional(),
     barcode: z.string().min(1).nullable().optional(),
     status: statusSchema.optional(),
+    ...detailFieldsSchema,
   })
   .refine((o) => Object.keys(o).length > 0, {
     message: "at least one field is required",
   });
+
+const createCategorySchema = z.object({
+  name: z.string().min(1),
+  parent_id: z.string().min(1).nullable().optional(),
+});
+
+const updateCategorySchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    parent_id: z.string().min(1).nullable().optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, {
+    message: "at least one field is required",
+  });
+
+const setProductCategoriesSchema = z.object({
+  categoryIds: z.array(z.string().min(1)),
+});
 
 function parseInt0(value: unknown): number | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
@@ -149,6 +187,41 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // Category tree (BE-6). Registered before "/:id" so "categories" isn't read as an id.
+  router.get(
+    "/categories",
+    handler(async (_req, res) => {
+      res.json({ items: await service.listCategories(tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/categories",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(createCategorySchema, req.body);
+      res.status(201).json(await service.createCategory(body, tenantId(res)));
+    }),
+  );
+
+  router.patch(
+    "/categories/:id",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(updateCategorySchema, req.body);
+      res.json(await service.updateCategory(String(req.params.id), body, tenantId(res)));
+    }),
+  );
+
+  router.delete(
+    "/categories/:id",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      await service.deleteCategory(String(req.params.id), tenantId(res));
+      res.json({ ok: true });
+    }),
+  );
+
   router.get(
     "/:id",
     handler(async (req, res) => {
@@ -156,6 +229,22 @@ export function registerRoutes(router: Router, service: CatalogService): void {
       const product = await service.get(id, tenantId(res));
       if (!product) throw notFound(`product '${id}' not found`);
       res.json(product);
+    }),
+  );
+
+  router.get(
+    "/:id/categories",
+    handler(async (req, res) => {
+      res.json({ items: await service.listProductCategories(String(req.params.id), tenantId(res)) });
+    }),
+  );
+
+  router.put(
+    "/:id/categories",
+    handler(async (req, res) => {
+      const body = parseBody(setProductCategoriesSchema, req.body);
+      await service.setProductCategories(String(req.params.id), body.categoryIds, tenantId(res));
+      res.json({ ok: true });
     }),
   );
 

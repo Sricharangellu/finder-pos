@@ -42,9 +42,62 @@ CREATE TABLE IF NOT EXISTS product_barcodes (
 CREATE INDEX IF NOT EXISTS product_barcodes_product_idx ON product_barcodes (tenant_id, product_id);
 `;
 
+// BE-6: product detail fields (description/brand/dimensions/weight/image/preferred
+// vendor/qty-sell limits). Dimensions in millimeters, weight in grams (BIGINT, like
+// money: integer base units, never floats). qty_increment defaults to 1 (sellable
+// in single units unless a tenant configures case-pack-only SKUs).
+const ALTER_PRODUCTS_DETAIL_FIELDS = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS length_mm BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS width_mm BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS height_mm BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_grams BIGINT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS preferred_vendor_id TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS vendor_upc TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS min_qty_to_sell INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS max_qty_to_sell INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS qty_increment INTEGER NOT NULL DEFAULT 1;
+`;
+
+// BE-6: category tree. `parent_id` is a self-reference (app-layer; no FK, matching
+// the suppliers/preferred_vendor_id reference convention) so categories can nest
+// arbitrarily. `products.category` (flat string, used by resolveTaxClass) is kept
+// unchanged — this tree is additive, for filtering/browsing.
+const CREATE_CATEGORIES_TABLE = `
+CREATE TABLE IF NOT EXISTS categories (
+  id         TEXT PRIMARY KEY,
+  tenant_id  TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  parent_id  TEXT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS categories_tenant_parent_idx ON categories (tenant_id, parent_id);
+`;
+
+const CREATE_PRODUCT_CATEGORIES = `
+CREATE TABLE IF NOT EXISTS product_categories (
+  tenant_id   TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  category_id TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, product_id, category_id)
+);
+CREATE INDEX IF NOT EXISTS product_categories_category_idx ON product_categories (tenant_id, category_id);
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
-  migrations: [dropLegacyNoTenant("products"), CREATE_PRODUCTS_TABLE, CREATE_PRODUCTS_INDEXES, CREATE_PRODUCT_BARCODES],
+  migrations: [
+    dropLegacyNoTenant("products"),
+    CREATE_PRODUCTS_TABLE,
+    CREATE_PRODUCTS_INDEXES,
+    CREATE_PRODUCT_BARCODES,
+    ALTER_PRODUCTS_DETAIL_FIELDS,
+    CREATE_CATEGORIES_TABLE,
+    CREATE_PRODUCT_CATEGORIES,
+  ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);
     // Idempotent demo seed (only runs when the table is empty for tnt_demo).
@@ -61,4 +114,7 @@ export type {
   ListProductsQuery,
   TaxClass,
   ProductStatus,
+  Category,
+  CreateCategoryInput,
+  UpdateCategoryInput,
 } from "./service.js";

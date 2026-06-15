@@ -20,6 +20,18 @@ export interface Product {
   status: ProductStatus;
   created_at: number;
   updated_at: number;
+  description: string | null;
+  brand: string | null;
+  length_mm: number | null;
+  width_mm: number | null;
+  height_mm: number | null;
+  weight_grams: number | null;
+  image_url: string | null;
+  preferred_vendor_id: string | null;
+  vendor_upc: string | null;
+  min_qty_to_sell: number | null;
+  max_qty_to_sell: number | null;
+  qty_increment: number;
 }
 
 export interface CreateProductInput {
@@ -30,6 +42,18 @@ export interface CreateProductInput {
   tax_class?: TaxClass;
   barcode?: string | null;
   status?: ProductStatus;
+  description?: string | null;
+  brand?: string | null;
+  length_mm?: number | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  weight_grams?: number | null;
+  image_url?: string | null;
+  preferred_vendor_id?: string | null;
+  vendor_upc?: string | null;
+  min_qty_to_sell?: number | null;
+  max_qty_to_sell?: number | null;
+  qty_increment?: number;
 }
 
 export interface UpdateProductInput {
@@ -39,6 +63,37 @@ export interface UpdateProductInput {
   tax_class?: TaxClass;
   barcode?: string | null;
   status?: ProductStatus;
+  description?: string | null;
+  brand?: string | null;
+  length_mm?: number | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  weight_grams?: number | null;
+  image_url?: string | null;
+  preferred_vendor_id?: string | null;
+  vendor_upc?: string | null;
+  min_qty_to_sell?: number | null;
+  max_qty_to_sell?: number | null;
+  qty_increment?: number;
+}
+
+export interface Category {
+  id: string;
+  tenant_id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateCategoryInput {
+  name: string;
+  parent_id?: string | null;
+}
+
+export interface UpdateCategoryInput {
+  name?: string;
+  parent_id?: string | null;
 }
 
 export interface ListProductsQuery {
@@ -87,14 +142,30 @@ export class CatalogService {
       status: input.status ?? "active",
       created_at: now,
       updated_at: now,
+      description: input.description ?? null,
+      brand: input.brand ?? null,
+      length_mm: input.length_mm ?? null,
+      width_mm: input.width_mm ?? null,
+      height_mm: input.height_mm ?? null,
+      weight_grams: input.weight_grams ?? null,
+      image_url: input.image_url ?? null,
+      preferred_vendor_id: input.preferred_vendor_id ?? null,
+      vendor_upc: input.vendor_upc ?? null,
+      min_qty_to_sell: input.min_qty_to_sell ?? null,
+      max_qty_to_sell: input.max_qty_to_sell ?? null,
+      qty_increment: input.qty_increment ?? 1,
     };
 
     try {
       await this.db.query(
         `INSERT INTO products
-           (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at)
+           (id, tenant_id, sku, name, price_cents, category, tax_class, barcode, status, created_at, updated_at,
+            description, brand, length_mm, width_mm, height_mm, weight_grams, image_url,
+            preferred_vendor_id, vendor_upc, min_qty_to_sell, max_qty_to_sell, qty_increment)
          VALUES
-           (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at)`,
+           (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
+            @description, @brand, @length_mm, @width_mm, @height_mm, @weight_grams, @image_url,
+            @preferred_vendor_id, @vendor_upc, @min_qty_to_sell, @max_qty_to_sell, @qty_increment)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
@@ -281,6 +352,18 @@ export class CatalogService {
       changed.tax_class = resolvedTax;
     }
 
+    const detailFields = [
+      "description", "brand", "length_mm", "width_mm", "height_mm", "weight_grams",
+      "image_url", "preferred_vendor_id", "vendor_upc", "min_qty_to_sell", "max_qty_to_sell", "qty_increment",
+    ] as const;
+    for (const field of detailFields) {
+      const value = input[field];
+      if (value !== undefined && value !== current[field]) {
+        (next as unknown as Record<string, unknown>)[field] = value;
+        (changed as unknown as Record<string, unknown>)[field] = value;
+      }
+    }
+
     if (Object.keys(changed).length === 0) {
       return current;
     }
@@ -295,6 +378,18 @@ export class CatalogService {
          tax_class = @tax_class,
          barcode = @barcode,
          status = @status,
+         description = @description,
+         brand = @brand,
+         length_mm = @length_mm,
+         width_mm = @width_mm,
+         height_mm = @height_mm,
+         weight_grams = @weight_grams,
+         image_url = @image_url,
+         preferred_vendor_id = @preferred_vendor_id,
+         vendor_upc = @vendor_upc,
+         min_qty_to_sell = @min_qty_to_sell,
+         max_qty_to_sell = @max_qty_to_sell,
+         qty_increment = @qty_increment,
          updated_at = @updated_at
        WHERE id = @id`,
       next as unknown as Record<string, unknown>,
@@ -335,6 +430,98 @@ export class CatalogService {
         // Tolerate a concurrent seeder racing on the same SKU (cold-start races).
       }
     }
+  }
+
+  // ---- Category tree (BE-6) ----
+
+  async listCategories(tenantId: string): Promise<Category[]> {
+    return this.db.query<Category>(
+      "SELECT * FROM categories WHERE tenant_id = @tenantId ORDER BY name",
+      { tenantId },
+    );
+  }
+
+  async getCategoryOrThrow(id: string, tenantId: string): Promise<Category> {
+    const category = await this.db.one<Category>(
+      "SELECT * FROM categories WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
+    if (!category) throw notFound(`category '${id}' not found`);
+    return category;
+  }
+
+  async createCategory(input: CreateCategoryInput, tenantId: string): Promise<Category> {
+    if (input.parent_id) await this.getCategoryOrThrow(input.parent_id, tenantId);
+    const now = Date.now();
+    const category: Category = {
+      id: `cat_${uuidv7()}`,
+      tenant_id: tenantId,
+      name: input.name,
+      parent_id: input.parent_id ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO categories (id, tenant_id, name, parent_id, created_at, updated_at)
+       VALUES (@id, @tenant_id, @name, @parent_id, @created_at, @updated_at)`,
+      category as unknown as Record<string, unknown>,
+    );
+    return category;
+  }
+
+  async updateCategory(id: string, input: UpdateCategoryInput, tenantId: string): Promise<Category> {
+    const current = await this.getCategoryOrThrow(id, tenantId);
+    if (input.parent_id) {
+      if (input.parent_id === id) throw conflict("a category cannot be its own parent");
+      await this.getCategoryOrThrow(input.parent_id, tenantId);
+    }
+    const next: Category = {
+      ...current,
+      name: input.name ?? current.name,
+      parent_id: input.parent_id !== undefined ? input.parent_id : current.parent_id,
+      updated_at: Date.now(),
+    };
+    await this.db.query(
+      `UPDATE categories SET name = @name, parent_id = @parent_id, updated_at = @updated_at WHERE id = @id`,
+      next as unknown as Record<string, unknown>,
+    );
+    return next;
+  }
+
+  async deleteCategory(id: string, tenantId: string): Promise<void> {
+    await this.getCategoryOrThrow(id, tenantId);
+    await this.db.tx(async (tdb) => {
+      await tdb.query("UPDATE categories SET parent_id = NULL WHERE tenant_id = @tenantId AND parent_id = @id", { tenantId, id });
+      await tdb.query("DELETE FROM product_categories WHERE tenant_id = @tenantId AND category_id = @id", { tenantId, id });
+      await tdb.query("DELETE FROM categories WHERE tenant_id = @tenantId AND id = @id", { tenantId, id });
+    });
+  }
+
+  /** Category ids assigned to a product. */
+  async listProductCategories(productId: string, tenantId: string): Promise<string[]> {
+    const rows = await this.db.query<{ category_id: string }>(
+      "SELECT category_id FROM product_categories WHERE tenant_id = @tenantId AND product_id = @productId",
+      { tenantId, productId },
+    );
+    return rows.map((r) => r.category_id);
+  }
+
+  /** Replace the full set of categories assigned to a product. */
+  async setProductCategories(productId: string, categoryIds: string[], tenantId: string): Promise<void> {
+    await this.getOrThrow(productId, tenantId);
+    for (const categoryId of categoryIds) {
+      await this.getCategoryOrThrow(categoryId, tenantId);
+    }
+    await this.db.tx(async (tdb) => {
+      await tdb.query("DELETE FROM product_categories WHERE tenant_id = @tenantId AND product_id = @productId", { tenantId, productId });
+      for (const categoryId of categoryIds) {
+        await tdb.query(
+          `INSERT INTO product_categories (tenant_id, product_id, category_id) VALUES (@tenantId, @productId, @categoryId)
+           ON CONFLICT DO NOTHING`,
+          { tenantId, productId, categoryId },
+        );
+      }
+    });
   }
 }
 
