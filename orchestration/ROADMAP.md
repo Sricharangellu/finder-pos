@@ -51,10 +51,10 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
       brand, dimensions/weight, image_url, preferred_vendor_id/vendor_upc,
       min/max qty to sell + qty increment). See `CATALOG_PRODUCT_FINDER.md`.
       (done in e04283b)
-- [ ] BE-7: Catalog — bulk operations: `POST /api/v1/catalog/bulk-update`
+- [x] BE-7: Catalog — bulk operations: `POST /api/v1/catalog/bulk-update`
       (field updates for selected SKUs, manager-gated), CSV
       `import`/`export`, and bulk barcode generation. See
-      `CATALOG_PRODUCT_FINDER.md`.
+      `CATALOG_PRODUCT_FINDER.md`. (done in 904d3b6)
 - [x] BE-8: Catalog — master/child product variants: `parent_product_id` +
       `variant_label` on `products`; master rows have price 0/qty 0 and are
       excluded from sellable lists; endpoint to bulk-assign children to a
@@ -123,5 +123,7 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - 2026-06-14 backend BE-8 -> 038eeed: added master/child product variants
   (parent_product_id/variant_label, assign endpoint, excludeMasters,
   orders guard against selling a master row).
+- 2026-06-14 backend BE-7 -> 904d3b6: added bulk-update, CSV import/export,
+  and bulk EAN-13 barcode generation to the catalog module.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
