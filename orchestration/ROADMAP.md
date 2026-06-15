@@ -22,7 +22,8 @@ This file is the shared backlog for the two scheduled developer agents (see
 
 Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 ("Suggested UI" notes per module), `CONTINUE_IN_ANTIGRAVITY.md` §6,
-`SECURITY_AUDIT.md` recommended-next, `DB_REVIEW.md` §6.
+`SECURITY_AUDIT.md` recommended-next, `DB_REVIEW.md` §6,
+`CATALOG_PRODUCT_FINDER.md` (catalog/product-detail benchmark notes).
 
 ---
 
@@ -45,6 +46,18 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - [ ] BE-5: Per-customer discount usage limit enforcement at redeem time
       (SECURITY_AUDIT M2 follow-up #4) — `discounts.evaluate`/`redeem` should
       check `per_customer_limit` against a usage ledger keyed by customer.
+- [ ] BE-6: Catalog — category tree (`categories` table with `parent_id` +
+      `product_categories` join) and product detail fields (description,
+      brand, dimensions/weight, image_url, preferred_vendor_id/vendor_upc,
+      min/max qty to sell + qty increment). See `CATALOG_PRODUCT_FINDER.md`.
+- [ ] BE-7: Catalog — bulk operations: `POST /api/v1/catalog/bulk-update`
+      (field updates for selected SKUs, manager-gated), CSV
+      `import`/`export`, and bulk barcode generation. See
+      `CATALOG_PRODUCT_FINDER.md`.
+- [ ] BE-8: Catalog — master/child product variants: `parent_product_id` +
+      `variant_label` on `products`; master rows have price 0/qty 0 and are
+      excluded from sellable lists; endpoint to bulk-assign children to a
+      master. See `CATALOG_PRODUCT_FINDER.md`.
 
 ## Frontend lane (web/)
 
@@ -67,6 +80,15 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - [ ] FE-6: Audit existing `web/mocks/lightspeedHandlers.ts` against live
       backend routes; flip any still-mocked endpoints used by built pages to
       live `apiGet`/`apiPost` calls.
+- [ ] FE-7: Catalog filter/bulk-select UI on `/inventory` — category-tree
+      filter, row checkboxes + "Actions" menu (bulk status/category update,
+      CSV export), consuming BE-6/BE-7. See `CATALOG_PRODUCT_FINDER.md`.
+- [ ] FE-8: Product detail/edit page (`/inventory/products/[id]`) with
+      General, Categories, Price (live cost/price/margin/markup), Manage Qty,
+      and Image sections, consuming BE-6. See `CATALOG_PRODUCT_FINDER.md`.
+- [ ] FE-9: Variants UI — master/child editor on the product detail page plus
+      a visual distinction for master rows in the `/inventory` list,
+      consuming BE-8. See `CATALOG_PRODUCT_FINDER.md`.
 
 ## Cross-cutting (claim into your lane when picked up)
 
