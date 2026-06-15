@@ -1,6 +1,12 @@
 # Finder — Living Roadmap (backlog for scheduled dev agents)
 
-**Product framing:** Finder is a standalone POS/business-management platform.
+**Product framing:** Finder is a standalone POS/business-management platform,
+sold as a single **hybrid** codebase to three buyer profiles — retail (single
+till, walk-in customers), wholesale/B2B (quotes, sales orders, AR/AP,
+purchasing), and enterprise (multi-store). A per-tenant **edition** setting
+(see `gaps/PRODUCT_SEGMENTATION.md`, BE-18/FE-13) controls which module groups
+are surfaced, defaulting to everything on. No feature is ever removed for any
+profile — segmentation is presentation/visibility only.
 `ERP_BENCHMARK.md` (the erp.fairtradetx.com 18-prompt spec) is **inspiration
 only** — a source of feature ideas — not a spec Finder must match or depend
 on. Don't frame work as "closing benchmark gaps"; frame it as "this is a
@@ -54,10 +60,16 @@ records, only triaged into "build now" vs. "documented for later."
 8. **BE-10** (cycle count sessions) — larger, self-contained; scheduled
    after the smaller/dependency-unblocking items above.
 9. **BE-15** (shipping tracking fields) — trivial, last.
-10. **FE-11** (discount rule builder) — no backend dependency, can start
+10. **BE-18** (edition presets/feature-flag groups) — added 2026-06-15 for
+    the hybrid retail/wholesale/enterprise direction; no dependencies on
+    BE-9..17, but placed after them since it's purely additive grouping
+    over features that should exist first.
+11. **FE-11** (discount rule builder) — no backend dependency, can start
     immediately.
-11. **FE-10** (credit limit UI) — once BE-13 lands.
-12. **FE-12** (age-verification + register UI) — once BE-16/BE-17 land.
+12. **FE-10** (credit limit UI) — once BE-13 lands.
+13. **FE-12** (age-verification + register UI) — once BE-16/BE-17 land.
+14. **FE-13** (edition-aware navigation) — once BE-18 lands; last, since it
+    depends on every other group's routes already existing to gate.
 
 ---
 
@@ -136,6 +148,16 @@ records, only triaged into "build now" vs. "documented for later."
 - [ ] BE-15: Shipping — add optional `tracking_number` + `carrier` text
       fields to shipping orders, settable on `POST /:id/ship`. No carrier
       API integration. See `gaps/FULFILLMENT_SHIPPING_GAPS.md`.
+- [ ] BE-18: Edition presets — extend `DEFAULT_FLAGS`
+      (`src/modules/settings/service.ts`) with `groupRetailPOS`,
+      `groupWholesale`, `groupEnterprise` (all default `true`). Add
+      `POST /api/v1/settings/edition` (manager-gated, body:
+      `"retail" | "wholesale" | "enterprise" | "hybrid"`) that sets the
+      three group flags to a preset via the existing `setFlags`, individually
+      overridable after. Gate `sales`/`billing`/`purchasing`/`accounting`
+      routes behind `groupWholesale` and `giftcards`/register-session routes
+      behind `groupRetailPOS` (404 when off). See
+      `gaps/PRODUCT_SEGMENTATION.md`.
 
 ## Frontend lane (web/)
 
@@ -182,6 +204,13 @@ records, only triaged into "build now" vs. "documented for later."
       when any line is `age_restricted` (consumes BE-16); register
       open/close screen with running cash-variance summary (consumes
       BE-17). See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
+- [ ] FE-13: Edition-aware navigation — read `/feature-flags` at app load;
+      hide nav sections/routes for disabled groups (`groupWholesale` hides
+      Sales Orders/Purchasing/Accounting, `groupRetailPOS` hides Gift
+      Cards/Register Sessions). Add a "Business type" picker on
+      `/settings/business` calling `POST /settings/edition`, plus the three
+      group toggles for custom mixes. Consumes BE-18. See
+      `gaps/PRODUCT_SEGMENTATION.md`.
 
 ## Cross-cutting (claim into your lane when picked up)
 
