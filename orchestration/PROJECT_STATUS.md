@@ -119,7 +119,8 @@ frontend (the website/app screens staff and owners use).
     `0 6 * * *` UTC, follows `AGENT_FRONTEND_CYCLE.md`.
 
 - **Vercel preview deploy** (testing env, `DEPLOY_ENV=testing`, no
-  `--prod`): ran `scripts/deploy.sh both` with a one-time user-supplied
+  `--prod`): ran `scripts/deploy.sh both` with a one-time user-suppli
+  ed
   token (not persisted). Result: exit 0, "Done (both)."
   - Frontend: build succeeded (28s, 13 routes), deployment
     `dpl_BPC4e9nTxNVurbYn47nQaXwjM85p`, `readyState: READY`, live at
@@ -159,3 +160,38 @@ frontend (the website/app screens staff and owners use).
      (`--prod` deploy is intentionally gated behind a human).
 3. **Periodic review**: check in on the roadmap run log and decide whether
    the daily cadence, lane split, or task priorities need adjusting.
+
+---
+
+## 4. 2026-06-15 update — production deploy + orchestration reorg
+
+- **Production deploy**: ran `DEPLOY_ENV=prod scripts/deploy.sh both` with a
+  one-time user-supplied Vercel token. Both backend (`/readyz` → `db:
+  connected`, 21 modules) and frontend (21 routes, `/login` 200) are live at
+  `finder-pos-backend.vercel.app` / `finder-pos-frontend.vercel.app`. This
+  reflects everything already on `master` (the scheduled agents' work) —
+  nothing new was merged for this deploy.
+- **Orchestration cleanup**: moved 9 superseded docs (the old three-parallel-
+  agent prompt book, one-time DB/security audits, the stale dev/testing/prod
+  environment doc, and Antigravity/cycle-3 handoff notes) to
+  `orchestration/_archive/` (see its `README.md` for why each was retired).
+  Nothing in the active flow (`ROADMAP.md`, `AGENT_*_CYCLE.md`) depended on
+  them.
+- **New gap analysis**: a fresh enterprise-architecture assessment (modeled
+  on the same erp.fairtradetx.com benchmark as `ERP_BENCHMARK.md`) was
+  triaged into `orchestration/gaps/*.md` — one file per business module
+  (inventory, purchasing, sales/orders, accounting, customers,
+  fulfillment/shipping, ecommerce, discounts, reports, settings/team/
+  compliance). Each file separates "already built" (several assessment
+  findings were outdated — e.g. discounts already support volume/BOGO/tier
+  rules, purchasing already has receiving + AP posting) from genuinely
+  useful gaps, with explicit **out-of-scope** calls (GL/ledger, carrier
+  integrations, multi-channel ecommerce, EDI) per Finder's "inspiration
+  only" framing.
+- **Roadmap additions**: appended **BE-9..BE-17** and **FE-10..FE-12** to
+  `ROADMAP.md`, each linking to its source gap file. Highest-value items:
+  inventory reservation/oversell prevention (BE-9), customer credit limits
+  (BE-13), AR dunning (BE-14), and age-verification + register
+  open/close (BE-16/17/FE-12). The scheduled backend/frontend agents will
+  pick these up in lane order, same as before — no change to the agent
+  playbooks was needed, only to the shared backlog they read.

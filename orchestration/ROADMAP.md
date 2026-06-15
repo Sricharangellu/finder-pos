@@ -20,10 +20,13 @@ This file is the shared backlog for the two scheduled developer agents (see
    (claim it by moving it into your lane with your tag, so the other agent
    doesn't duplicate it).
 
-Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
-("Suggested UI" notes per module), `CONTINUE_IN_ANTIGRAVITY.md` §6,
-`SECURITY_AUDIT.md` recommended-next, `DB_REVIEW.md` §6,
-`CATALOG_PRODUCT_FINDER.md` (catalog/product-detail benchmark notes).
+Source material: `ERP_BENCHMARK.md` (parity matrix),
+`CATALOG_PRODUCT_FINDER.md` (catalog/product-detail benchmark notes), and
+`orchestration/gaps/*.md` (per-module gap analysis from the 2026-06-15
+enterprise architecture assessment — one file per module, each ending in a
+curated "what this turns into on the roadmap" section). Historical docs
+(old three-agent prompt book, one-time audits, prior environment model) are
+in `orchestration/_archive/` and are not source material for new work.
 
 ---
 
@@ -59,6 +62,49 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
       `variant_label` on `products`; master rows have price 0/qty 0 and are
       excluded from sellable lists; endpoint to bulk-assign children to a
       master. See `CATALOG_PRODUCT_FINDER.md`. (done in 038eeed)
+- [ ] BE-9: Inventory reservation — on `POST /api/v1/orders`, check
+      `available` (onHand − committed) per line and reject (409
+      `insufficient_stock`) if short; increment `committed` on order
+      creation, release it on completion/void/refund. Make `committed` in
+      `GET /inventory/levels` reflect real reservations (currently
+      hardcoded to 0). See `gaps/INVENTORY_GAPS.md`.
+- [ ] BE-10: Cycle count sessions —
+      `POST /api/v1/inventory/counts` (open session with expected qtys per
+      SKU), `POST /:id/lines` (record counted qty), `POST /:id/close`
+      (manager-gated; posts variances as `inventory_movements`
+      adjustments). See `gaps/INVENTORY_GAPS.md`.
+- [ ] BE-11: Purchasing — partial PO receiving: `POST
+      /api/v1/purchasing/orders/:id/receive` accepts a `quantity` per line
+      (≤ remaining); PO status tracks
+      `open → partially_received → received`, repeatable until fully
+      received. See `gaps/PURCHASING_GAPS.md`.
+- [ ] BE-12: Purchasing — bill variance flag: when an auto-drafted bill's
+      total ≠ `sum(receivedQty * unitCost)` across all receives for its PO,
+      set `bills.variance_cents` (signed) and surface it in
+      `GET /billing/bills`. See `gaps/PURCHASING_GAPS.md`.
+- [ ] BE-13: Customers — credit limit: add `credit_limit_cents` (nullable)
+      to `customers`; enforce on `POST /sales-orders` and `POST /invoices`
+      (409 `credit_limit_exceeded` for `cashier`, allowed with a logged
+      override for `manager`/`owner`). Surface `creditLimitCents` +
+      `creditAvailableCents` in the customer financial summary. See
+      `gaps/SALES_ORDERS_GAPS.md`.
+- [ ] BE-14: Accounting — AR dunning: for invoices `> 30/60/90` days
+      overdue (reuse `ar-aging` query), set `invoices.dunning_level` and
+      emit `invoice.overdue` (consumed by `webhooks`). See
+      `gaps/ACCOUNTING_GAPS.md`.
+- [ ] BE-15: Shipping — add optional `tracking_number` + `carrier` text
+      fields to shipping orders, settable on `POST /:id/ship`. No carrier
+      API integration. See `gaps/FULFILLMENT_SHIPPING_GAPS.md`.
+- [ ] BE-16: Compliance — age-restriction flag: `products.age_restricted`
+      (boolean, default false); `POST /api/v1/sales/sales-orders` and
+      `POST /api/v1/orders` reject (400) if any line is age-restricted and
+      the request lacks `ageVerified: true`. See
+      `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
+- [ ] BE-17: Outlets — register sessions:
+      `POST /registers/:id/open` (starting cash float),
+      `POST /registers/:id/close` (counted cash, computes variance against
+      float + cash-tender sales since open); read endpoint for session
+      history. See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
 
 ## Frontend lane (web/)
 
@@ -90,6 +136,21 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - [ ] FE-9: Variants UI — master/child editor on the product detail page plus
       a visual distinction for master rows in the `/inventory` list,
       consuming BE-8. See `CATALOG_PRODUCT_FINDER.md`.
+- [ ] FE-10: Customers — show `creditLimitCents`/`creditAvailableCents` on
+      the customer detail panel; warn (or block, with manager override) on
+      SO/invoice creation when a customer is over their credit limit,
+      consuming BE-13. See `gaps/SALES_ORDERS_GAPS.md`.
+- [ ] FE-11: Discounts — rule builder on `/discounts`: create/edit form
+      covering `ruleType` (simple/volume/bxgy), `discountType`
+      (fixed/percent), `applyTo`, `tierRestriction`,
+      `minOrderCents`/`minQty`, `buyQty`/`getQty`, date window,
+      `autoApplicable`, `usageLimit`/`perCustomerLimit`, coupon code.
+      Consumes existing `/api/v1/discounts*` endpoints. See
+      `gaps/DISCOUNTS_GAPS.md`.
+- [ ] FE-12: Checkout/operations — age-verification checkbox on the cart
+      when any line is `age_restricted` (consumes BE-16); register
+      open/close screen with running cash-variance summary (consumes
+      BE-17). See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
 
 ## Cross-cutting (claim into your lane when picked up)
 
