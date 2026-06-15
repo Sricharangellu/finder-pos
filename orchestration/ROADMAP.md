@@ -46,10 +46,11 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
 - [ ] BE-5: Per-customer discount usage limit enforcement at redeem time
       (SECURITY_AUDIT M2 follow-up #4) — `discounts.evaluate`/`redeem` should
       check `per_customer_limit` against a usage ledger keyed by customer.
-- [ ] BE-6: Catalog — category tree (`categories` table with `parent_id` +
+- [x] BE-6: Catalog — category tree (`categories` table with `parent_id` +
       `product_categories` join) and product detail fields (description,
       brand, dimensions/weight, image_url, preferred_vendor_id/vendor_upc,
       min/max qty to sell + qty increment). See `CATALOG_PRODUCT_FINDER.md`.
+      (done in e04283b)
 - [ ] BE-7: Catalog — bulk operations: `POST /api/v1/catalog/bulk-update`
       (field updates for selected SKUs, manager-gated), CSV
       `import`/`export`, and bulk barcode generation. See
@@ -117,5 +118,7 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
   column on inventory grid.
 - 2026-06-14 frontend FE-2 -> a391420: added AP/AR aging surface (AR/AP
   cards, aging summaries, pay actions) to accounting page.
+- 2026-06-14 backend BE-6 -> e04283b: added category tree + product detail
+  fields to catalog module, with CRUD/assignment endpoints.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
