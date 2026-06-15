@@ -55,10 +55,10 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
       (field updates for selected SKUs, manager-gated), CSV
       `import`/`export`, and bulk barcode generation. See
       `CATALOG_PRODUCT_FINDER.md`.
-- [ ] BE-8: Catalog — master/child product variants: `parent_product_id` +
+- [x] BE-8: Catalog — master/child product variants: `parent_product_id` +
       `variant_label` on `products`; master rows have price 0/qty 0 and are
       excluded from sellable lists; endpoint to bulk-assign children to a
-      master. See `CATALOG_PRODUCT_FINDER.md`.
+      master. See `CATALOG_PRODUCT_FINDER.md`. (done in 038eeed)
 
 ## Frontend lane (web/)
 
@@ -120,5 +120,8 @@ Source material: `ERP_BENCHMARK.md` (parity matrix), `BACKEND_HANDOFF.md`
   cards, aging summaries, pay actions) to accounting page.
 - 2026-06-14 backend BE-6 -> e04283b: added category tree + product detail
   fields to catalog module, with CRUD/assignment endpoints.
+- 2026-06-14 backend BE-8 -> 038eeed: added master/child product variants
+  (parent_product_id/variant_label, assign endpoint, excludeMasters,
+  orders guard against selling a master row).
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
