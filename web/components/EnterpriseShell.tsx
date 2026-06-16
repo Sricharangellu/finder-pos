@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 
 type NavKey =
+  | "dashboard"
   | "register"
   | "inventory"
   | "purchasing"
@@ -37,6 +38,7 @@ const NAV_ITEMS: Array<{
   href: string;
   icon: NavKey;
 }> = [
+  { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard" },
   { key: "register", label: "Register", href: "/terminal", icon: "register" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory" },
@@ -304,6 +306,8 @@ function UserContext({ name, role }: { name: string; role: string }) {
 
 function NavIcon({ name }: { name: NavKey }) {
   switch (name) {
+    case "dashboard":
+      return <DashboardIcon />;
     case "register":
       return <RegisterIcon />;
     case "inventory":
@@ -319,6 +323,17 @@ function NavIcon({ name }: { name: NavKey }) {
     default:
       return <ReportsIcon />;
   }
+}
+
+function DashboardIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
 }
 
 function OfflineIcon() {

@@ -62,6 +62,29 @@ export default function ReportsPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6">
+        {/* Sub-report navigation */}
+        {allowed && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {([
+              { label: "Overview", href: "/reports" },
+              { label: "Sales", href: "/reports/sales" },
+              { label: "Inventory Valuation", href: "/reports/inventory" },
+              { label: "AR Aging", href: "/reports/ar-aging" },
+            ] as const).map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                  link.href === "/reports"
+                    ? "border-brand-600 bg-brand-600 text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        )}
         {allowed && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
