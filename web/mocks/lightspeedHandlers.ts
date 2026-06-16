@@ -922,4 +922,53 @@ lightspeedHandlers.push(
     if (so.status === "delivered") return HttpResponse.json({ error: { code: "conflict", message: "cannot cancel a delivered shipping order", requestId: rid() } }, { status: 409 });
     so.status = "cancelled"; return HttpResponse.json(so);
   }),
+
+  // ── Register sessions (open/close cash drawer) ────────────────────────────
+  http.get(`${V1}/outlets/registers/:registerId/sessions`, async ({ params }) => {
+    await lat();
+    const regId = String(params.registerId);
+    const sessions = Array.from(registerSessions.values())
+      .filter((s) => s.register_id === regId)
+      .sort((a, b) => b.opened_at - a.opened_at);
+    return HttpResponse.json({ items: sessions });
+  }),
+  http.post(`${V1}/outlets/registers/:registerId/open`, async ({ params, request }) => {
+    await lat();
+    const regId = String(params.registerId);
+    const existing = Array.from(registerSessions.values()).find(
+      (s) => s.register_id === regId && s.status === "open"
+    );
+    if (existing) return HttpResponse.json({ error: { code: "conflict", message: "register already open", requestId: rid() } }, { status: 409 });
+    const b = (await request.json()) as { openingFloatCents?: number };
+    const session = {
+      id: `ses_${Math.random().toString(36).slice(2, 12)}`,
+      tenant_id: "tnt_demo",
+      register_id: regId,
+      opened_by: "usr_demo_cashier",
+      opening_float_cents: b.openingFloatCents ?? 0,
+      closing_float_cents: null,
+      counted_cash_cents: null,
+      variance_cents: null,
+      status: "open",
+      opened_at: Date.now(),
+      closed_at: null,
+    };
+    registerSessions.set(session.id, session);
+    return HttpResponse.json(session, { status: 201 });
+  }),
+  http.post(`${V1}/outlets/registers/:registerId/close`, async ({ params, request }) => {
+    await lat();
+    const regId = String(params.registerId);
+    const session = Array.from(registerSessions.values()).find(
+      (s) => s.register_id === regId && s.status === "open"
+    );
+    if (!session) return HttpResponse.json({ error: { code: "not_found", message: "no open session for this register", requestId: rid() } }, { status: 404 });
+    const b = (await request.json()) as { countedCashCents?: number; closingFloatCents?: number };
+    session.counted_cash_cents = b.countedCashCents ?? 0;
+    session.closing_float_cents = b.closingFloatCents ?? 0;
+    session.variance_cents = (b.countedCashCents ?? 0) - session.opening_float_cents;
+    session.status = "closed";
+    session.closed_at = Date.now();
+    return HttpResponse.json(session);
+  }),
 );
