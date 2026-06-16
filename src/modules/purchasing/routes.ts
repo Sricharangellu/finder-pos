@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { PurchasingService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -49,7 +50,9 @@ const vendorCreditSchema = z.object({
 });
 
 export function registerRoutes(router: Router, service: PurchasingService): void {
-  router.post("/suppliers", handler(async (req, res) => {
+  const mgr = requireRole("manager");
+
+  router.post("/suppliers", mgr, handler(async (req, res) => {
     const b = parseBody(supplierSchema, req.body);
     res.status(201).json(await service.createSupplier(b.name, b.email, tenantId(res)));
   }));
@@ -64,7 +67,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   }));
 
   // Vendor AP credits — chargebacks + credit memos.
-  router.post("/vendor-credits", handler(async (req, res) => {
+  router.post("/vendor-credits", mgr, handler(async (req, res) => {
     const b = parseBody(vendorCreditSchema, req.body);
     res.status(201).json(await service.createVendorCredit(b, tenantId(res)));
   }));
@@ -74,12 +77,12 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json({ items: await service.listVendorCredits(tenantId(res), supplierId) });
   }));
 
-  router.post("/vendor-credits/:id/void", handler(async (req, res) => {
+  router.post("/vendor-credits/:id/void", mgr, handler(async (req, res) => {
     res.json(await service.voidVendorCredit(String(req.params.id), tenantId(res)));
   }));
 
   // Vendor returns / write-offs (damaged + expired) — optionally raise a credit memo.
-  router.post("/returns", handler(async (req, res) => {
+  router.post("/returns", mgr, handler(async (req, res) => {
     const b = parseBody(returnSchema, req.body);
     res.status(201).json(await service.createReturn(b, tenantId(res)));
   }));
@@ -88,7 +91,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json({ items: await service.listReturns(tenantId(res)) });
   }));
 
-  router.post("/orders", handler(async (req, res) => {
+  router.post("/orders", mgr, handler(async (req, res) => {
     const b = parseBody(poSchema, req.body);
     res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res)));
   }));
@@ -101,7 +104,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json(await service.getOrder(String(req.params.id), tenantId(res)));
   }));
 
-  router.post("/orders/:id/receive", handler(async (req, res) => {
+  router.post("/orders/:id/receive", mgr, handler(async (req, res) => {
     res.json(await service.receive(String(req.params.id), tenantId(res)));
   }));
 }

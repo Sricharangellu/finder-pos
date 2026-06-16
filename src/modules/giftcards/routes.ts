@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { GiftCardsService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -19,6 +20,7 @@ const redeemSchema = z.object({
 export function registerRoutes(router: Router, service: GiftCardsService): void {
   router.post(
     "/",
+    requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(issueSchema, req.body);
       const card = await service.issue(body.amountCents, tenantId(res));

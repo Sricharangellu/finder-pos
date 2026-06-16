@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { CustomersService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -85,6 +86,7 @@ export function registerRoutes(router: Router, service: CustomersService): void 
 
   router.post(
     "/:id/redeem",
+    requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(redeemSchema, req.body);
       const result = await service.redeem(String(req.params.id), body.points, tenantId(res));

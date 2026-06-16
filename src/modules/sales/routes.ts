@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { SalesService, QuoteStatus, SOStatus } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -37,6 +38,8 @@ const tierPricesSchema = z.object({
 });
 
 export function registerRoutes(router: Router, service: SalesService): void {
+  const mgr = requireRole("manager");
+
   // ── Quotations ─────────────────────────────────────────────────────────
   router.post("/quotations", handler(async (req, res) => {
     res.status(201).json(await service.createQuotation(parseBody(quoteSchema, req.body), tenantId(res)));
@@ -77,17 +80,17 @@ export function registerRoutes(router: Router, service: SalesService): void {
   router.get("/sales-orders/:id", handler(async (req, res) => {
     res.json(await service.getSalesOrder(String(req.params.id), tenantId(res)));
   }));
-  router.post("/sales-orders/:id/approve", handler(async (req, res) => {
+  router.post("/sales-orders/:id/approve", mgr, handler(async (req, res) => {
     res.json(await service.approveSalesOrder(String(req.params.id), tenantId(res)));
   }));
-  router.post("/sales-orders/:id/assign-picker", handler(async (req, res) => {
+  router.post("/sales-orders/:id/assign-picker", mgr, handler(async (req, res) => {
     const b = parseBody(assignSchema, req.body);
     res.json(await service.assignPicker(String(req.params.id), b.pickerId, tenantId(res)));
   }));
-  router.post("/sales-orders/:id/invoice", handler(async (req, res) => {
+  router.post("/sales-orders/:id/invoice", mgr, handler(async (req, res) => {
     res.json(await service.convertToInvoice(String(req.params.id), tenantId(res)));
   }));
-  router.post("/sales-orders/:id/cancel", handler(async (req, res) => {
+  router.post("/sales-orders/:id/cancel", mgr, handler(async (req, res) => {
     res.json(await service.cancelSalesOrder(String(req.params.id), tenantId(res)));
   }));
 
@@ -95,7 +98,7 @@ export function registerRoutes(router: Router, service: SalesService): void {
   router.get("/products/:productId/tier-prices", handler(async (req, res) => {
     res.json(await service.getTierPrices(String(req.params.productId), tenantId(res)));
   }));
-  router.put("/products/:productId/tier-prices", handler(async (req, res) => {
+  router.put("/products/:productId/tier-prices", mgr, handler(async (req, res) => {
     const b = parseBody(tierPricesSchema, req.body);
     const prices: Record<number, number> = {};
     for (const [k, v] of Object.entries(b.prices)) prices[Number(k)] = v;

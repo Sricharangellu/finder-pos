@@ -75,11 +75,11 @@ records, only triaged into "build now" vs. "documented for later."
 
 ## Backend lane (src/, db/, contracts/, scripts/)
 
-- [ ] BE-1: Finish the RBAC matrix — apply `requireRole("manager")` from
+- [x] BE-1: Finish the RBAC matrix — apply `requireRole("manager")` from
       `src/gateway/auth.ts` to remaining sensitive mutations: purchasing
       vendor-credits/returns/PO-receive, discounts create/status, accounting
       deposit create, sales-order cancel/void, giftcard/customer redeem
-      overrides. List each route touched in the commit message.
+      overrides. List each route touched in the commit message. (done)
 - [ ] BE-2: Refresh-token rotation/revocation — make refresh tokens single-use
       (rotate on `/api/identity/refresh`, invalidate the old one), add a
       revocation check on logout. Add tests.

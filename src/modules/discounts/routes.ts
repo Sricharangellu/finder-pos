@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { DiscountsService, RuleStatus } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -42,7 +43,9 @@ const evaluateSchema = z.object({
 const statusSchema = z.object({ status: z.enum(["active", "inactive"]) });
 
 export function registerRoutes(router: Router, service: DiscountsService): void {
-  router.post("/", handler(async (req, res) => {
+  const mgr = requireRole("manager");
+
+  router.post("/", mgr, handler(async (req, res) => {
     res.status(201).json(await service.create(parseBody(createSchema, req.body), tenantId(res)));
   }));
   router.get("/", handler(async (req, res) => {
@@ -52,7 +55,7 @@ export function registerRoutes(router: Router, service: DiscountsService): void 
   router.get("/:id", handler(async (req, res) => {
     res.json(await service.get(String(req.params.id), tenantId(res)));
   }));
-  router.patch("/:id/status", handler(async (req, res) => {
+  router.patch("/:id/status", mgr, handler(async (req, res) => {
     const b = parseBody(statusSchema, req.body);
     res.json(await service.setStatus(String(req.params.id), b.status, tenantId(res)));
   }));

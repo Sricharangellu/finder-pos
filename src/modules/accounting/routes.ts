@@ -27,11 +27,13 @@ const depositSchema = z.object({
 });
 
 export function registerRoutes(router: Router, service: AccountingService): void {
+  const mgr = requireRole("manager");
+
   // ── Chart of Accounts ──────────────────────────────────────────────────
-  router.post("/accounts", handler(async (req, res) => {
+  router.post("/accounts", mgr, handler(async (req, res) => {
     res.status(201).json(await service.createAccount(parseBody(accountSchema, req.body), tenantId(res)));
   }));
-  router.post("/accounts/seed", handler(async (_req, res) => {
+  router.post("/accounts/seed", mgr, handler(async (_req, res) => {
     res.json(await service.seedDefaults(tenantId(res)));
   }));
   router.get("/accounts", handler(async (req, res) => {
@@ -41,12 +43,12 @@ export function registerRoutes(router: Router, service: AccountingService): void
   router.get("/accounts/tree", handler(async (_req, res) => {
     res.json({ items: await service.tree(tenantId(res)) });
   }));
-  router.patch("/accounts/:id", handler(async (req, res) => {
+  router.patch("/accounts/:id", mgr, handler(async (req, res) => {
     res.json(await service.updateAccount(String(req.params.id), parseBody(updateAccountSchema, req.body), tenantId(res)));
   }));
 
   // ── Batch Deposits ─────────────────────────────────────────────────────
-  router.post("/deposits", handler(async (req, res) => {
+  router.post("/deposits", mgr, handler(async (req, res) => {
     res.status(201).json(await service.createDeposit(parseBody(depositSchema, req.body), tenantId(res)));
   }));
   router.get("/deposits", handler(async (req, res) => {
