@@ -1,6 +1,6 @@
 import type { Router, Response } from "express";
 import { z } from "zod";
-import { handler, parseBody } from "../../shared/http.js";
+import { handler, parseBody, notFound } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { PurchasingService } from "./service.js";
@@ -9,15 +9,31 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
-const supplierSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email().optional(),
+// All editable vendor profile fields — shared by create and update schemas.
+const supplierProfileSchema = {
+  email: z.string().email().nullable().optional(),
   company: z.string().nullable().optional(),
+  dba: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  taxId: z.string().nullable().optional(),
+  feinNumber: z.string().nullable().optional(),
+  vendorType: z.enum(["manufacturer", "wholesaler"]).nullable().optional(),
+  msaType: z.string().nullable().optional(),
   contactName: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
+  primarySalesRep: z.string().nullable().optional(),
   termsDays: z.number().int().nonnegative().nullable().optional(),
-});
+  address1: z.string().nullable().optional(),
+  address2: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  county: z.string().nullable().optional(),
+  zip: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+};
+
+const supplierSchema = z.object({ name: z.string().min(1), ...supplierProfileSchema });
+const updateSupplierSchema = z.object({ name: z.string().min(1).optional(), ...supplierProfileSchema, status: z.enum(["active", "inactive"]).optional() });
 
 const poSchema = z.object({
   supplierId: z.string().min(1),
@@ -68,13 +84,30 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.post("/suppliers", mgr, handler(async (req, res) => {
     const b = parseBody(supplierSchema, req.body);
-    res.status(201).json(await service.createSupplier(b.name, b.email, tenantId(res), {
-      company: b.company, phone: b.phone, contactName: b.contactName, address: b.address, termsDays: b.termsDays,
+    res.status(201).json(await service.createSupplier(b.name, b.email ?? undefined, tenantId(res), {
+      company: b.company, dba: b.dba, phone: b.phone,
+      description: b.description, taxId: b.taxId, feinNumber: b.feinNumber,
+      vendorType: b.vendorType, msaType: b.msaType,
+      contactName: b.contactName, primarySalesRep: b.primarySalesRep,
+      termsDays: b.termsDays,
+      address1: b.address1, address2: b.address2, city: b.city,
+      state: b.state, county: b.county, zip: b.zip, country: b.country,
     }));
   }));
 
   router.get("/suppliers", handler(async (_req, res) => {
     res.json({ items: await service.listSuppliers(tenantId(res)) });
+  }));
+
+  router.get("/suppliers/:id", handler(async (req, res) => {
+    const s = await service.getSupplier(String(req.params.id), tenantId(res));
+    if (!s) throw notFound(`supplier '${req.params.id}' not found`);
+    res.json(s);
+  }));
+
+  router.patch("/suppliers/:id", mgr, handler(async (req, res) => {
+    const b = parseBody(updateSupplierSchema, req.body);
+    res.json(await service.updateSupplier(String(req.params.id), b, tenantId(res)));
   }));
 
   // Vendor list with spend + open-credit balances.

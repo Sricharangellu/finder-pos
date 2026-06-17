@@ -124,11 +124,41 @@ ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS billed_qty INTEGER;
 CREATE INDEX IF NOT EXISTS po_tenant_number_idx ON purchase_orders (tenant_id, po_number);
 `;
 
+// Full vendor profile from Vendor Template XLSX (BulkUpdateVendor sheet).
+// vendor_type: 'manufacturer' | 'wholesaler' (from vendorType column).
+// msa_type: MSA (Master Settlement Agreement) category — tobacco-industry compliance.
+// due_amount_cents: running AP balance owed to this vendor (updated on PO receive / credit).
+// status: 'active' | 'inactive' replacing the template's activeStatus 0/1 flag.
+// Structured address (address1–zip) replaces the previous single address TEXT blob;
+// address is kept for backward compat with data written by the earlier migration.
+// updated_at added for audit trail on vendor record changes.
+const ALTER_SUPPLIERS_VENDOR_FIELDS = `
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS dba TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS tax_id TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS fein_number TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS vendor_type TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS msa_type TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS primary_sales_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS due_amount_cents BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS address1 TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS address2 TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS county TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS zip TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS country TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS updated_at BIGINT;
+CREATE INDEX IF NOT EXISTS suppliers_tenant_type_idx ON suppliers (tenant_id, vendor_type);
+CREATE INDEX IF NOT EXISTS suppliers_tenant_status_idx ON suppliers (tenant_id, status);
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

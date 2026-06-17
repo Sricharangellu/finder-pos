@@ -39,14 +39,62 @@ export interface VendorCredit {
 export interface Supplier {
   id: string;
   tenant_id: string;
+  // Identity
   name: string;
-  email: string | null;
   company: string | null;
+  dba: string | null;
+  email: string | null;
   phone: string | null;
-  contact_name: string | null;
-  address: string | null;
+  description: string | null;
+  // Financial / compliance
+  tax_id: string | null;
+  fein_number: string | null;
+  vendor_type: string | null;   // 'manufacturer' | 'wholesaler'
+  msa_type: string | null;      // MSA category for tobacco compliance
+  // AP
+  due_amount_cents: number;
   terms_days: number | null;
+  // Relationship
+  contact_name: string | null;
+  primary_sales_rep: string | null;
+  // Address (structured)
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  county: string | null;
+  zip: string | null;
+  country: string | null;
+  // Legacy address blob (kept for backward compat)
+  address: string | null;
+  // Status
+  status: string;
   created_at: number;
+  updated_at: number | null;
+}
+
+export interface UpdateSupplierInput {
+  name?: string;
+  company?: string | null;
+  dba?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  description?: string | null;
+  taxId?: string | null;
+  feinNumber?: string | null;
+  vendorType?: string | null;
+  msaType?: string | null;
+  termsDays?: number | null;
+  contactName?: string | null;
+  primarySalesRep?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  county?: string | null;
+  zip?: string | null;
+  country?: string | null;
+  status?: 'active' | 'inactive';
 }
 
 export interface POLineInput {
@@ -108,25 +156,106 @@ export class PurchasingService {
     name: string,
     email: string | undefined,
     tenantId: string,
-    extra?: { company?: string | null; phone?: string | null; contactName?: string | null; address?: string | null; termsDays?: number | null },
+    extra?: {
+      company?: string | null; dba?: string | null; phone?: string | null;
+      description?: string | null; taxId?: string | null; feinNumber?: string | null;
+      vendorType?: string | null; msaType?: string | null;
+      contactName?: string | null; primarySalesRep?: string | null;
+      termsDays?: number | null;
+      address?: string | null; address1?: string | null; address2?: string | null;
+      city?: string | null; state?: string | null; county?: string | null;
+      zip?: string | null; country?: string | null;
+    },
   ): Promise<Supplier> {
     const id = `sup_${uuidv7()}`;
     const now = Date.now();
     await this.db.query(
-      `INSERT INTO suppliers (id, tenant_id, name, email, company, phone, contact_name, address, terms_days, created_at)
-       VALUES (@id, @tenant_id, @name, @email, @company, @phone, @contact_name, @address, @terms_days, @created_at)`,
+      `INSERT INTO suppliers (
+         id, tenant_id, name, email, company, dba, phone, description,
+         tax_id, fein_number, vendor_type, msa_type,
+         contact_name, primary_sales_rep, terms_days,
+         address, address1, address2, city, state, county, zip, country,
+         status, due_amount_cents, created_at, updated_at
+       ) VALUES (
+         @id, @tenant_id, @name, @email, @company, @dba, @phone, @description,
+         @tax_id, @fein_number, @vendor_type, @msa_type,
+         @contact_name, @primary_sales_rep, @terms_days,
+         @address, @address1, @address2, @city, @state, @county, @zip, @country,
+         'active', 0, @created_at, @updated_at
+       )`,
       {
         id, tenant_id: tenantId, name, email: email ?? null,
-        company: extra?.company ?? null, phone: extra?.phone ?? null,
-        contact_name: extra?.contactName ?? null, address: extra?.address ?? null,
-        terms_days: extra?.termsDays ?? null, created_at: now,
+        company: extra?.company ?? null,
+        dba: extra?.dba ?? null,
+        phone: extra?.phone ?? null,
+        description: extra?.description ?? null,
+        tax_id: extra?.taxId ?? null,
+        fein_number: extra?.feinNumber ?? null,
+        vendor_type: extra?.vendorType ?? null,
+        msa_type: extra?.msaType ?? null,
+        contact_name: extra?.contactName ?? null,
+        primary_sales_rep: extra?.primarySalesRep ?? null,
+        terms_days: extra?.termsDays ?? null,
+        address: extra?.address ?? null,
+        address1: extra?.address1 ?? null,
+        address2: extra?.address2 ?? null,
+        city: extra?.city ?? null,
+        state: extra?.state ?? null,
+        county: extra?.county ?? null,
+        zip: extra?.zip ?? null,
+        country: extra?.country ?? null,
+        created_at: now,
+        updated_at: now,
       },
     );
     return (await this.db.one<Supplier>("SELECT * FROM suppliers WHERE id = @id", { id }))!;
   }
 
+  async updateSupplier(id: string, patch: UpdateSupplierInput, tenantId: string): Promise<Supplier> {
+    const current = await this.db.one<Supplier>("SELECT * FROM suppliers WHERE id = @id AND tenant_id = @tenantId", { id, tenantId });
+    if (!current) throw new HttpError(404, "not_found", `supplier '${id}' not found`);
+    const map: Record<string, unknown> = {
+      name: patch.name,
+      company: patch.company,
+      dba: patch.dba,
+      email: patch.email,
+      phone: patch.phone,
+      description: patch.description,
+      tax_id: patch.taxId,
+      fein_number: patch.feinNumber,
+      vendor_type: patch.vendorType,
+      msa_type: patch.msaType,
+      terms_days: patch.termsDays,
+      contact_name: patch.contactName,
+      primary_sales_rep: patch.primarySalesRep,
+      address1: patch.address1,
+      address2: patch.address2,
+      city: patch.city,
+      state: patch.state,
+      county: patch.county,
+      zip: patch.zip,
+      country: patch.country,
+      status: patch.status,
+    };
+    const sets: string[] = [];
+    const params: Record<string, unknown> = { id, tenantId, now: Date.now() };
+    for (const [col, val] of Object.entries(map)) {
+      if (val !== undefined) { sets.push(`${col} = @${col}`); params[col] = val; }
+    }
+    if (sets.length === 0) return current;
+    await this.db.query(
+      `UPDATE suppliers SET ${sets.join(", ")}, updated_at = @now WHERE id = @id AND tenant_id = @tenantId`,
+      params,
+    );
+    return (await this.db.one<Supplier>("SELECT * FROM suppliers WHERE id = @id", { id }))!;
+  }
+
+  async getSupplier(id: string, tenantId: string): Promise<Supplier | undefined> {
+    return this.db.one<Supplier>("SELECT * FROM suppliers WHERE id = @id AND tenant_id = @tenantId", { id, tenantId });
+  }
+
   async listSuppliers(tenantId: string): Promise<Supplier[]> {
-    return this.db.query<Supplier>("SELECT * FROM suppliers WHERE tenant_id = @tenantId ORDER BY created_at DESC", { tenantId });
+    return this.db.query<Supplier>("SELECT * FROM suppliers WHERE tenant_id = @tenantId ORDER BY name ASC", { tenantId });
   }
 
   /** Vendor directory with spend + open-credit balances (the vendor list). */
