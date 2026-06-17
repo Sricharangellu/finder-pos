@@ -10,6 +10,7 @@ import { apiGet, ApiResponseError } from "@/api-client/client";
 import type { SalesSummary, TopProduct, TopProductsResponse } from "@/api-client/types";
 import { getUser } from "@/lib/auth";
 import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
+import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 import { Card } from "@/components/Card";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 
@@ -71,27 +72,7 @@ export default function ReportsPage() {
                 Operational reporting across sales, inventory, and receivables.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-            {([
-              { label: "Overview", href: "/reports" },
-              { label: "Sales", href: "/reports/sales" },
-              { label: "Inventory Valuation", href: "/reports/inventory" },
-              { label: "AR Aging", href: "/reports/ar-aging" },
-              { label: "Expiry", href: "/reports/expiry" },
-            ] as const).map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                  link.href === "/reports"
-                    ? "border-slate-950 bg-slate-950 text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {link.label}
-              </a>
-            ))}
-            </div>
+            <ReportsSubNav />
           </div>
         )}
         {allowed && (

@@ -10,6 +10,7 @@ import { apiGet, ApiResponseError } from "@/api-client/client";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
+import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,7 @@ export default function InventoryReportPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6 space-y-6">
+        <ReportsSubNav />
         {/* Summary cards */}
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

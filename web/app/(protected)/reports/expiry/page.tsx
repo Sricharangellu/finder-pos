@@ -5,6 +5,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 
 interface ExpiringLot {
   id: string;
@@ -47,14 +48,6 @@ function ExpiryBadge({ days }: { days: number }) {
   );
 }
 
-const NAV_LINKS = [
-  { label: "Overview", href: "/reports" },
-  { label: "Sales", href: "/reports/sales" },
-  { label: "Inventory Valuation", href: "/reports/inventory" },
-  { label: "AR Aging", href: "/reports/ar-aging" },
-  { label: "Expiry", href: "/reports/expiry" },
-] as const;
-
 export default function ExpiryReportPage() {
   const [days, setDays] = useState(30);
   const [expiring, setExpiring] = useState<ExpiringLot[]>([]);
@@ -93,27 +86,12 @@ export default function ExpiryReportPage() {
   return (
     <EnterpriseShell active="reports" title="Expiry Report" subtitle="Near-expiry and expired stock">
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-        {/* Sub-nav */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div>
+        <div className="border-b border-slate-200 pb-4">
+          <div className="mb-3">
             <h1 className="text-lg font-semibold text-slate-950">Expiry Report</h1>
             <p className="mt-1 text-sm text-slate-500">Identify stock approaching expiry to mark down or return.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                  link.href === "/reports/expiry"
-                    ? "border-slate-950 bg-slate-950 text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
+          <ReportsSubNav />
         </div>
 
         {/* Look-ahead toggle */}

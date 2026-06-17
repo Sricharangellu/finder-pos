@@ -971,4 +971,55 @@ lightspeedHandlers.push(
     session.closed_at = Date.now();
     return HttpResponse.json(session);
   }),
+
+  // ── PO detail (GET /purchasing/orders/:id) ────────────────────────────────
+  http.get(`${V1}/purchasing/orders/:id`, async ({ params }) => {
+    await lat();
+    const id = String(params.id);
+    const seed: Record<string, any> = {
+      po_1: { id: "po_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", receive_status: "received", total_cost_cents: 24000, created_at: Date.now() - 86400000, received_at: Date.now() - 3600000, lines: [
+        { id: "pol_1a", tenant_id: "tnt_demo", po_id: "po_1", product_id: "prod_1", quantity: 24, unit_cost_cents: 600, line_cost_cents: 14400, received_qty: 24, expiry_date: null, lot_code: "LOT-001" },
+        { id: "pol_1b", tenant_id: "tnt_demo", po_id: "po_1", product_id: "prod_2", quantity: 12, unit_cost_cents: 800, line_cost_cents: 9600, received_qty: 12, expiry_date: Date.now() + 90 * 86400000, lot_code: "LOT-002" },
+      ]},
+      po_2: { id: "po_2", tenant_id: "tnt_demo", supplier_id: "sup_tea", status: "ordered", receive_status: "pending", total_cost_cents: 11250, created_at: Date.now() - 3600000, received_at: null, lines: [
+        { id: "pol_2a", tenant_id: "tnt_demo", po_id: "po_2", product_id: "prod_2", quantity: 15, unit_cost_cents: 750, line_cost_cents: 11250, received_qty: 0, expiry_date: null, lot_code: null },
+      ]},
+    };
+    const po = seed[id];
+    if (!po) return HttpResponse.json({ error: { code: "not_found", message: "purchase order not found", requestId: rid() } }, { status: 404 });
+    return HttpResponse.json(po);
+  }),
+
+  // ── P&L report ────────────────────────────────────────────────────────────
+  http.get(`${V1}/reports/p-l`, async () => {
+    await lat();
+    return HttpResponse.json({
+      revenue: { grossCents: 284600, taxCents: 22768, netCents: 261832 },
+      cogs: { costCents: 142300 },
+      grossProfit: { cents: 119532, pct: 45.6 },
+      opex: { cents: 38400 },
+      netProfit: { cents: 81132, pct: 31.0 },
+      period: "Last 30 days",
+    });
+  }),
+
+  // ── Sales-by-rep report ────────────────────────────────────────────────────
+  http.get(`${V1}/reports/sales-by-rep`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { repId: "usr_demo_owner", repName: "Demo Owner", orderCount: 48, revenueCents: 142300, avgOrderCents: 2965 },
+      { repId: "usr_demo_cashier", repName: "Demo Cashier", orderCount: 31, revenueCents: 89400, avgOrderCents: 2884 },
+      { repId: "usr_rep_3", repName: "Sales Rep 3", orderCount: 19, revenueCents: 52900, avgOrderCents: 2784 },
+    ]});
+  }),
+
+  // ── Sales-by-vendor report ─────────────────────────────────────────────────
+  http.get(`${V1}/reports/sales-by-vendor`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, revenueCents: 168400, unitsSold: 312 },
+      { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, revenueCents: 84200, unitsSold: 198 },
+      { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, revenueCents: 32000, unitsSold: 87 },
+    ]});
+  }),
 );

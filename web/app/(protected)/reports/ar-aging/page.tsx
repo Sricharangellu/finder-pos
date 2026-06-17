@@ -11,6 +11,7 @@ import { apiGet, ApiResponseError } from "@/api-client/client";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
+import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ export default function ArAgingReportPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6">
+        <div className="mb-5"><ReportsSubNav /></div>
         <Card title="AR Aging Report" noPadding>
           <div className="p-5">
             {loading ? (

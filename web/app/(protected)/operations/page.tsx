@@ -59,7 +59,7 @@ export default function OperationsPage() {
   ];
 
   return (
-    <EnterpriseShell active={"operations" as "inventory"} title="Operations" subtitle="Locations & Pick/Pack" contentClassName="overflow-y-auto">
+    <EnterpriseShell active="operations" title="Operations" subtitle="Locations & Pick/Pack" contentClassName="overflow-y-auto">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Tabs */}
         <div className="border-b border-gray-200">

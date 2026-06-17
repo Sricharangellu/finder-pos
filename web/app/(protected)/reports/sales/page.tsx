@@ -12,6 +12,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
+import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,6 +241,9 @@ export default function SalesReportPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6">
+        <div className="mb-5">
+          <ReportsSubNav />
+        </div>
         {/* Controls */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <RangeToggle value={range} onChange={setRange} />
