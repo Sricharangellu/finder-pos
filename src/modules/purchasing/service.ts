@@ -41,6 +41,11 @@ export interface Supplier {
   tenant_id: string;
   name: string;
   email: string | null;
+  company: string | null;
+  phone: string | null;
+  contact_name: string | null;
+  address: string | null;
+  terms_days: number | null;
   created_at: number;
 }
 
@@ -50,6 +55,11 @@ export interface POLineInput {
   unitCostCents: number;
   expiryDate?: number | null; // epoch ms — captured into an inventory lot on receive
   lotCode?: string | null;
+  productName?: string | null;
+  upc?: string | null;
+  vendorUpc?: string | null;
+  rawCostPriceCents?: number | null;
+  unitPriceCents?: number | null;
 }
 
 export interface PurchaseOrderLine {
@@ -57,21 +67,29 @@ export interface PurchaseOrderLine {
   tenant_id: string;
   po_id: string;
   product_id: string;
+  product_name: string | null;
+  upc: string | null;
+  vendor_upc: string | null;
   quantity: number;
   unit_cost_cents: number;
+  raw_cost_price_cents: number | null;
+  unit_price_cents: number | null;
   line_cost_cents: number;
   expiry_date: number | null;
   lot_code: string | null;
   received_qty: number;
+  billed_qty: number | null;
 }
 
 export interface PurchaseOrder {
   id: string;
   tenant_id: string;
   supplier_id: string;
+  po_number: number | null;
   status: POStatus;
   receive_status: string;
   total_cost_cents: number;
+  notes: string | null;
   created_at: number;
   received_at: number | null;
 }
@@ -86,13 +104,25 @@ export class PurchasingService {
     private readonly events: EventBus,
   ) {}
 
-  async createSupplier(name: string, email: string | undefined, tenantId: string): Promise<Supplier> {
-    const s: Supplier = { id: `sup_${uuidv7()}`, tenant_id: tenantId, name, email: email ?? null, created_at: Date.now() };
+  async createSupplier(
+    name: string,
+    email: string | undefined,
+    tenantId: string,
+    extra?: { company?: string | null; phone?: string | null; contactName?: string | null; address?: string | null; termsDays?: number | null },
+  ): Promise<Supplier> {
+    const id = `sup_${uuidv7()}`;
+    const now = Date.now();
     await this.db.query(
-      "INSERT INTO suppliers (id, tenant_id, name, email, created_at) VALUES (@id,@tenant_id,@name,@email,@created_at)",
-      s as unknown as Record<string, unknown>,
+      `INSERT INTO suppliers (id, tenant_id, name, email, company, phone, contact_name, address, terms_days, created_at)
+       VALUES (@id, @tenant_id, @name, @email, @company, @phone, @contact_name, @address, @terms_days, @created_at)`,
+      {
+        id, tenant_id: tenantId, name, email: email ?? null,
+        company: extra?.company ?? null, phone: extra?.phone ?? null,
+        contact_name: extra?.contactName ?? null, address: extra?.address ?? null,
+        terms_days: extra?.termsDays ?? null, created_at: now,
+      },
     );
-    return s;
+    return (await this.db.one<Supplier>("SELECT * FROM suppliers WHERE id = @id", { id }))!;
   }
 
   async listSuppliers(tenantId: string): Promise<Supplier[]> {
@@ -229,32 +259,56 @@ export class PurchasingService {
     if (!supplier) throw new HttpError(404, "not_found", `supplier '${supplierId}' not found`);
     const now = Date.now();
     const poId = `po_${uuidv7()}`;
+    // Auto-increment po_number: max existing + 1 for this tenant.
+    const lastPo = await this.db.one<{ n: number }>(
+      "SELECT COALESCE(MAX(po_number), 0)::int AS n FROM purchase_orders WHERE tenant_id = @t",
+      { t: tenantId },
+    );
+    const poNumber = (lastPo?.n ?? 0) + 1;
     const poLines: PurchaseOrderLine[] = lines.map((l) => ({
       id: `pol_${uuidv7()}`,
       tenant_id: tenantId,
       po_id: poId,
       product_id: l.productId,
+      product_name: l.productName ?? null,
+      upc: l.upc ?? null,
+      vendor_upc: l.vendorUpc ?? null,
       quantity: l.quantity,
       unit_cost_cents: l.unitCostCents,
+      raw_cost_price_cents: l.rawCostPriceCents ?? null,
+      unit_price_cents: l.unitPriceCents ?? null,
       line_cost_cents: l.quantity * l.unitCostCents,
       expiry_date: l.expiryDate ?? null,
       lot_code: l.lotCode ?? null,
       received_qty: 0,
+      billed_qty: null,
     }));
     const total = poLines.reduce((s, l) => s + l.line_cost_cents, 0);
     await this.db.tx(async (tdb) => {
       await tdb.query(
-        "INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, total_cost_cents, created_at, received_at) VALUES (@id,@tenant_id,@supplier_id,'ordered',@total,@created_at,NULL)",
-        { id: poId, tenant_id: tenantId, supplier_id: supplierId, total, created_at: now },
+        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, total_cost_cents, po_number, created_at, received_at)
+         VALUES (@id,@tenant_id,@supplier_id,'ordered',@total,@po_number,@created_at,NULL)`,
+        { id: poId, tenant_id: tenantId, supplier_id: supplierId, total, po_number: poNumber, created_at: now },
       );
       for (const l of poLines) {
         await tdb.query(
-          "INSERT INTO purchase_order_lines (id, tenant_id, po_id, product_id, quantity, unit_cost_cents, line_cost_cents, expiry_date, lot_code, received_qty) VALUES (@id,@tenant_id,@po_id,@product_id,@quantity,@unit_cost_cents,@line_cost_cents,@expiry_date,@lot_code,@received_qty)",
+          `INSERT INTO purchase_order_lines
+             (id, tenant_id, po_id, product_id, product_name, upc, vendor_upc, quantity,
+              unit_cost_cents, raw_cost_price_cents, unit_price_cents, line_cost_cents,
+              expiry_date, lot_code, received_qty, billed_qty)
+           VALUES
+             (@id,@tenant_id,@po_id,@product_id,@product_name,@upc,@vendor_upc,@quantity,
+              @unit_cost_cents,@raw_cost_price_cents,@unit_price_cents,@line_cost_cents,
+              @expiry_date,@lot_code,@received_qty,@billed_qty)`,
           l as unknown as Record<string, unknown>,
         );
       }
     });
-    return { id: poId, tenant_id: tenantId, supplier_id: supplierId, status: "ordered", receive_status: "pending", total_cost_cents: total, created_at: now, received_at: null, lines: poLines };
+    return {
+      id: poId, tenant_id: tenantId, supplier_id: supplierId, po_number: poNumber,
+      status: "ordered", receive_status: "pending", total_cost_cents: total,
+      notes: null, created_at: now, received_at: null, lines: poLines,
+    };
   }
 
   async listOrders(tenantId: string): Promise<PurchaseOrder[]> {

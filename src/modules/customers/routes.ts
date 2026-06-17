@@ -9,10 +9,60 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
-const createSchema = z.object({
-  name: z.string().min(1),
+// All customer profile fields shared by create and update schemas.
+const profileFieldsSchema = {
+  firstName: z.string().nullable().optional(),
+  lastName: z.string().nullable().optional(),
   email: z.string().email().nullable().optional(),
   phone: z.string().min(1).nullable().optional(),
+  customerType: z.enum(["retail", "business"]).optional(),
+  primaryBusiness: z.string().nullable().optional(),
+  // Business profile
+  company: z.string().nullable().optional(),
+  dba: z.string().nullable().optional(),
+  contactPerson: z.string().nullable().optional(),
+  feinNumber: z.string().nullable().optional(),
+  taxId: z.string().nullable().optional(),
+  licenseNo: z.string().nullable().optional(),
+  salesRepId: z.string().nullable().optional(),
+  salesRepName: z.string().nullable().optional(),
+  // Compliance licenses
+  tobaccoId: z.string().nullable().optional(),
+  tobaccoLicenseExpiry: z.number().int().positive().nullable().optional(),
+  cigaretteId: z.string().nullable().optional(),
+  cigaretteLicenseExpiry: z.number().int().positive().nullable().optional(),
+  vaporTaxId: z.string().nullable().optional(),
+  vaporTaxExpiry: z.number().int().positive().nullable().optional(),
+  salesTaxId: z.string().nullable().optional(),
+  salesTaxExpiry: z.number().int().positive().nullable().optional(),
+  hempLicenseNumber: z.string().nullable().optional(),
+  hempLicenseExpiry: z.number().int().positive().nullable().optional(),
+  // Address (structured)
+  address1: z.string().nullable().optional(),
+  address2: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zip: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  county: z.string().nullable().optional(),
+  // Legacy address blobs
+  billingAddress: z.string().nullable().optional(),
+  shippingAddress: z.string().nullable().optional(),
+  // Financial
+  tier: z.number().int().min(1).max(5).optional(),
+  paymentTermDays: z.number().int().nonnegative().nullable().optional(),
+  creditLimitCents: z.number().int().nonnegative().nullable().optional(),
+  bankName: z.string().nullable().optional(),
+  // Retail
+  dateOfBirth: z.number().int().positive().nullable().optional(),
+  drivingLicenseNumber: z.string().nullable().optional(),
+  // Shared
+  notes: z.string().nullable().optional(),
+};
+
+const createSchema = z.object({
+  name: z.string().min(1),
+  ...profileFieldsSchema,
 });
 
 const redeemSchema = z.object({
@@ -21,20 +71,10 @@ const redeemSchema = z.object({
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
-  email: z.string().email().nullable().optional(),
-  phone: z.string().min(1).nullable().optional(),
-  tier: z.number().int().min(1).max(5).optional(),
-  company: z.string().nullable().optional(),
-  dba: z.string().nullable().optional(),
-  taxId: z.string().nullable().optional(),
-  licenseNo: z.string().nullable().optional(),
-  state: z.string().nullable().optional(),
-  billingAddress: z.string().nullable().optional(),
-  shippingAddress: z.string().nullable().optional(),
-  salesRepId: z.string().nullable().optional(),
+  ...profileFieldsSchema,
   status: z.enum(["active", "inactive"]).optional(),
   verified: z.boolean().optional(),
-  creditLimitCents: z.number().int().nonnegative().nullable().optional(),
+  achVerified: z.boolean().optional(),
 });
 
 export function registerRoutes(router: Router, service: CustomersService): void {

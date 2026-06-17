@@ -9,51 +9,169 @@ import { HttpError } from "../../shared/http.js";
 export interface Customer {
   id: string;
   tenant_id: string;
+  // Identity
   name: string;
+  first_name: string | null;
+  last_name: string | null;
   email: string | null;
   phone: string | null;
-  points: number;
-  tier: number;
+  date_of_birth: number | null;
+  driving_license_number: string | null;
+  // Classification
+  customer_type: 'retail' | 'business';
+  primary_business: string | null;
+  // Business profile
   company: string | null;
   dba: string | null;
+  contact_person: string | null;
+  fein_number: string | null;
   tax_id: string | null;
   license_no: string | null;
+  sales_rep_id: string | null;
+  sales_rep_name: string | null;
+  // Regulatory/compliance licenses (tobacco/vape distribution)
+  tobacco_id: string | null;
+  tobacco_license_expiry: number | null;
+  cigarette_id: string | null;
+  cigarette_license_expiry: number | null;
+  vapor_tax_id: string | null;
+  vapor_tax_expiry: number | null;
+  sales_tax_id: string | null;
+  sales_tax_expiry: number | null;
+  hemp_license_number: string | null;
+  hemp_license_expiry: number | null;
+  // Address (structured)
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
   state: string | null;
+  zip: string | null;
+  country: string | null;
+  county: string | null;
+  // Legacy address blobs (kept for backward compat)
   billing_address: string | null;
   shipping_address: string | null;
-  sales_rep_id: string | null;
+  // Financial
+  tier: number;
+  payment_term_days: number | null;
+  credit_limit_cents: number | null;
   store_credit_cents: number;
   excess_cents: number;
-  credit_limit_cents: number | null;
+  bank_name: string | null;
+  // Status
   status: string;
   verified: number;
+  ach_verified: number;
+  points: number;
+  notes: string | null;
   created_at: number;
   updated_at: number;
 }
 
 export interface CreateCustomerInput {
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email?: string | null;
   phone?: string | null;
-}
-
-/** Editable customer profile fields (Wave B). */
-export interface UpdateCustomerInput {
-  name?: string;
-  email?: string | null;
-  phone?: string | null;
-  tier?: number;
+  customerType?: 'retail' | 'business';
+  primaryBusiness?: string | null;
+  // Business profile
   company?: string | null;
   dba?: string | null;
+  contactPerson?: string | null;
+  feinNumber?: string | null;
   taxId?: string | null;
   licenseNo?: string | null;
+  salesRepId?: string | null;
+  salesRepName?: string | null;
+  // Compliance licenses
+  tobaccoId?: string | null;
+  tobaccoLicenseExpiry?: number | null;
+  cigaretteId?: string | null;
+  cigaretteLicenseExpiry?: number | null;
+  vaporTaxId?: string | null;
+  vaporTaxExpiry?: number | null;
+  salesTaxId?: string | null;
+  salesTaxExpiry?: number | null;
+  hempLicenseNumber?: string | null;
+  hempLicenseExpiry?: number | null;
+  // Address (structured)
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
   state?: string | null;
+  zip?: string | null;
+  country?: string | null;
+  county?: string | null;
+  // Legacy address blobs
   billingAddress?: string | null;
   shippingAddress?: string | null;
+  // Financial
+  tier?: number;
+  paymentTermDays?: number | null;
+  creditLimitCents?: number | null;
+  bankName?: string | null;
+  // Retail
+  dateOfBirth?: number | null;
+  drivingLicenseNumber?: string | null;
+  // Shared
+  notes?: string | null;
+}
+
+/** Editable customer profile fields. All fields optional — only provided keys change. */
+export interface UpdateCustomerInput {
+  name?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  customerType?: 'retail' | 'business';
+  primaryBusiness?: string | null;
+  // Business profile
+  company?: string | null;
+  dba?: string | null;
+  contactPerson?: string | null;
+  feinNumber?: string | null;
+  taxId?: string | null;
+  licenseNo?: string | null;
   salesRepId?: string | null;
+  salesRepName?: string | null;
+  // Compliance licenses
+  tobaccoId?: string | null;
+  tobaccoLicenseExpiry?: number | null;
+  cigaretteId?: string | null;
+  cigaretteLicenseExpiry?: number | null;
+  vaporTaxId?: string | null;
+  vaporTaxExpiry?: number | null;
+  salesTaxId?: string | null;
+  salesTaxExpiry?: number | null;
+  hempLicenseNumber?: string | null;
+  hempLicenseExpiry?: number | null;
+  // Address (structured)
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  country?: string | null;
+  county?: string | null;
+  // Legacy address blobs
+  billingAddress?: string | null;
+  shippingAddress?: string | null;
+  // Financial
+  tier?: number;
+  paymentTermDays?: number | null;
+  creditLimitCents?: number | null;
+  bankName?: string | null;
+  // Retail
+  dateOfBirth?: number | null;
+  drivingLicenseNumber?: string | null;
+  // Shared
+  notes?: string | null;
   status?: string;
   verified?: boolean;
-  creditLimitCents?: number | null;
+  achVerified?: boolean;
 }
 
 export interface CustomerFinancials {
@@ -87,9 +205,84 @@ export class CustomersService {
     const now = Date.now();
     const id = `cus_${uuidv7()}`;
     await this.db.query(
-      `INSERT INTO customers (id, tenant_id, name, email, phone, points, created_at, updated_at)
-       VALUES (@id, @tenant_id, @name, @email, @phone, 0, @created_at, @updated_at)`,
-      { id, tenant_id: tenantId, name: input.name, email: input.email ?? null, phone: input.phone ?? null, created_at: now, updated_at: now },
+      `INSERT INTO customers (
+         id, tenant_id, name, first_name, last_name, email, phone, points,
+         customer_type, primary_business,
+         company, dba, contact_person, fein_number, tax_id, license_no,
+         sales_rep_id, sales_rep_name,
+         tobacco_id, tobacco_license_expiry,
+         cigarette_id, cigarette_license_expiry,
+         vapor_tax_id, vapor_tax_expiry,
+         sales_tax_id, sales_tax_expiry,
+         hemp_license_number, hemp_license_expiry,
+         address1, address2, city, state, zip, country, county,
+         billing_address, shipping_address,
+         tier, payment_term_days, credit_limit_cents, bank_name,
+         date_of_birth, driving_license_number, notes,
+         created_at, updated_at
+       ) VALUES (
+         @id, @tenant_id, @name, @first_name, @last_name, @email, @phone, 0,
+         @customer_type, @primary_business,
+         @company, @dba, @contact_person, @fein_number, @tax_id, @license_no,
+         @sales_rep_id, @sales_rep_name,
+         @tobacco_id, @tobacco_license_expiry,
+         @cigarette_id, @cigarette_license_expiry,
+         @vapor_tax_id, @vapor_tax_expiry,
+         @sales_tax_id, @sales_tax_expiry,
+         @hemp_license_number, @hemp_license_expiry,
+         @address1, @address2, @city, @state, @zip, @country, @county,
+         @billing_address, @shipping_address,
+         @tier, @payment_term_days, @credit_limit_cents, @bank_name,
+         @date_of_birth, @driving_license_number, @notes,
+         @created_at, @updated_at
+       )`,
+      {
+        id,
+        tenant_id: tenantId,
+        name: input.name,
+        first_name: input.firstName ?? null,
+        last_name: input.lastName ?? null,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        customer_type: input.customerType ?? 'retail',
+        primary_business: input.primaryBusiness ?? null,
+        company: input.company ?? null,
+        dba: input.dba ?? null,
+        contact_person: input.contactPerson ?? null,
+        fein_number: input.feinNumber ?? null,
+        tax_id: input.taxId ?? null,
+        license_no: input.licenseNo ?? null,
+        sales_rep_id: input.salesRepId ?? null,
+        sales_rep_name: input.salesRepName ?? null,
+        tobacco_id: input.tobaccoId ?? null,
+        tobacco_license_expiry: input.tobaccoLicenseExpiry ?? null,
+        cigarette_id: input.cigaretteId ?? null,
+        cigarette_license_expiry: input.cigaretteLicenseExpiry ?? null,
+        vapor_tax_id: input.vaporTaxId ?? null,
+        vapor_tax_expiry: input.vaporTaxExpiry ?? null,
+        sales_tax_id: input.salesTaxId ?? null,
+        sales_tax_expiry: input.salesTaxExpiry ?? null,
+        hemp_license_number: input.hempLicenseNumber ?? null,
+        hemp_license_expiry: input.hempLicenseExpiry ?? null,
+        address1: input.address1 ?? null,
+        address2: input.address2 ?? null,
+        city: input.city ?? null,
+        state: input.state ?? null,
+        zip: input.zip ?? null,
+        country: input.country ?? null,
+        county: input.county ?? null,
+        billing_address: input.billingAddress ?? null,
+        shipping_address: input.shippingAddress ?? null,
+        tier: input.tier ?? 5,
+        payment_term_days: input.paymentTermDays ?? null,
+        credit_limit_cents: input.creditLimitCents ?? null,
+        bank_name: input.bankName ?? null,
+        date_of_birth: input.dateOfBirth ?? null,
+        driving_license_number: input.drivingLicenseNumber ?? null,
+        notes: input.notes ?? null,
+        created_at: now,
+        updated_at: now,
+      },
     );
     await this.events.publish("customer.created", { id, tenantId }, id);
     // Re-read so default-backed profile columns (tier, credit, status, …) are populated.
@@ -116,12 +309,50 @@ export class CustomersService {
     if (!current) throw new HttpError(404, "not_found", `customer '${id}' not found`);
     if (patch.tier !== undefined && (patch.tier < 1 || patch.tier > 5)) throw new HttpError(400, "bad_request", "tier must be 1–5");
     const map: Record<string, unknown> = {
-      name: patch.name, email: patch.email, phone: patch.phone, tier: patch.tier,
-      company: patch.company, dba: patch.dba, tax_id: patch.taxId, license_no: patch.licenseNo,
-      state: patch.state, billing_address: patch.billingAddress, shipping_address: patch.shippingAddress,
-      sales_rep_id: patch.salesRepId, status: patch.status,
-      verified: patch.verified === undefined ? undefined : patch.verified ? 1 : 0,
+      name: patch.name,
+      first_name: patch.firstName,
+      last_name: patch.lastName,
+      email: patch.email,
+      phone: patch.phone,
+      customer_type: patch.customerType,
+      primary_business: patch.primaryBusiness,
+      company: patch.company,
+      dba: patch.dba,
+      contact_person: patch.contactPerson,
+      fein_number: patch.feinNumber,
+      tax_id: patch.taxId,
+      license_no: patch.licenseNo,
+      sales_rep_id: patch.salesRepId,
+      sales_rep_name: patch.salesRepName,
+      tobacco_id: patch.tobaccoId,
+      tobacco_license_expiry: patch.tobaccoLicenseExpiry,
+      cigarette_id: patch.cigaretteId,
+      cigarette_license_expiry: patch.cigaretteLicenseExpiry,
+      vapor_tax_id: patch.vaporTaxId,
+      vapor_tax_expiry: patch.vaporTaxExpiry,
+      sales_tax_id: patch.salesTaxId,
+      sales_tax_expiry: patch.salesTaxExpiry,
+      hemp_license_number: patch.hempLicenseNumber,
+      hemp_license_expiry: patch.hempLicenseExpiry,
+      address1: patch.address1,
+      address2: patch.address2,
+      city: patch.city,
+      state: patch.state,
+      zip: patch.zip,
+      country: patch.country,
+      county: patch.county,
+      billing_address: patch.billingAddress,
+      shipping_address: patch.shippingAddress,
+      tier: patch.tier,
+      payment_term_days: patch.paymentTermDays,
       credit_limit_cents: patch.creditLimitCents,
+      bank_name: patch.bankName,
+      date_of_birth: patch.dateOfBirth,
+      driving_license_number: patch.drivingLicenseNumber,
+      notes: patch.notes,
+      status: patch.status,
+      verified: patch.verified === undefined ? undefined : patch.verified ? 1 : 0,
+      ach_verified: patch.achVerified === undefined ? undefined : patch.achVerified ? 1 : 0,
     };
     const sets: string[] = [];
     const params: Record<string, unknown> = { id, tenantId, now: Date.now() };

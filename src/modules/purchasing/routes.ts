@@ -9,7 +9,16 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
-const supplierSchema = z.object({ name: z.string().min(1), email: z.string().email().optional() });
+const supplierSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email().optional(),
+  company: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  contactName: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  termsDays: z.number().int().nonnegative().nullable().optional(),
+});
+
 const poSchema = z.object({
   supplierId: z.string().min(1),
   lines: z
@@ -20,6 +29,11 @@ const poSchema = z.object({
         unitCostCents: z.number().int().nonnegative(),
         expiryDate: z.number().int().positive().optional(),
         lotCode: z.string().min(1).optional(),
+        productName: z.string().nullable().optional(),
+        upc: z.string().nullable().optional(),
+        vendorUpc: z.string().nullable().optional(),
+        rawCostPriceCents: z.number().int().nonnegative().nullable().optional(),
+        unitPriceCents: z.number().int().nonnegative().nullable().optional(),
       }),
     )
     .min(1),
@@ -54,7 +68,9 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.post("/suppliers", mgr, handler(async (req, res) => {
     const b = parseBody(supplierSchema, req.body);
-    res.status(201).json(await service.createSupplier(b.name, b.email, tenantId(res)));
+    res.status(201).json(await service.createSupplier(b.name, b.email, tenantId(res), {
+      company: b.company, phone: b.phone, contactName: b.contactName, address: b.address, termsDays: b.termsDays,
+    }));
   }));
 
   router.get("/suppliers", handler(async (_req, res) => {
