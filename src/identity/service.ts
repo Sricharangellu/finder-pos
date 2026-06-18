@@ -96,7 +96,10 @@ export class IdentityService {
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
     }
 
-    const pair = this.issueTokens(user.id, user.tenant_id, user.role);
+    const permissions = user.custom_role_id
+      ? await this.resolveCustomRolePermissions(user.custom_role_id)
+      : undefined;
+    const pair = this.issueTokens(user.id, user.tenant_id, user.role, user.custom_role_id ?? undefined, permissions);
 
     const rtkId = `rtk_${uuidv7()}`;
     await this.db.query(
@@ -201,7 +204,10 @@ export class IdentityService {
       throw new HttpError(401, "unauthenticated", "User no longer exists.");
     }
 
-    const pair = this.issueTokens(user.id, user.tenant_id, user.role);
+    const refreshPerms = user.custom_role_id
+      ? await this.resolveCustomRolePermissions(user.custom_role_id)
+      : undefined;
+    const pair = this.issueTokens(user.id, user.tenant_id, user.role, user.custom_role_id ?? undefined, refreshPerms);
 
     // Store the new refresh token hash.
     const newRtkId = `rtk_${uuidv7()}`;
@@ -315,19 +321,36 @@ export class IdentityService {
     return createHash("sha256").update(token).digest("hex");
   }
 
-  private issueTokens(userId: string, tenantId: string, role: Role): TokenPair {
+  private issueTokens(
+    userId: string,
+    tenantId: string,
+    role: Role,
+    customRoleId?: string,
+    permissions?: string[],
+  ): TokenPair {
     const secret = this.getSecret();
-    const accessToken = jwt.sign(
-      { tenantId, role } as Omit<TokenClaims, "sub" | "iat" | "exp">,
-      secret,
-      { subject: userId, expiresIn: ACCESS_TOKEN_TTL },
-    );
-    const refreshToken = jwt.sign(
-      { tenantId, role } as Omit<TokenClaims, "sub" | "iat" | "exp">,
-      secret + ":refresh",
-      { subject: userId, expiresIn: REFRESH_TOKEN_TTL },
-    );
+    const claims: Omit<TokenClaims, "sub" | "iat" | "exp"> = {
+      tenantId,
+      role,
+      ...(customRoleId ? { customRoleId } : {}),
+      ...(permissions && permissions.length > 0 ? { permissions } : {}),
+    };
+    const accessToken = jwt.sign(claims, secret, { subject: userId, expiresIn: ACCESS_TOKEN_TTL });
+    const refreshToken = jwt.sign(claims, secret + ":refresh", { subject: userId, expiresIn: REFRESH_TOKEN_TTL });
     return { accessToken, refreshToken, expiresIn: 15 * 60 };
+  }
+
+  private async resolveCustomRolePermissions(customRoleId: string): Promise<string[]> {
+    const row = await this.db.one<{ permissions: string }>(
+      "SELECT permissions FROM custom_roles WHERE id = @id",
+      { id: customRoleId },
+    );
+    if (!row) return [];
+    try {
+      return JSON.parse(row.permissions) as string[];
+    } catch {
+      return [];
+    }
   }
 
   private async verifyPassword(plain: string, stored: string): Promise<boolean> {

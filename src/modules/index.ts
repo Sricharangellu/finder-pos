@@ -8,6 +8,7 @@ import { customersModule } from "./customers/index.js";
 import { giftcardsModule } from "./giftcards/index.js";
 import { webhooksModule } from "./webhooks/index.js";
 import { teamModule } from "./team/index.js";
+import { customRolesModule } from "./custom_roles/index.js";
 import { outletsModule } from "./outlets/index.js";
 import { purchasingModule } from "./purchasing/index.js";
 import { billingModule } from "./billing/index.js";
@@ -35,6 +36,7 @@ export const modules: PosModule[] = [
   giftcardsModule,
   webhooksModule,
   teamModule,
+  customRolesModule,
   outletsModule,
   purchasingModule,
   billingModule,

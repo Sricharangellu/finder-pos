@@ -16,6 +16,8 @@ export interface TokenClaims {
   sub: string;       // userId
   tenantId: string;
   role: Role;
+  customRoleId?: string;
+  permissions?: string[];
   iat?: number;
   exp?: number;
 }
@@ -27,8 +29,31 @@ export interface UserRow {
   email: string;
   password_hash: string;
   role: Role;
+  custom_role_id: string | null;
   created_at: number;
   updated_at: number;
+}
+
+/** Row shape from the `custom_roles` table. */
+export interface CustomRoleRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  permissions: string; // JSON array string
+  created_at: number;
+  updated_at: number;
+}
+
+/** Parsed custom role returned to clients. */
+export interface CustomRole {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 /** Row shape from the `tenants` table. */

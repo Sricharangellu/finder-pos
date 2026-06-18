@@ -10,6 +10,10 @@ export interface AuthPayload {
   role: Role;
   /** Store IDs this user is allowed to access. Empty array = all stores (owner/manager default). */
   storeIds: string[];
+  /** Custom role ID when user has a tenant-defined role (Plus tier). */
+  customRoleId?: string;
+  /** Fine-grained permission strings granted by custom role (e.g. "orders:read"). */
+  permissions: string[];
 }
 
 // Augment Express Request so downstream handlers can read the auth context.
@@ -48,6 +52,31 @@ export function requireRole(min: Role) {
   };
 }
 
+/**
+ * Permission guard: checks that the authenticated user holds a specific
+ * fine-grained permission string (from a custom role). Falls through if the
+ * user's base role is owner/manager (they always have full access). Rejects
+ * with 403 if the user's permissions list does not include `permission`.
+ */
+export function requirePermission(permission: string) {
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    if (!auth) {
+      next(new HttpError(401, "unauthenticated", "Not authenticated."));
+      return;
+    }
+    if (auth.role === "owner" || auth.role === "manager") {
+      next();
+      return;
+    }
+    if (auth.permissions.includes(permission)) {
+      next();
+      return;
+    }
+    next(new HttpError(403, "forbidden", `requires permission: ${permission}`));
+  };
+}
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
@@ -67,6 +96,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       userId: String(payload["sub"] ?? ""),
       role: (payload["role"] as Role) ?? "cashier",
       storeIds: Array.isArray(payload["storeIds"]) ? (payload["storeIds"] as string[]).map(String) : [],
+      customRoleId: payload["customRoleId"] ? String(payload["customRoleId"]) : undefined,
+      permissions: Array.isArray(payload["permissions"]) ? (payload["permissions"] as string[]).map(String) : [],
     };
     if (!auth.tenantId || !auth.userId) {
       next(new HttpError(401, "unauthenticated", "Token is missing required claims."));

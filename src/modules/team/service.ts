@@ -7,6 +7,7 @@ export interface TeamMember {
   id: string;
   email: string;
   role: string;
+  custom_role_id: string | null;
   created_at: number;
 }
 
@@ -15,7 +16,7 @@ export class TeamService {
 
   async list(tenantId: string): Promise<TeamMember[]> {
     return this.db.query<TeamMember>(
-      "SELECT id, email, role, created_at FROM users WHERE tenant_id = @tenantId ORDER BY created_at ASC",
+      "SELECT id, email, role, custom_role_id, created_at FROM users WHERE tenant_id = @tenantId ORDER BY created_at ASC",
       { tenantId },
     );
   }

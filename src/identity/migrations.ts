@@ -94,6 +94,24 @@ CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON refresh_tokens (tenant_id,
 CREATE INDEX IF NOT EXISTS refresh_tokens_hash_idx ON refresh_tokens (token_hash) WHERE revoked_at IS NULL;
 `;
 
+export const CREATE_CUSTOM_ROLES_TABLE = `
+CREATE TABLE IF NOT EXISTS custom_roles (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  description TEXT,
+  permissions TEXT NOT NULL DEFAULT '[]',
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL,
+  UNIQUE (tenant_id, name)
+);
+CREATE INDEX IF NOT EXISTS custom_roles_tenant_idx ON custom_roles (tenant_id);
+`;
+
+export const ADD_CUSTOM_ROLE_TO_USERS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_role_id TEXT REFERENCES custom_roles(id) ON DELETE SET NULL;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -102,4 +120,6 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_FEATURE_FLAGS_UNIQUE_IDX,
   CREATE_IDEMPOTENCY_KEYS_TABLE,
   CREATE_REFRESH_TOKENS_TABLE,
+  CREATE_CUSTOM_ROLES_TABLE,
+  ADD_CUSTOM_ROLE_TO_USERS,
 ];
