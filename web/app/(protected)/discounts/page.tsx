@@ -7,35 +7,7 @@ import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPatch, apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type RuleType = "simple" | "volume" | "bxgy";
-type DiscountType = "fixed" | "percent";
-type ApplyTo = "order" | "product" | "category";
-type DiscountStatus = "active" | "paused" | "archived";
-
-interface Discount {
-  id: string;
-  name: string;
-  coupon_code: string | null;
-  rule_type: RuleType;
-  discount_type: DiscountType;
-  value: number;
-  apply_to: ApplyTo;
-  status: DiscountStatus;
-  auto_applicable: number;
-  used_count: number;
-  usage_limit: number | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  min_order_cents?: number | null;
-  min_qty?: number | null;
-  buy_qty?: number | null;
-  get_qty?: number | null;
-  tier_restriction?: number | null;
-  per_customer_limit?: number | null;
-}
+import type { Discount, RuleType, DiscountType, ApplyTo, DiscountStatus } from "@/api-client/types";
 
 interface NewDiscountForm {
   name: string;

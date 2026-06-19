@@ -450,11 +450,76 @@ export const lightspeedHandlers = [
     await lat();
     return HttpResponse.json({
       items: [
-        { id: "usr_demo_owner", email: "owner@finder-pos.dev", role: "owner", created_at: Date.now() },
-        { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier", created_at: Date.now() },
+        { id: "usr_demo_owner",   email: "owner@finder-pos.dev",   role: "owner",   custom_role_id: null, created_at: Date.now() - 90 * 86_400_000 },
+        { id: "usr_demo_manager", email: "manager@finder-pos.dev", role: "manager", custom_role_id: null, created_at: Date.now() - 60 * 86_400_000 },
+        { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier", custom_role_id: "crl_demo_1", created_at: Date.now() - 30 * 86_400_000 },
       ],
     });
   }),
+
+  // ── Custom Roles ─────────────────────────────────────────────────────────
+  ...(() => {
+    let crlSeq = 0;
+    let customRoles: Array<{
+      id: string; name: string; description: string | null;
+      permissions: string[]; createdAt: number; updatedAt: number;
+    }> = [
+      {
+        id: "crl_demo_1", name: "Sales Rep",
+        description: "Can view and write orders and customers",
+        permissions: ["orders:read", "orders:write", "customers:read", "customers:write"],
+        createdAt: Date.now() - 45 * 86_400_000, updatedAt: Date.now() - 45 * 86_400_000,
+      },
+      {
+        id: "crl_demo_2", name: "Inventory Clerk",
+        description: "Can manage catalog and inventory",
+        permissions: ["catalog:read", "catalog:write", "inventory:read", "inventory:write"],
+        createdAt: Date.now() - 20 * 86_400_000, updatedAt: Date.now() - 20 * 86_400_000,
+      },
+    ];
+    return [
+      http.get(`${V1}/custom-roles`, async () => {
+        await lat();
+        return HttpResponse.json({ items: customRoles });
+      }),
+      http.get(`${V1}/custom-roles/:id`, async ({ params }) => {
+        await lat();
+        const r = customRoles.find((x) => x.id === String(params["id"]));
+        if (!r) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(r);
+      }),
+      http.post(`${V1}/custom-roles`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { name: string; description?: string; permissions: string[] };
+        const r = {
+          id: `crl_${++crlSeq}`, name: b.name,
+          description: b.description ?? null, permissions: b.permissions,
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        customRoles.push(r);
+        return HttpResponse.json(r, { status: 201 });
+      }),
+      http.patch(`${V1}/custom-roles/:id`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<{ name: string; description: string; permissions: string[] }>;
+        const idx = customRoles.findIndex((x) => x.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        customRoles[idx] = { ...customRoles[idx], ...b, updatedAt: Date.now() };
+        return HttpResponse.json(customRoles[idx]);
+      }),
+      http.delete(`${V1}/custom-roles/:id`, async ({ params }) => {
+        await lat();
+        const before = customRoles.length;
+        customRoles = customRoles.filter((x) => x.id !== String(params["id"]));
+        if (customRoles.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.patch(`${V1}/custom-roles/assign/:userId`, async () => {
+        await lat();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
 
   // ── Webhooks (Settings → Webhooks) ────────────────────────────────────────
   http.get(`${V1}/webhooks`, async () => {
@@ -1088,6 +1153,90 @@ lightspeedHandlers.push(
       { vendorId: "sup_acme", vendorName: "Acme Coffee Co", orderCount: 54, revenueCents: 168400, unitsSold: 312 },
       { vendorId: "sup_tea", vendorName: "Tea Traders", orderCount: 29, revenueCents: 84200, unitsSold: 198 },
       { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, revenueCents: 32000, unitsSold: 87 },
+    ]});
+  }),
+
+  // ── Insights: Scheduled Reports ────────────────────────────────────────────
+  ...(() => {
+    let srpSeq = 0;
+    let scheduledReports: Array<{
+      id: string; name: string; reportType: string; frequency: string;
+      recipientEmails: string[]; enabled: boolean;
+      lastSentAt: number | null; nextSendAt: number; createdAt: number; updatedAt: number;
+    }> = [
+      {
+        id: "srp_demo_1", name: "Weekly Sales Summary", reportType: "sales_summary",
+        frequency: "weekly", recipientEmails: ["owner@finder-pos.dev"], enabled: true,
+        lastSentAt: Date.now() - 7 * 86_400_000, nextSendAt: Date.now() + 7 * 86_400_000,
+        createdAt: Date.now() - 30 * 86_400_000, updatedAt: Date.now() - 7 * 86_400_000,
+      },
+      {
+        id: "srp_demo_2", name: "Monthly P&L Report", reportType: "p_l",
+        frequency: "monthly", recipientEmails: ["owner@finder-pos.dev", "cfo@finder-pos.dev"], enabled: true,
+        lastSentAt: Date.now() - 30 * 86_400_000, nextSendAt: Date.now() + 30 * 86_400_000,
+        createdAt: Date.now() - 60 * 86_400_000, updatedAt: Date.now() - 30 * 86_400_000,
+      },
+    ];
+    return [
+      http.get(`${V1}/insights/scheduled-reports`, async () => {
+        await lat();
+        return HttpResponse.json({ items: scheduledReports });
+      }),
+      http.post(`${V1}/insights/scheduled-reports`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as { name: string; reportType: string; frequency: string; recipientEmails: string[] };
+        const r = {
+          id: `srp_${++srpSeq}`, name: b.name, reportType: b.reportType,
+          frequency: b.frequency, recipientEmails: b.recipientEmails, enabled: true,
+          lastSentAt: null as number | null, nextSendAt: Date.now() + 86_400_000,
+          createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        scheduledReports.push(r);
+        return HttpResponse.json(r, { status: 201 });
+      }),
+      http.patch(`${V1}/insights/scheduled-reports/:id`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<{ name: string; reportType: string; frequency: string; recipientEmails: string[]; enabled: boolean }>;
+        const idx = scheduledReports.findIndex((x) => x.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        scheduledReports[idx] = { ...scheduledReports[idx], ...b, updatedAt: Date.now() };
+        return HttpResponse.json(scheduledReports[idx]);
+      }),
+      http.delete(`${V1}/insights/scheduled-reports/:id`, async ({ params }) => {
+        await lat();
+        const before = scheduledReports.length;
+        scheduledReports = scheduledReports.filter((x) => x.id !== String(params["id"]));
+        if (scheduledReports.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.post(`${V1}/insights/scheduled-reports/:id/trigger`, async ({ params }) => {
+        await lat();
+        const r = scheduledReports.find((x) => x.id === String(params["id"]));
+        if (!r) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        r.lastSentAt = Date.now();
+        r.nextSendAt = Date.now() + 86_400_000;
+        r.updatedAt = Date.now();
+        return HttpResponse.json(r);
+      }),
+    ];
+  })(),
+
+  // ── Insights: Inventory Forecasting ───────────────────────────────────────
+  http.get(`${V1}/insights/reorder`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { productId: "prod_2", sku: "GRO-HONEY-001", name: "Wildflower Honey", currentStock: 6, reorderPoint: 8, reorderQuantity: 24, leadTimeDays: 5, velocityPerDay: 1.2, daysOfStock: 5, belowReorderPoint: true, supplierId: null },
+      { productId: "prod_4", sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", currentStock: 0, reorderPoint: 4, reorderQuantity: 12, leadTimeDays: 7, velocityPerDay: 0.8, daysOfStock: 0, belowReorderPoint: true, supplierId: null },
+      { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", currentStock: 17, reorderPoint: 5, reorderQuantity: 20, leadTimeDays: 14, velocityPerDay: 1.5, daysOfStock: 11, belowReorderPoint: false, supplierId: null },
+    ]});
+  }),
+  http.get(`${V1}/insights/order-recommendations`, async () => {
+    await lat();
+    return HttpResponse.json({ items: [
+      { productId: "prod_1", sku: "GRO-COFFEE-001", name: "Organic Dark Roast Beans", totalUnitsSold: 186, revenueGrossCents: 278814, rank: 1, belowReorderPoint: false },
+      { productId: "prod_2", sku: "GRO-HONEY-001", name: "Wildflower Honey", totalUnitsSold: 102, revenueGrossCents: 91698, rank: 2, belowReorderPoint: true },
+      { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", totalUnitsSold: 87, revenueGrossCents: 191400, rank: 3, belowReorderPoint: false },
+      { productId: "prod_4", sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", totalUnitsSold: 64, revenueGrossCents: 76800, rank: 4, belowReorderPoint: true },
     ]});
   }),
 );

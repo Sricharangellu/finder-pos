@@ -305,7 +305,7 @@ export default function FinancePage() {
 
   return (
     <EnterpriseShell
-      active="accounting"
+      active="finance"
       title="Finance"
       subtitle="Receivables, Payables & Aging"
       contentClassName="overflow-y-auto"

@@ -462,6 +462,20 @@ export const handlers = [
     }
   }),
 
+  // ── GET /api/v1/orders (list) ────────────────────────────────────────────
+  http.get(`${V1}/orders`, async ({ request }) => {
+    await latency();
+    const url = new URL(request.url);
+    const statusFilter = url.searchParams.get("status") ?? undefined;
+    const limit = parseInt(url.searchParams.get("limit") ?? "50", 10);
+    const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
+    let items = Array.from(orderStore.values()).sort((a, b) => b.createdAt - a.createdAt);
+    if (statusFilter) items = items.filter((o) => o.status === statusFilter);
+    const total = items.length;
+    const page = items.slice(offset, offset + limit);
+    return HttpResponse.json({ items: page, total, limit, offset });
+  }),
+
   // ── GET /api/v1/orders/:id ───────────────────────────────────────────────
   http.get(`${V1}/orders/:id`, async ({ params }) => {
     await latency();
@@ -711,6 +725,43 @@ export const handlers = [
     orderStore.set(id, voided);
 
     return HttpResponse.json(voided, { status: 200 });
+  }),
+
+  // ── GET /api/v1/search ───────────────────────────────────────────────────
+  http.get(`${V1}/search`, async ({ request }) => {
+    await latency();
+    const q = new URL(request.url).searchParams.get("q")?.toLowerCase().trim() ?? "";
+    if (!q) return HttpResponse.json({ query: "", results: {} }, { status: 200 });
+
+    const results: Record<string, Array<{ type: string; id: string; label: string; sublabel?: string }>> = {};
+
+    // Products
+    const matchedProducts = MOCK_PRODUCTS.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
+    ).slice(0, 6);
+    if (matchedProducts.length > 0) {
+      results.products = matchedProducts.map((p) => ({
+        type: "product",
+        id: p.id,
+        label: p.name,
+        sublabel: p.sku,
+      }));
+    }
+
+    // Orders (search by order number)
+    const matchedOrders = Array.from(orderStore.values())
+      .filter((o) => o.orderNumber.toLowerCase().includes(q))
+      .slice(0, 4);
+    if (matchedOrders.length > 0) {
+      results.orders = matchedOrders.map((o) => ({
+        type: "order",
+        id: o.id,
+        label: o.orderNumber,
+        sublabel: o.status,
+      }));
+    }
+
+    return HttpResponse.json({ query: q, results }, { status: 200 });
   }),
 
   // ── GET /api/v1/reports/summary ──────────────────────────────────────────

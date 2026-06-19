@@ -7,15 +7,11 @@ import { Badge, statusBadge } from "@/components/Badge";
 import { Table } from "@/components/Table";
 import { Modal } from "@/components/Modal";
 import { apiGet, apiPost } from "@/api-client/client";
-
-interface Location { id: string; name: string; code: string; type: string; description?: string; }
-interface PickList { id: string; pick_number: string; status: string; assigned_to?: string; created_at: number; line_count?: number; }
-interface Register { id: string; name: string; status: "open" | "closed"; outlet_id: string; }
-interface Outlet { id: string; name: string; timezone?: string; registers: Register[]; }
+import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
 
 export default function OperationsPage() {
   const [tab, setTab] = useState<"locations" | "picklists" | "outlets">("locations");
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [locations, setLocations] = useState<FulfillmentLocation[]>([]);
   const [pickLists, setPickLists] = useState<PickList[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +31,7 @@ export default function OperationsPage() {
     setLoading(true);
     try {
       const [locRes, plRes, outRes] = await Promise.all([
-        apiGet<{ items: Location[] }>("/api/v1/fulfillment/locations").catch(() => ({ items: [] as Location[] })),
+        apiGet<{ items: FulfillmentLocation[] }>("/api/v1/fulfillment/locations").catch(() => ({ items: [] as FulfillmentLocation[] })),
         apiGet<{ items: PickList[] }>("/api/v1/fulfillment/pick-lists").catch(() => ({ items: [] as PickList[] })),
         apiGet<{ items: Outlet[] }>("/api/v1/outlets").catch(() => ({ items: [] as Outlet[] })),
       ]);
@@ -80,10 +76,10 @@ export default function OperationsPage() {
   };
 
   const locationCols = [
-    { key: "code", header: "Code", render: (r: Location) => <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{r.code}</span> },
-    { key: "name", header: "Name", render: (r: Location) => <span className="font-medium text-gray-900">{r.name}</span> },
-    { key: "type", header: "Type", render: (r: Location) => <Badge variant="blue">{r.type}</Badge> },
-    { key: "desc", header: "Description", render: (r: Location) => <span className="text-gray-500">{r.description ?? "—"}</span> },
+    { key: "code", header: "Code", render: (r: FulfillmentLocation) => <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{r.code}</span> },
+    { key: "name", header: "Name", render: (r: FulfillmentLocation) => <span className="font-medium text-gray-900">{r.name}</span> },
+    { key: "type", header: "Type", render: (r: FulfillmentLocation) => <Badge variant="blue">{r.type}</Badge> },
+    { key: "desc", header: "Description", render: (r: FulfillmentLocation) => <span className="text-gray-500">{r.description ?? "—"}</span> },
   ];
 
   const pickCols = [

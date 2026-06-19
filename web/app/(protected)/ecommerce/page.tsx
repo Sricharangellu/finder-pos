@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Badge, statusBadge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPatch, ApiResponseError } from "@/api-client/client";
+import type { OnlineOrder } from "@/api-client/types";
 
 // ── Local types ──────────────────────────────────────────────────────────────
 
@@ -18,19 +19,6 @@ interface CatalogItem {
   category: string;
   status: string;
   ecommerce?: boolean;
-}
-
-interface OnlineOrder {
-  id: string;
-  so_number?: string;
-  orderNumber?: string;
-  customer_id?: string;
-  customerName?: string;
-  status: string;
-  total_cents?: number;
-  totalCents?: number;
-  created_at?: number;
-  createdAt?: number;
 }
 
 interface StorefrontSettings {

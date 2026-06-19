@@ -6,16 +6,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { apiGet, apiPost } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
-
-interface Shipment {
-  id: string;
-  ship_number: string;
-  invoice_id: string;
-  status: string;
-  method: string;
-  carrier: string | null;
-  tracking_number: string | null;
-}
+import type { Shipment } from "@/api-client/types";
 
 const STATUS_STYLE: Record<string, string> = {
   pending_shipment: "bg-amber-50 text-amber-700 ring-amber-200",

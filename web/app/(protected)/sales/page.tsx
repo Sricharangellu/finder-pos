@@ -6,24 +6,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost } from "@/api-client/client";
-
-interface SalesOrder {
-  id: string;
-  so_number: string;
-  customer_id: string;
-  status: string;
-  total_cents: number;
-  store_id: string | null;
-  created_at: number;
-}
-interface Quotation {
-  id: string;
-  quote_number: string;
-  customer_id: string;
-  status: string;
-  total_cents: number;
-  created_at: number;
-}
+import type { SalesOrder, Quotation } from "@/api-client/types";
 
 const SO_STATUS_STYLE: Record<string, string> = {
   pending_approve: "bg-blue-50 text-blue-700 ring-blue-200",

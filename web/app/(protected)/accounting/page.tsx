@@ -7,10 +7,7 @@ import { Button } from "@/components/Button";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import type { AgingReport, Bill, Invoice, BillingStatus } from "@/api-client/types";
-
-interface Account { id: string; code: string; name: string; type: string; is_active: number; }
-interface Deposit { id: string; batch_number: string; status: string; total_cents: number; account_id: string; created_at: number; }
+import type { AgingReport, Bill, Invoice, BillingStatus, Account, Deposit } from "@/api-client/types";
 
 const TYPE_STYLE: Record<string, string> = {
   asset: "bg-blue-50 text-blue-700 ring-blue-200",

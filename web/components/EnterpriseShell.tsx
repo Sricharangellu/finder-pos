@@ -10,9 +10,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { Button } from "@/components/Button";
+import { CommandPalette } from "@/components/CommandPalette";
 import { apiGet } from "@/api-client/client";
 import type { OutletsResponse } from "@/api-client/types";
 import { useAuth } from "@/lib/useAuth";
@@ -25,6 +26,7 @@ type NavKey =
   | "inventory"
   | "purchasing"
   | "customers"
+  | "orders"
   | "sales"
   | "accounting"
   | "shipping"
@@ -32,7 +34,10 @@ type NavKey =
   | "ecommerce"
   | "reports"
   | "settings"
-  | "operations";
+  | "operations"
+  | "team"
+  | "insights"
+  | "finance";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -47,14 +52,18 @@ const NAV_ITEMS: Array<{
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", group: "Operate" },
   { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
+  { key: "orders", label: "Orders", href: "/orders", icon: "orders", group: "Operate" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
   { key: "operations", label: "Operations", href: "/operations", icon: "operations", group: "Manage" },
   { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing", group: "Manage", editionFlag: "groupWholesale" },
   { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping", group: "Manage", editionFlag: "groupWholesale" },
   { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", group: "Manage", editionFlag: "groupRetailPOS" },
+  { key: "team", label: "Team", href: "/team", icon: "team", group: "Manage" },
+  { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce", group: "Analyze", editionFlag: "groupEnterprise" },
+  { key: "insights", label: "Insights", href: "/insights", icon: "insights", group: "Analyze" },
   { key: "reports", label: "Reports", href: "/reports", icon: "reports", group: "Analyze" },
   { key: "settings", label: "Settings", href: "/settings", icon: "settings", group: "Analyze" },
 ];
@@ -80,6 +89,20 @@ export function EnterpriseShell({
   const { isOffline } = useOffline();
   const pathname = usePathname();
   const { editionFlags: flags } = useAccountMode();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // ⌘K / Ctrl+K global shortcut
+  const handleGlobalKey = useCallback((e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      setPaletteOpen((o) => !o);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleGlobalKey);
+    return () => window.removeEventListener("keydown", handleGlobalKey);
+  }, [handleGlobalKey]);
 
   return (
     <div className="flex min-h-screen bg-slate-100 text-slate-900">
@@ -108,6 +131,19 @@ export function EnterpriseShell({
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              {/* ⌘K search trigger */}
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                className="hidden min-h-[40px] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 transition-colors hover:border-slate-300 hover:bg-white sm:flex"
+                aria-label="Open search (⌘K)"
+              >
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <span className="text-slate-400">Search</span>
+                <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-400">⌘K</kbd>
+              </button>
               <StoreSwitcher />
               <DeviceStatus isOffline={isOffline} />
               {user && <UserContext name={user.name} role={user.role} />}
@@ -128,6 +164,8 @@ export function EnterpriseShell({
       </div>
 
       <MobileNav active={active} flags={flags} />
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }
@@ -336,6 +374,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <RegisterIcon />;
     case "sales":
       return <SalesIcon />;
+    case "orders":
+      return <OrdersIcon />;
     case "inventory":
       return <InventoryIcon />;
     case "operations":
@@ -356,9 +396,49 @@ function NavIcon({ name }: { name: NavKey }) {
       return <ReportsIcon />;
     case "settings":
       return <SettingsIcon />;
+    case "team":
+      return <TeamIcon />;
+    case "insights":
+      return <InsightsIcon />;
+    case "finance":
+      return <FinanceIcon />;
     default:
       return <ReportsIcon />;
   }
+}
+
+function FinanceIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M7 15h.01" />
+      <path d="M11 15h2" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function InsightsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 20h20" />
+      <path d="M6 20V10" />
+      <path d="M10 20V4" />
+      <path d="M14 20V14" />
+      <path d="M18 20V8" />
+    </svg>
+  );
 }
 
 function DashboardIcon() {
@@ -461,6 +541,17 @@ function SalesIcon() {
       <path d="M3 18h18" />
       <path d="M7 6v12" />
       <path d="M17 6v12" />
+    </svg>
+  );
+}
+
+function OrdersIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="M9 12h6" />
+      <path d="M9 16h4" />
     </svg>
   );
 }

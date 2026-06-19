@@ -536,3 +536,257 @@ export interface CatalogBarcode {
 export interface CatalogBarcodesResponse {
   items: CatalogBarcode[];
 }
+
+// ─── Accounting ───────────────────────────────────────────────────────────────
+
+export type AccountType = "asset" | "liability" | "income" | "expense";
+
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType | string;
+  parent_id?: string | null;
+  is_active: number; // 1 = active, 0 = inactive (SQLite integer)
+}
+
+export interface AccountsResponse {
+  items: Account[];
+}
+
+export type DepositStatus = "pending_approval" | "approved" | "rejected";
+
+export interface Deposit {
+  id: string;
+  batch_number: string;
+  description?: string | null;
+  note?: string | null;
+  status: DepositStatus | string;
+  total_cents: number;
+  account_id: string;
+  created_at: number;
+}
+
+export interface DepositsResponse {
+  items: Deposit[];
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+export interface ShippingMethod {
+  id: string;
+  name: string;
+  amount_cents: number;
+  free_limit_cents?: number | null;
+  ecommerce?: number | boolean | null;
+  sequence?: number;
+}
+
+export interface ShippingMethodsResponse {
+  items: ShippingMethod[];
+}
+
+export interface PaymentTerm {
+  id: string;
+  name: string;
+  days_due: number;
+  description?: string | null;
+}
+
+export interface PaymentTermsResponse {
+  items: PaymentTerm[];
+}
+
+export interface PaymentMode {
+  id: string;
+  name: string;
+  active?: number;
+}
+
+export interface PaymentModesResponse {
+  items: PaymentMode[];
+}
+
+export interface TaxRate {
+  id: string;
+  name: string;
+  rate_bps: number;
+  apply_to_category?: string | null;
+  state?: string | null;
+}
+
+export interface TaxRatesResponse {
+  items: TaxRate[];
+}
+
+// ─── Sales (Quotations & Sales Orders) ───────────────────────────────────────
+
+export type QuotationStatus = "draft" | "sent" | "accepted" | "cancelled" | "expired";
+
+export interface Quotation {
+  id: string;
+  quote_number: string;
+  customer_id: string;
+  status: QuotationStatus | string;
+  total_cents: number;
+  created_at: number;
+}
+
+export interface QuotationsResponse {
+  items: Quotation[];
+}
+
+export type SalesOrderStatus = "pending_approve" | "approved" | "fulfilled" | "cancelled";
+
+export interface SalesOrder {
+  id: string;
+  so_number: string;
+  customer_id: string;
+  status: SalesOrderStatus | string;
+  total_cents: number;
+  store_id: string | null;
+  created_at: number;
+}
+
+export interface SalesOrdersResponse {
+  items: SalesOrder[];
+}
+
+// ─── Shipping ─────────────────────────────────────────────────────────────────
+
+export type ShipmentStatus = "pending" | "shipped" | "delivered" | "cancelled";
+
+export interface Shipment {
+  id: string;
+  ship_number: string;
+  invoice_id: string;
+  status: ShipmentStatus | string;
+  method: string;
+  carrier: string | null;
+  tracking_number: string | null;
+}
+
+export interface ShipmentsResponse {
+  items: Shipment[];
+}
+
+// ─── Fulfillment (Locations & Pick Lists) ────────────────────────────────────
+
+export interface FulfillmentLocation {
+  id: string;
+  code: string;
+  name?: string;
+  kind?: string;
+  type?: string;
+  description?: string;
+}
+
+export interface FulfillmentLocationsResponse {
+  items: FulfillmentLocation[];
+}
+
+export interface PickListLine {
+  id: string;
+  product_id: string;
+  quantity: number;
+  picked_qty: number;
+  status: string;
+}
+
+export type PickListStatus = "picking" | "picked" | "packed";
+
+export interface PickList {
+  id: string;
+  pick_number?: string;
+  status: PickListStatus | string;
+  assigned_to?: string;
+  created_at: number;
+  lines?: PickListLine[];
+  line_count?: number;
+}
+
+export interface PickListsResponse {
+  items: PickList[];
+}
+
+// ─── Discounts ────────────────────────────────────────────────────────────────
+
+export type RuleType = "simple" | "volume" | "bxgy";
+export type DiscountType = "fixed" | "percent";
+export type ApplyTo = "order" | "product" | "category";
+export type DiscountStatus = "active" | "paused" | "archived";
+
+export interface Discount {
+  id: string;
+  name: string;
+  coupon_code: string | null;
+  rule_type: RuleType;
+  discount_type: DiscountType;
+  value: number;
+  apply_to: ApplyTo;
+  status: DiscountStatus;
+  auto_applicable: number;
+  used_count: number;
+  usage_limit?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  min_order_cents?: number | null;
+  min_qty?: number | null;
+  buy_qty?: number | null;
+  get_qty?: number | null;
+  tier_restriction?: number | null;
+  per_customer_limit?: number | null;
+}
+
+export interface DiscountsResponse {
+  items: Discount[];
+}
+
+// ─── Ecommerce ────────────────────────────────────────────────────────────────
+
+export interface OnlineOrder {
+  id: string;
+  so_number?: string;
+  /** camelCase alias some mock handlers return */
+  orderNumber?: string;
+  customer_id?: string;
+  /** display name returned by some handlers */
+  customerName?: string;
+  status: string;
+  total_cents?: number;
+  /** camelCase alias some mock handlers return */
+  totalCents?: number;
+  created_at?: number;
+  /** camelCase alias some mock handlers return */
+  createdAt?: number;
+}
+
+export interface OnlineOrdersResponse {
+  items: OnlineOrder[];
+}
+
+// ─── Global Search (⌘K command palette) ──────────────────────────────────────
+export type SearchHitType =
+  | "product"
+  | "customer"
+  | "vendor"
+  | "invoice"
+  | "sales_order"
+  | "quotation"
+  | "purchase_order"
+  | "order";
+
+export interface SearchHit {
+  type: SearchHitType;
+  id: string;
+  label: string;
+  sublabel?: string;
+}
+
+/** Keyed by group name (e.g. "products", "customers", "orders"). */
+export type SearchResults = Record<string, SearchHit[]>;
+
+export interface SearchResponse {
+  query: string;
+  results: SearchResults;
+}

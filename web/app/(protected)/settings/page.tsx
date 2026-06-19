@@ -9,14 +9,11 @@ import { getUser } from "@/lib/auth";
 import { apiGet, apiPut, apiPost, apiDelete } from "@/api-client/client";
 import { useToast } from "@/components/Toast";
 import { formatMoney } from "@/lib/money";
+import type { ShippingMethod, PaymentTerm, PaymentMode, TaxRate, Account, Deposit } from "@/api-client/types";
 
 type Section = "store" | "shipping" | "terms" | "modes" | "tax" | "flags" | "security" | "coa" | "deposits";
 
 interface Business { [key: string]: unknown }
-interface ShippingMethod { id: string; name: string; amountCents: number; freeLimitCents?: number; ecommerce?: boolean; sequence?: number }
-interface PaymentTerm { id: string; name: string; daysDue: number; description?: string }
-interface PaymentMode { id: string; name: string }
-interface TaxRate { id: string; name: string; rateBps: number; applyToCategory?: string; state?: string }
 
 export default function SettingsPage() {
   const role = getUser()?.role ?? "cashier";
@@ -223,8 +220,8 @@ function ShippingSection({ canManage, addToast }: { canManage: boolean; addToast
             {items.map((m) => (
               <tr key={m.id}>
                 <td className="px-4 py-3 font-medium">{m.name}</td>
-                <td className="px-4 py-3">{formatMoney(m.amountCents)}</td>
-                <td className="px-4 py-3">{m.freeLimitCents ? formatMoney(m.freeLimitCents) : "—"}</td>
+                <td className="px-4 py-3">{formatMoney(m.amount_cents)}</td>
+                <td className="px-4 py-3">{m.free_limit_cents ? formatMoney(m.free_limit_cents) : "—"}</td>
                 {canManage && <td className="px-4 py-3 text-right"><Button size="sm" variant="ghost" onClick={() => setDeleteTarget(m)}>Remove</Button></td>}
               </tr>
             ))}
@@ -289,7 +286,7 @@ function TermsSection({ canManage, addToast }: { canManage: boolean; addToast: R
           {items.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">{t.name}</td>
-              <td className="px-4 py-3">{t.daysDue}</td>
+              <td className="px-4 py-3">{t.days_due}</td>
               <td className="px-4 py-3 text-slate-500">{t.description ?? "—"}</td>
             </tr>
           ))}
@@ -409,8 +406,8 @@ function TaxSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
           {items.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">{t.name}</td>
-              <td className="px-4 py-3">{(t.rateBps / 100).toFixed(2)}%</td>
-              <td className="px-4 py-3 text-slate-500">{t.applyToCategory ?? "All"}</td>
+              <td className="px-4 py-3">{(t.rate_bps / 100).toFixed(2)}%</td>
+              <td className="px-4 py-3 text-slate-500">{t.apply_to_category ?? "All"}</td>
               <td className="px-4 py-3 text-slate-500">{t.state ?? "—"}</td>
             </tr>
           ))}
@@ -523,16 +520,10 @@ function SecuritySection() {
 
 // ─── Chart of Accounts ───────────────────────────────────────────────────────
 
-interface CoaAccount {
-  id: string;
-  code: string;
-  name: string;
-  type: "asset" | "liability" | "income" | "expense" | string;
-  parent_id?: string | null;
-}
+// Account uses the shared Account type from api-client/types
 
 function CoaSection({ canManage, addToast }: { canManage: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
-  const [accounts, setAccounts] = useState<CoaAccount[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ code: "", name: "", type: "asset" });
@@ -540,7 +531,7 @@ function CoaSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
 
   const load = useCallback(() => {
     setLoading(true);
-    apiGet<{ items: CoaAccount[] }>("/api/v1/accounting/accounts")
+    apiGet<{ items: Account[] }>("/api/v1/accounting/accounts")
       .then(r => setAccounts(r.items ?? []))
       .catch(() => setAccounts([]))
       .finally(() => setLoading(false));
@@ -563,7 +554,7 @@ function CoaSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
   };
 
   const typeOrder = ["asset", "liability", "income", "expense"];
-  const grouped = typeOrder.reduce<Record<string, CoaAccount[]>>((acc, t) => {
+  const grouped = typeOrder.reduce<Record<string, Account[]>>((acc, t) => {
     acc[t] = accounts.filter(a => a.type === t);
     return acc;
   }, {});
@@ -634,14 +625,7 @@ function CoaSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
 
 // ─── Deposits ─────────────────────────────────────────────────────────────────
 
-interface Deposit {
-  id: string;
-  batch_number: string;
-  description: string | null;
-  status: string;
-  total_cents: number;
-  created_at: number;
-}
+// Deposit uses the shared Deposit type from api-client/types
 
 function DepositsSection({ canManage, addToast }: { canManage: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
