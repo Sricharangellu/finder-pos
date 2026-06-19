@@ -18,17 +18,22 @@ function readStatusFilter(value: unknown): OrderStatus | undefined {
   return value as OrderStatus;
 }
 
+const lineSchema = z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().positive(),
+  ageVerified: z.boolean().optional(),
+});
+
 const createSchema = z.object({
-  stateCode: stateSchema,
-  lines: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().positive(),
-        ageVerified: z.boolean().optional(),
-      }),
-    )
-    .min(1),
+  stateCode: stateSchema.optional(), // optional — POS terminal doesn't send it; defaults to "CA"
+  lines: z.array(lineSchema).min(1),
+  discountCents: z.number().int().nonnegative().optional(),
+  customerId: z.string().min(1).nullable().optional(),
+  storeId: z.string().min(1).nullable().optional(),
+});
+
+const updateSchema = z.object({
+  lines: z.array(lineSchema).min(1),
   discountCents: z.number().int().nonnegative().optional(),
   customerId: z.string().min(1).nullable().optional(),
   storeId: z.string().min(1).nullable().optional(),
@@ -98,6 +103,15 @@ export function registerRoutes(router: Router, service: OrdersService): void {
       const order = await service.get(id, tenantId(res));
       if (!order) throw notFound(`order '${id}' not found`);
       res.json(order);
+    }),
+  );
+
+  // PUT /:id — replace cart lines (used by POS terminal on every cart change).
+  router.put(
+    "/:id",
+    handler(async (req: Request, res: Response) => {
+      const body = parseBody(updateSchema, req.body);
+      res.json(await service.update(String(req.params.id), body, tenantId(res)));
     }),
   );
 

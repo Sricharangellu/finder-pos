@@ -25,6 +25,12 @@ const depositSchema = z.object({
   paymentIds: z.array(z.string().min(1)).min(1),
   depositDate: z.number().int().positive().optional(),
 });
+// Simpler schema used by the Settings → Deposits UI (no payment IDs required).
+const manualDepositSchema = z.object({
+  totalCents: z.number().int().positive(),
+  note: z.string().optional(),
+  accountId: z.string().min(1).optional(),
+});
 
 export function registerRoutes(router: Router, service: AccountingService): void {
   const mgr = requireRole("manager");
@@ -49,7 +55,12 @@ export function registerRoutes(router: Router, service: AccountingService): void
 
   // ── Batch Deposits ─────────────────────────────────────────────────────
   router.post("/deposits", mgr, handler(async (req, res) => {
-    res.status(201).json(await service.createDeposit(parseBody(depositSchema, req.body), tenantId(res)));
+    // Dispatch: Settings UI sends { totalCents, note }; API clients send { accountId, paymentIds[] }.
+    if (typeof (req.body as Record<string, unknown>).totalCents === "number") {
+      res.status(201).json(await service.createManualDeposit(parseBody(manualDepositSchema, req.body), tenantId(res)));
+    } else {
+      res.status(201).json(await service.createDeposit(parseBody(depositSchema, req.body), tenantId(res)));
+    }
   }));
   router.get("/deposits", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? (req.query.status as DepositStatus) : undefined;

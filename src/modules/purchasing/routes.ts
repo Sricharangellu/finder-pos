@@ -156,18 +156,34 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   }));
 
   const receiveSchema = z.object({
+    // lines is optional — omitting it (or sending {}) means "receive all open lines".
     lines: z.array(z.object({
       lineId: z.string().min(1),
       qty: z.number().int().positive().optional(),
       quantity: z.number().int().positive().optional(),
-    })).min(1),
+    })).optional(),
   });
 
   router.post("/orders/:id/receive", mgr, handler(async (req, res) => {
-    const b = parseBody(receiveSchema, req.body);
-    // Support both `qty` (legacy) and `quantity` (BE-11) field names.
-    const lines = b.lines.map((l) => ({ lineId: l.lineId, qty: l.qty ?? l.quantity ?? 1 }));
-    res.json(await service.receive(String(req.params.id), tenantId(res), lines));
+    const id = String(req.params.id);
+    const tid = tenantId(res);
+    const b = parseBody(receiveSchema, req.body ?? {});
+    let lines: Array<{ lineId: string; qty: number }>;
+    if (b.lines && b.lines.length > 0) {
+      // Explicit lines provided — support both `qty` and `quantity` field names.
+      lines = b.lines.map((l) => ({ lineId: l.lineId, qty: l.qty ?? l.quantity ?? 1 }));
+    } else {
+      // No lines specified: receive all open lines at full remaining quantity ("receive all" button).
+      const po = await service.getOrder(id, tid);
+      lines = po.lines
+        .filter((l) => (l.received_qty ?? 0) < l.quantity)
+        .map((l) => ({ lineId: l.id, qty: l.quantity - (l.received_qty ?? 0) }));
+      if (lines.length === 0) {
+        res.json(po); // already fully received — nothing to do
+        return;
+      }
+    }
+    res.json(await service.receive(id, tid, lines));
   }));
 
   // Landed costs: freight and other charges distributed proportionally across PO lines.

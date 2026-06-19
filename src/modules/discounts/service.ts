@@ -15,7 +15,7 @@ import { notFound, badRequest, conflict } from "../../shared/http.js";
 export type RuleType = "simple" | "volume" | "bxgy";
 export type DiscountType = "fixed" | "percent";
 export type ApplyTo = "product" | "category" | "cart";
-export type RuleStatus = "active" | "inactive";
+export type RuleStatus = "active" | "inactive" | "paused" | "archived";
 
 export interface Discount {
   id: string;
@@ -137,6 +137,53 @@ export class DiscountsService {
     await this.db.query("UPDATE discounts SET status = @s, updated_at = @now WHERE id = @id AND tenant_id = @t", { s: status, now: Date.now(), id, t: tenantId });
     return { ...d, status };
   }
+
+  async update(id: string, input: Partial<CreateDiscountInput>, tenantId: string): Promise<Discount> {
+    const d = await this.get(id, tenantId);
+    
+    if (input.name !== undefined) d.name = input.name;
+    if (input.couponCode !== undefined) d.coupon_code = input.couponCode || null;
+    if (input.ruleType !== undefined) d.rule_type = input.ruleType;
+    if (input.discountType !== undefined) d.discount_type = input.discountType;
+    if (input.value !== undefined) d.value = input.value;
+    if (input.applyTo !== undefined) d.apply_to = input.applyTo;
+    if (input.targetId !== undefined) d.target_id = input.targetId || null;
+    if (input.minOrderCents !== undefined) d.min_order_cents = input.minOrderCents;
+    if (input.minQty !== undefined) d.min_qty = input.minQty;
+    if (input.buyQty !== undefined) d.buy_qty = input.buyQty;
+    if (input.getQty !== undefined) d.get_qty = input.getQty;
+    if (input.tierRestriction !== undefined) {
+      d.tier_restriction = input.tierRestriction && input.tierRestriction.length ? input.tierRestriction.join(",") : null;
+    }
+    if (input.startDate !== undefined) d.start_date = input.startDate || null;
+    if (input.endDate !== undefined) d.end_date = input.endDate || null;
+    if (input.autoApplicable !== undefined) d.auto_applicable = input.autoApplicable ? 1 : 0;
+    if (input.usageLimit !== undefined) d.usage_limit = input.usageLimit || null;
+    if (input.perCustomerLimit !== undefined) d.per_customer_limit = input.perCustomerLimit || null;
+
+    if (d.discount_type === "percent" && (d.value < 0 || d.value > 100)) throw badRequest("percent value must be 0–100");
+    if (d.value < 0) throw badRequest("value must be non-negative");
+
+    d.updated_at = Date.now();
+
+    try {
+      await this.db.query(
+        `UPDATE discounts SET
+          name = @name, coupon_code = @coupon_code, rule_type = @rule_type, discount_type = @discount_type,
+          value = @value, apply_to = @apply_to, target_id = @target_id, min_order_cents = @min_order_cents,
+          min_qty = @min_qty, buy_qty = @buy_qty, get_qty = @get_qty, tier_restriction = @tier_restriction,
+          start_date = @start_date, end_date = @end_date, auto_applicable = @auto_applicable,
+          usage_limit = @usage_limit, per_customer_limit = @per_customer_limit, updated_at = @updated_at
+         WHERE id = @id AND tenant_id = @tenant_id`,
+        d as unknown as Record<string, unknown>,
+      );
+    } catch (err) {
+      if ((err as { code?: string }).code === "23505") throw conflict(`coupon code '${d.coupon_code}' already exists`);
+      throw err;
+    }
+    return d;
+  }
+
 
   /** Increment usage, enforcing usage_limit and per_customer_limit.
    *  Pass `customerId` for per-customer tracking (BE-5). */

@@ -851,6 +851,31 @@ lightspeedHandlers.push(
     if (!d) return HttpResponse.json({ error: { code: "not_found", message: "discount not found", requestId: rid() } }, { status: 404 });
     d.status = ((await request.json()) as any).status; return HttpResponse.json(d);
   }),
+  http.patch(`${V1}/discounts/:id`, async ({ params, request }) => {
+    await lat();
+    const d = discounts.find((x) => x.id === String(params.id));
+    if (!d) return HttpResponse.json({ error: { code: "not_found", message: "discount not found", requestId: rid() } }, { status: 404 });
+    const b = (await request.json()) as any;
+    if (b.name !== undefined) d.name = b.name;
+    if (b.couponCode !== undefined) d.coupon_code = b.couponCode || null;
+    if (b.ruleType !== undefined) d.rule_type = b.ruleType;
+    if (b.discountType !== undefined) d.discount_type = b.discountType;
+    if (b.value !== undefined) d.value = b.value;
+    if (b.applyTo !== undefined) d.apply_to = b.applyTo;
+    if (b.targetId !== undefined) d.target_id = b.targetId || null;
+    if (b.minOrderCents !== undefined) d.min_order_cents = b.minOrderCents;
+    if (b.minQty !== undefined) d.min_qty = b.minQty;
+    if (b.buyQty !== undefined) d.buy_qty = b.buyQty;
+    if (b.getQty !== undefined) d.get_qty = b.getQty;
+    if (b.tierRestriction !== undefined) d.tier_restriction = b.tierRestriction?.join(",") ?? null;
+    if (b.startDate !== undefined) d.start_date = b.startDate;
+    if (b.endDate !== undefined) d.end_date = b.endDate;
+    if (b.autoApplicable !== undefined) d.auto_applicable = b.autoApplicable ? 1 : 0;
+    if (b.usageLimit !== undefined) d.usage_limit = b.usageLimit;
+    if (b.perCustomerLimit !== undefined) d.per_customer_limit = b.perCustomerLimit;
+    return HttpResponse.json(d);
+  }),
+
   http.post(`${V1}/discounts/:id/redeem`, async ({ params }) => {
     await lat();
     const d = discounts.find((x) => x.id === String(params.id));
@@ -957,7 +982,25 @@ lightspeedHandlers.push(
       .sort((a, b) => b.opened_at - a.opened_at);
     return HttpResponse.json({ items: sessions });
   }),
+  http.get(`${V1}/outlets/registers/:registerId/expected-cash`, async ({ params }) => {
+    await lat();
+    const regId = String(params.registerId);
+    const session = Array.from(registerSessions.values()).find(
+      (s) => s.register_id === regId && s.status === "open"
+    );
+    if (!session) {
+      return HttpResponse.json({ openingFloatCents: 0, cashSalesCents: 0, expectedCashCents: 0 });
+    }
+    const cashSalesCents = 12000;
+    return HttpResponse.json({
+      openingFloatCents: session.opening_float_cents,
+      cashSalesCents,
+      expectedCashCents: session.opening_float_cents + cashSalesCents,
+    });
+  }),
   http.post(`${V1}/outlets/registers/:registerId/open`, async ({ params, request }) => {
+
+
     await lat();
     const regId = String(params.registerId);
     const existing = Array.from(registerSessions.values()).find(

@@ -10,6 +10,7 @@ const captureSchema = z.object({
   cashCents: z.number().int().nonnegative().optional(),
   cardCents: z.number().int().nonnegative().optional(),
   tenderedCents: z.number().int().nonnegative().optional(),
+  cardLast4: z.string().length(4).optional(), // from POS terminal UI; backend may override via card reader simulation
   idempotencyKey: z.string().min(1).optional(),
 });
 

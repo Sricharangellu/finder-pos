@@ -8,10 +8,13 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+const locationKindSchema = z.enum(["zone", "aisle", "shelf", "bin"]).optional();
 const locationSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1).optional(),
-  kind: z.enum(["zone", "aisle", "shelf", "bin"]).optional(),
+  kind: locationKindSchema,  // API convention
+  type: locationKindSchema,  // frontend sends `type` — treated as alias for `kind`
+  description: z.string().optional(), // frontend field, stored in name if name is absent
 });
 const assignSchema = z.object({ productId: z.string().min(1), locationId: z.string().min(1) });
 const pickListSchema = z.object({ orderId: z.string().min(1) });
@@ -20,7 +23,9 @@ const pickSchema = z.object({ quantity: z.number().int().positive().optional() }
 export function registerRoutes(router: Router, service: FulfillmentService): void {
   router.post("/locations", handler(async (req, res) => {
     const b = parseBody(locationSchema, req.body);
-    res.status(201).json(await service.createLocation(b.code, b.name, b.kind ?? "bin", tenantId(res)));
+    const kind = b.kind ?? b.type ?? "bin";
+    const name = b.name ?? b.description ?? undefined;
+    res.status(201).json(await service.createLocation(b.code, name, kind, tenantId(res)));
   }));
   router.get("/locations", handler(async (_req, res) => {
     res.json({ items: await service.listLocations(tenantId(res)) });

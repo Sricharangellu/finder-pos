@@ -194,4 +194,46 @@ export class AccountingService {
 
   approveDeposit(id: string, tenantId: string) { return this.decide(id, "approved", tenantId); }
   rejectDeposit(id: string, tenantId: string) { return this.decide(id, "rejected", tenantId); }
+
+  /** Simple manual cash deposit — used by the Settings UI which doesn't pick payment IDs.
+   *  Auto-selects the first active asset account if no accountId is supplied. */
+  async createManualDeposit(
+    input: { totalCents: number; note?: string; accountId?: string },
+    tenantId: string,
+  ): Promise<BatchDeposit> {
+    if (input.totalCents <= 0) throw badRequest("totalCents must be positive");
+
+    let accountId = input.accountId;
+    if (!accountId) {
+      const acct = await this.db.one<{ id: string }>(
+        "SELECT id FROM accounts WHERE tenant_id = @t AND type = 'asset' AND is_active = 1 ORDER BY code ASC LIMIT 1",
+        { t: tenantId },
+      );
+      if (!acct) throw badRequest("no asset accounts found — seed your chart of accounts first (Settings → Chart of Accounts → seed)");
+      accountId = acct.id;
+    } else {
+      const acct = await this.db.one("SELECT id FROM accounts WHERE id = @a AND tenant_id = @t", { a: accountId, t: tenantId });
+      if (!acct) throw notFound(`account '${accountId}' not found`);
+    }
+
+    const now = Date.now();
+    const dep: BatchDeposit = {
+      id: `dep_${uuidv7()}`,
+      tenant_id: tenantId,
+      batch_number: await this.nextNumber(tenantId),
+      description: input.note ?? null,
+      account_id: accountId,
+      status: "pending_approval",
+      total_cents: input.totalCents,
+      deposit_date: null,
+      created_at: now,
+      decided_at: null,
+    };
+    await this.db.query(
+      `INSERT INTO batch_deposits (id, tenant_id, batch_number, description, account_id, status, total_cents, deposit_date, created_at, decided_at)
+       VALUES (@id,@tenant_id,@batch_number,@description,@account_id,@status,@total_cents,@deposit_date,@created_at,@decided_at)`,
+      dep as unknown as Record<string, unknown>,
+    );
+    return dep;
+  }
 }

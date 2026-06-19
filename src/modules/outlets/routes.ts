@@ -64,6 +64,13 @@ export function registerRoutes(router: Router, service: OutletsService): void {
     }),
   );
 
+  router.get(
+    "/registers/:registerId/expected-cash",
+    handler(async (req, res) => {
+      res.json(await service.getExpectedCash(String(req.params.registerId), tenantId(res)));
+    }),
+  );
+
   router.post(
     "/registers/:registerId/close",
     handler(async (req, res) => {
@@ -71,6 +78,7 @@ export function registerRoutes(router: Router, service: OutletsService): void {
       res.json(await service.closeSession(String(req.params.registerId), body.countedCashCents, body.closingFloatCents ?? 0, tenantId(res)));
     }),
   );
+
 
   router.get(
     "/registers/:registerId/sessions",

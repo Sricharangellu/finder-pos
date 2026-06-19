@@ -21,7 +21,12 @@ const invoiceSchema = z.object({
   totalCents: z.number().int().positive().optional(),
   dueDate: z.number().int().positive().optional(),
 });
-const paySchema = z.object({ amountCents: z.number().int().positive(), method: z.string().min(1).optional() });
+// Accept both `method` (API convention) and `mode` (frontend convention) as the same field.
+const paySchema = z.object({
+  amountCents: z.number().int().positive(),
+  method: z.string().min(1).optional(),
+  mode: z.string().min(1).optional(),
+});
 
 export function registerRoutes(router: Router, service: BillingService): void {
   const mgr = requireRole("manager");
@@ -35,7 +40,7 @@ export function registerRoutes(router: Router, service: BillingService): void {
   }));
   router.post("/bills/:id/pay", handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);
-    res.json(await service.payBill(String(req.params.id), b.amountCents, b.method ?? "transfer", tenantId(res)));
+    res.json(await service.payBill(String(req.params.id), b.amountCents, b.method ?? b.mode ?? "transfer", tenantId(res)));
   }));
 
   // Invoices (AR)
@@ -48,7 +53,7 @@ export function registerRoutes(router: Router, service: BillingService): void {
   }));
   router.post("/invoices/:id/pay", handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);
-    res.json(await service.payInvoice(String(req.params.id), b.amountCents, b.method ?? "transfer", tenantId(res)));
+    res.json(await service.payInvoice(String(req.params.id), b.amountCents, b.method ?? b.mode ?? "transfer", tenantId(res)));
   }));
 
   // BE-14: AR dunning — updates dunning_level on overdue open/partial invoices.

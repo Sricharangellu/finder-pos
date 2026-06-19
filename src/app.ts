@@ -16,6 +16,7 @@ import {
   renderMetrics,
 } from "./gateway/index.js";
 import { handler } from "./shared/http.js";
+import { bootstrapOrchestration } from "./orchestration/index.js";
 
 export interface App {
   express: Express;
@@ -162,6 +163,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       ],
     });
   });
+
+  // ── Orchestration layer (workflows, sagas, command handlers, background jobs)
+  bootstrapOrchestration(db, events);
 
   // ── Error handling (errorEnvelope must be last)
   app.use(errorMiddleware);

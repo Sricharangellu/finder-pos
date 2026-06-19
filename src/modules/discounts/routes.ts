@@ -40,7 +40,7 @@ const evaluateSchema = z.object({
   couponCode: z.string().min(1).optional(),
 });
 
-const statusSchema = z.object({ status: z.enum(["active", "inactive"]) });
+const statusSchema = z.object({ status: z.enum(["active", "inactive", "paused", "archived"]) });
 
 export function registerRoutes(router: Router, service: DiscountsService): void {
   const mgr = requireRole("manager");
@@ -59,6 +59,11 @@ export function registerRoutes(router: Router, service: DiscountsService): void 
     const b = parseBody(statusSchema, req.body);
     res.json(await service.setStatus(String(req.params.id), b.status, tenantId(res)));
   }));
+  const updateSchema = createSchema.partial();
+  router.patch("/:id", mgr, handler(async (req, res) => {
+    res.json(await service.update(String(req.params.id), parseBody(updateSchema, req.body), tenantId(res)));
+  }));
+
   const redeemSchema = z.object({
     customerId: z.string().min(1).optional(),
     orderId: z.string().min(1).optional(),

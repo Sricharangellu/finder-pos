@@ -28,6 +28,8 @@ export function registerRoutes(router: Router, service: SettingsService): void {
   // Business profile + feature flags
   router.get("/business", handler(async (_req, res) => res.json(await service.getBusiness(tenantId(res)))));
   router.put("/business", mgr, handler(async (req, res) => res.json(await service.setBusiness(parseBody(businessSchema, req.body), tenantId(res)))));
+  // PATCH is an alias for PUT — both merge into the stored KV blob.
+  router.patch("/business", mgr, handler(async (req, res) => res.json(await service.setBusiness(parseBody(businessSchema, req.body), tenantId(res)))));
   router.get("/feature-flags", handler(async (_req, res) => res.json(await service.getFlags(tenantId(res)))));
   router.put("/feature-flags", mgr, handler(async (req, res) => res.json(await service.setFlags(parseBody(flagsSchema, req.body), tenantId(res)))));
 

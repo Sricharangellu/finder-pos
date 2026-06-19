@@ -104,4 +104,14 @@ export function registerRoutes(router: Router, service: SalesService): void {
     for (const [k, v] of Object.entries(b.prices)) prices[Number(k)] = v;
     res.json(await service.setTierPrices(String(req.params.productId), prices, tenantId(res)));
   }));
+
+  // GET /orders — alias for sales-orders with optional ?type filter (used by ecommerce page).
+  router.get("/orders", handler(async (req, res) => {
+    const type = typeof req.query.type === "string" ? req.query.type : undefined;
+    const orders = await service.listSalesOrders(tenantId(res));
+    const items = type === "ecommerce"
+      ? orders.filter((o) => o.store_id === "ecommerce")
+      : orders;
+    res.json({ items });
+  }));
 }

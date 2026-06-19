@@ -149,6 +149,32 @@ export class OutletsService {
     return session;
   }
 
+  async getExpectedCash(registerId: string, tenantId: string): Promise<{ openingFloatCents: number; cashSalesCents: number; expectedCashCents: number }> {
+    const session = await this.db.one<RegisterSession>(
+      "SELECT * FROM register_sessions WHERE register_id = @registerId AND tenant_id = @tenantId AND status = 'open' ORDER BY opened_at DESC LIMIT 1",
+      { registerId, tenantId },
+    );
+    if (!session) {
+      return { openingFloatCents: 0, cashSalesCents: 0, expectedCashCents: 0 };
+    }
+
+    const row = await this.db.one<{ cash_sales: number }>(
+      `SELECT COALESCE(SUM(cash_cents - change_cents), 0)::int AS cash_sales
+       FROM payments
+       WHERE tenant_id = @tenantId
+         AND created_at >= @openedAt
+         AND status = 'captured'`,
+      { tenantId, openedAt: session.opened_at },
+    );
+
+    const cashSalesCents = row?.cash_sales ?? 0;
+    return {
+      openingFloatCents: Number(session.opening_float_cents),
+      cashSalesCents,
+      expectedCashCents: Number(session.opening_float_cents) + cashSalesCents,
+    };
+  }
+
   async closeSession(registerId: string, countedCashCents: number, closingFloatCents: number, tenantId: string): Promise<RegisterSession> {
     const session = await this.db.one<RegisterSession>(
       "SELECT * FROM register_sessions WHERE register_id = @registerId AND tenant_id = @tenantId AND status = 'open' ORDER BY opened_at DESC LIMIT 1",
@@ -156,7 +182,8 @@ export class OutletsService {
     );
     if (!session) throw new HttpError(404, "not_found", `no open session for register '${registerId}'`);
 
-    const varianceCents = closingFloatCents - countedCashCents;
+    const expected = await this.getExpectedCash(registerId, tenantId);
+    const varianceCents = expected.expectedCashCents - countedCashCents;
     const now = Date.now();
     await this.db.query(
       `UPDATE register_sessions
@@ -168,6 +195,7 @@ export class OutletsService {
     await this.setRegisterStatus(registerId, "closed", tenantId);
     return { ...session, status: "closed", counted_cash_cents: countedCashCents, closing_float_cents: closingFloatCents, variance_cents: varianceCents, closed_at: now };
   }
+
 
   async listSessions(registerId: string, tenantId: string, limit = 20): Promise<RegisterSession[]> {
     return this.db.query<RegisterSession>(

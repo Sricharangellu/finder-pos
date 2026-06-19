@@ -85,6 +85,8 @@ const detailFieldsSchema = {
   composite_product: z.boolean().optional(),
   track_inventory: z.boolean().optional(),
   track_inventory_by_imei: z.boolean().optional(),
+  // Ecommerce visibility flag (toggled by ecommerce module)
+  ecommerce: z.boolean().optional(),
 };
 
 const createSchema = z.object({

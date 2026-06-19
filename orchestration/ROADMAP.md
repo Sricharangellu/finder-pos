@@ -191,21 +191,21 @@ records, only triaged into "build now" vs. "documented for later."
 - [x] FE-9: Variants UI — master/child editor on the product detail page plus
       a visual distinction for master rows in the `/inventory` list,
       consuming BE-8. See `CATALOG_PRODUCT_FINDER.md`. (done)
-- [ ] FE-11: Discounts — rule builder on `/discounts`: create/edit form
+- [x] FE-11: Discounts — rule builder on `/discounts`: create/edit form
       covering `ruleType` (simple/volume/bxgy), `discountType`
       (fixed/percent), `applyTo`, `tierRestriction`,
       `minOrderCents`/`minQty`, `buyQty`/`getQty`, date window,
       `autoApplicable`, `usageLimit`/`perCustomerLimit`, coupon code.
       Consumes existing `/api/v1/discounts*` endpoints. See
-      `gaps/DISCOUNTS_GAPS.md`.
+      `gaps/DISCOUNTS_GAPS.md`. (done)
 - [ ] FE-10: Customers — show `creditLimitCents`/`creditAvailableCents` on
       the customer detail panel; warn (or block, with manager override) on
       SO/invoice creation when a customer is over their credit limit,
       consuming BE-13. See `gaps/SALES_ORDERS_GAPS.md`.
-- [ ] FE-12: Checkout/operations — age-verification checkbox on the cart
+- [x] FE-12: Checkout/operations — age-verification checkbox on the cart
       when any line is `age_restricted` (consumes BE-16); register
       open/close screen with running cash-variance summary (consumes
-      BE-17). See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`.
+      BE-17). See `gaps/SETTINGS_TEAM_COMPLIANCE_GAPS.md`. (done)
 - [ ] FE-13: Edition-aware navigation — read `/feature-flags` at app load;
       hide nav sections/routes for disabled groups (`groupWholesale` hides
       Sales Orders/Purchasing/Accounting, `groupRetailPOS` hides Gift

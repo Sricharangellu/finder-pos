@@ -48,7 +48,14 @@ export interface CreateOrderLineInput {
 }
 
 export interface CreateOrderInput {
-  stateCode: StateCode;
+  stateCode?: StateCode; // optional — defaults to "CA" when not supplied (e.g. from POS terminal)
+  lines: CreateOrderLineInput[];
+  discountCents?: Cents;
+  customerId?: string | null;
+  storeId?: string | null;
+}
+
+export interface UpdateOrderInput {
   lines: CreateOrderLineInput[];
   discountCents?: Cents;
   customerId?: string | null;
@@ -179,7 +186,7 @@ export class OrdersService {
       taxable: r.taxable,
     }));
 
-    const computed = computeOrderTax(taxInputs, input.stateCode, input.discountCents ?? 0);
+    const computed = computeOrderTax(taxInputs, input.stateCode ?? "CA", input.discountCents ?? 0);
 
     const now = Date.now();
     const orderId = `ord_${uuidv7()}`;
@@ -189,7 +196,7 @@ export class OrdersService {
       id: orderId,
       tenant_id: tenantId,
       order_number: orderNumber,
-      state_code: input.stateCode,
+      state_code: input.stateCode ?? "CA",
       status: "open",
       subtotal_cents: computed.subtotalCents,
       discount_cents: computed.discountCents,
@@ -257,6 +264,83 @@ export class OrdersService {
     );
 
     return { ...order, lines };
+  }
+
+  /** Replace the lines of an open order in-place (cart update from POS terminal).
+   *  Deletes existing lines, recomputes tax/totals, and updates the order row.
+   *  The order id and order_number are preserved. */
+  async update(id: string, input: UpdateOrderInput, tenantId: string): Promise<OrderWithLines> {
+    const existing = await this.getOrThrow(id, tenantId);
+    if (existing.status !== "open") throw conflict(`order '${id}' is ${existing.status} and cannot be updated`);
+    if (input.lines.length === 0) throw badRequest("an order requires at least one line");
+
+    // Resolve products and check inventory (same logic as create).
+    interface Resolved { input: CreateOrderLineInput; product: ProductRow; taxable: boolean; lineGross: Cents; }
+    const resolved: Resolved[] = [];
+    for (const line of input.lines) {
+      if (line.quantity <= 0) throw badRequest(`line quantity must be positive for ${line.productId}`);
+      const product = await this.db.one<ProductRow>(
+        `SELECT p.id, p.name, p.price_cents, p.tax_class, p.status, p.age_restricted,
+                EXISTS(SELECT 1 FROM products c WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
+           FROM products p WHERE p.id = @id AND p.tenant_id = @tenantId`,
+        { id: line.productId, tenantId },
+      );
+      if (!product) throw badRequest(`product '${line.productId}' not found`);
+      if (product.status !== "active") throw badRequest(`product '${line.productId}' is ${product.status} and cannot be sold`);
+      if (product.age_restricted && !line.ageVerified) throw badRequest(`product '${line.productId}' is age-restricted — set ageVerified: true`);
+      resolved.push({ input: line, product, taxable: product.tax_class !== "exempt", lineGross: product.price_cents * line.quantity });
+    }
+
+    const taxInputs: TaxableLine[] = resolved.map((r) => ({ lineGross: r.lineGross, taxable: r.taxable }));
+    const computed = computeOrderTax(taxInputs, existing.state_code, input.discountCents ?? 0);
+    const now = Date.now();
+
+    const newLines: OrderLineRow[] = resolved.map((r) => {
+      const tax = Math.round((r.lineGross / (computed.subtotalCents || 1)) * computed.taxCents);
+      return {
+        id: `ol_${uuidv7()}`, tenant_id: tenantId, order_id: id,
+        product_id: r.product.id, name: r.product.name,
+        quantity: r.input.quantity, unit_cents: r.product.price_cents,
+        tax_cents: tax, line_cents: r.lineGross + tax, taxable: r.taxable ? 1 : 0,
+      };
+    });
+
+    await this.db.tx(async (tdb) => {
+      // Replace lines.
+      await tdb.query("DELETE FROM order_lines WHERE order_id = @id AND tenant_id = @t", { id, t: tenantId });
+      for (const l of newLines) {
+        await tdb.query(
+          `INSERT INTO order_lines (id, tenant_id, order_id, product_id, name, quantity, unit_cents, tax_cents, line_cents, taxable)
+           VALUES (@id,@tenant_id,@order_id,@product_id,@name,@quantity,@unit_cents,@tax_cents,@line_cents,@taxable)`,
+          l as unknown as Record<string, unknown>,
+        );
+      }
+      // Update order totals in place.
+      await tdb.query(
+        `UPDATE orders SET subtotal_cents=@sub, discount_cents=@disc, tax_cents=@tax, total_cents=@total,
+           customer_id=@cust, store_id=@store, updated_at=@now
+           WHERE id=@id AND tenant_id=@t`,
+        {
+          sub: computed.subtotalCents, disc: computed.discountCents,
+          tax: computed.taxCents, total: computed.totalCents,
+          cust: input.customerId ?? existing.customer_id,
+          store: input.storeId ?? existing.store_id,
+          now, id, t: tenantId,
+        },
+      );
+    });
+
+    return {
+      ...existing,
+      subtotal_cents: computed.subtotalCents,
+      discount_cents: computed.discountCents,
+      tax_cents: computed.taxCents,
+      total_cents: computed.totalCents,
+      customer_id: input.customerId ?? existing.customer_id,
+      store_id: input.storeId ?? existing.store_id,
+      updated_at: now,
+      lines: newLines,
+    };
   }
 
   /**

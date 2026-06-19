@@ -27,6 +27,7 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
   const [showClose, setShowClose] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expectedData, setExpectedData] = useState<{ openingFloatCents: number; cashSalesCents: number; expectedCashCents: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -38,7 +39,24 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
     }
   }, [registerId]);
 
+  const loadExpected = useCallback(async () => {
+    try {
+      const data = await apiGet<{ openingFloatCents: number; cashSalesCents: number; expectedCashCents: number }>(
+        `/api/v1/outlets/registers/${registerId}/expected-cash`
+      );
+      setExpectedData(data);
+    } catch {
+      setExpectedData(null);
+    }
+  }, [registerId]);
+
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (showClose) {
+      void loadExpected();
+    }
+  }, [showClose, loadExpected]);
 
   const handleOpen = async () => {
     setWorking(true); setError(null);
@@ -59,6 +77,9 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
       const closingCents = Math.round(parseFloat(closeFloat || "0") * 100);
       await apiPost(`/api/v1/outlets/registers/${registerId}/close`, { countedCashCents: countedCents, closingFloatCents: closingCents });
       setSession(null); setShowClose(false);
+      setExpectedData(null);
+      setCloseCounted("");
+      setCloseFloat("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to close register");
     } finally { setWorking(false); }
@@ -110,30 +131,57 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
     );
   }
 
+  // Calculate real-time variance
+  const expectedCents = expectedData?.expectedCashCents ?? 0;
+  const countedCents = closeCounted ? Math.round(parseFloat(closeCounted) * 100) : 0;
+  const varianceCents = countedCents - expectedCents;
+
   return (
     <div className="flex h-full flex-col">
       {/* Close register banner */}
       {showClose && (
-        <div className="flex-none border-b border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-medium text-amber-800 mb-2">Close Register — Count your cash</p>
-          {error && <p className="mb-2 rounded bg-red-50 px-3 py-1 text-xs text-red-700">{error}</p>}
-          <div className="flex flex-wrap gap-2 items-end">
-            <div>
-              <label className="block text-xs text-amber-700 mb-1">Counted Cash ($)</label>
-              <input type="number" min="0" step="0.01" value={closeCounted} onChange={e => setCloseCounted(e.target.value)}
-                placeholder="0.00" className="rounded border border-amber-300 px-2 py-1 text-sm w-28" />
+        <div className="flex-none border-b border-amber-200 bg-amber-50 px-5 py-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-amber-900">Close Register & Count Cash</p>
+              {expectedData && (
+                <div className="text-xs text-amber-800 space-y-0.5">
+                  <p>Opening float: <span className="font-medium">{formatMoney(expectedData.openingFloatCents)}</span></p>
+                  <p>Cash sales: <span className="font-medium">{formatMoney(expectedData.cashSalesCents)}</span></p>
+                  <p className="font-semibold">Expected cash in drawer: {formatMoney(expectedData.expectedCashCents)}</p>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-xs text-amber-700 mb-1">Closing Float ($)</label>
-              <input type="number" min="0" step="0.01" value={closeFloat} onChange={e => setCloseFloat(e.target.value)}
-                placeholder="0.00" className="rounded border border-amber-300 px-2 py-1 text-sm w-28" />
-            </div>
-            <Button variant="danger" size="sm" loading={working} onClick={() => void handleClose()}>Confirm Close</Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowClose(false)}>Cancel</Button>
+
+            {/* Variance summary badge */}
+            {expectedData && (
+              <div className="rounded-lg border border-amber-200 bg-white px-4 py-2 text-center shadow-sm">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-gray-500">Variance</span>
+                <span className={`text-base font-bold ${varianceCents === 0 ? "text-green-600" : varianceCents > 0 ? "text-green-700" : "text-red-600"}`}>
+                  {varianceCents === 0 ? "$0.00" : varianceCents > 0 ? `+${formatMoney(varianceCents)}` : `-${formatMoney(Math.abs(varianceCents))}`}
+                </span>
+              </div>
+            )}
           </div>
-          <p className="mt-1 text-xs text-amber-600">
-            Opening float: {formatMoney(session.opening_float_cents)} · Opened {new Date(session.opened_at).toLocaleTimeString()}
-          </p>
+
+          {error && <p className="mt-3 rounded bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+
+          <div className="mt-4 flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs font-semibold text-amber-800 mb-1">Counted Cash ($) <span className="text-red-500">*</span></label>
+              <input type="number" min="0" step="0.01" value={closeCounted} onChange={e => setCloseCounted(e.target.value)}
+                placeholder="0.00" className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm w-36 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-amber-800 mb-1">Next Opening Float ($)</label>
+              <input type="number" min="0" step="0.01" value={closeFloat} onChange={e => setCloseFloat(e.target.value)}
+                placeholder="0.00" className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm w-36 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="danger" size="sm" loading={working} disabled={!closeCounted} onClick={() => void handleClose()}>Confirm Close</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowClose(false)}>Cancel</Button>
+            </div>
+          </div>
         </div>
       )}
       {!showClose && (
@@ -150,3 +198,4 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
     </div>
   );
 }
+

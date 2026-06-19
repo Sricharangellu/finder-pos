@@ -636,11 +636,11 @@ function CoaSection({ canManage, addToast }: { canManage: boolean; addToast: Ret
 
 interface Deposit {
   id: string;
-  deposit_number: string;
+  batch_number: string;
+  description: string | null;
   status: string;
   total_cents: number;
   created_at: number;
-  note?: string;
 }
 
 function DepositsSection({ canManage, addToast }: { canManage: boolean; addToast: ReturnType<typeof useToast>["addToast"] }) {
@@ -715,11 +715,11 @@ function DepositsSection({ canManage, addToast }: { canManage: boolean; addToast
           {!loading && deposits.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No deposits yet</td></tr>}
           {deposits.map(d => (
             <tr key={d.id}>
-              <td className="px-4 py-3 font-medium">{d.deposit_number}</td>
-              <td className={`px-4 py-3 capitalize font-medium ${statusColor(d.status)}`}>{d.status}</td>
+              <td className="px-4 py-3 font-medium">{d.batch_number}</td>
+              <td className={`px-4 py-3 capitalize font-medium ${statusColor(d.status)}`}>{d.status.replace(/_/g, " ")}</td>
               <td className="px-4 py-3">{formatMoney(d.total_cents)}</td>
               <td className="px-4 py-3 text-slate-500">{new Date(d.created_at).toLocaleDateString()}</td>
-              <td className="px-4 py-3 text-slate-500">{d.note ?? "—"}</td>
+              <td className="px-4 py-3 text-slate-500">{d.description ?? "—"}</td>
             </tr>
           ))}
         </tbody>

@@ -82,6 +82,8 @@ export interface Product {
   composite_product: number;
   track_inventory: number;
   track_inventory_by_imei: number;
+  // Ecommerce visibility (owned by ecommerce module, stored on products)
+  ecommerce: number;
   // Expiry — denormalized MIN(lot.expiry_date) written by InventoryService.syncProductExpiry()
   expiry_date: number | null;
 }
@@ -156,6 +158,8 @@ export interface CreateProductInput {
   composite_product?: boolean;
   track_inventory?: boolean;
   track_inventory_by_imei?: boolean;
+  // Ecommerce visibility flag
+  ecommerce?: boolean;
 }
 
 // UpdateProductInput mirrors CreateProductInput but all fields optional (sku is immutable).
@@ -295,6 +299,7 @@ export class CatalogService {
       composite_product: input.composite_product ? 1 : 0,
       track_inventory: input.track_inventory !== false ? 1 : 0,
       track_inventory_by_imei: input.track_inventory_by_imei ? 1 : 0,
+      ecommerce: input.ecommerce ? 1 : 0,
       // Expiry cache — null on create; written by InventoryService.syncProductExpiry()
       expiry_date: null,
     };
@@ -312,7 +317,7 @@ export class CatalogService {
             preferred_vendor_id, preferred_vendor_name, primary_vendor, vendor_upc, drop_shipment, reorder_quantity,
             min_qty_to_sell, max_qty_to_sell, qty_increment,
             parent_product_id, variant_label,
-            age_restricted, returnable, service_product, customer_specific, exclude_from_po, composite_product, track_inventory, track_inventory_by_imei)
+            age_restricted, returnable, service_product, customer_specific, exclude_from_po, composite_product, track_inventory, track_inventory_by_imei, ecommerce)
          VALUES
            (@id, @tenant_id, @sku, @name, @price_cents, @category, @tax_class, @barcode, @status, @created_at, @updated_at,
             @description, @short_description, @full_description, @alternative_name, @model_name, @manufacturer, @brand, @tags, @url_alias,
@@ -324,7 +329,7 @@ export class CatalogService {
             @preferred_vendor_id, @preferred_vendor_name, @primary_vendor, @vendor_upc, @drop_shipment, @reorder_quantity,
             @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
             @parent_product_id, @variant_label,
-            @age_restricted, @returnable, @service_product, @customer_specific, @exclude_from_po, @composite_product, @track_inventory, @track_inventory_by_imei)`,
+            @age_restricted, @returnable, @service_product, @customer_specific, @exclude_from_po, @composite_product, @track_inventory, @track_inventory_by_imei, @ecommerce)`,
         product as unknown as Record<string, unknown>,
       );
     } catch (err) {
@@ -531,6 +536,7 @@ export class CatalogService {
       ["composite_product", "composite_product"],
       ["track_inventory", "track_inventory"],
       ["track_inventory_by_imei", "track_inventory_by_imei"],
+      ["ecommerce", "ecommerce"],
     ];
     for (const [inputKey, productKey] of boolFlags) {
       const value = input[inputKey];
@@ -599,6 +605,7 @@ export class CatalogService {
          customer_specific = @customer_specific, exclude_from_po = @exclude_from_po,
          composite_product = @composite_product, track_inventory = @track_inventory,
          track_inventory_by_imei = @track_inventory_by_imei,
+         ecommerce = @ecommerce,
          updated_at = @updated_at
        WHERE id = @id`,
       next as unknown as Record<string, unknown>,

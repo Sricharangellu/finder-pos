@@ -34,6 +34,7 @@ interface Discount {
   buy_qty?: number | null;
   get_qty?: number | null;
   tier_restriction?: number | null;
+  per_customer_limit?: number | null;
 }
 
 interface NewDiscountForm {
@@ -115,9 +116,11 @@ function RuleTypeBadge({ ruleType }: { ruleType: string }) {
 function StatusActionsDropdown({
   discount,
   onStatusChange,
+  onEdit,
 }: {
   discount: Discount;
   onStatusChange: (id: string, status: DiscountStatus) => void;
+  onEdit: (discount: Discount) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -165,6 +168,16 @@ function StatusActionsDropdown({
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-36 rounded-lg border border-gray-200 bg-white shadow-lg">
           <div className="py-1">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onEdit(discount);
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
+            >
+              Edit
+            </button>
             {actions.map((a) => (
               <button
                 key={a.status}
@@ -191,15 +204,46 @@ function NewDiscountPanel({
   open,
   onClose,
   onCreated,
+  editingDiscount,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  editingDiscount: Discount | null;
 }) {
   const { addToast } = useToast();
   const [form, setForm] = useState<NewDiscountForm>(defaultForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editingDiscount) {
+      setForm({
+        name: editingDiscount.name,
+        rule_type: editingDiscount.rule_type,
+        discount_type: editingDiscount.discount_type,
+        value: editingDiscount.discount_type === "fixed" 
+          ? (editingDiscount.value / 100).toFixed(2) 
+          : String(editingDiscount.value),
+        apply_to: editingDiscount.apply_to,
+        coupon_code: editingDiscount.coupon_code || "",
+        auto_applicable: editingDiscount.auto_applicable === 1,
+        min_order_cents: editingDiscount.min_order_cents 
+          ? (editingDiscount.min_order_cents / 100).toFixed(2) 
+          : "",
+        min_qty: editingDiscount.min_qty ? String(editingDiscount.min_qty) : "",
+        buy_qty: editingDiscount.buy_qty ? String(editingDiscount.buy_qty) : "",
+        get_qty: editingDiscount.get_qty ? String(editingDiscount.get_qty) : "",
+        usage_limit: editingDiscount.usage_limit ? String(editingDiscount.usage_limit) : "",
+        per_customer_limit: editingDiscount.per_customer_limit ? String(editingDiscount.per_customer_limit) : "",
+        start_date: editingDiscount.start_date ? new Date(Number(editingDiscount.start_date)).toISOString().split("T")[0] : "",
+        end_date: editingDiscount.end_date ? new Date(Number(editingDiscount.end_date)).toISOString().split("T")[0] : "",
+        tier_restriction: editingDiscount.tier_restriction ? String(editingDiscount.tier_restriction) : "",
+      });
+    } else {
+      setForm(defaultForm);
+    }
+  }, [editingDiscount, open]);
 
   function set<K extends keyof NewDiscountForm>(key: K, value: NewDiscountForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -219,53 +263,58 @@ function NewDiscountPanel({
 
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
-      rule_type: form.rule_type,
-      discount_type: form.discount_type,
-      value: numValue,
-      apply_to: form.apply_to,
-      auto_applicable: form.coupon_code ? false : form.auto_applicable,
+      ruleType: form.rule_type,
+      discountType: form.discount_type,
+      value: form.discount_type === "fixed" ? Math.round(numValue * 100) : numValue,
+      applyTo: form.apply_to === "order" ? "cart" : form.apply_to, // normalize order->cart
+      autoApplicable: form.coupon_code ? false : form.auto_applicable,
     };
 
-    if (form.coupon_code.trim()) payload.coupon_code = form.coupon_code.trim();
+    if (form.coupon_code.trim()) payload.couponCode = form.coupon_code.trim().toUpperCase();
     if (form.min_order_cents.trim()) {
       const dollars = parseFloat(form.min_order_cents);
-      if (!isNaN(dollars)) payload.min_order_cents = Math.round(dollars * 100);
+      if (!isNaN(dollars)) payload.minOrderCents = Math.round(dollars * 100);
     }
     if (form.usage_limit.trim()) {
       const n = parseInt(form.usage_limit, 10);
-      if (!isNaN(n) && n > 0) payload.usage_limit = n;
+      if (!isNaN(n) && n > 0) payload.usageLimit = n;
     }
     if (form.per_customer_limit.trim()) {
       const n = parseInt(form.per_customer_limit, 10);
-      if (!isNaN(n) && n > 0) payload.per_customer_limit = n;
+      if (!isNaN(n) && n > 0) payload.perCustomerLimit = n;
     }
-    if (form.start_date) payload.start_date = form.start_date;
-    if (form.end_date) payload.end_date = form.end_date;
+    if (form.start_date) payload.startDate = new Date(form.start_date + "T00:00:00").getTime();
+    if (form.end_date) payload.endDate = new Date(form.end_date + "T23:59:59").getTime();
     if (form.tier_restriction.trim()) {
-      const n = parseInt(form.tier_restriction, 10);
-      if (!isNaN(n) && n >= 1 && n <= 5) payload.tier_restriction = n;
+      const parts = form.tier_restriction.split(",").map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
+      if (parts.length > 0) payload.tierRestriction = parts;
     }
     if (form.rule_type === "volume" && form.min_qty.trim()) {
       const n = parseInt(form.min_qty, 10);
-      if (!isNaN(n) && n > 0) payload.min_qty = n;
+      if (!isNaN(n) && n > 0) payload.minQty = n;
     }
     if (form.rule_type === "bxgy") {
       const buyQty = parseInt(form.buy_qty, 10);
       const getQty = parseInt(form.get_qty, 10);
-      if (!isNaN(buyQty) && buyQty > 0) payload.buy_qty = buyQty;
-      if (!isNaN(getQty) && getQty > 0) payload.get_qty = getQty;
+      if (!isNaN(buyQty) && buyQty > 0) payload.buyQty = buyQty;
+      if (!isNaN(getQty) && getQty > 0) payload.getQty = getQty;
     }
 
     setSubmitting(true);
     setError(null);
     try {
-      await apiPost("/api/v1/discounts", payload);
-      addToast({ title: "Discount created", variant: "success" });
+      if (editingDiscount) {
+        await apiPatch(`/api/v1/discounts/${editingDiscount.id}`, payload);
+        addToast({ title: "Discount updated", variant: "success" });
+      } else {
+        await apiPost("/api/v1/discounts", payload);
+        addToast({ title: "Discount created", variant: "success" });
+      }
       setForm(defaultForm);
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create discount.");
+      setError(err instanceof Error ? err.message : "Failed to save discount.");
     } finally {
       setSubmitting(false);
     }
@@ -584,6 +633,7 @@ export default function DiscountsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
   const [statusBusy, setStatusBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -623,6 +673,11 @@ export default function DiscountsPage() {
     }
   };
 
+  const handleEdit = (discount: Discount) => {
+    setEditingDiscount(discount);
+    setPanelOpen(true);
+  };
+
   function valueLabel(d: Discount) {
     if (d.rule_type === "bxgy") return "Buy/Get";
     return d.discount_type === "fixed" ? formatMoney(d.value) : `${d.value}%`;
@@ -647,7 +702,7 @@ export default function DiscountsPage() {
             <p className="text-sm text-gray-500">
               {items.length} rule{items.length !== 1 ? "s" : ""} configured
             </p>
-            <Button variant="primary" size="sm" onClick={() => setPanelOpen(true)}>
+            <Button variant="primary" size="sm" onClick={() => { setEditingDiscount(null); setPanelOpen(true); }}>
               + New Discount
             </Button>
           </div>
@@ -662,7 +717,7 @@ export default function DiscountsPage() {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-5 py-3">Name</th>
+                     <th className="px-5 py-3">Name</th>
                     <th className="px-5 py-3">Type</th>
                     <th className="px-5 py-3">Discount</th>
                     <th className="px-5 py-3">Coupon code</th>
@@ -715,6 +770,7 @@ export default function DiscountsPage() {
                           <StatusActionsDropdown
                             discount={d}
                             onStatusChange={handleStatusChange}
+                            onEdit={handleEdit}
                           />
                         )}
                       </td>
@@ -729,8 +785,9 @@ export default function DiscountsPage() {
 
       <NewDiscountPanel
         open={panelOpen}
-        onClose={() => setPanelOpen(false)}
+        onClose={() => { setPanelOpen(false); setEditingDiscount(null); }}
         onCreated={() => void load()}
+        editingDiscount={editingDiscount}
       />
     </EnterpriseShell>
   );
