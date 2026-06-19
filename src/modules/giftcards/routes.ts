@@ -18,6 +18,15 @@ const redeemSchema = z.object({
 });
 
 export function registerRoutes(router: Router, service: GiftCardsService): void {
+  router.get(
+    "/",
+    handler(async (req, res) => {
+      const limit = typeof req.query.limit === "string" ? Math.min(100, parseInt(req.query.limit, 10) || 50) : 50;
+      const offset = typeof req.query.offset === "string" ? parseInt(req.query.offset, 10) || 0 : 0;
+      res.json(await service.list(tenantId(res), limit, offset));
+    }),
+  );
+
   router.post(
     "/",
     requireRole("manager"),
@@ -43,6 +52,14 @@ export function registerRoutes(router: Router, service: GiftCardsService): void 
       const body = parseBody(redeemSchema, req.body);
       const result = await service.redeem(String(req.params.code), body.amountCents, tenantId(res));
       res.json(result);
+    }),
+  );
+
+  router.post(
+    "/:code/void",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      res.json(await service.voidCard(String(req.params.code), tenantId(res)));
     }),
   );
 }

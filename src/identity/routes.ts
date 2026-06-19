@@ -8,6 +8,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const registerSchema = z.object({
+  storeName: z.string().min(2).max(80),
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+});
+
 const refreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
@@ -20,6 +26,15 @@ const refreshSchema = z.object({
  * GET  /me       — return the caller's own identity (requires auth middleware upstream)
  */
 export function registerIdentityRoutes(router: Router, service: IdentityService): void {
+  router.post(
+    "/register",
+    handler(async (req, res) => {
+      const body = parseBody(registerSchema, req.body);
+      const result = await service.register(body);
+      res.status(201).json(result);
+    }),
+  );
+
   router.post(
     "/login",
     handler(async (req, res) => {

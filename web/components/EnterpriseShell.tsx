@@ -39,7 +39,8 @@ type NavKey =
   | "team"
   | "insights"
   | "finance"
-  | "catalog";
+  | "catalog"
+  | "gift-cards";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -62,6 +63,7 @@ const NAV_ITEMS: Array<{
   { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping", group: "Manage", editionFlag: "groupWholesale" },
   { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", group: "Manage", editionFlag: "groupRetailPOS" },
+  { key: "gift-cards", label: "Gift Cards", href: "/gift-cards", icon: "gift-cards", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "team", label: "Team", href: "/team", icon: "team", group: "Manage" },
   { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
@@ -408,9 +410,21 @@ function NavIcon({ name }: { name: NavKey }) {
       return <FinanceIcon />;
     case "catalog":
       return <CatalogIcon />;
+    case "gift-cards":
+      return <GiftCardIcon />;
     default:
       return <ReportsIcon />;
   }
+}
+
+function GiftCardIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 3c0 2-4 4-4 4S8 5 8 3a4 4 0 0 1 8 0z" />
+      <line x1="12" y1="7" x2="12" y2="21" />
+    </svg>
+  );
 }
 
 function FinanceIcon() {

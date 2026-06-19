@@ -775,6 +775,54 @@ export const handlers = [
     return HttpResponse.json(response, { status: 200 });
   }),
 
+  // ── Gift cards (S7-GIFTCARDS) ─────────────────────────────────────────────────
+  http.get(`${V1}/giftcards`, async () => {
+    await latency();
+    const now = Date.now();
+    return HttpResponse.json({ items: [
+      { id: "gft_1", code: "GC-ABCD-EFGH-JKLM", initial_cents: 5000, balance_cents: 5000, status: "active", created_at: now - 2*86_400_000 },
+      { id: "gft_2", code: "GC-WXYZ-1234-PQRS", initial_cents: 10000, balance_cents: 2500, status: "active", created_at: now - 5*86_400_000 },
+      { id: "gft_3", code: "GC-MNOP-5678-TUVA", initial_cents: 2500, balance_cents: 0, status: "redeemed", created_at: now - 10*86_400_000 },
+    ], total: 3 });
+  }),
+  http.get(`${V1}/giftcards/:code`, async ({ params }) => {
+    await latency();
+    const code = String(params.code).toUpperCase();
+    const cards: Record<string, { id: string; code: string; initial_cents: number; balance_cents: number; status: "active"|"redeemed"|"void"; created_at: number }> = {
+      "GC-ABCD-EFGH-JKLM": { id: "gft_1", code: "GC-ABCD-EFGH-JKLM", initial_cents: 5000, balance_cents: 5000, status: "active", created_at: Date.now() - 2*86_400_000 },
+      "GC-WXYZ-1234-PQRS": { id: "gft_2", code: "GC-WXYZ-1234-PQRS", initial_cents: 10000, balance_cents: 2500, status: "active", created_at: Date.now() - 5*86_400_000 },
+    };
+    const card = cards[code];
+    if (!card) return HttpResponse.json({ error: { code: "not_found", message: `gift card '${code}' not found` } }, { status: 404 });
+    return HttpResponse.json(card);
+  }),
+  http.post(`${V1}/giftcards`, async ({ request }) => {
+    await latency();
+    const b = (await request.json()) as Record<string, unknown>;
+    const code = `GC-${Math.random().toString(36).slice(2,6).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+    return HttpResponse.json({ id: `gft_new`, code, initial_cents: Number(b.amountCents), balance_cents: Number(b.amountCents), status: "active", created_at: Date.now() }, { status: 201 });
+  }),
+  http.post(`${V1}/giftcards/:code/redeem`, async () => {
+    await latency();
+    return HttpResponse.json({ code: "GC-ABCD-EFGH-JKLM", redeemedCents: 1000, balanceCents: 4000, status: "active" });
+  }),
+  http.post(`${V1}/giftcards/:code/void`, async ({ params }) => {
+    await latency();
+    return HttpResponse.json({ id: "gft_1", code: String(params.code), initial_cents: 5000, balance_cents: 5000, status: "void", created_at: Date.now() });
+  }),
+
+  // ── Tenant registration (S7-SIGNUP) ──────────────────────────────────────────
+  http.post("/api/identity/register", async ({ request }) => {
+    await latency();
+    const b = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({
+      accessToken: "mock-access-token",
+      refreshToken: "mock-refresh-token",
+      expiresIn: 900,
+      user: { id: "usr_new", email: String(b.email ?? ""), name: String(b.email ?? "").split("@")[0], role: "owner", tenantId: "tnt_new" },
+    }, { status: 201 });
+  }),
+
   // ── Email receipt (S5-EMAIL) ─────────────────────────────────────────────────
   http.post(`${V1}/orders/:id/email-receipt`, async () => {
     await latency();

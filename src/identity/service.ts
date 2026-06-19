@@ -34,6 +34,12 @@ export interface AuthUser {
 export const DEMO_TENANT_ID = "tnt_demo";
 export const DEMO_PASSWORD = "FinderDemo!2026";
 
+export interface RegisterInput {
+  storeName: string;
+  email: string;
+  password: string;
+}
+
 export interface AuditWriteInput {
   tenantId: string;
   actorId: string;
@@ -130,6 +136,52 @@ export class IdentityService {
         tenantId: user.tenant_id,
       },
     };
+  }
+
+  /**
+   * Create a new tenant and owner account. Returns a token pair so the user
+   * is immediately logged in after sign-up — no separate login step needed.
+   */
+  async register(input: RegisterInput): Promise<TokenPair & { user: AuthUser }> {
+    const { default: bcrypt } = await import("bcryptjs");
+
+    // Check email not already in use (globally — email is unique per tenant but
+    // we also want to prevent someone registering twice with the same email across
+    // tenants on a single-instance deployment).
+    const existing = await this.db.one<{ c: number }>(
+      "SELECT COUNT(*)::int AS c FROM users WHERE email = @email",
+      { email: input.email.toLowerCase().trim() },
+    );
+    if (existing && Number(existing.c) > 0) {
+      throw new HttpError(409, "email_taken", "An account with that email already exists.");
+    }
+
+    const now = Date.now();
+    const tenantId = `tnt_${uuidv7()}`;
+    const userId = `usr_${uuidv7()}`;
+    const slug = input.storeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 48);
+
+    await this.db.query(
+      "INSERT INTO tenants (id, name, slug, created_at, updated_at) VALUES (@id, @name, @slug, @now, @now)",
+      { id: tenantId, name: input.storeName.trim(), slug: `${slug}-${tenantId.slice(-6)}`, now },
+    );
+
+    const passwordHash = await bcrypt.hash(input.password, 10);
+    await this.db.query(
+      "INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at) VALUES (@id, @t, @e, @h, 'owner', @now, @now)",
+      { id: userId, t: tenantId, e: input.email.toLowerCase().trim(), h: passwordHash, now },
+    );
+
+    const pair = this.issueTokens(userId, tenantId, "owner");
+    await this.db.query(
+      "INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @tenantId, @userId, @hash, @exp, @now)",
+      { id: uuidv7(), tenantId, userId, hash: this.hashToken(pair.refreshToken), exp: now + 7 * 86_400_000, now },
+    );
+
+    const name = (input.email.split("@")[0] ?? input.email).replace(/[._-]/g, " ");
+    const user: AuthUser = { id: userId, email: input.email.toLowerCase().trim(), name, role: "owner", tenantId };
+    await this.events.publish("tenant.registered", { tenantId, userId, storeName: input.storeName }, tenantId);
+    return { ...pair, user };
   }
 
   /**

@@ -69,6 +69,29 @@ export class GiftCardsService {
     throw new HttpError(500, "code_generation_failed", "could not allocate a unique gift card code");
   }
 
+  async list(tenantId: string, limit = 50, offset = 0): Promise<{ items: GiftCard[]; total: number }> {
+    const rows = await this.db.query<GiftCard>(
+      "SELECT * FROM gift_cards WHERE tenant_id = @t ORDER BY created_at DESC LIMIT @limit OFFSET @offset",
+      { t: tenantId, limit, offset },
+    );
+    const count = await this.db.one<{ n: number }>(
+      "SELECT COUNT(*)::int AS n FROM gift_cards WHERE tenant_id = @t",
+      { t: tenantId },
+    );
+    return { items: rows, total: Number(count?.n ?? 0) };
+  }
+
+  async voidCard(code: string, tenantId: string): Promise<GiftCard> {
+    const card = await this.getByCode(code, tenantId);
+    if (!card) throw new HttpError(404, "not_found", `gift card '${code}' not found`);
+    if (card.status === "redeemed") throw new HttpError(409, "already_redeemed", "fully redeemed cards cannot be voided");
+    await this.db.query(
+      "UPDATE gift_cards SET status = 'void', updated_at = @now WHERE code = @code AND tenant_id = @t",
+      { now: Date.now(), code, t: tenantId },
+    );
+    return { ...card, status: "void" };
+  }
+
   async getByCode(code: string, tenantId: string): Promise<GiftCard | undefined> {
     return this.db.one<GiftCard>(
       "SELECT * FROM gift_cards WHERE code = @code AND tenant_id = @tenantId",
