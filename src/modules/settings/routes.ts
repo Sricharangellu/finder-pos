@@ -86,4 +86,9 @@ export function registerRoutes(router: Router, service: SettingsService): void {
     }, tenantId(res));
     res.json({ ok: true });
   }));
+
+  // Currencies
+  router.get("/currencies", handler(async (_req, res) => {
+    res.json({ items: await service.listCurrencies(tenantId(res)) });
+  }));
 }

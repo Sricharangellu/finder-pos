@@ -102,6 +102,14 @@ export class SettingsService {
     return row;
   }
 
+  // ── Currencies ────────────────────────────────────────────────────────────
+  async listCurrencies(tenantId: string) {
+    return this.db.query(
+      "SELECT * FROM supported_currencies WHERE tenant_id = @t AND is_active = true ORDER BY is_base DESC, currency_code ASC",
+      { t: tenantId }
+    );
+  }
+
   /** Seed sensible defaults (idempotent: only when a table is empty). */
   async seedDefaults(tenantId: string) {
     const sm = await this.listShipping(tenantId);

@@ -101,7 +101,7 @@ export default function SignupPage() {
       const data = (await res.json()) as RegisterResponse & { error?: { message?: string } };
       if (!res.ok) throw new Error(data.error?.message ?? `Registration failed (${res.status})`);
       setSession(data.accessToken, data.expiresIn, data.refreshToken, data.user);
-      router.replace("/terminal");
+      router.replace("/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

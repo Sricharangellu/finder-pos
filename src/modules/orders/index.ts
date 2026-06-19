@@ -48,9 +48,15 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_id TEXT;
 CREATE INDEX IF NOT EXISTS orders_tenant_store_idx ON orders (tenant_id, store_id, created_at DESC);
 `;
 
+// Multi-currency support: currency code and exchange rate against base currency.
+const ALTER_ORDERS_CURRENCY = `
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(10,6) NOT NULL DEFAULT 1.0;
+`;
+
 export const ordersModule: PosModule = {
   name: "orders",
-  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID],
+  migrations: [dropLegacyNoTenant("order_lines"), dropLegacyNoTenant("orders"), CREATE_ORDERS_TABLE, CREATE_ORDER_LINES_TABLE, ALTER_ORDERS_STORE_ID, ALTER_ORDERS_CURRENCY],
   register(ctx: ModuleContext): void {
     const service = new OrdersService(ctx.db, ctx.events);
     registerRoutes(ctx.router, service);
