@@ -40,7 +40,13 @@ type NavKey =
   | "insights"
   | "finance"
   | "catalog"
-  | "gift-cards";
+  | "gift-cards"
+  | "vendors"
+  | "payments"
+  | "returns"
+  | "tax-compliance"
+  | "integrations"
+  | "imports-exports";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -49,17 +55,20 @@ const NAV_ITEMS: Array<{
   label: string;
   href: string;
   icon: NavKey;
-  group: "Operate" | "Manage" | "Analyze";
+  group: "Operate" | "Manage" | "Analyze" | "Platform";
   editionFlag?: "groupRetailPOS" | "groupWholesale" | "groupEnterprise";
 }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", group: "Operate" },
   { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
   { key: "orders", label: "Orders", href: "/orders", icon: "orders", group: "Operate" },
+  { key: "returns", label: "Returns", href: "/returns", icon: "returns", group: "Operate", editionFlag: "groupRetailPOS" },
+  { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
   { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
   { key: "operations", label: "Operations", href: "/operations", icon: "operations", group: "Manage" },
   { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing", group: "Manage", editionFlag: "groupWholesale" },
+  { key: "vendors", label: "Vendors", href: "/vendors", icon: "vendors", group: "Manage", editionFlag: "groupWholesale" },
   { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping", group: "Manage", editionFlag: "groupWholesale" },
   { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", group: "Manage", editionFlag: "groupRetailPOS" },
@@ -67,10 +76,21 @@ const NAV_ITEMS: Array<{
   { key: "team", label: "Team", href: "/team", icon: "team", group: "Manage" },
   { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
+  { key: "tax-compliance", label: "Tax Compliance", href: "/tax-compliance", icon: "tax-compliance", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce", group: "Analyze", editionFlag: "groupEnterprise" },
   { key: "insights", label: "Insights", href: "/insights", icon: "insights", group: "Analyze" },
   { key: "reports", label: "Reports", href: "/reports", icon: "reports", group: "Analyze" },
-  { key: "settings", label: "Settings", href: "/settings", icon: "settings", group: "Analyze" },
+  { key: "integrations", label: "Integrations", href: "/integrations", icon: "integrations", group: "Platform", editionFlag: "groupEnterprise" },
+  { key: "imports-exports", label: "Imports/Exports", href: "/imports-exports", icon: "imports-exports", group: "Platform" },
+  { key: "settings", label: "Settings", href: "/settings", icon: "settings", group: "Platform" },
+];
+
+const APP_SWITCHER = [
+  { label: "POS", href: "/terminal", activeKeys: ["register"] },
+  { label: "Admin", href: "/dashboard", activeKeys: ["dashboard", "sales", "orders", "catalog", "customers", "reports", "settings"] },
+  { label: "Warehouse", href: "/operations", activeKeys: ["operations", "inventory", "shipping", "purchasing", "vendors"] },
+  { label: "B2B", href: "/ecommerce", activeKeys: ["ecommerce", "finance", "accounting", "payments"] },
+  { label: "Kiosk", href: "/terminal", activeKeys: [] },
 ];
 
 interface EnterpriseShellProps {
@@ -117,6 +137,28 @@ export function EnterpriseShell({
         {banner}
 
         <header className="z-10 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+          <div className="border-b border-slate-100 px-3 py-2 sm:px-5">
+            <div className="flex gap-1 overflow-x-auto" aria-label="Application areas">
+              {APP_SWITCHER.map((app) => {
+                const selected = app.activeKeys.includes(active);
+                return (
+                  <Link
+                    key={app.label}
+                    href={app.href}
+                    aria-current={selected ? "page" : undefined}
+                    className={clsx(
+                      "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                      selected
+                        ? "bg-slate-950 text-white"
+                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                    )}
+                  >
+                    {app.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
               <div
@@ -132,6 +174,9 @@ export function EnterpriseShell({
                 <span className="block truncate text-xs font-medium text-slate-500">
                   {subtitle}
                 </span>
+                <nav className="mt-1 hidden text-[11px] font-medium text-slate-400 sm:block" aria-label="Breadcrumb">
+                  Finder / {activeLabel(active)} / {title}
+                </nav>
               </div>
             </div>
 
@@ -205,7 +250,7 @@ function EnterpriseRail({
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-        {(["Operate", "Manage", "Analyze"] as const).map((group) => (
+        {(["Operate", "Manage", "Analyze", "Platform"] as const).map((group) => (
           <div key={group} className="space-y-1">
             <p className="hidden px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:block">
               {group}
@@ -412,9 +457,25 @@ function NavIcon({ name }: { name: NavKey }) {
       return <CatalogIcon />;
     case "gift-cards":
       return <GiftCardIcon />;
+    case "vendors":
+      return <PurchasingIcon />;
+    case "payments":
+      return <FinanceIcon />;
+    case "returns":
+      return <RegisterIcon />;
+    case "tax-compliance":
+      return <AccountingIcon />;
+    case "integrations":
+      return <OperationsIcon />;
+    case "imports-exports":
+      return <ReportsIcon />;
     default:
       return <ReportsIcon />;
   }
+}
+
+function activeLabel(active: NavKey) {
+  return NAV_ITEMS.find((item) => item.key === active)?.label ?? "Workspace";
 }
 
 function GiftCardIcon() {
