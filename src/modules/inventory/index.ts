@@ -111,61 +111,69 @@ CREATE UNIQUE INDEX IF NOT EXISTS inventory_locations_tenant_code_idx ON invento
 `,
     `
 CREATE TABLE IF NOT EXISTS inventory_stock (
-  id                  TEXT PRIMARY KEY,
+
   tenant_id           TEXT NOT NULL,
   location_id         TEXT NOT NULL,
   product_id          TEXT NOT NULL,
   quantity_on_hand    INTEGER NOT NULL DEFAULT 0,
   quantity_committed  INTEGER NOT NULL DEFAULT 0,
-  quantity_available  INTEGER GENERATED ALWAYS AS (quantity_on_hand - quantity_committed) STORED,
+  quantity_available  INTEGER NOT NULL DEFAULT 0,
   average_cost_cents  BIGINT NOT NULL DEFAULT 0,
   reorder_level       INTEGER NOT NULL DEFAULT 0,
   reorder_quantity    INTEGER NOT NULL DEFAULT 0,
   last_counted_at     BIGINT,
   updated_at          BIGINT NOT NULL,
-  CONSTRAINT inventory_stock_pk PRIMARY KEY (tenant_id, location_id, product_id)
+  PRIMARY KEY (tenant_id, location_id, product_id)
 );
 CREATE INDEX IF NOT EXISTS inventory_stock_location_idx ON inventory_stock (tenant_id, location_id, product_id);
 CREATE INDEX IF NOT EXISTS inventory_stock_low_stock_idx ON inventory_stock (tenant_id, product_id) WHERE quantity_on_hand <= reorder_level AND reorder_level > 0;
 `,
     `
-INSERT INTO inventory_locations (id, tenant_id, outlet_id, code, name, location_type, is_sellable, is_receiving_location, is_active, created_at, updated_at)
-SELECT
-  'iloc_' || o.id,
-  o.tenant_id,
-  o.id,
-  'MAIN',
-  COALESCE(o.name, 'Main Floor'),
-  'floor',
-  true,
-  true,
-  true,
-  extract(epoch from now()) * 1000,
-  extract(epoch from now()) * 1000
-FROM outlets o
-WHERE NOT EXISTS (
-  SELECT 1 FROM inventory_locations il WHERE il.tenant_id = o.tenant_id AND il.outlet_id = o.id
-)
-ON CONFLICT DO NOTHING;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'outlets' AND table_schema = current_schema()) THEN
+    INSERT INTO inventory_locations (id, tenant_id, outlet_id, code, name, location_type, is_sellable, is_receiving_location, is_active, created_at, updated_at)
+    SELECT
+      'iloc_' || o.id,
+      o.tenant_id,
+      o.id,
+      'MAIN',
+      COALESCE(o.name, 'Main Floor'),
+      'floor',
+      true,
+      true,
+      true,
+      extract(epoch from now()) * 1000,
+      extract(epoch from now()) * 1000
+    FROM outlets o
+    WHERE NOT EXISTS (
+      SELECT 1 FROM inventory_locations il WHERE il.tenant_id = o.tenant_id AND il.outlet_id = o.id
+    )
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $$;
 `,
     `
-INSERT INTO inventory_stock (id, tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, average_cost_cents, reorder_level, reorder_quantity, updated_at)
-SELECT
-  'ist_' || i.tenant_id || '_' || il.id || '_' || i.product_id,
-  i.tenant_id,
-  il.id,
-  i.product_id,
-  COALESCE(i.stock_qty, 0),
-  0,
-  0,
-  COALESCE(i.reorder_pt, 0),
-  0,
-  COALESCE(i.updated_at, extract(epoch from now()) * 1000)
-FROM inventory i
-JOIN (
-  SELECT DISTINCT ON (tenant_id) id, tenant_id FROM inventory_locations ORDER BY tenant_id, created_at ASC
-) il ON il.tenant_id = i.tenant_id
-ON CONFLICT (tenant_id, location_id, product_id) DO NOTHING;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inventory_locations' AND table_schema = current_schema()) THEN
+    INSERT INTO inventory_stock (tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, quantity_available, average_cost_cents, reorder_level, reorder_quantity, updated_at)
+    SELECT
+      i.tenant_id,
+      il.id,
+      i.product_id,
+      COALESCE(i.stock_qty, 0),
+      0,
+      COALESCE(i.stock_qty, 0),
+      0,
+      COALESCE(i.reorder_pt, 0),
+      0,
+      COALESCE(i.updated_at, extract(epoch from now()) * 1000)
+    FROM inventory i
+    JOIN (
+      SELECT DISTINCT ON (tenant_id) id, tenant_id FROM inventory_locations ORDER BY tenant_id, created_at ASC
+    ) il ON il.tenant_id = i.tenant_id
+    ON CONFLICT (tenant_id, location_id, product_id) DO NOTHING;
+  END IF;
+END $$;
 `,
   ],
   register({ db, events, router }) {

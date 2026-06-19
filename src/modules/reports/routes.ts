@@ -96,4 +96,10 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     const days: 7 | 30 | 90 = r === "30d" ? 30 : r === "90d" ? 90 : 7;
     res.json({ items: await service.revenueTrend(tenantId(res), days) });
   }));
+
+  // GET /api/v1/reports/aggregate/daily?date=YYYY-MM-DD — compute daily sales aggregate.
+  router.get("/aggregate/daily", handler(async (req, res) => {
+    const date = typeof req.query.date === "string" ? req.query.date : new Date().toISOString().slice(0, 10);
+    res.json(await service.aggregateDailySales(tenantId(res), date));
+  }));
 }

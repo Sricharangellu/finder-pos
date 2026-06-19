@@ -147,6 +147,46 @@ CREATE TABLE IF NOT EXISTS devices (
 CREATE INDEX IF NOT EXISTS devices_tenant_idx ON devices (tenant_id, status);
 `;
 
+export const CREATE_AUDIT_ENHANCEMENT_TABLES = `
+CREATE TABLE IF NOT EXISTS entity_change_logs (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id   TEXT NOT NULL,
+  change_type TEXT NOT NULL,
+  old_values  TEXT,
+  new_values  TEXT,
+  changed_by  TEXT,
+  changed_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS entity_change_logs_entity_idx ON entity_change_logs (tenant_id, entity_type, entity_id, changed_at DESC);
+
+CREATE TABLE IF NOT EXISTS price_change_logs (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  old_price   BIGINT,
+  new_price   BIGINT,
+  price_type  TEXT NOT NULL DEFAULT 'retail',
+  changed_by  TEXT,
+  changed_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS price_change_logs_product_idx ON price_change_logs (tenant_id, product_id, changed_at DESC);
+
+CREATE TABLE IF NOT EXISTS security_events (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT,
+  user_id     TEXT,
+  event_type  TEXT NOT NULL,
+  severity    TEXT NOT NULL DEFAULT 'info',
+  ip_address  TEXT,
+  user_agent  TEXT,
+  details     TEXT,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS security_events_tenant_idx ON security_events (tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -159,4 +199,5 @@ export const IDENTITY_MIGRATIONS = [
   ADD_CUSTOM_ROLE_TO_USERS,
   CREATE_LOGIN_EVENTS_TABLE,
   CREATE_DEVICES_TABLE,
+  CREATE_AUDIT_ENHANCEMENT_TABLES,
 ];

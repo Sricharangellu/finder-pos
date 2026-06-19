@@ -246,6 +246,61 @@ export class SyncEngine {
 
     return { items, total, limit, offset };
   }
+
+  // ── Import/Export batch tracking ─────────────────────────────────────────────
+
+  async listImportBatches(tenantId: string, limit = 50) {
+    return this.db.query(
+      "SELECT * FROM import_batches WHERE tenant_id = @t ORDER BY created_at DESC LIMIT @limit",
+      { t: tenantId, limit }
+    );
+  }
+
+  async listExportBatches(tenantId: string, limit = 50) {
+    return this.db.query(
+      "SELECT * FROM export_batches WHERE tenant_id = @t ORDER BY created_at DESC LIMIT @limit",
+      { t: tenantId, limit }
+    );
+  }
+
+  async listIntegrationProviders() {
+    return this.db.query(
+      "SELECT * FROM integration_providers WHERE is_active = true ORDER BY name ASC",
+      {}
+    );
+  }
+
+  async listCompanyIntegrations(tenantId: string) {
+    return this.db.query(
+      "SELECT ci.*, ip.name AS provider_name, ip.provider_type FROM company_integrations ci JOIN integration_providers ip ON ip.id = ci.provider_id WHERE ci.tenant_id = @t ORDER BY ci.created_at ASC",
+      { t: tenantId }
+    );
+  }
+
+  async upsertCompanyIntegration(tenantId: string, providerId: string, status: string, settings?: string | null) {
+    const now = Date.now();
+    // Check if exists
+    const existing = await this.db.one<{ id: string }>(
+      "SELECT id FROM company_integrations WHERE tenant_id = @t AND provider_id = @p",
+      { t: tenantId, p: providerId }
+    );
+    if (existing) {
+      await this.db.query(
+        "UPDATE company_integrations SET status = @status, settings = @settings, updated_at = @now WHERE id = @id",
+        { status, settings: settings ?? null, now, id: existing.id }
+      );
+      return existing.id;
+    } else {
+      const { v7: uuidv7 } = await import("uuid");
+      const id = `cint_${uuidv7()}`;
+      await this.db.query(
+        `INSERT INTO company_integrations (id, tenant_id, provider_id, status, settings, created_at, updated_at)
+         VALUES (@id, @t, @p, @status, @settings, @now, @now)`,
+        { id, t: tenantId, p: providerId, status, settings: settings ?? null, now }
+      );
+      return id;
+    }
+  }
 }
 
 function clampLimit(limit?: number): number {

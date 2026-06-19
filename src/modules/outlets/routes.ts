@@ -2,6 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { OutletsService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -22,6 +23,8 @@ const closeSessionSchema = z.object({
 });
 
 export function registerRoutes(router: Router, service: OutletsService): void {
+  const mgr = requireRole("manager");
+
   // GET /api/v1/outlets — outlets with their registers (powers the store/register selector).
   router.get(
     "/",
@@ -87,4 +90,25 @@ export function registerRoutes(router: Router, service: OutletsService): void {
       res.json({ items: await service.listSessions(String(req.params.registerId), tenantId(res), limit) });
     }),
   );
+
+  // Shifts
+  router.get("/shifts/:registerId", handler(async (req, res) => {
+    res.json({ items: await service.listShifts(String(req.params.registerId), tenantId(res)) });
+  }));
+  router.post("/shifts/open", mgr, handler(async (req, res) => {
+    const body = parseBody(z.object({ registerId: z.string().min(1), outletId: z.string().min(1), openingCash: z.number().int().nonnegative() }), req.body);
+    res.status(201).json(await service.openShift(body.registerId, body.outletId, userId(res), body.openingCash, tenantId(res)));
+  }));
+  router.post("/shifts/:id/close", mgr, handler(async (req, res) => {
+    const body = parseBody(z.object({ closingCash: z.number().int().nonnegative() }), req.body);
+    res.json(await service.closeShift(String(req.params.id), userId(res), body.closingCash, tenantId(res)));
+  }));
+  router.post("/shifts/:shiftId/movements", handler(async (req, res) => {
+    const body = parseBody(z.object({ registerId: z.string().min(1), movementType: z.enum(["cash_in","cash_out","paid_in","paid_out","safe_drop"]), amount: z.number().int().positive(), reason: z.string().nullable().optional() }), req.body);
+    const auth = res.locals["auth"] as { userId: string } | undefined;
+    res.status(201).json(await service.addCashMovement(String(req.params.shiftId), body.registerId, body.movementType, body.amount, body.reason ?? null, auth?.userId ?? null, tenantId(res)));
+  }));
+  router.get("/shifts/:shiftId/movements", handler(async (req, res) => {
+    res.json({ items: await service.listCashMovements(String(req.params.shiftId), tenantId(res)) });
+  }));
 }

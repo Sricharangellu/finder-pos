@@ -631,4 +631,36 @@ export class PurchasingService {
   ): Promise<PurchaseOrderWithLines> {
     return this.receive(poId, tenantId, lines.map((l) => ({ lineId: l.lineId, qty: l.quantity })));
   }
+
+  // ── Supplier addresses ───────────────────────────────────────────────────────
+  async listSupplierAddresses(supplierId: string, tenantId: string) {
+    return this.db.query("SELECT * FROM supplier_addresses WHERE supplier_id = @sid AND tenant_id = @t ORDER BY is_default DESC, created_at ASC", { sid: supplierId, t: tenantId });
+  }
+
+  async addSupplierAddress(supplierId: string, tenantId: string, input: { addressType?: string; addressLine1?: string | null; addressLine2?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string; county?: string | null; isDefault?: boolean }) {
+    const now = Date.now();
+    const id = `saddr_${uuidv7()}`;
+    await this.db.query(
+      `INSERT INTO supplier_addresses (id, tenant_id, supplier_id, address_type, address_line1, address_line2, city, state, zip, country, county, is_default, created_at, updated_at)
+       VALUES (@id, @t, @sid, @type, @l1, @l2, @city, @state, @zip, @country, @county, @def, @now, @now)`,
+      { id, t: tenantId, sid: supplierId, type: input.addressType ?? 'billing', l1: input.addressLine1 ?? null, l2: input.addressLine2 ?? null, city: input.city ?? null, state: input.state ?? null, zip: input.zip ?? null, country: input.country ?? 'US', county: input.county ?? null, def: input.isDefault ?? false, now },
+    );
+    return { id, supplier_id: supplierId, tenant_id: tenantId, ...input, created_at: now, updated_at: now };
+  }
+
+  // ── Supplier contacts ────────────────────────────────────────────────────────
+  async listSupplierContacts(supplierId: string, tenantId: string) {
+    return this.db.query("SELECT * FROM supplier_contacts WHERE supplier_id = @sid AND tenant_id = @t ORDER BY is_primary DESC, created_at ASC", { sid: supplierId, t: tenantId });
+  }
+
+  async addSupplierContact(supplierId: string, tenantId: string, input: { contactName: string; title?: string | null; email?: string | null; phone?: string | null; isPrimary?: boolean }) {
+    const now = Date.now();
+    const id = `scon_${uuidv7()}`;
+    await this.db.query(
+      `INSERT INTO supplier_contacts (id, tenant_id, supplier_id, contact_name, title, email, phone, is_primary, created_at, updated_at)
+       VALUES (@id, @t, @sid, @name, @title, @email, @phone, @primary, @now, @now)`,
+      { id, t: tenantId, sid: supplierId, name: input.contactName, title: input.title ?? null, email: input.email ?? null, phone: input.phone ?? null, primary: input.isPrimary ?? false, now },
+    );
+    return { id, supplier_id: supplierId, tenant_id: tenantId, ...input, created_at: now, updated_at: now };
+  }
 }

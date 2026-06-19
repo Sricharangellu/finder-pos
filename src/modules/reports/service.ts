@@ -431,4 +431,26 @@ export class ReportsService {
       return { date: key, label, revenueCents: entry.revenueCents, orderCount: entry.orderCount };
     });
   }
+
+  async aggregateDailySales(tenantId: string, date: string): Promise<{ date: string; grossSalesCents: number; netSalesCents: number; taxCents: number; transactionCount: number }> {
+    const startOfDay = new Date(`${date}T00:00:00Z`).getTime();
+    const endOfDay = startOfDay + 86_400_000;
+    const row = await this.db.one<{ gross: number; net: number; tax: number; cnt: number; discounts: number }>(
+      `SELECT COALESCE(SUM(total_cents), 0) AS gross,
+              COALESCE(SUM(total_cents - tax_cents), 0) AS net,
+              COALESCE(SUM(tax_cents), 0) AS tax,
+              COUNT(*)::int AS cnt,
+              COALESCE(SUM(discount_cents), 0) AS discounts
+         FROM orders
+        WHERE tenant_id = @tenantId AND status = 'completed' AND created_at >= @start AND created_at < @end`,
+      { tenantId, start: startOfDay, end: endOfDay }
+    );
+    return {
+      date,
+      grossSalesCents: Number(row?.gross ?? 0),
+      netSalesCents: Number(row?.net ?? 0),
+      taxCents: Number(row?.tax ?? 0),
+      transactionCount: Number(row?.cnt ?? 0),
+    };
+  }
 }

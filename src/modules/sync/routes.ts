@@ -1,7 +1,12 @@
-import type { Router, Request } from "express";
+import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, badRequest } from "../../shared/http.js";
+import type { AuthPayload } from "../../gateway/auth.js";
 import type { SyncEngine, SyncStatus } from "./service.js";
+
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
 
 const onlineSchema = z.object({ online: z.boolean() });
 
@@ -70,4 +75,29 @@ export function registerRoutes(router: Router, engine: SyncEngine): void {
       res.json({ pulled: 0, note: "pull sync stub — Year 2" });
     }),
   );
+
+  // Import/Export batch tracking
+  router.get("/import-batches", handler(async (_req, res) => {
+    res.json({ items: await engine.listImportBatches(tenantId(res)) });
+  }));
+
+  router.get("/export-batches", handler(async (_req, res) => {
+    res.json({ items: await engine.listExportBatches(tenantId(res)) });
+  }));
+
+  // Integration providers (catalogue — public to tenant)
+  router.get("/integration-providers", handler(async (_req, res) => {
+    res.json({ items: await engine.listIntegrationProviders() });
+  }));
+
+  // Company integrations
+  router.get("/integrations", handler(async (_req, res) => {
+    res.json({ items: await engine.listCompanyIntegrations(tenantId(res)) });
+  }));
+
+  router.post("/integrations", handler(async (req, res) => {
+    const body = parseBody(z.object({ providerId: z.string().min(1), status: z.string().optional(), settings: z.string().nullable().optional() }), req.body);
+    const id = await engine.upsertCompanyIntegration(tenantId(res), body.providerId, body.status ?? 'inactive', body.settings);
+    res.status(201).json({ id });
+  }));
 }

@@ -204,4 +204,22 @@ export function registerRoutes(router: Router, service: PurchasingService): void
       b.otherChargesCents ?? 0,
     ));
   }));
+
+  // Supplier addresses
+  router.get("/suppliers/:supplierId/addresses", handler(async (req, res) => {
+    res.json({ items: await service.listSupplierAddresses(String(req.params.supplierId), tenantId(res)) });
+  }));
+  router.post("/suppliers/:supplierId/addresses", mgr, handler(async (req, res) => {
+    const body = parseBody(z.object({ addressType: z.string().optional(), addressLine1: z.string().nullable().optional(), addressLine2: z.string().nullable().optional(), city: z.string().nullable().optional(), state: z.string().nullable().optional(), zip: z.string().nullable().optional(), country: z.string().optional(), county: z.string().nullable().optional(), isDefault: z.boolean().optional() }), req.body);
+    res.status(201).json(await service.addSupplierAddress(String(req.params.supplierId), tenantId(res), body));
+  }));
+
+  // Supplier contacts
+  router.get("/suppliers/:supplierId/contacts", handler(async (req, res) => {
+    res.json({ items: await service.listSupplierContacts(String(req.params.supplierId), tenantId(res)) });
+  }));
+  router.post("/suppliers/:supplierId/contacts", mgr, handler(async (req, res) => {
+    const body = parseBody(z.object({ contactName: z.string().min(1), title: z.string().nullable().optional(), email: z.string().email().nullable().optional(), phone: z.string().nullable().optional(), isPrimary: z.boolean().optional() }), req.body);
+    res.status(201).json(await service.addSupplierContact(String(req.params.supplierId), tenantId(res), body));
+  }));
 }

@@ -165,11 +165,57 @@ ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS other_charges_cents BIGINT 
 ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS landed_cost_cents BIGINT NOT NULL DEFAULT 0;
 `;
 
+// Supplier normalization: normalized addresses, multiple contacts, and balance snapshot.
+const CREATE_SUPPLIER_ADDRESSES = `
+CREATE TABLE IF NOT EXISTS supplier_addresses (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  supplier_id   TEXT NOT NULL,
+  address_type  TEXT NOT NULL DEFAULT 'billing',
+  address_line1 TEXT,
+  address_line2 TEXT,
+  city          TEXT,
+  state         TEXT,
+  zip           TEXT,
+  country       TEXT NOT NULL DEFAULT 'US',
+  county        TEXT,
+  is_default    BOOLEAN NOT NULL DEFAULT false,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS supplier_addresses_supplier_idx ON supplier_addresses (tenant_id, supplier_id);
+
+CREATE TABLE IF NOT EXISTS supplier_contacts (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  supplier_id   TEXT NOT NULL,
+  contact_name  TEXT NOT NULL,
+  title         TEXT,
+  email         TEXT,
+  phone         TEXT,
+  is_primary    BOOLEAN NOT NULL DEFAULT false,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS supplier_contacts_supplier_idx ON supplier_contacts (tenant_id, supplier_id);
+
+CREATE TABLE IF NOT EXISTS supplier_balances (
+  id              TEXT PRIMARY KEY,
+  tenant_id       TEXT NOT NULL,
+  supplier_id     TEXT NOT NULL UNIQUE,
+  opening_balance BIGINT NOT NULL DEFAULT 0,
+  current_balance BIGINT NOT NULL DEFAULT 0,
+  due_amount      BIGINT NOT NULL DEFAULT 0,
+  last_payment_at BIGINT,
+  updated_at      BIGINT NOT NULL
+);
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);
