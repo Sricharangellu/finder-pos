@@ -237,4 +237,25 @@ export function registerRoutes(router: Router, service: InventoryService): void 
   router.post("/counts/:id/close", mgr, handler(async (req, res) => {
     res.json(await service.closeCycleCount(String(req.params.id), tenantId(res)));
   }));
+
+  // ── Inventory Locations ────────────────────────────────────────────────────
+  const createLocationSchema = z.object({
+    code: z.string().min(1),
+    name: z.string().min(1),
+    outletId: z.string().min(1).nullable().optional(),
+    locationType: z.string().min(1).optional(),
+  });
+
+  router.get("/locations", handler(async (_req, res) => {
+    res.json({ items: await service.listLocations(tenantId(res)) });
+  }));
+
+  router.post("/locations", mgr, handler(async (req, res) => {
+    const body = parseBody(createLocationSchema, req.body);
+    res.status(201).json(await service.createLocation(tenantId(res), body));
+  }));
+
+  router.get("/locations/:id/stock", handler(async (req, res) => {
+    res.json({ items: await service.getStockByLocation(tenantId(res), String(req.params.id)) });
+  }));
 }

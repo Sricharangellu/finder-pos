@@ -177,6 +177,56 @@ export const catalogModule: PosModule = {
     ALTER_PRODUCTS_EXPIRY,
     ALTER_PRODUCTS_XLSX_FIELDS,
     ALTER_PRODUCTS_TIERED_PRICING,
+    `
+CREATE TABLE IF NOT EXISTS product_images (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  image_url   TEXT NOT NULL,
+  alt_text    TEXT,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  is_primary  BOOLEAN NOT NULL DEFAULT false,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images (tenant_id, product_id, sort_order);
+`,
+    `
+CREATE TABLE IF NOT EXISTS product_attributes (
+  id                TEXT PRIMARY KEY,
+  tenant_id         TEXT NOT NULL,
+  name              TEXT NOT NULL,
+  data_type         TEXT NOT NULL DEFAULT 'text',
+  is_filterable     BOOLEAN NOT NULL DEFAULT false,
+  is_variant_option BOOLEAN NOT NULL DEFAULT false,
+  created_at        BIGINT NOT NULL,
+  updated_at        BIGINT NOT NULL
+);
+`,
+    `
+CREATE TABLE IF NOT EXISTS product_attribute_values (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  product_id    TEXT NOT NULL,
+  attribute_id  TEXT NOT NULL,
+  value_text    TEXT,
+  value_number  NUMERIC,
+  value_boolean BOOLEAN,
+  created_at    BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS product_attribute_values_unique_idx ON product_attribute_values (tenant_id, product_id, attribute_id);
+`,
+    `
+CREATE TABLE IF NOT EXISTS product_units (
+  id                TEXT PRIMARY KEY,
+  tenant_id         TEXT NOT NULL,
+  unit_code         TEXT NOT NULL,
+  unit_name         TEXT NOT NULL,
+  base_unit         TEXT,
+  conversion_factor NUMERIC NOT NULL DEFAULT 1,
+  created_at        BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS product_units_code_idx ON product_units (tenant_id, unit_code);
+`,
   ],
   async register({ db, events, router }) {
     const service = new CatalogService(db, events);

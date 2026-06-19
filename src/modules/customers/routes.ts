@@ -96,6 +96,21 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     }),
   );
 
+  // ── Customer Groups (static routes MUST be before /:id parameterized routes) ─
+  const createGroupSchema = z.object({
+    name: z.string().min(1),
+    description: z.string().nullable().optional(),
+  });
+
+  router.get("/groups", handler(async (_req, res) => {
+    res.json({ items: await service.listGroups(tenantId(res)) });
+  }));
+
+  router.post("/groups", requireRole("manager"), handler(async (req, res) => {
+    const body = parseBody(createGroupSchema, req.body);
+    res.status(201).json(await service.createGroup(tenantId(res), body));
+  }));
+
   router.get(
     "/:id",
     handler(async (req, res) => {
@@ -165,5 +180,67 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     const level = parseInt(String(req.params.level), 10);
     await service.deleteTierRule(tenantId(res), level);
     res.status(204).end();
+  }));
+
+  // ── Customer Addresses ───────────────────────────────────────────────────────
+  const addAddressSchema = z.object({
+    addressType: z.enum(["billing", "shipping"]).optional(),
+    addressLine1: z.string().nullable().optional(),
+    addressLine2: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+    zip: z.string().nullable().optional(),
+    country: z.string().min(1).optional(),
+    county: z.string().nullable().optional(),
+    isDefault: z.boolean().optional(),
+  });
+
+  router.get("/:id/addresses", handler(async (req, res) => {
+    res.json({ items: await service.listAddresses(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/:id/addresses", handler(async (req, res) => {
+    const body = parseBody(addAddressSchema, req.body);
+    res.status(201).json(await service.addAddress(String(req.params.id), tenantId(res), body));
+  }));
+
+  // ── Customer Contacts ────────────────────────────────────────────────────────
+  const addContactSchema = z.object({
+    contactName: z.string().min(1),
+    title: z.string().nullable().optional(),
+    email: z.string().email().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    isPrimary: z.boolean().optional(),
+  });
+
+  router.get("/:id/contacts", handler(async (req, res) => {
+    res.json({ items: await service.listContacts(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/:id/contacts", handler(async (req, res) => {
+    const body = parseBody(addContactSchema, req.body);
+    res.status(201).json(await service.addContact(String(req.params.id), tenantId(res), body));
+  }));
+
+  // ── Customer ↔ Group membership ──────────────────────────────────────────────
+  router.post("/:id/groups/:groupId", requireRole("manager"), handler(async (req, res) => {
+    await service.addToGroup(String(req.params.id), String(req.params.groupId), tenantId(res));
+    res.status(201).json({ ok: true });
+  }));
+
+  // ── Customer Notes ───────────────────────────────────────────────────────────
+  const addNoteSchema = z.object({
+    note: z.string().min(1),
+    noteType: z.string().min(1).optional(),
+  });
+
+  router.get("/:id/notes", handler(async (req, res) => {
+    res.json({ items: await service.listNotes(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/:id/notes", handler(async (req, res) => {
+    const body = parseBody(addNoteSchema, req.body);
+    const auth = res.locals["auth"] as { userId?: string } | undefined;
+    res.status(201).json(await service.addNote(String(req.params.id), tenantId(res), body.note, body.noteType, auth?.userId ?? null));
   }));
 }

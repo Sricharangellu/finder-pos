@@ -9,6 +9,55 @@ export interface CursorPage<T> {
   limit: number;
 }
 
+export interface CustomerAddress {
+  id: string;
+  tenant_id: string;
+  customer_id: string;
+  address_type: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string;
+  county: string | null;
+  is_default: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CustomerContact {
+  id: string;
+  tenant_id: string;
+  customer_id: string;
+  contact_name: string;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  is_primary: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CustomerGroup {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CustomerNote {
+  id: string;
+  tenant_id: string;
+  customer_id: string;
+  note: string;
+  note_type: string;
+  created_by: string | null;
+  created_at: number;
+}
+
 function clampLimit(limit?: number): number {
   if (!limit || limit <= 0) return 50;
   return Math.min(Math.floor(limit), 200);
@@ -605,5 +654,164 @@ export class CustomersService {
       nextTierName: nextRule?.name ?? null,
       pointsToNextTier: nextRule ? nextRule.min_points - currentPoints : null,
     };
+  }
+
+  // ── Customer Addresses ───────────────────────────────────────────────────────
+
+  async addAddress(
+    customerId: string,
+    tenantId: string,
+    input: {
+      addressType?: string;
+      addressLine1?: string | null;
+      addressLine2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      zip?: string | null;
+      country?: string;
+      county?: string | null;
+      isDefault?: boolean;
+    },
+  ): Promise<CustomerAddress> {
+    const now = Date.now();
+    const addr: CustomerAddress = {
+      id: `cadr_${uuidv7()}`,
+      tenant_id: tenantId,
+      customer_id: customerId,
+      address_type: input.addressType ?? "billing",
+      address_line1: input.addressLine1 ?? null,
+      address_line2: input.addressLine2 ?? null,
+      city: input.city ?? null,
+      state: input.state ?? null,
+      zip: input.zip ?? null,
+      country: input.country ?? "US",
+      county: input.county ?? null,
+      is_default: input.isDefault ?? false,
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO customer_addresses (id, tenant_id, customer_id, address_type, address_line1, address_line2, city, state, zip, country, county, is_default, created_at, updated_at)
+       VALUES (@id, @tenant_id, @customer_id, @address_type, @address_line1, @address_line2, @city, @state, @zip, @country, @county, @is_default, @created_at, @updated_at)`,
+      addr as unknown as Record<string, unknown>,
+    );
+    return addr;
+  }
+
+  async listAddresses(customerId: string, tenantId: string): Promise<CustomerAddress[]> {
+    return this.db.query<CustomerAddress>(
+      "SELECT * FROM customer_addresses WHERE tenant_id = @tenantId AND customer_id = @customerId ORDER BY is_default DESC, created_at ASC",
+      { tenantId, customerId },
+    );
+  }
+
+  // ── Customer Contacts ────────────────────────────────────────────────────────
+
+  async addContact(
+    customerId: string,
+    tenantId: string,
+    input: {
+      contactName: string;
+      title?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      isPrimary?: boolean;
+    },
+  ): Promise<CustomerContact> {
+    const now = Date.now();
+    const contact: CustomerContact = {
+      id: `ccnt_${uuidv7()}`,
+      tenant_id: tenantId,
+      customer_id: customerId,
+      contact_name: input.contactName,
+      title: input.title ?? null,
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      is_primary: input.isPrimary ?? false,
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO customer_contacts (id, tenant_id, customer_id, contact_name, title, email, phone, is_primary, created_at, updated_at)
+       VALUES (@id, @tenant_id, @customer_id, @contact_name, @title, @email, @phone, @is_primary, @created_at, @updated_at)`,
+      contact as unknown as Record<string, unknown>,
+    );
+    return contact;
+  }
+
+  async listContacts(customerId: string, tenantId: string): Promise<CustomerContact[]> {
+    return this.db.query<CustomerContact>(
+      "SELECT * FROM customer_contacts WHERE tenant_id = @tenantId AND customer_id = @customerId ORDER BY is_primary DESC, created_at ASC",
+      { tenantId, customerId },
+    );
+  }
+
+  // ── Customer Groups ──────────────────────────────────────────────────────────
+
+  async listGroups(tenantId: string): Promise<CustomerGroup[]> {
+    return this.db.query<CustomerGroup>(
+      "SELECT * FROM customer_groups WHERE tenant_id = @tenantId ORDER BY name ASC",
+      { tenantId },
+    );
+  }
+
+  async createGroup(tenantId: string, input: { name: string; description?: string | null }): Promise<CustomerGroup> {
+    const now = Date.now();
+    const group: CustomerGroup = {
+      id: `cgrp_${uuidv7()}`,
+      tenant_id: tenantId,
+      name: input.name,
+      description: input.description ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      "INSERT INTO customer_groups (id, tenant_id, name, description, created_at, updated_at) VALUES (@id, @tenant_id, @name, @description, @created_at, @updated_at)",
+      group as unknown as Record<string, unknown>,
+    );
+    return group;
+  }
+
+  async addToGroup(customerId: string, groupId: string, tenantId: string): Promise<void> {
+    const now = Date.now();
+    await this.db.query(
+      `INSERT INTO customer_group_members (id, tenant_id, customer_id, customer_group_id, created_at)
+       VALUES (@id, @tenantId, @customerId, @groupId, @now)
+       ON CONFLICT (tenant_id, customer_id, customer_group_id) DO NOTHING`,
+      { id: `cgm_${uuidv7()}`, tenantId, customerId, groupId, now },
+    );
+  }
+
+  // ── Customer Notes ───────────────────────────────────────────────────────────
+
+  async addNote(
+    customerId: string,
+    tenantId: string,
+    note: string,
+    noteType?: string,
+    createdBy?: string | null,
+  ): Promise<CustomerNote> {
+    const now = Date.now();
+    const n: CustomerNote = {
+      id: `cnote_${uuidv7()}`,
+      tenant_id: tenantId,
+      customer_id: customerId,
+      note,
+      note_type: noteType ?? "general",
+      created_by: createdBy ?? null,
+      created_at: now,
+    };
+    await this.db.query(
+      "INSERT INTO customer_notes (id, tenant_id, customer_id, note, note_type, created_by, created_at) VALUES (@id, @tenant_id, @customer_id, @note, @note_type, @created_by, @created_at)",
+      n as unknown as Record<string, unknown>,
+    );
+    return n;
+  }
+
+  async listNotes(customerId: string, tenantId: string): Promise<CustomerNote[]> {
+    return this.db.query<CustomerNote>(
+      "SELECT * FROM customer_notes WHERE tenant_id = @tenantId AND customer_id = @customerId ORDER BY created_at DESC",
+      { tenantId, customerId },
+    );
   }
 }

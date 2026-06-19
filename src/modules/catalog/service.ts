@@ -8,6 +8,28 @@ import { notFound, conflict } from "../../shared/http.js";
 export type TaxClass = "standard" | "exempt";
 export type ProductStatus = "active" | "draft" | "archived";
 
+export interface ProductImage {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  image_url: string;
+  alt_text: string | null;
+  sort_order: number;
+  is_primary: boolean;
+  created_at: number;
+}
+
+export interface ProductAttribute {
+  id: string;
+  tenant_id: string;
+  name: string;
+  data_type: string;
+  is_filterable: boolean;
+  is_variant_option: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Product {
   id: string;
   tenant_id: string;
@@ -808,6 +830,78 @@ export class CatalogService {
         );
       }
     });
+  }
+
+  // ── Product Images ───────────────────────────────────────────────────────────
+
+  async listImages(productId: string, tenantId: string): Promise<ProductImage[]> {
+    return this.db.query<ProductImage>(
+      "SELECT * FROM product_images WHERE tenant_id = @tenantId AND product_id = @productId ORDER BY sort_order ASC, created_at ASC",
+      { tenantId, productId },
+    );
+  }
+
+  async addImage(
+    productId: string,
+    tenantId: string,
+    input: { imageUrl: string; altText?: string | null; sortOrder?: number; isPrimary?: boolean },
+  ): Promise<ProductImage> {
+    const now = Date.now();
+    const img: ProductImage = {
+      id: `pimg_${uuidv7()}`,
+      tenant_id: tenantId,
+      product_id: productId,
+      image_url: input.imageUrl,
+      alt_text: input.altText ?? null,
+      sort_order: input.sortOrder ?? 0,
+      is_primary: input.isPrimary ?? false,
+      created_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO product_images (id, tenant_id, product_id, image_url, alt_text, sort_order, is_primary, created_at)
+       VALUES (@id, @tenant_id, @product_id, @image_url, @alt_text, @sort_order, @is_primary, @created_at)`,
+      img as unknown as Record<string, unknown>,
+    );
+    return img;
+  }
+
+  async deleteImage(imageId: string, tenantId: string): Promise<void> {
+    await this.db.query(
+      "DELETE FROM product_images WHERE id = @id AND tenant_id = @tenantId",
+      { id: imageId, tenantId },
+    );
+  }
+
+  // ── Product Attributes ───────────────────────────────────────────────────────
+
+  async listAttributes(tenantId: string): Promise<ProductAttribute[]> {
+    return this.db.query<ProductAttribute>(
+      "SELECT * FROM product_attributes WHERE tenant_id = @tenantId ORDER BY name ASC",
+      { tenantId },
+    );
+  }
+
+  async createAttribute(
+    tenantId: string,
+    input: { name: string; dataType?: string; isFilterable?: boolean; isVariantOption?: boolean },
+  ): Promise<ProductAttribute> {
+    const now = Date.now();
+    const attr: ProductAttribute = {
+      id: `pattr_${uuidv7()}`,
+      tenant_id: tenantId,
+      name: input.name,
+      data_type: input.dataType ?? "text",
+      is_filterable: input.isFilterable ?? false,
+      is_variant_option: input.isVariantOption ?? false,
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO product_attributes (id, tenant_id, name, data_type, is_filterable, is_variant_option, created_at, updated_at)
+       VALUES (@id, @tenant_id, @name, @data_type, @is_filterable, @is_variant_option, @created_at, @updated_at)`,
+      attr as unknown as Record<string, unknown>,
+    );
+    return attr;
   }
 }
 

@@ -365,6 +365,40 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // ── Product Attributes (static — registered before /:id) ────────────────────
+  const createAttributeSchema = z.object({
+    name: z.string().min(1),
+    dataType: z.string().min(1).optional(),
+    isFilterable: z.boolean().optional(),
+    isVariantOption: z.boolean().optional(),
+  });
+
+  router.get(
+    "/attributes",
+    handler(async (_req, res) => {
+      res.json({ items: await service.listAttributes(tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/attributes",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(createAttributeSchema, req.body);
+      res.status(201).json(await service.createAttribute(tenantId(res), body));
+    }),
+  );
+
+  // DELETE /images/:imageId — static segment "images" must be before /:id
+  router.delete(
+    "/images/:imageId",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      await service.deleteImage(String(req.params.imageId), tenantId(res));
+      res.json({ ok: true });
+    }),
+  );
+
   router.get(
     "/:id",
     handler(async (req, res) => {
@@ -425,4 +459,31 @@ export function registerRoutes(router: Router, service: CatalogService): void {
       res.json(product);
     }),
   );
+
+  // ── Product Images ─────────────────────────────────────────────────────────
+  const addImageSchema = z.object({
+    imageUrl: z.string().url(),
+    altText: z.string().nullable().optional(),
+    sortOrder: z.number().int().nonnegative().optional(),
+    isPrimary: z.boolean().optional(),
+  });
+
+  router.get(
+    "/:id/images",
+    handler(async (req, res) => {
+      res.json({ items: await service.listImages(String(req.params.id), tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/:id/images",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(addImageSchema, req.body);
+      const img = await service.addImage(String(req.params.id), tenantId(res), body);
+      res.status(201).json(img);
+    }),
+  );
+
+
 }

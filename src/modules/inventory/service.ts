@@ -6,6 +6,36 @@ import type { Page } from "../../shared/types.js";
 
 export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
 
+export interface InventoryLocation {
+  id: string;
+  tenant_id: string;
+  outlet_id: string | null;
+  code: string;
+  name: string;
+  location_type: string;
+  is_sellable: boolean;
+  is_receiving_location: boolean;
+  is_damage_location: boolean;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface InventoryStock {
+  id: string;
+  tenant_id: string;
+  location_id: string;
+  product_id: string;
+  quantity_on_hand: number;
+  quantity_committed: number;
+  quantity_available: number;
+  average_cost_cents: number;
+  reorder_level: number;
+  reorder_quantity: number;
+  last_counted_at: number | null;
+  updated_at: number;
+}
+
 export interface InventoryRow {
   product_id: string;
   tenant_id: string;
@@ -627,6 +657,90 @@ export class InventoryService {
       "SELECT * FROM cycle_count_lines WHERE session_id = @sid AND tenant_id = @t ORDER BY product_id",
       { sid: sessionId, t: tenantId },
     );
+  }
+
+  // ── Inventory Locations ────────────────────────────────────────────────────
+
+  async listLocations(tenantId: string): Promise<InventoryLocation[]> {
+    return this.db.query<InventoryLocation>(
+      "SELECT * FROM inventory_locations WHERE tenant_id = @tenantId AND is_active = true ORDER BY code ASC",
+      { tenantId },
+    );
+  }
+
+  async createLocation(
+    tenantId: string,
+    input: { code: string; name: string; outletId?: string | null; locationType?: string },
+  ): Promise<InventoryLocation> {
+    const now = Date.now();
+    const loc: InventoryLocation = {
+      id: `iloc_${uuidv7()}`,
+      tenant_id: tenantId,
+      outlet_id: input.outletId ?? null,
+      code: input.code,
+      name: input.name,
+      location_type: input.locationType ?? "floor",
+      is_sellable: true,
+      is_receiving_location: true,
+      is_damage_location: false,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO inventory_locations (id, tenant_id, outlet_id, code, name, location_type, is_sellable, is_receiving_location, is_damage_location, is_active, created_at, updated_at)
+       VALUES (@id, @tenant_id, @outlet_id, @code, @name, @location_type, @is_sellable, @is_receiving_location, @is_damage_location, @is_active, @created_at, @updated_at)`,
+      loc as unknown as Record<string, unknown>,
+    );
+    return loc;
+  }
+
+  async getStockByLocation(tenantId: string, locationId: string): Promise<InventoryStock[]> {
+    return this.db.query<InventoryStock>(
+      "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId ORDER BY product_id ASC",
+      { tenantId, locationId },
+    );
+  }
+
+  async adjustStock(
+    tenantId: string,
+    locationId: string,
+    productId: string,
+    delta: number,
+    reason: MovementReason,
+    ref?: string,
+  ): Promise<InventoryStock> {
+    return this.db.tx(async (tdb) => {
+      const now = Date.now();
+      const existing = await tdb.one<InventoryStock>(
+        "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
+        { tenantId, locationId, productId },
+      );
+      if (existing) {
+        const nextQty = Math.max(0, Number(existing.quantity_on_hand) + delta);
+        await tdb.query(
+          "UPDATE inventory_stock SET quantity_on_hand = @qty, updated_at = @now WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
+          { qty: nextQty, now, tenantId, locationId, productId },
+        );
+      } else {
+        const initQty = Math.max(0, delta);
+        const id = `ist_${uuidv7()}`;
+        await tdb.query(
+          `INSERT INTO inventory_stock (id, tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, average_cost_cents, reorder_level, reorder_quantity, updated_at)
+           VALUES (@id, @tenantId, @locationId, @productId, @qty, 0, 0, 0, 0, @now)`,
+          { id, tenantId, locationId, productId, qty: initQty, now },
+        );
+      }
+      await tdb.query(
+        `INSERT INTO inventory_movements (id, tenant_id, product_id, delta, reason, ref, created_at)
+         VALUES (@id, @tenantId, @productId, @delta, @reason, @ref, @now)`,
+        { id: `mov_${uuidv7()}`, tenantId, productId, delta, reason, ref: ref ?? null, now },
+      );
+      return (await tdb.one<InventoryStock>(
+        "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
+        { tenantId, locationId, productId },
+      ))!;
+    });
   }
 }
 

@@ -51,6 +51,31 @@ export interface AuditWriteInput {
   requestId?: string;
 }
 
+export interface DeviceRow {
+  id: string;
+  tenant_id: string;
+  outlet_id: string | null;
+  register_id: string | null;
+  device_name: string;
+  device_type: string;
+  device_identifier: string | null;
+  app_version: string | null;
+  trusted: boolean;
+  last_seen_at: number | null;
+  status: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RegisterDeviceInput {
+  deviceName: string;
+  deviceType?: string;
+  outletId?: string | null;
+  registerId?: string | null;
+  deviceIdentifier?: string | null;
+  appVersion?: string | null;
+}
+
 /**
  * ABAC policy hook. Called after RBAC passes. Returns null (allow) or a
  * reason string (deny). In Wave 0 we ship always-allow; Wave 1+ plugs in
@@ -94,13 +119,17 @@ export class IdentityService {
     );
 
     if (!user) {
+      await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: null, tenantId: null, ip: null });
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
     }
 
     const valid = await this.verifyPassword(input.password, user.password_hash);
     if (!valid) {
+      await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: user.id, tenantId: user.tenant_id, ip: null });
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
     }
+
+    await this.logLoginAttempt({ email: input.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip: null });
 
     const permissions = user.custom_role_id
       ? await this.resolveCustomRolePermissions(user.custom_role_id)
@@ -136,6 +165,83 @@ export class IdentityService {
         tenantId: user.tenant_id,
       },
     };
+  }
+
+  /** Record a login attempt (success or failure) to the login_events table. */
+  private async logLoginAttempt(opts: {
+    email: string;
+    success: boolean;
+    reason: string | null;
+    userId: string | null;
+    tenantId: string | null;
+    ip: string | null;
+  }): Promise<void> {
+    try {
+      await this.db.query(
+        "INSERT INTO login_events (id, tenant_id, user_id, email, success, failure_reason, ip_address, created_at) VALUES (@id, @tenantId, @userId, @email, @success, @reason, @ip, @now)",
+        {
+          id: `lev_${uuidv7()}`,
+          tenantId: opts.tenantId,
+          userId: opts.userId,
+          email: opts.email.toLowerCase().trim(),
+          success: opts.success,
+          reason: opts.reason,
+          ip: opts.ip,
+          now: Date.now(),
+        },
+      );
+    } catch {
+      // Never fail a login due to audit-logging errors.
+    }
+  }
+
+  // ── Devices ─────────────────────────────────────────────────────────────────
+
+  async listDevices(tenantId: string): Promise<DeviceRow[]> {
+    return this.db.query<DeviceRow>(
+      "SELECT * FROM devices WHERE tenant_id = @tenantId AND status = 'active' ORDER BY created_at DESC",
+      { tenantId },
+    );
+  }
+
+  async registerDevice(tenantId: string, input: RegisterDeviceInput): Promise<DeviceRow> {
+    const now = Date.now();
+    const id = `dev_${uuidv7()}`;
+    const device: DeviceRow = {
+      id,
+      tenant_id: tenantId,
+      outlet_id: input.outletId ?? null,
+      register_id: input.registerId ?? null,
+      device_name: input.deviceName,
+      device_type: input.deviceType ?? "pos_terminal",
+      device_identifier: input.deviceIdentifier ?? null,
+      app_version: input.appVersion ?? null,
+      trusted: false,
+      last_seen_at: now,
+      status: "active",
+      created_at: now,
+      updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO devices (id, tenant_id, outlet_id, register_id, device_name, device_type, device_identifier, app_version, trusted, last_seen_at, status, created_at, updated_at)
+       VALUES (@id, @tenant_id, @outlet_id, @register_id, @device_name, @device_type, @device_identifier, @app_version, @trusted, @last_seen_at, @status, @created_at, @updated_at)`,
+      device as unknown as Record<string, unknown>,
+    );
+    return device;
+  }
+
+  async trustDevice(id: string, tenantId: string): Promise<DeviceRow> {
+    const existing = await this.db.one<DeviceRow>(
+      "SELECT * FROM devices WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
+    if (!existing) throw new HttpError(404, "not_found", `device '${id}' not found`);
+    const now = Date.now();
+    await this.db.query(
+      "UPDATE devices SET trusted = true, updated_at = @now WHERE id = @id AND tenant_id = @tenantId",
+      { now, id, tenantId },
+    );
+    return { ...existing, trusted: true, updated_at: now };
   }
 
   /**

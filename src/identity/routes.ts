@@ -1,7 +1,22 @@
-import type { Router } from "express";
+import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody } from "../shared/http.js";
 import type { IdentityService } from "./service.js";
+import type { AuthPayload } from "../gateway/auth.js";
+import { requireRole } from "../gateway/auth.js";
+
+function tenantId(res: Response): string {
+  return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
+const registerDeviceSchema = z.object({
+  deviceName: z.string().min(1),
+  deviceType: z.string().min(1).optional(),
+  outletId: z.string().min(1).nullable().optional(),
+  registerId: z.string().min(1).nullable().optional(),
+  deviceIdentifier: z.string().min(1).nullable().optional(),
+  appVersion: z.string().min(1).nullable().optional(),
+});
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -78,6 +93,32 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
         return;
       }
       res.json({ userId: auth.userId, tenantId: auth.tenantId, role: auth.role });
+    }),
+  );
+
+  // ── Devices (auth required — auth middleware mounted upstream) ───────────────
+  router.get(
+    "/devices",
+    handler(async (_req, res) => {
+      res.json({ items: await service.listDevices(tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/devices",
+    handler(async (req, res) => {
+      const body = parseBody(registerDeviceSchema, req.body);
+      const device = await service.registerDevice(tenantId(res), body);
+      res.status(201).json(device);
+    }),
+  );
+
+  router.patch(
+    "/devices/:id/trust",
+    requireRole("owner"),
+    handler(async (req, res) => {
+      const device = await service.trustDevice(String(req.params.id), tenantId(res));
+      res.json(device);
     }),
   );
 }

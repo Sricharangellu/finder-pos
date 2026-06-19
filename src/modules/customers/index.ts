@@ -107,9 +107,80 @@ CREATE UNIQUE INDEX IF NOT EXISTS loyalty_tier_rules_tenant_level_idx ON loyalty
  * paid order's customer and awards loyalty points ($1 net spent = 1 point).
  * Net spent = amountCents − changeCents (i.e. the order total, change excluded).
  */
+const CREATE_CUSTOMER_ADDRESSES = `
+CREATE TABLE IF NOT EXISTS customer_addresses (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  customer_id   TEXT NOT NULL,
+  address_type  TEXT NOT NULL DEFAULT 'billing',
+  address_line1 TEXT,
+  address_line2 TEXT,
+  city          TEXT,
+  state         TEXT,
+  zip           TEXT,
+  country       TEXT NOT NULL DEFAULT 'US',
+  county        TEXT,
+  is_default    BOOLEAN NOT NULL DEFAULT false,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_addresses_customer_idx ON customer_addresses (tenant_id, customer_id);
+`;
+
+const CREATE_CUSTOMER_CONTACTS = `
+CREATE TABLE IF NOT EXISTS customer_contacts (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  customer_id   TEXT NOT NULL,
+  contact_name  TEXT NOT NULL,
+  title         TEXT,
+  email         TEXT,
+  phone         TEXT,
+  is_primary    BOOLEAN NOT NULL DEFAULT false,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_contacts_customer_idx ON customer_contacts (tenant_id, customer_id);
+`;
+
+const CREATE_CUSTOMER_GROUPS = `
+CREATE TABLE IF NOT EXISTS customer_groups (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  description TEXT,
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS customer_group_members (
+  id                TEXT PRIMARY KEY,
+  tenant_id         TEXT NOT NULL,
+  customer_id       TEXT NOT NULL,
+  customer_group_id TEXT NOT NULL,
+  created_at        BIGINT NOT NULL,
+  CONSTRAINT customer_group_members_unique UNIQUE (tenant_id, customer_id, customer_group_id)
+);
+CREATE INDEX IF NOT EXISTS customer_group_members_customer_idx ON customer_group_members (tenant_id, customer_id);
+CREATE INDEX IF NOT EXISTS customer_group_members_group_idx ON customer_group_members (tenant_id, customer_group_id);
+`;
+
+const CREATE_CUSTOMER_NOTES = `
+CREATE TABLE IF NOT EXISTS customer_notes (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  customer_id TEXT NOT NULL,
+  note        TEXT NOT NULL,
+  note_type   TEXT NOT NULL DEFAULT 'general',
+  created_by  TEXT,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_notes_customer_idx ON customer_notes (tenant_id, customer_id, created_at DESC);
+`;
+
 export const customersModule: PosModule = {
   name: "customers",
-  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS, CREATE_LOYALTY_TIER_RULES],
+  migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS, CREATE_LOYALTY_TIER_RULES, CREATE_CUSTOMER_ADDRESSES, CREATE_CUSTOMER_CONTACTS, CREATE_CUSTOMER_GROUPS, CREATE_CUSTOMER_NOTES],
   async register({ db, events, router }) {
     const service = new CustomersService(db, events);
 
