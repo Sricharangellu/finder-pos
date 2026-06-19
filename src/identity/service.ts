@@ -473,6 +473,113 @@ export class IdentityService {
     );
   }
 
+  // ── MFA ──────────────────────────────────────────────────────────────────────
+
+  async setupMfa(userId: string, tenantId: string): Promise<{ secret: string; otpauthUrl: string; qrDataUrl: string }> {
+    const OTPAuth = await import("otpauth");
+    const user = await this.db.one<{ email: string }>("SELECT email FROM users WHERE id = @id AND tenant_id = @t", { id: userId, t: tenantId });
+    if (!user) throw new HttpError(404, "not_found", "User not found");
+    const secret = new OTPAuth.Secret({ size: 20 });
+    const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", label: user.email, algorithm: "SHA1", digits: 6, period: 30, secret });
+    const now = Date.now();
+    await this.db.query(
+      `INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, created_at, updated_at)
+       VALUES (@id, @t, @uid, @secret, false, @now, @now)
+       ON CONFLICT (user_id) DO UPDATE SET totp_secret = EXCLUDED.totp_secret, enabled = false, updated_at = @now`,
+      { id: `mfa_${uuidv7()}`, t: tenantId, uid: userId, secret: secret.base32, now }
+    );
+    return { secret: secret.base32, otpauthUrl: totp.toString(), qrDataUrl: "" };
+  }
+
+  async verifyAndEnableMfa(userId: string, tenantId: string, code: string): Promise<void> {
+    const OTPAuth = await import("otpauth");
+    const row = await this.db.one<{ totp_secret: string }>("SELECT totp_secret FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
+    if (!row) throw new HttpError(404, "not_found", "MFA not set up");
+    const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
+    const delta = totp.validate({ token: code, window: 1 });
+    if (delta === null) throw new HttpError(400, "invalid_code", "Invalid or expired TOTP code");
+    const now = Date.now();
+    await this.db.query("UPDATE user_mfa SET enabled = true, updated_at = @now WHERE user_id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
+    await this.db.query("UPDATE users SET mfa_enabled = true, updated_at = @now WHERE id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
+  }
+
+  async verifyMfaCode(userId: string, tenantId: string, code: string): Promise<boolean> {
+    const OTPAuth = await import("otpauth");
+    const row = await this.db.one<{ totp_secret: string; enabled: boolean }>("SELECT totp_secret, enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
+    if (!row || !row.enabled) return true; // MFA not enabled — pass through
+    const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
+    return totp.validate({ token: code, window: 1 }) !== null;
+  }
+
+  async disableMfa(userId: string, tenantId: string): Promise<void> {
+    const now = Date.now();
+    await this.db.query("UPDATE user_mfa SET enabled = false, updated_at = @now WHERE user_id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
+    await this.db.query("UPDATE users SET mfa_enabled = false, updated_at = @now WHERE id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
+  }
+
+  async getMfaStatus(userId: string, tenantId: string): Promise<{ enabled: boolean; setupRequired: boolean }> {
+    const row = await this.db.one<{ enabled: boolean }>("SELECT enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
+    return { enabled: row?.enabled ?? false, setupRequired: !row };
+  }
+
+  // ── API Keys ──────────────────────────────────────────────────────────────────
+
+  async createApiKey(tenantId: string, name: string, scopes: string[], createdBy: string, expiresAt?: number): Promise<{ id: string; key: string; prefix: string }> {
+    const { randomBytes } = await import("node:crypto");
+    const rawKey = `fpk_${randomBytes(24).toString("base64url")}`;
+    const prefix = rawKey.slice(0, 12);
+    const hash = createHash("sha256").update(rawKey).digest("hex");
+    const now = Date.now();
+    const id = `apk_${uuidv7()}`;
+    await this.db.query(
+      `INSERT INTO api_keys (id, tenant_id, name, key_prefix, key_hash, scopes, expires_at, created_by, created_at, updated_at)
+       VALUES (@id, @t, @name, @prefix, @hash, @scopes, @exp, @by, @now, @now)`,
+      { id, t: tenantId, name, prefix, hash, scopes: JSON.stringify(scopes), exp: expiresAt ?? null, by: createdBy, now }
+    );
+    return { id, key: rawKey, prefix };
+  }
+
+  async listApiKeys(tenantId: string): Promise<Array<{ id: string; name: string; key_prefix: string; scopes: string; last_used_at: number | null; expires_at: number | null; created_at: number }>> {
+    return this.db.query("SELECT id, name, key_prefix, scopes, last_used_at, expires_at, created_at FROM api_keys WHERE tenant_id = @t AND revoked_at IS NULL ORDER BY created_at DESC", { t: tenantId });
+  }
+
+  async revokeApiKey(id: string, tenantId: string): Promise<void> {
+    await this.db.query("UPDATE api_keys SET revoked_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
+  }
+
+  // ── Password reset ─────────────────────────────────────────────────────────────
+
+  async requestPasswordReset(email: string): Promise<{ token: string } | null> {
+    const { randomBytes } = await import("node:crypto");
+    const user = await this.db.one<{ id: string; tenant_id: string }>("SELECT id, tenant_id FROM users WHERE email = @email", { email: email.toLowerCase().trim() });
+    if (!user) return null; // don't reveal existence
+    const token = randomBytes(32).toString("base64url");
+    const hash = createHash("sha256").update(token).digest("hex");
+    const now = Date.now();
+    await this.db.query(
+      "INSERT INTO password_reset_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @t, @uid, @hash, @exp, @now)",
+      { id: `prt_${uuidv7()}`, t: user.tenant_id, uid: user.id, hash, exp: now + 3_600_000, now }
+    );
+    // In production: send email. In dev: return token for testing.
+    return { token };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const { default: bcrypt } = await import("bcryptjs");
+    const hash = createHash("sha256").update(token).digest("hex");
+    const row = await this.db.one<{ id: string; user_id: string; tenant_id: string; expires_at: number; used_at: number | null }>(
+      "SELECT id, user_id, tenant_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = @hash",
+      { hash }
+    );
+    if (!row) throw new HttpError(400, "invalid_token", "Invalid or expired reset token");
+    if (row.used_at) throw new HttpError(400, "token_used", "Reset token has already been used");
+    if (Date.now() > row.expires_at) throw new HttpError(400, "token_expired", "Reset token has expired");
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const now = Date.now();
+    await this.db.query("UPDATE users SET password_hash = @hash, updated_at = @now WHERE id = @uid AND tenant_id = @t", { hash: passwordHash, now, uid: row.user_id, t: row.tenant_id });
+    await this.db.query("UPDATE password_reset_tokens SET used_at = @now WHERE id = @id", { now, id: row.id });
+  }
+
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   private hashToken(token: string): string {

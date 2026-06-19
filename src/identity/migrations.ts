@@ -147,6 +147,56 @@ CREATE TABLE IF NOT EXISTS devices (
 CREATE INDEX IF NOT EXISTS devices_tenant_idx ON devices (tenant_id, status);
 `;
 
+export const ADD_MFA_TO_USERS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT false;
+`;
+
+export const CREATE_MFA_TABLE = `
+CREATE TABLE IF NOT EXISTS user_mfa (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  user_id       TEXT NOT NULL UNIQUE,
+  totp_secret   TEXT NOT NULL,
+  enabled       BOOLEAN NOT NULL DEFAULT false,
+  backup_codes  TEXT NOT NULL DEFAULT '[]',
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS user_mfa_user_idx ON user_mfa (user_id);
+`;
+
+export const CREATE_API_KEYS_TABLE = `
+CREATE TABLE IF NOT EXISTS api_keys (
+  id            TEXT PRIMARY KEY,
+  tenant_id     TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  key_prefix    TEXT NOT NULL,
+  key_hash      TEXT NOT NULL,
+  scopes        TEXT NOT NULL DEFAULT '["read"]',
+  last_used_at  BIGINT,
+  expires_at    BIGINT,
+  revoked_at    BIGINT,
+  created_by    TEXT,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS api_keys_prefix_idx ON api_keys (key_prefix);
+CREATE INDEX IF NOT EXISTS api_keys_tenant_idx ON api_keys (tenant_id, revoked_at) WHERE revoked_at IS NULL;
+`;
+
+export const CREATE_PASSWORD_RESET_TABLE = `
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id         TEXT PRIMARY KEY,
+  tenant_id  TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at BIGINT NOT NULL,
+  used_at    BIGINT,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS password_reset_tokens_hash_idx ON password_reset_tokens (token_hash);
+`;
+
 export const CREATE_AUDIT_ENHANCEMENT_TABLES = `
 CREATE TABLE IF NOT EXISTS entity_change_logs (
   id          TEXT PRIMARY KEY,
@@ -200,4 +250,8 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_LOGIN_EVENTS_TABLE,
   CREATE_DEVICES_TABLE,
   CREATE_AUDIT_ENHANCEMENT_TABLES,
+  ADD_MFA_TO_USERS,
+  CREATE_MFA_TABLE,
+  CREATE_API_KEYS_TABLE,
+  CREATE_PASSWORD_RESET_TABLE,
 ];

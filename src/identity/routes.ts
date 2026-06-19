@@ -121,4 +121,93 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
       res.json(device);
     }),
   );
+
+  // ── MFA routes (auth middleware must be applied upstream) ─────────────────────
+  router.get(
+    "/mfa/status",
+    handler(async (_req, res) => {
+      const auth = res.locals["auth"] as { userId: string; tenantId: string } | undefined;
+      if (!auth) { res.status(401).end(); return; }
+      res.json(await service.getMfaStatus(auth.userId, auth.tenantId));
+    }),
+  );
+
+  router.post(
+    "/mfa/setup",
+    handler(async (_req, res) => {
+      const auth = res.locals["auth"] as { userId: string; tenantId: string } | undefined;
+      if (!auth) { res.status(401).end(); return; }
+      res.json(await service.setupMfa(auth.userId, auth.tenantId));
+    }),
+  );
+
+  router.post(
+    "/mfa/verify",
+    handler(async (req, res) => {
+      const auth = res.locals["auth"] as { userId: string; tenantId: string } | undefined;
+      if (!auth) { res.status(401).end(); return; }
+      const body = parseBody(z.object({ code: z.string().length(6) }), req.body);
+      await service.verifyAndEnableMfa(auth.userId, auth.tenantId, body.code);
+      res.json({ ok: true, message: "MFA enabled successfully" });
+    }),
+  );
+
+  router.post(
+    "/mfa/disable",
+    handler(async (_req, res) => {
+      const auth = res.locals["auth"] as { userId: string; tenantId: string } | undefined;
+      if (!auth) { res.status(401).end(); return; }
+      await service.disableMfa(auth.userId, auth.tenantId);
+      res.json({ ok: true });
+    }),
+  );
+
+  // ── API Keys (owner only) ─────────────────────────────────────────────────────
+  router.get(
+    "/api-keys",
+    requireRole("owner"),
+    handler(async (_req, res) => {
+      res.json({ items: await service.listApiKeys(tenantId(res)) });
+    }),
+  );
+
+  router.post(
+    "/api-keys",
+    requireRole("owner"),
+    handler(async (req, res) => {
+      const auth = res.locals["auth"] as { userId: string; tenantId: string };
+      const body = parseBody(z.object({ name: z.string().min(1), scopes: z.array(z.string()).min(1).optional(), expiresAt: z.number().int().positive().optional() }), req.body);
+      const result = await service.createApiKey(auth.tenantId, body.name, body.scopes ?? ["read"], auth.userId, body.expiresAt);
+      res.status(201).json(result);
+    }),
+  );
+
+  router.delete(
+    "/api-keys/:id",
+    requireRole("owner"),
+    handler(async (req, res) => {
+      await service.revokeApiKey(String(req.params.id), tenantId(res));
+      res.status(204).end();
+    }),
+  );
+
+  // ── Password reset ────────────────────────────────────────────────────────────
+  router.post(
+    "/forgot-password",
+    handler(async (req, res) => {
+      const body = parseBody(z.object({ email: z.string().email() }), req.body);
+      const result = await service.requestPasswordReset(body.email);
+      // Always return 200 to prevent email enumeration
+      res.json({ ok: true, ...(process.env["NODE_ENV"] !== "production" && result ? { token: result.token } : {}) });
+    }),
+  );
+
+  router.post(
+    "/reset-password",
+    handler(async (req, res) => {
+      const body = parseBody(z.object({ token: z.string().min(1), password: z.string().min(8) }), req.body);
+      await service.resetPassword(body.token, body.password);
+      res.json({ ok: true });
+    }),
+  );
 }
