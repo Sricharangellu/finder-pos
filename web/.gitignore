@@ -20,3 +20,4 @@ public/mockServiceWorker.js
 *.swp
 .idea/
 .vscode/settings.json
+.vercel

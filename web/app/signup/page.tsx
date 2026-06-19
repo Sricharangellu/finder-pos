@@ -11,13 +11,9 @@ import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
 import { setSession } from "@/lib/auth";
+import type { LoginResponse } from "@/api-client/types";
 
-interface RegisterResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  user: { id: string; email: string; name: string; role: string; tenantId: string };
-}
+type RegisterResponse = LoginResponse;
 
 function Field({
   id, label, type = "text", value, onChange, onBlur, error, placeholder, autoComplete, required,
