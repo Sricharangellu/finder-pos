@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import type { SalesSummary, TopProduct, TopProductsResponse } from "@/api-client/types";
 import { getUser } from "@/lib/auth";
@@ -75,6 +76,27 @@ export default function ReportsPage() {
             <ReportsSubNav />
           </div>
         )}
+        {/* Quick links to sub-reports */}
+        {allowed && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/reports/end-of-day"
+              className="group flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 group-hover:bg-blue-100">
+                <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-950">End of Day</p>
+                <p className="text-xs text-slate-500">Z-report · shift summary</p>
+              </div>
+            </Link>
+          </div>
+        )}
+
         {allowed && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">

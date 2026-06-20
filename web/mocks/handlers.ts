@@ -1006,7 +1006,7 @@ export const handlers = [
     ];
   })(),
 
-  // ── Settings: Currencies (Sprint 11) ─────────────────────────────────────────
+  // ── Settings: Currencies ─────────────────────────────────────────────────────
   http.get(`${V1}/settings/currencies`, async () => {
     await latency();
     return HttpResponse.json({ items: [
@@ -1015,6 +1015,39 @@ export const handlers = [
       { currency_code: "GBP", currency_name: "British Pound",   symbol: "£",  exchange_rate: 0.79, is_base: false, is_active: true },
       { currency_code: "CAD", currency_name: "Canadian Dollar", symbol: "C$", exchange_rate: 1.36, is_base: false, is_active: true },
     ]});
+  }),
+
+  // ── End-of-Day Z-Report ───────────────────────────────────────────────────────
+  http.get(`${V1}/reports/end-of-day`, async () => {
+    await latency();
+    return HttpResponse.json({
+      date: new Date().toISOString().slice(0, 10),
+      businessDate: new Intl.DateTimeFormat("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date()),
+      openedAt: Date.now() - 8 * 3600 * 1000,
+      closedAt: null,
+      status: "open",
+      transactions: { count: 47, voidCount: 2, refundCount: 1, averageTicket_cents: 2340 },
+      sales: { grossSales_cents: 124850, discounts_cents: 4200, refunds_cents: 1500, netSales_cents: 119150, taxCollected_cents: 9532, totalCollected_cents: 128682 },
+      tenders: [
+        { method: "Cash", count: 18, total_cents: 42300 },
+        { method: "Card", count: 26, total_cents: 78382 },
+        { method: "Gift Card", count: 3, total_cents: 8000 },
+      ],
+      topItems: [
+        { productId: "prod_1", productName: "Marlboro Red King", quantitySold: 24, total_cents: 23976 },
+        { productId: "prod_2", productName: "Coca-Cola 12oz", quantitySold: 18, total_cents: 3582 },
+        { productId: "prod_3", productName: "Newport Menthol 100s", quantitySold: 15, total_cents: 14985 },
+        { productId: "prod_4", productName: "Red Bull 8.4oz", quantitySold: 12, total_cents: 7188 },
+        { productId: "prod_5", productName: "Swisher Sweets Cigarillos", quantitySold: 11, total_cents: 8789 },
+      ],
+      cashDrawer: { openingFloat_cents: 20000, cashSales_cents: 42300, cashRefunds_cents: 1500, expectedCash_cents: 60800, actualCash_cents: null, variance_cents: null },
+    });
+  }),
+
+  // ── Inventory Transfers ───────────────────────────────────────────────────────
+  http.post(`${V1}/inventory/transfers`, async () => {
+    await latency();
+    return HttpResponse.json({ success: true, message: "Stock transferred successfully." });
   }),
 ];
 
