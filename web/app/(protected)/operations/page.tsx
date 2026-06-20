@@ -6,8 +6,24 @@ import { Button } from "@/components/Button";
 import { Badge, statusBadge } from "@/components/Badge";
 import { Table } from "@/components/Table";
 import { Modal } from "@/components/Modal";
+import { Skeleton } from "@/components/Skeleton";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
+
+interface StockItem {
+  product_id: string;
+  product_name: string;
+  sku: string;
+  quantity_on_hand: number;
+  quantity_reserved: number;
+  quantity_available: number;
+}
+
+interface LocationStockResponse {
+  locationId: string;
+  locationName: string;
+  items: StockItem[];
+}
 
 interface InventoryLocation {
   id: string;
@@ -255,6 +271,28 @@ function StockLocationsTab() {
   const [stockItems, setStockItems] = useState<LocationStock[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
 
+  // Stock-by-location modal state
+  const [stockModalLoc, setStockModalLoc] = useState<InventoryLocation | null>(null);
+  const [stockData, setStockData] = useState<LocationStockResponse | null>(null);
+  const [stockLoading, setStockLoading] = useState(false);
+
+  const openStockModal = useCallback(async (loc: InventoryLocation) => {
+    setStockModalLoc(loc);
+    setStockData(null);
+    setStockLoading(true);
+    try {
+      const data = await apiGet<LocationStockResponse>(`/api/v1/inventory/locations/${loc.id}/stock`);
+      setStockData(data);
+    } finally {
+      setStockLoading(false);
+    }
+  }, []);
+
+  const closeStockModal = useCallback(() => {
+    setStockModalLoc(null);
+    setStockData(null);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -341,7 +379,7 @@ function StockLocationsTab() {
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Type</th>
@@ -405,7 +443,7 @@ function StockLocationsTab() {
           <div className="overflow-x-auto -mx-4 sm:-mx-6">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   <th className="px-4 py-2.5">Product ID</th>
                   <th className="px-4 py-2.5 text-right">On Hand</th>
                   <th className="px-4 py-2.5 text-right">Committed</th>

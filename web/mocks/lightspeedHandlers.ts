@@ -1708,6 +1708,18 @@ lightspeedHandlers.push(
     inventoryLocations[idx] = { ...inventoryLocations[idx], ...b };
     return HttpResponse.json(inventoryLocations[idx]);
   }),
+  http.get(`${V1}/inventory/locations/:id/stock`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({
+      locationId: params.id as string,
+      locationName: "Main Floor",
+      items: [
+        { product_id: "prod_1", product_name: "Coca-Cola 12oz", sku: "COKE12", quantity_on_hand: 48, quantity_reserved: 6, quantity_available: 42 },
+        { product_id: "prod_2", product_name: "Marlboro Red King", sku: "MARL-RK", quantity_on_hand: 10, quantity_reserved: 0, quantity_available: 10 },
+        { product_id: "prod_3", product_name: "Newport Menthol 100s", sku: "NEWP-M100", quantity_on_hand: 3, quantity_reserved: 3, quantity_available: 0 },
+      ],
+    });
+  }),
 
   // ── Vendor Quotes (Sprint 10C) ────────────────────────────────────────────
   ...(() => {
