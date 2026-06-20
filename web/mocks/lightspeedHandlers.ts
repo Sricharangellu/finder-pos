@@ -1797,17 +1797,63 @@ lightspeedHandlers.push(
     });
   }),
 
-  // ── Vendor Quotes (Sprint 10C) ────────────────────────────────────────────
+  // ── Vendor Quotes (Sprint 16) ─────────────────────────────────────────────
   ...(() => {
     const VQ_BASE = Date.now();
-    let vqItems = [
-      { id: "vq_1", quote_number: "VQ-00001", supplier: "Altria Group", items_count: 3, total_cents: 450000, received_at: VQ_BASE - 86400000 * 2, status: "pending" },
-      { id: "vq_2", quote_number: "VQ-00002", supplier: "RJ Reynolds", items_count: 5, total_cents: 320000, received_at: VQ_BASE - 86400000 * 5, status: "accepted" },
+    let vqItems: Array<{
+      id: string; vendor: string; status: "pending" | "accepted" | "rejected";
+      expires_at: number; line_items: Array<{ product: string; qty: number; unit_price_cents: number }>;
+      total_cents: number; created_at: number;
+    }> = [
+      { id: "vq_001", vendor: "Altria Group", status: "pending", expires_at: VQ_BASE + 7 * 86400000,
+        line_items: [{ product: "Marlboro Red Box 20s", qty: 500, unit_price_cents: 670 }, { product: "Marlboro Gold Box 20s", qty: 300, unit_price_cents: 650 }],
+        total_cents: 530000, created_at: VQ_BASE - 86400000 },
+      { id: "vq_002", vendor: "Swedish Match", status: "accepted", expires_at: VQ_BASE + 3 * 86400000,
+        line_items: [{ product: "General Snus Original Portion", qty: 200, unit_price_cents: 480 }],
+        total_cents: 96000, created_at: VQ_BASE - 2 * 86400000 },
+      { id: "vq_003", vendor: "Standard General", status: "pending", expires_at: VQ_BASE + 14 * 86400000,
+        line_items: [{ product: "Camel Filters Box 20s", qty: 400, unit_price_cents: 660 }],
+        total_cents: 264000, created_at: VQ_BASE - 3600000 },
     ];
+    let vqSeq = 3;
     return [
-      http.get(`${V1}/purchasing/vendor-quotes`, async () => { await lat(); return HttpResponse.json({ items: vqItems }); }),
-      http.post(`${V1}/purchasing/vendor-quotes/:id/accept`, async ({ params }) => { await lat(); vqItems = vqItems.map(q => q.id === params["id"] ? { ...q, status: "accepted" } : q); return HttpResponse.json({ ok: true }); }),
-      http.post(`${V1}/purchasing/vendor-quotes/:id/reject`, async ({ params }) => { await lat(); vqItems = vqItems.map(q => q.id === params["id"] ? { ...q, status: "rejected" } : q); return HttpResponse.json({ ok: true }); }),
+      http.get(`${V1}/purchasing/vendor-quotes`, async () => {
+        await lat();
+        return HttpResponse.json({ items: vqItems, total: vqItems.length });
+      }),
+      http.post(`${V1}/purchasing/vendor-quotes`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as any;
+        const lines: Array<{ product: string; qty: number; unit_price_cents: number }> = (b.line_items ?? []).map((l: any) => ({
+          product: String(l.product), qty: Number(l.qty), unit_price_cents: Number(l.unit_price_cents),
+        }));
+        const total = lines.reduce((s, l) => s + l.qty * l.unit_price_cents, 0);
+        const q = {
+          id: `vq_${String(++vqSeq).padStart(3, "0")}`,
+          vendor: String(b.vendor ?? "Unknown"),
+          status: "pending" as const,
+          expires_at: Number(b.expires_at ?? Date.now() + 7 * 86400000),
+          line_items: lines,
+          total_cents: total,
+          created_at: Date.now(),
+        };
+        vqItems.push(q);
+        return HttpResponse.json(q, { status: 201 });
+      }),
+      http.patch(`${V1}/purchasing/vendor-quotes/:id/accept`, async ({ params }) => {
+        await lat();
+        const q = vqItems.find((x) => x.id === String(params.id));
+        if (!q) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        q.status = "accepted";
+        return HttpResponse.json({ ...q });
+      }),
+      http.patch(`${V1}/purchasing/vendor-quotes/:id/reject`, async ({ params }) => {
+        await lat();
+        const q = vqItems.find((x) => x.id === String(params.id));
+        if (!q) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        q.status = "rejected";
+        return HttpResponse.json({ ...q });
+      }),
     ];
   })(),
 

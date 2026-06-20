@@ -1011,6 +1011,22 @@ export const handlers = [
   http.post("*/api/identity/mfa/verify", async () => { await latency(); return HttpResponse.json({ ok: true, message: "MFA enabled successfully" }); }),
   http.post("*/api/identity/mfa/disable", async () => { await latency(); return HttpResponse.json({ ok: true }); }),
 
+  // ── Backup codes (Sprint 16) ──────────────────────────────────────────────
+  ...(() => {
+    let backupCodes: string[] = [];
+    return [
+      http.get("*/api/v1/auth/backup-codes", async () => {
+        await latency();
+        return HttpResponse.json({ codes: backupCodes, remaining: backupCodes.length });
+      }),
+      http.post("*/api/v1/auth/backup-codes", async () => {
+        await latency();
+        backupCodes = [];
+        return HttpResponse.json({ codes: backupCodes });
+      }),
+    ];
+  })(),
+
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
   // Maintained in a separate file to avoid cross-agent edit collisions.
   ...lightspeedHandlers,

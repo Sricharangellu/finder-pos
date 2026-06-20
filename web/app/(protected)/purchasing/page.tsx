@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { formatMoney, parseToCents } from "@/lib/money";
-import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { hasRole } from "@/lib/auth";
 import { useFlag } from "@/flags/useFlag";
 import type {
@@ -31,14 +31,20 @@ interface DraftLine {
   lotCode: string;
 }
 
+interface QuoteLine {
+  product: string;
+  qty: number;
+  unit_price_cents: number;
+}
+
 interface VendorQuote {
   id: string;
-  quote_number: string;
-  supplier: string;
-  items_count: number;
+  vendor: string;
+  status: "pending" | "accepted" | "rejected";
+  expires_at: number;
+  line_items: QuoteLine[];
   total_cents: number;
-  received_at: number;
-  status: "pending" | "accepted" | "rejected" | "expired";
+  created_at: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -48,11 +54,10 @@ const STATUS_STYLE: Record<string, string> = {
   received: "bg-emerald-50 text-emerald-700 ring-emerald-200",
 };
 
-const VQ_STATUS_BADGE: Record<string, "yellow" | "green" | "gray" | "red"> = {
+const VQ_STATUS_BADGE: Record<VendorQuote["status"], "yellow" | "green" | "gray"> = {
   pending: "yellow",
   accepted: "green",
   rejected: "gray",
-  expired: "red",
 };
 
 function emptyLine(): DraftLine {
@@ -120,9 +125,8 @@ export default function PurchasingPage() {
   const [vendorQuotes, setVendorQuotes] = useState<VendorQuote[]>([]);
   const [vqLoading, setVqLoading] = useState(false);
   const [vqBusy, setVqBusy] = useState(false);
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [rqSupplier, setRqSupplier] = useState("");
-  const [rqProducts, setRqProducts] = useState("");
+  const [showNewQuoteModal, setShowNewQuoteModal] = useState(false);
+  const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
 
   const canManage = hasRole("manager");
 
@@ -237,7 +241,7 @@ export default function PurchasingPage() {
   const acceptQuote = async (id: string) => {
     setVqBusy(true);
     try {
-      await apiPost(`/api/v1/purchasing/vendor-quotes/${id}/accept`, {});
+      await apiPatch(`/api/v1/purchasing/vendor-quotes/${id}/accept`, {});
       await loadVendorQuotes();
     } catch {
       // silently ignore
@@ -249,7 +253,20 @@ export default function PurchasingPage() {
   const rejectQuote = async (id: string) => {
     setVqBusy(true);
     try {
-      await apiPost(`/api/v1/purchasing/vendor-quotes/${id}/reject`, {});
+      await apiPatch(`/api/v1/purchasing/vendor-quotes/${id}/reject`, {});
+      await loadVendorQuotes();
+    } catch {
+      // silently ignore
+    } finally {
+      setVqBusy(false);
+    }
+  };
+
+  const createQuote = async (payload: { vendor: string; line_items: QuoteLine[]; expires_at: number }) => {
+    setVqBusy(true);
+    try {
+      await apiPost("/api/v1/purchasing/vendor-quotes", payload);
+      setShowNewQuoteModal(false);
       await loadVendorQuotes();
     } catch {
       // silently ignore
@@ -458,21 +475,168 @@ export default function PurchasingPage() {
               loading={vqLoading}
               busy={vqBusy}
               canManage={canManage}
-              suppliers={suppliers}
+              expandedId={expandedQuoteId}
+              onToggleExpand={(id) => setExpandedQuoteId((cur) => (cur === id ? null : id))}
               onAccept={(id) => void acceptQuote(id)}
               onReject={(id) => void rejectQuote(id)}
-              showRequestModal={showRequestModal}
-              onOpenRequestModal={() => setShowRequestModal(true)}
-              onCloseRequestModal={() => setShowRequestModal(false)}
-              rqSupplier={rqSupplier}
-              setRqSupplier={setRqSupplier}
-              rqProducts={rqProducts}
-              setRqProducts={setRqProducts}
+              showNewQuoteModal={showNewQuoteModal}
+              onOpenNewQuoteModal={() => setShowNewQuoteModal(true)}
+              onCloseNewQuoteModal={() => setShowNewQuoteModal(false)}
+              onCreateQuote={(payload) => void createQuote(payload)}
             />
           )}
         </Card>
       </div>
     </EnterpriseShell>
+  );
+}
+
+// ─── New Quote Modal ──────────────────────────────────────────────────────────
+
+interface DraftQuoteLine { product: string; qty: string; unit_price: string; }
+
+function emptyQuoteLine(): DraftQuoteLine {
+  return { product: "", qty: "1", unit_price: "" };
+}
+
+function NewQuoteModal({
+  open,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (payload: { vendor: string; line_items: QuoteLine[]; expires_at: number }) => void;
+}) {
+  const [vendor, setVendor] = useState("");
+  const [expiresOn, setExpiresOn] = useState("");
+  const [draftLines, setDraftLines] = useState<DraftQuoteLine[]>([emptyQuoteLine()]);
+
+  const updateDraftLine = (i: number, patch: Partial<DraftQuoteLine>) =>
+    setDraftLines((cur) => cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
+  const submit = () => {
+    if (!vendor.trim()) return;
+    const line_items: QuoteLine[] = draftLines
+      .filter((l) => l.product.trim() && l.qty && l.unit_price)
+      .map((l) => ({
+        product: l.product.trim(),
+        qty: Number(l.qty),
+        unit_price_cents: parseToCents(l.unit_price),
+      }));
+    if (line_items.length === 0) return;
+    const expires_at = expiresOn ? new Date(expiresOn).getTime() : Date.now() + 7 * 86400000;
+    onSubmit({ vendor: vendor.trim(), line_items, expires_at });
+  };
+
+  const canSubmit = vendor.trim() && draftLines.some((l) => l.product.trim() && l.qty && l.unit_price);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="New Quote"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" loading={busy} disabled={!canSubmit} onClick={submit}>
+            Create quote
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Vendor</label>
+          <input
+            type="text"
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+            placeholder="e.g. Altria Group"
+            className="min-h-[44px] w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Expires on</label>
+          <input
+            type="date"
+            value={expiresOn}
+            onChange={(e) => setExpiresOn(e.target.value)}
+            className="min-h-[44px] rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs font-semibold uppercase text-slate-500">Line items</label>
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs font-semibold uppercase text-slate-500">
+              <tr>
+                <th className="pb-1 pr-2">Product</th>
+                <th className="pb-1 pr-2 w-16">Qty</th>
+                <th className="pb-1 pr-2 w-24">Unit price ($)</th>
+                <th className="pb-1 w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {draftLines.map((l, i) => (
+                <tr key={i}>
+                  <td className="py-1 pr-2">
+                    <input
+                      type="text"
+                      value={l.product}
+                      onChange={(e) => updateDraftLine(i, { product: e.target.value })}
+                      placeholder="Product name"
+                      className="min-h-[36px] w-full rounded border border-slate-300 px-2 text-sm outline-none focus:border-blue-500"
+                    />
+                  </td>
+                  <td className="py-1 pr-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={l.qty}
+                      onChange={(e) => updateDraftLine(i, { qty: e.target.value })}
+                      className="min-h-[36px] w-full rounded border border-slate-300 px-2 text-sm outline-none focus:border-blue-500"
+                    />
+                  </td>
+                  <td className="py-1 pr-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={l.unit_price}
+                      onChange={(e) => updateDraftLine(i, { unit_price: e.target.value })}
+                      placeholder="0.00"
+                      className="min-h-[36px] w-full rounded border border-slate-300 px-2 text-sm outline-none focus:border-blue-500"
+                    />
+                  </td>
+                  <td className="py-1">
+                    {draftLines.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setDraftLines((cur) => cur.filter((_, idx) => idx !== i))}
+                        className="rounded p-1 text-slate-400 hover:text-red-500"
+                        aria-label="Remove line"
+                      >
+                        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={() => setDraftLines((cur) => [...cur, emptyQuoteLine()])}
+            className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+          >
+            + Add line
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -484,32 +648,28 @@ function VendorQuotesTab({
   loading,
   busy,
   canManage,
-  suppliers,
+  expandedId,
+  onToggleExpand,
   onAccept,
   onReject,
-  showRequestModal,
-  onOpenRequestModal,
-  onCloseRequestModal,
-  rqSupplier,
-  setRqSupplier,
-  rqProducts,
-  setRqProducts,
+  showNewQuoteModal,
+  onOpenNewQuoteModal,
+  onCloseNewQuoteModal,
+  onCreateQuote,
 }: {
   enabled: boolean;
   quotes: VendorQuote[];
   loading: boolean;
   busy: boolean;
   canManage: boolean;
-  suppliers: Supplier[];
+  expandedId: string | null;
+  onToggleExpand: (id: string) => void;
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
-  showRequestModal: boolean;
-  onOpenRequestModal: () => void;
-  onCloseRequestModal: () => void;
-  rqSupplier: string;
-  setRqSupplier: (v: string) => void;
-  rqProducts: string;
-  setRqProducts: (v: string) => void;
+  showNewQuoteModal: boolean;
+  onOpenNewQuoteModal: () => void;
+  onCloseNewQuoteModal: () => void;
+  onCreateQuote: (payload: { vendor: string; line_items: QuoteLine[]; expires_at: number }) => void;
 }) {
   if (!enabled) {
     return (
@@ -526,65 +686,53 @@ function VendorQuotesTab({
 
   return (
     <>
-      <Modal
-        open={showRequestModal}
-        onClose={onCloseRequestModal}
-        title="Request Quote from Supplier"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={onCloseRequestModal}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={onCloseRequestModal}>Send Request</Button>
-          </div>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Supplier</label>
-            <select
-              value={rqSupplier}
-              onChange={(e) => setRqSupplier(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select supplier…</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Products / Notes</label>
-            <textarea
-              value={rqProducts}
-              onChange={(e) => setRqProducts(e.target.value)}
-              rows={4}
-              placeholder="List the products or SKUs you need a quote for…"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-          </div>
-        </div>
-      </Modal>
+      <NewQuoteModal
+        open={showNewQuoteModal}
+        busy={busy}
+        onClose={onCloseNewQuoteModal}
+        onSubmit={onCreateQuote}
+      />
 
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <p className="text-sm text-slate-500">Quotes received from suppliers for products you want to purchase.</p>
+        <p className="text-sm text-slate-500">Quotes received from vendors. Click a row to see line items.</p>
         {canManage && (
-          <Button variant="primary" size="sm" onClick={onOpenRequestModal}>
-            Request Quote
+          <Button variant="primary" size="sm" onClick={onOpenNewQuoteModal}>
+            New Quote
           </Button>
         )}
       </div>
 
       <div className="overflow-x-auto">
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-400">Loading quotes…</div>
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Vendor</th>
+                <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3">Expires</th>
+                <th className="px-4 py-3">Status</th>
+                {canManage && <th className="px-4 py-3 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {[0, 1, 2].map((i) => (
+                <tr key={i}>
+                  <td className="px-4 py-3"><div className="h-4 w-32 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="px-4 py-3"><div className="ml-auto h-4 w-16 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-14 animate-pulse rounded bg-slate-200" /></td>
+                  {canManage && <td className="px-4 py-3" />}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : (
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
               <tr>
-                <th className="px-4 py-3">Quote #</th>
-                <th className="px-4 py-3">Supplier</th>
-                <th className="px-4 py-3 text-right">Items</th>
+                <th className="px-4 py-3">Vendor</th>
                 <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3">Received</th>
+                <th className="px-4 py-3">Expires</th>
                 <th className="px-4 py-3">Status</th>
                 {canManage && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
@@ -592,38 +740,92 @@ function VendorQuotesTab({
             <tbody className="divide-y divide-slate-100 bg-white">
               {quotes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">No vendor quotes yet. Request one from a supplier.</td>
+                  <td colSpan={canManage ? 5 : 4} className="px-4 py-8 text-center text-slate-400">
+                    No vendor quotes yet. Create one with "New Quote".
+                  </td>
                 </tr>
               ) : (
                 quotes.map((q) => (
-                  <tr key={q.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{q.quote_number}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-950">{q.supplier}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{q.items_count}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(q.total_cents)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                      {new Date(q.received_at).toLocaleDateString()}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <Badge variant={VQ_STATUS_BADGE[q.status] ?? "gray"}>
-                        {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
-                      </Badge>
-                    </td>
-                    {canManage && (
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        {q.status === "pending" && (
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="primary" disabled={busy} onClick={() => onAccept(q.id)}>
-                              Accept
-                            </Button>
-                            <Button size="sm" variant="danger" disabled={busy} onClick={() => onReject(q.id)}>
-                              Reject
-                            </Button>
-                          </div>
-                        )}
+                  <Fragment key={q.id}>
+                    <tr
+                      className="cursor-pointer hover:bg-slate-50 transition-colors"
+                      onClick={() => onToggleExpand(q.id)}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-950">
+                        <div className="flex items-center gap-2">
+                          <svg
+                            aria-hidden="true"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className={`shrink-0 text-slate-400 transition-transform ${expandedId === q.id ? "rotate-90" : ""}`}
+                          >
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                          {q.vendor}
+                        </div>
                       </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">
+                        {formatMoney(q.total_cents)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                        {new Date(q.expires_at).toLocaleDateString()}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <Badge variant={VQ_STATUS_BADGE[q.status]}>
+                          {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
+                        </Badge>
+                      </td>
+                      {canManage && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          {q.status === "pending" && (
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="primary" disabled={busy} onClick={() => onAccept(q.id)}>
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="danger" disabled={busy} onClick={() => onReject(q.id)}>
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                    {expandedId === q.id && (
+                      <tr key={`${q.id}-detail`}>
+                        <td colSpan={canManage ? 5 : 4} className="bg-slate-50 px-8 py-3">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-left text-slate-500 uppercase tracking-wide">
+                                <th className="pb-1 pr-4">Product</th>
+                                <th className="pb-1 pr-4 text-right">Qty</th>
+                                <th className="pb-1 pr-4 text-right">Unit price</th>
+                                <th className="pb-1 text-right">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                              {q.line_items.map((li, idx) => (
+                                <tr key={idx}>
+                                  <td className="py-1 pr-4 font-medium text-slate-900">{li.product}</td>
+                                  <td className="py-1 pr-4 text-right text-slate-600">{li.qty}</td>
+                                  <td className="py-1 pr-4 text-right text-slate-600">{formatMoney(li.unit_price_cents)}</td>
+                                  <td className="py-1 text-right font-semibold text-slate-900">{formatMoney(li.qty * li.unit_price_cents)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <p className="mt-2 text-xs text-slate-400">
+                            Created {new Date(q.created_at).toLocaleString()}
+                          </p>
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </Fragment>
                 ))
               )}
             </tbody>

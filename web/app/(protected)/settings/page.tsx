@@ -659,6 +659,8 @@ function SecuritySection() {
         )}
       </Card>
 
+      <BackupCodesCard />
+
       <Card className="flex flex-col gap-3">
         <h2 className="text-base font-semibold text-slate-950">Security posture</h2>
         <div className="flex flex-col gap-2 text-sm">
@@ -672,6 +674,125 @@ function SecuritySection() {
         </div>
       </Card>
     </div>
+  );
+}
+
+// ─── Backup Codes ─────────────────────────────────────────────────────────────
+
+type BackupCodesState = "idle" | "revealed" | "hidden";
+
+function generateCodes(): string[] {
+  const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 8 }, () => {
+    const buf = new Uint8Array(8);
+    crypto.getRandomValues(buf);
+    const part = (arr: Uint8Array, start: number) =>
+      Array.from(arr.slice(start, start + 4)).map((b) => CHARS[b % CHARS.length]).join("");
+    return `${part(buf, 0)}-${part(buf, 4)}`;
+  });
+}
+
+function BackupCodesCard() {
+  const [codesState, setCodesState] = useState<BackupCodesState>("idle");
+  const [codes, setCodes] = useState<string[]>([]);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const { addToast } = useToast();
+
+  const generate = () => {
+    const newCodes = generateCodes();
+    setCodes(newCodes);
+    setCodesState("revealed");
+    setConfirmRegen(false);
+    void fetch("/api/v1/auth/backup-codes", { method: "POST" });
+  };
+
+  const copyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(codes.join("\n"));
+      addToast({ title: "Backup codes copied", variant: "success" });
+    } catch {
+      addToast({ title: "Could not copy", description: "Copy the codes manually.", variant: "error" });
+    }
+  };
+
+  const download = () => {
+    const blob = new Blob([codes.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "finderpos-backup-codes.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Backup codes</h2>
+          <p className="text-sm text-slate-500">Generate one-time recovery codes in case you lose access to your authenticator app.</p>
+        </div>
+        {codesState !== "idle" && (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            {codes.length} codes remaining
+          </span>
+        )}
+      </div>
+
+      {codesState === "idle" && (
+        <Button variant="primary" size="sm" onClick={generate}>Generate</Button>
+      )}
+
+      {codesState === "revealed" && (
+        <>
+          <p className="text-sm text-slate-500">Save these somewhere safe. Each code can only be used once.</p>
+          <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
+            {codes.map((c) => (
+              <span key={c} className="font-mono text-sm font-semibold tracking-wider text-slate-950 select-all">
+                {c}
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => void copyAll()}>Copy all</Button>
+            <Button variant="secondary" size="sm" onClick={download}>Download .txt</Button>
+            <Button variant="ghost" size="sm" onClick={() => setCodesState("hidden")}>Hide codes</Button>
+            {confirmRegen ? (
+              <span className="flex items-center gap-2 text-sm text-slate-600">
+                This will invalidate all existing codes. Continue?
+                <button
+                  type="button"
+                  className="font-semibold text-red-600 hover:text-red-700"
+                  onClick={generate}
+                >
+                  Yes, regenerate
+                </button>
+                <button
+                  type="button"
+                  className="text-slate-500 hover:text-slate-700"
+                  onClick={() => setConfirmRegen(false)}
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <Button variant="danger" size="sm" onClick={() => setConfirmRegen(true)}>Regenerate codes</Button>
+            )}
+          </div>
+        </>
+      )}
+
+      {codesState === "hidden" && (
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-sm text-slate-600">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            {codes.length} codes remaining
+          </span>
+          <Button variant="secondary" size="sm" onClick={() => setCodesState("revealed")}>Show codes</Button>
+        </div>
+      )}
+    </Card>
   );
 }
 
