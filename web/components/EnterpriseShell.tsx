@@ -47,7 +47,8 @@ type NavKey =
   | "tax-compliance"
   | "integrations"
   | "imports-exports"
-  | "workflows";
+  | "workflows"
+  | "quotes";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -63,6 +64,7 @@ const NAV_ITEMS: Array<{
   { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
   { key: "orders", label: "Orders", href: "/orders", icon: "orders", group: "Operate" },
+  { key: "quotes", label: "Quotations", href: "/quotes", icon: "quotes", group: "Operate" },
   { key: "returns", label: "Returns", href: "/returns", icon: "returns", group: "Operate", editionFlag: "groupRetailPOS" },
   { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
   { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
@@ -461,6 +463,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <WorkflowsIcon />;
     case "gift-cards":
       return <GiftCardIcon />;
+    case "quotes":
+      return <QuotesIcon />;
     case "vendors":
       return <PurchasingIcon />;
     case "payments":
@@ -488,6 +492,18 @@ function GiftCardIcon() {
       <rect x="2" y="7" width="20" height="14" rx="2" />
       <path d="M16 3c0 2-4 4-4 4S8 5 8 3a4 4 0 0 1 8 0z" />
       <line x1="12" y1="7" x2="12" y2="21" />
+    </svg>
+  );
+}
+
+function QuotesIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M12 18v-4" />
+      <path d="M9.5 15.5 12 18l2.5-2.5" />
+      <path d="M9 12h6" />
     </svg>
   );
 }

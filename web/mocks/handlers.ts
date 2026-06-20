@@ -894,6 +894,83 @@ export const handlers = [
     });
   }),
 
+  // ── Quotes (S10A) ─────────────────────────────────────────────────────────────
+  ...(() => {
+    const now = Date.now();
+    let quotesStore: Array<{
+      id: string; quote_number: string; status: string; customer_id: string;
+      total_cents: number; currency: string; valid_until: number; created_at: number;
+    }> = [
+      { id: "qt_001", quote_number: "QT-00001", status: "draft",    customer_id: "Acme Corp", total_cents: 125000, currency: "USD", valid_until: now + 30 * 86_400_000, created_at: now - 2 * 86_400_000 },
+      { id: "qt_002", quote_number: "QT-00002", status: "sent",     customer_id: "Beta Ltd",  total_cents:  47500, currency: "EUR", valid_until: now + 15 * 86_400_000, created_at: now - 5 * 86_400_000 },
+      { id: "qt_003", quote_number: "QT-00003", status: "accepted", customer_id: "Gamma Inc", total_cents:  89900, currency: "USD", valid_until: now +  7 * 86_400_000, created_at: now - 10 * 86_400_000 },
+    ];
+    const quoteLines: Record<string, Array<{ id: string; name: string; quantity: number; unit_cents: number; sku?: string }>> = {
+      qt_001: [
+        { id: "ql_001a", name: "Consulting Package", quantity: 5, unit_cents: 20000, sku: "SVC-001" },
+        { id: "ql_001b", name: "Setup Fee",          quantity: 1, unit_cents: 25000 },
+      ],
+      qt_002: [{ id: "ql_002a", name: "Widget Pro",        quantity: 10, unit_cents: 4750,  sku: "WDG-PRO" }],
+      qt_003: [{ id: "ql_003a", name: "Enterprise License", quantity: 1, unit_cents: 89900, sku: "LIC-ENT" }],
+    };
+    let qtSeq = 3;
+
+    return [
+      http.get(`${V1}/quotes`, async () => {
+        await latency();
+        return HttpResponse.json({ items: [...quotesStore].sort((a, b) => b.created_at - a.created_at), total: quotesStore.length });
+      }),
+      http.post(`${V1}/quotes`, async ({ request }) => {
+        await latency();
+        const b = (await request.json()) as Record<string, unknown>;
+        const id = `qt_${Math.random().toString(36).slice(2, 10)}`;
+        const rawLines = (b.lines as Array<{ name: string; quantity: number; unitCents: number; sku?: string }>) ?? [];
+        const lines = rawLines.map((l, i) => ({
+          id: `ql_${id}_${i}`, name: l.name, quantity: l.quantity, unit_cents: l.unitCents ?? 0, sku: l.sku,
+        }));
+        const total = lines.reduce((s, l) => s + l.unit_cents * l.quantity, 0);
+        const q = {
+          id, quote_number: `QT-${String(++qtSeq).padStart(5, "0")}`,
+          status: "draft", customer_id: String(b.customerId ?? ""),
+          total_cents: total, currency: String(b.currency ?? "USD"),
+          valid_until: (b.validUntil as number) ?? Date.now() + 30 * 86_400_000,
+          created_at: Date.now(),
+        };
+        quotesStore.push(q);
+        quoteLines[id] = lines;
+        return HttpResponse.json({ ...q, lines }, { status: 201 });
+      }),
+      http.get(`${V1}/quotes/:id`, async ({ params }) => {
+        await latency();
+        const q = quotesStore.find((x) => x.id === String(params.id));
+        if (!q) return HttpResponse.json({ error: { code: "not_found", message: "quote not found" } }, { status: 404 });
+        return HttpResponse.json({ ...q, lines: quoteLines[q.id] ?? [] });
+      }),
+      http.patch(`${V1}/quotes/:id/status`, async ({ params, request }) => {
+        await latency();
+        const { status } = (await request.json()) as { status: string };
+        const q = quotesStore.find((x) => x.id === String(params.id));
+        if (!q) return HttpResponse.json({ error: { code: "not_found", message: "quote not found" } }, { status: 404 });
+        q.status = status;
+        return HttpResponse.json(q);
+      }),
+      http.post(`${V1}/quotes/:id/convert`, async ({ params }) => {
+        await latency();
+        const q = quotesStore.find((x) => x.id === String(params.id));
+        if (!q) return HttpResponse.json({ error: { code: "not_found", message: "quote not found" } }, { status: 404 });
+        q.status = "accepted";
+        return HttpResponse.json({ quoteId: q.id, message: `Quote ${q.quote_number} converted to order` });
+      }),
+      http.delete(`${V1}/quotes/:id`, async ({ params }) => {
+        await latency();
+        const before = quotesStore.length;
+        quotesStore = quotesStore.filter((x) => x.id !== String(params.id));
+        if (quotesStore.length === before) return HttpResponse.json({ error: { code: "not_found", message: "quote not found" } }, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
   // Maintained in a separate file to avoid cross-agent edit collisions.
   ...lightspeedHandlers,

@@ -12,6 +12,7 @@ import { useQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
+import { KpiCard } from "@/components/KpiCard";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { LineChart } from "@/components/charts/LineChart";
@@ -104,39 +105,44 @@ function SkeletonBox({ className = "" }: { className?: string }) {
   );
 }
 
-// ─── KPI Tile ─────────────────────────────────────────────────────────────────
+// ─── KPI Icons ────────────────────────────────────────────────────────────────
 
-function KpiTile({
-  label,
-  value,
-  loading,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string | number;
-  loading: boolean;
-  tone?: "neutral" | "revenue" | "orders" | "risk";
-}) {
-  const toneClass = {
-    neutral: "border-slate-200 bg-white",
-    revenue: "border-emerald-200 bg-emerald-50",
-    orders: "border-blue-200 bg-blue-50",
-    risk: "border-amber-200 bg-amber-50",
-  }[tone];
-
+function IconDollar() {
   return (
-    <div className={`rounded-md border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </p>
-      {loading ? (
-        <SkeletonBox className="mt-2 h-8 w-3/4" />
-      ) : (
-        <p className="mt-2 text-2xl font-semibold text-slate-950 tabular-nums">
-          {value}
-        </p>
-      )}
-    </div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  );
+}
+
+function IconCart() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+    </svg>
+  );
+}
+
+function IconPackage() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="16.5" y1="9.4" x2="7.5" y2="4.21" />
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function IconCreditCard() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
   );
 }
 
@@ -332,17 +338,67 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── KPI tile grid ──────────────────────────────────────────────── */}
+        {/* ── KPI card grid ──────────────────────────────────────────────── */}
         <section aria-label="Key performance indicators">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <KpiTile label="Revenue" value={formatMoney(gross)} loading={loading} tone="revenue" />
-            <KpiTile label="Net Revenue" value={formatMoney(net)} loading={loading} tone="revenue" />
-            <KpiTile label="Tax Collected" value={formatMoney(tax)} loading={loading} />
-            <KpiTile label="Payments Captured" value={formatMoney(summary?.payments.capturedCents ?? 0)} loading={loading} />
-            <KpiTile label="Total Orders" value={totalOrders} loading={loading} tone="orders" />
-            <KpiTile label="Completed Sales" value={completedOrders} loading={loading} tone="orders" />
-            <KpiTile label="Open Orders" value={openOrders} loading={loading} tone="risk" />
-            <KpiTile label="Avg Order Value" value={formatMoney(avgOrderCents)} loading={loading} />
+            <KpiCard
+              title="Revenue"
+              value={formatMoney(gross)}
+              loading={loading}
+              tone="green"
+              icon={<IconDollar />}
+              trend={{ value: 12.5, label: "vs last period" }}
+            />
+            <KpiCard
+              title="Net Revenue"
+              value={formatMoney(net)}
+              loading={loading}
+              tone="green"
+              icon={<IconDollar />}
+            />
+            <KpiCard
+              title="Tax Collected"
+              value={formatMoney(tax)}
+              loading={loading}
+              tone="neutral"
+              icon={<IconCreditCard />}
+            />
+            <KpiCard
+              title="Payments Captured"
+              value={formatMoney(summary?.payments.capturedCents ?? 0)}
+              loading={loading}
+              tone="blue"
+              icon={<IconCreditCard />}
+            />
+            <KpiCard
+              title="Total Orders"
+              value={totalOrders}
+              loading={loading}
+              tone="blue"
+              icon={<IconCart />}
+              trend={{ value: 0, label: "vs yesterday" }}
+            />
+            <KpiCard
+              title="Completed Sales"
+              value={completedOrders}
+              loading={loading}
+              tone="green"
+              icon={<IconPackage />}
+            />
+            <KpiCard
+              title="Open Orders"
+              value={openOrders}
+              loading={loading}
+              tone="amber"
+              icon={<IconCart />}
+            />
+            <KpiCard
+              title="Avg Order Value"
+              value={formatMoney(avgOrderCents)}
+              loading={loading}
+              tone="neutral"
+              icon={<IconDollar />}
+            />
           </div>
         </section>
 
