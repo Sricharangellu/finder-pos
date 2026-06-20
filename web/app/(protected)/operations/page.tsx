@@ -20,6 +20,17 @@ interface InventoryLocation {
   is_active: boolean;
 }
 
+interface LocationStock {
+  id: string;
+  product_id: string;
+  quantity_on_hand: number;
+  quantity_committed: number;
+  quantity_available: number;
+  average_cost_cents: number;
+  reorder_level: number;
+  updated_at: number;
+}
+
 export default function OperationsPage() {
   const [tab, setTab] = useState<"locations" | "picklists" | "outlets" | "stock-locations">("locations");
   const [locations, setLocations] = useState<FulfillmentLocation[]>([]);
@@ -240,6 +251,9 @@ function StockLocationsTab() {
   const [form, setForm] = useState({ code: "", name: "", location_type: "floor", outlet_id: "", is_sellable: false, is_receiving_location: false });
   const [busy, setBusy] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [viewStockLoc, setViewStockLoc] = useState<InventoryLocation | null>(null);
+  const [stockItems, setStockItems] = useState<LocationStock[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,6 +281,16 @@ function StockLocationsTab() {
       setForm({ code: "", name: "", location_type: "floor", outlet_id: "", is_sellable: false, is_receiving_location: false });
       void load();
     } finally { setBusy(false); }
+  };
+
+  const openStockModal = async (loc: InventoryLocation) => {
+    setViewStockLoc(loc);
+    setStockItems([]);
+    setStockLoading(true);
+    try {
+      const data = await apiGet<LocationStock[]>(`/api/v1/inventory/locations/${loc.id}/stock`).catch(() => [] as LocationStock[]);
+      setStockItems(Array.isArray(data) ? data : []);
+    } finally { setStockLoading(false); }
   };
 
   const toggleActive = async (loc: InventoryLocation) => {
@@ -325,11 +349,12 @@ function StockLocationsTab() {
               <th className="px-4 py-3">Sellable</th>
               <th className="px-4 py-3">Receiving</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
-            {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
+            {loading && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>}
+            {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No stock locations yet. Create one above.</td></tr>}
             {items.map(loc => (
               <tr key={loc.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
@@ -358,11 +383,51 @@ function StockLocationsTab() {
                     <span className="sr-only">{loc.is_active ? "Active" : "Inactive"}</span>
                   </button>
                 </td>
+                <td className="px-4 py-3">
+                  <Button size="sm" variant="secondary" onClick={() => void openStockModal(loc)}>View Stock</Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={viewStockLoc !== null}
+        onClose={() => setViewStockLoc(null)}
+        title={viewStockLoc ? `Stock at ${viewStockLoc.name} (${viewStockLoc.code})` : "Stock"}
+      >
+        {stockLoading && <p className="py-6 text-center text-sm text-gray-400">Loading stock…</p>}
+        {!stockLoading && stockItems.length === 0 && (
+          <p className="py-6 text-center text-sm text-gray-400">No stock recorded at this location.</p>
+        )}
+        {!stockLoading && stockItems.length > 0 && (
+          <div className="overflow-x-auto -mx-4 sm:-mx-6">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                  <th className="px-4 py-2.5">Product ID</th>
+                  <th className="px-4 py-2.5 text-right">On Hand</th>
+                  <th className="px-4 py-2.5 text-right">Committed</th>
+                  <th className="px-4 py-2.5 text-right">Available</th>
+                  <th className="px-4 py-2.5 text-right">Avg Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {stockItems.map(s => (
+                  <tr key={s.product_id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{s.product_id}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{s.quantity_on_hand}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-orange-600">{s.quantity_committed}</td>
+                    <td className={`px-4 py-2.5 text-right tabular-nums font-medium ${s.quantity_available <= 0 ? "text-red-600" : "text-green-700"}`}>{s.quantity_available}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">${(s.average_cost_cents / 100).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

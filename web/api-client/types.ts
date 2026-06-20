@@ -899,3 +899,154 @@ export interface SearchResponse {
   query: string;
   results: SearchResults;
 }
+
+// ─── Loyalty Program ──────────────────────────────────────────────────────────
+
+/** The tier level label displayed to customers. */
+export type LoyaltyTierLevel = "bronze" | "silver" | "gold" | "platinum";
+
+/**
+ * A loyalty tier. Customers are promoted when their lifetime points
+ * reach `points_required`. Higher tiers receive a larger `discount_pct`.
+ */
+export interface LoyaltyTier {
+  id: string;
+  name: string;
+  level: LoyaltyTierLevel;
+  /** Lifetime points needed to reach this tier. */
+  points_required: number;
+  /** Percentage discount (0–100) applied to every purchase at this tier. */
+  discount_pct: number;
+  /** Optional description shown in customer-facing materials. */
+  description: string | null;
+  /** Number of members currently in this tier (read-only, computed). */
+  member_count: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface LoyaltyTiersResponse {
+  items: LoyaltyTier[];
+}
+
+/**
+ * A customer enrolled in the loyalty programme.
+ * Points are earned at a rate configured in loyalty settings.
+ */
+export interface LoyaltyMember {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  customer_email: string | null;
+  tier_id: string;
+  tier_name: string;
+  tier_level: LoyaltyTierLevel;
+  /** Current redeemable points balance. */
+  points_balance: number;
+  /** Total points ever earned (used for tier promotion). */
+  points_lifetime: number;
+  /** ISO date the customer enrolled. */
+  joined_at: number;
+  last_activity_at: number | null;
+}
+
+export interface LoyaltyMembersResponse {
+  items: LoyaltyMember[];
+  total: number;
+}
+
+/** Status of a loyalty reward offer. */
+export type LoyaltyRewardStatus = "active" | "inactive" | "archived";
+
+/**
+ * A redeemable reward. Members spend `points_cost` to receive
+ * `discount_cents` off a future purchase (or a free item).
+ */
+export interface LoyaltyReward {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Points a member must spend to redeem this reward. */
+  points_cost: number;
+  /** Discount value in integer cents. */
+  discount_cents: number;
+  status: LoyaltyRewardStatus;
+  /** How many times this reward has been redeemed in total. */
+  redemption_count: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface LoyaltyRewardsResponse {
+  items: LoyaltyReward[];
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export type NotificationSeverity = "info" | "warning" | "critical";
+export type NotificationType =
+  | "low_stock"
+  | "payment_failed"
+  | "new_order"
+  | "order_fulfilled"
+  | "purchase_order_received"
+  | "sync_error"
+  | "system";
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  severity: NotificationSeverity;
+  title: string;
+  body: string;
+  /** ID of the related resource (order, product, etc.), if any. */
+  resource_id: string | null;
+  resource_type: string | null;
+  read: boolean;
+  created_at: number;
+}
+
+export interface NotificationsResponse {
+  items: Notification[];
+  total: number;
+  unread_count: number;
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+export type AuditAction =
+  | "created"
+  | "updated"
+  | "deleted"
+  | "login"
+  | "logout"
+  | "exported"
+  | "refunded"
+  | "voided"
+  | "approved"
+  | "rejected";
+
+export interface AuditActor {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  actor: AuditActor;
+  action: AuditAction;
+  resource_type: string;
+  resource_id: string;
+  resource_label: string;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  ip_address: string | null;
+  created_at: number;
+}
+
+export interface AuditLogResponse {
+  items: AuditEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}

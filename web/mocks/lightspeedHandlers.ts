@@ -1722,4 +1722,463 @@ lightspeedHandlers.push(
       http.post(`${V1}/purchasing/vendor-quotes/:id/reject`, async ({ params }) => { await lat(); vqItems = vqItems.map(q => q.id === params["id"] ? { ...q, status: "rejected" } : q); return HttpResponse.json({ ok: true }); }),
     ];
   })(),
+
+  // ── Gift Cards ────────────────────────────────────────────────────────────
+  ...(() => {
+    let gcSeq = 4;
+    const GC_BASE = Date.now();
+    interface GiftCardRecord {
+      id: string;
+      code: string;
+      initial_cents: number;
+      balance_cents: number;
+      status: "active" | "redeemed" | "void";
+      issued_by: string;
+      created_at: number;
+    }
+    let giftCards: GiftCardRecord[] = [
+      { id: "gc_demo_1", code: "GC-ABCD-1234", initial_cents: 5000,  balance_cents: 5000,  status: "active",   issued_by: "staff_demo", created_at: GC_BASE - 86400000 * 3  },
+      { id: "gc_demo_2", code: "GC-EFGH-5678", initial_cents: 10000, balance_cents: 3250,  status: "active",   issued_by: "staff_demo", created_at: GC_BASE - 86400000 * 7  },
+      { id: "gc_demo_3", code: "GC-IJKL-9012", initial_cents: 2500,  balance_cents: 0,     status: "redeemed", issued_by: "staff_demo", created_at: GC_BASE - 86400000 * 14 },
+      { id: "gc_demo_4", code: "GC-MNOP-3456", initial_cents: 7500,  balance_cents: 7500,  status: "void",     issued_by: "staff_demo", created_at: GC_BASE - 86400000 * 21 },
+    ];
+
+    function genCode(): string {
+      const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const s = () => Array.from({ length: 4 }, () => c[Math.floor(Math.random() * c.length)]).join("");
+      return `GC-${s()}-${s()}`;
+    }
+
+    return [
+      // GET list
+      http.get(`${V1}/giftcards`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const q = url.searchParams.get("q");
+        let filtered = giftCards;
+        if (status && status !== "all") filtered = filtered.filter(c => c.status === status);
+        if (q) filtered = filtered.filter(c => c.code.toLowerCase().includes(q.toLowerCase()));
+        return HttpResponse.json({ items: [...filtered].sort((a, b) => b.created_at - a.created_at), total: filtered.length });
+      }),
+
+      // GET by code lookup — must be before /:id
+      http.get(`${V1}/giftcards/lookup`, async ({ request }) => {
+        await lat();
+        const code = new URL(request.url).searchParams.get("code") ?? "";
+        const card = giftCards.find(c => c.code.toLowerCase() === code.toLowerCase());
+        if (!card) return HttpResponse.json({ error: { code: "not_found", message: "Gift card not found." } }, { status: 404 });
+        return HttpResponse.json(card);
+      }),
+
+      // GET by id
+      http.get(`${V1}/giftcards/:id`, async ({ params }) => {
+        await lat();
+        const card = giftCards.find(c => c.id === String(params["id"]));
+        if (!card) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(card);
+      }),
+
+      // POST issue new card
+      http.post(`${V1}/giftcards`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { amountCents?: number; amount_cents?: number };
+        const cents = body.amountCents ?? body.amount_cents ?? 0;
+        if (!cents || cents <= 0) {
+          return HttpResponse.json({ error: { code: "invalid_amount", message: "Amount must be greater than zero." } }, { status: 400 });
+        }
+        const card: GiftCardRecord = {
+          id: `gc_${++gcSeq}`,
+          code: genCode(),
+          initial_cents: cents,
+          balance_cents: cents,
+          status: "active",
+          issued_by: "staff_demo",
+          created_at: Date.now(),
+        };
+        giftCards.push(card);
+        return HttpResponse.json(card, { status: 201 });
+      }),
+
+      // POST void
+      http.post(`${V1}/giftcards/:id/void`, async ({ params }) => {
+        await lat();
+        const idx = giftCards.findIndex(c => c.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        if (giftCards[idx].status !== "active") {
+          return HttpResponse.json({ error: { code: "not_active", message: "Only active cards can be voided." } }, { status: 422 });
+        }
+        giftCards[idx] = { ...giftCards[idx], status: "void" };
+        return HttpResponse.json(giftCards[idx]);
+      }),
+
+      // POST redeem partial balance
+      http.post(`${V1}/giftcards/:id/redeem`, async ({ request, params }) => {
+        await lat();
+        const idx = giftCards.findIndex(c => c.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { amount_cents: number };
+        const card = giftCards[idx];
+        if (card.status !== "active") return HttpResponse.json({ error: { code: "not_active" } }, { status: 422 });
+        const deduct = Math.min(body.amount_cents, card.balance_cents);
+        const newBalance = card.balance_cents - deduct;
+        giftCards[idx] = { ...card, balance_cents: newBalance, status: newBalance === 0 ? "redeemed" : "active" };
+        return HttpResponse.json({ ...giftCards[idx], amount_deducted_cents: deduct });
+      }),
+    ];
+  })(),
+
+  // ── Payments ledger ───────────────────────────────────────────────────────
+  ...(() => {
+    const PAY_BASE = Date.now();
+    interface PaymentRecord {
+      id: string;
+      order_id: string;
+      method: "cash" | "card" | "split";
+      amount_cents: number;
+      status: "captured" | "declined" | "refunded";
+      card_last4: string | null;
+      card_brand: string | null;
+      created_at: number;
+    }
+    const payments: PaymentRecord[] = [
+      { id: "pay_001", order_id: "ord_001", method: "card",  amount_cents: 4599,  status: "captured", card_last4: "4242", card_brand: "Visa",       created_at: PAY_BASE - 86400000 * 1  },
+      { id: "pay_002", order_id: "ord_002", method: "cash",  amount_cents: 2150,  status: "captured", card_last4: null,   card_brand: null,          created_at: PAY_BASE - 86400000 * 2  },
+      { id: "pay_003", order_id: "ord_003", method: "card",  amount_cents: 8900,  status: "refunded", card_last4: "1234", card_brand: "Mastercard",  created_at: PAY_BASE - 86400000 * 3  },
+      { id: "pay_004", order_id: "ord_004", method: "split", amount_cents: 6250,  status: "captured", card_last4: "5678", card_brand: "Amex",        created_at: PAY_BASE - 86400000 * 4  },
+      { id: "pay_005", order_id: "ord_005", method: "card",  amount_cents: 1099,  status: "declined", card_last4: "9999", card_brand: "Visa",        created_at: PAY_BASE - 86400000 * 5  },
+      { id: "pay_006", order_id: "ord_006", method: "cash",  amount_cents: 3300,  status: "captured", card_last4: null,   card_brand: null,          created_at: PAY_BASE - 86400000 * 6  },
+      { id: "pay_007", order_id: "ord_007", method: "card",  amount_cents: 7499,  status: "captured", card_last4: "4444", card_brand: "Discover",    created_at: PAY_BASE - 86400000 * 7  },
+      { id: "pay_008", order_id: "ord_008", method: "card",  amount_cents: 5500,  status: "captured", card_last4: "3333", card_brand: "Visa",        created_at: PAY_BASE - 86400000 * 8  },
+      { id: "pay_009", order_id: "ord_009", method: "cash",  amount_cents: 900,   status: "captured", card_last4: null,   card_brand: null,          created_at: PAY_BASE - 86400000 * 9  },
+      { id: "pay_010", order_id: "ord_010", method: "card",  amount_cents: 12000, status: "refunded", card_last4: "2222", card_brand: "Mastercard",  created_at: PAY_BASE - 86400000 * 10 },
+    ];
+
+    return [
+      // GET payments — filterable by method, status, orderId, date range
+      http.get(`${V1}/payments`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const method = url.searchParams.get("method");
+        const status = url.searchParams.get("status");
+        const orderId = url.searchParams.get("orderId");
+        const from   = url.searchParams.get("from")  ? Number(url.searchParams.get("from"))  : null;
+        const to     = url.searchParams.get("to")    ? Number(url.searchParams.get("to"))    : null;
+        const limit  = Number(url.searchParams.get("limit")  ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+
+        let filtered = payments;
+        if (method  && method  !== "all") filtered = filtered.filter(p => p.method  === method);
+        if (status  && status  !== "all") filtered = filtered.filter(p => p.status  === status);
+        if (orderId) filtered = filtered.filter(p => p.order_id === orderId);
+        if (from)    filtered = filtered.filter(p => p.created_at >= from);
+        if (to)      filtered = filtered.filter(p => p.created_at <= to);
+
+        const total = filtered.length;
+        const total_cents = filtered.reduce((s, p) => s + (p.status !== "declined" ? p.amount_cents : 0), 0);
+        const page = filtered.slice(offset, offset + limit);
+        return HttpResponse.json({ items: page, total, total_cents, limit, offset });
+      }),
+
+      // GET single payment
+      http.get(`${V1}/payments/:id`, async ({ params }) => {
+        await lat();
+        const payment = payments.find(p => p.id === String(params["id"]));
+        if (!payment) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(payment);
+      }),
+    ];
+  })(),
+
+  // ── Loyalty Programme ─────────────────────────────────────────────────────
+  ...(() => {
+    const LY_BASE = Date.now();
+
+    // ---- Tiers ----
+    interface TierRecord {
+      id: string; name: string; level: string;
+      points_required: number; discount_pct: number;
+      description: string | null; member_count: number;
+      created_at: number; updated_at: number;
+    }
+    let tierSeq = 4;
+    let tiers: TierRecord[] = [
+      { id: "tier_1", name: "Bronze",   level: "bronze",   points_required: 0,    discount_pct: 0,  description: "Entry level for all new members.",       member_count: 142, created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
+      { id: "tier_2", name: "Silver",   level: "silver",   points_required: 500,  discount_pct: 3,  description: "3% discount on every purchase.",          member_count: 67,  created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
+      { id: "tier_3", name: "Gold",     level: "gold",     points_required: 1500, discount_pct: 7,  description: "7% discount plus priority support.",      member_count: 28,  created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
+      { id: "tier_4", name: "Platinum", level: "platinum", points_required: 5000, discount_pct: 12, description: "12% discount and exclusive early access.", member_count: 9,   created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
+    ];
+
+    // ---- Members ----
+    interface MemberRecord {
+      id: string; customer_id: string; customer_name: string; customer_email: string | null;
+      tier_id: string; tier_name: string; tier_level: string;
+      points_balance: number; points_lifetime: number;
+      joined_at: number; last_activity_at: number | null;
+    }
+    const members: MemberRecord[] = [
+      { id: "lm_1",  customer_id: "cust_001", customer_name: "Alice Johnson",   customer_email: "alice@example.com",   tier_id: "tier_3", tier_name: "Gold",     tier_level: "gold",     points_balance: 320,  points_lifetime: 2140, joined_at: LY_BASE - 86400000 * 180, last_activity_at: LY_BASE - 86400000 * 2  },
+      { id: "lm_2",  customer_id: "cust_002", customer_name: "Bob Martinez",    customer_email: "bob@example.com",     tier_id: "tier_2", tier_name: "Silver",   tier_level: "silver",   points_balance: 88,   points_lifetime: 620,  joined_at: LY_BASE - 86400000 * 120, last_activity_at: LY_BASE - 86400000 * 5  },
+      { id: "lm_3",  customer_id: "cust_003", customer_name: "Carol White",     customer_email: null,                  tier_id: "tier_4", tier_name: "Platinum", tier_level: "platinum", points_balance: 1200, points_lifetime: 7800, joined_at: LY_BASE - 86400000 * 365, last_activity_at: LY_BASE - 86400000 * 1  },
+      { id: "lm_4",  customer_id: "cust_004", customer_name: "David Kim",       customer_email: "david@example.com",   tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 45,   points_lifetime: 45,   joined_at: LY_BASE - 86400000 * 14,  last_activity_at: LY_BASE - 86400000 * 3  },
+      { id: "lm_5",  customer_id: "cust_005", customer_name: "Emma Davis",      customer_email: "emma@example.com",    tier_id: "tier_2", tier_name: "Silver",   tier_level: "silver",   points_balance: 210,  points_lifetime: 890,  joined_at: LY_BASE - 86400000 * 200, last_activity_at: LY_BASE - 86400000 * 8  },
+      { id: "lm_6",  customer_id: "cust_006", customer_name: "Frank Brown",     customer_email: "frank@example.com",   tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 170,  points_lifetime: 420,  joined_at: LY_BASE - 86400000 * 60,  last_activity_at: LY_BASE - 86400000 * 12 },
+      { id: "lm_7",  customer_id: "cust_007", customer_name: "Grace Lee",       customer_email: "grace@example.com",   tier_id: "tier_3", tier_name: "Gold",     tier_level: "gold",     points_balance: 55,   points_lifetime: 1650, joined_at: LY_BASE - 86400000 * 270, last_activity_at: LY_BASE - 86400000 * 4  },
+      { id: "lm_8",  customer_id: "cust_008", customer_name: "Henry Wilson",    customer_email: null,                  tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 30,   points_lifetime: 30,   joined_at: LY_BASE - 86400000 * 7,   last_activity_at: LY_BASE - 86400000 * 7  },
+    ];
+
+    // ---- Rewards ----
+    interface RewardRecord {
+      id: string; name: string; description: string | null;
+      points_cost: number; discount_cents: number;
+      status: string; redemption_count: number;
+      created_at: number; updated_at: number;
+    }
+    let rewardSeq = 5;
+    let rewards: RewardRecord[] = [
+      { id: "rwd_1", name: "$5 Off Next Purchase",   description: "Redeem for $5 off any order over $20.",       points_cost: 100,  discount_cents: 500,  status: "active",   redemption_count: 312, created_at: LY_BASE - 86400000 * 60, updated_at: LY_BASE - 86400000 * 60 },
+      { id: "rwd_2", name: "$10 Off Next Purchase",  description: "Redeem for $10 off any order over $40.",      points_cost: 200,  discount_cents: 1000, status: "active",   redemption_count: 148, created_at: LY_BASE - 86400000 * 60, updated_at: LY_BASE - 86400000 * 60 },
+      { id: "rwd_3", name: "Free Beverage",          description: "One complimentary beverage of your choice.",  points_cost: 150,  discount_cents: 350,  status: "active",   redemption_count: 94,  created_at: LY_BASE - 86400000 * 45, updated_at: LY_BASE - 86400000 * 45 },
+      { id: "rwd_4", name: "Double Points Weekend",  description: "Earn 2× points on all purchases this weekend.", points_cost: 50, discount_cents: 0,    status: "inactive", redemption_count: 23,  created_at: LY_BASE - 86400000 * 30, updated_at: LY_BASE - 86400000 * 15 },
+      { id: "rwd_5", name: "$25 Off (Gold+ only)",   description: "Exclusive $25 reward for Gold and Platinum members.", points_cost: 400, discount_cents: 2500, status: "active", redemption_count: 41, created_at: LY_BASE - 86400000 * 20, updated_at: LY_BASE - 86400000 * 20 },
+    ];
+
+    return [
+      // ── TIERS ─────────────────────────────────────────────────────────────
+      http.get(`${V1}/loyalty/tiers`, async () => {
+        await lat();
+        return HttpResponse.json({ items: [...tiers].sort((a, b) => a.points_required - b.points_required) });
+      }),
+
+      http.post(`${V1}/loyalty/tiers`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<TierRecord>;
+        const now = Date.now();
+        const tier: TierRecord = {
+          id: `tier_${++tierSeq}`,
+          name: b.name ?? "New Tier",
+          level: b.level ?? "bronze",
+          points_required: b.points_required ?? 0,
+          discount_pct: b.discount_pct ?? 0,
+          description: b.description ?? null,
+          member_count: 0,
+          created_at: now, updated_at: now,
+        };
+        tiers.push(tier);
+        return HttpResponse.json(tier, { status: 201 });
+      }),
+
+      http.patch(`${V1}/loyalty/tiers/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = tiers.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<TierRecord>;
+        tiers[idx] = { ...tiers[idx], ...b, updated_at: Date.now() };
+        return HttpResponse.json(tiers[idx]);
+      }),
+
+      http.delete(`${V1}/loyalty/tiers/:id`, async ({ params }) => {
+        await lat();
+        const idx = tiers.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        if (tiers[idx].member_count > 0) {
+          return HttpResponse.json({ error: { code: "has_members", message: "Cannot delete a tier with active members. Move them to another tier first." } }, { status: 422 });
+        }
+        tiers.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // ── MEMBERS ───────────────────────────────────────────────────────────
+      http.get(`${V1}/loyalty/members`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const q       = url.searchParams.get("q");
+        const tierId  = url.searchParams.get("tier_id");
+        const limit   = Number(url.searchParams.get("limit")  ?? 50);
+        const offset  = Number(url.searchParams.get("offset") ?? 0);
+
+        let filtered = members;
+        if (q)      filtered = filtered.filter(m => m.customer_name.toLowerCase().includes(q.toLowerCase()) || (m.customer_email ?? "").toLowerCase().includes(q.toLowerCase()));
+        if (tierId) filtered = filtered.filter(m => m.tier_id === tierId);
+
+        const total = filtered.length;
+        const page  = filtered.slice(offset, offset + limit);
+        return HttpResponse.json({ items: page, total });
+      }),
+
+      http.get(`${V1}/loyalty/members/:id`, async ({ params }) => {
+        await lat();
+        const member = members.find(m => m.id === String(params["id"]));
+        if (!member) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(member);
+      }),
+
+      // Adjust points manually (manager action)
+      http.post(`${V1}/loyalty/members/:id/adjust`, async ({ request, params }) => {
+        await lat();
+        const idx = members.findIndex(m => m.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as { delta: number; reason?: string };
+        const member = members[idx];
+        const newBalance  = Math.max(0, member.points_balance + b.delta);
+        const newLifetime = b.delta > 0 ? member.points_lifetime + b.delta : member.points_lifetime;
+        members[idx] = { ...member, points_balance: newBalance, points_lifetime: newLifetime, last_activity_at: Date.now() };
+        return HttpResponse.json(members[idx]);
+      }),
+
+      // ── REWARDS ───────────────────────────────────────────────────────────
+      http.get(`${V1}/loyalty/rewards`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        let filtered = rewards;
+        if (status && status !== "all") filtered = filtered.filter(r => r.status === status);
+        return HttpResponse.json({ items: [...filtered].sort((a, b) => a.points_cost - b.points_cost) });
+      }),
+
+      http.post(`${V1}/loyalty/rewards`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<RewardRecord>;
+        const now = Date.now();
+        const reward: RewardRecord = {
+          id: `rwd_${++rewardSeq}`,
+          name: b.name ?? "New Reward",
+          description: b.description ?? null,
+          points_cost: b.points_cost ?? 100,
+          discount_cents: b.discount_cents ?? 0,
+          status: "active",
+          redemption_count: 0,
+          created_at: now, updated_at: now,
+        };
+        rewards.push(reward);
+        return HttpResponse.json(reward, { status: 201 });
+      }),
+
+      http.patch(`${V1}/loyalty/rewards/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = rewards.findIndex(r => r.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<RewardRecord>;
+        rewards[idx] = { ...rewards[idx], ...b, updated_at: Date.now() };
+        return HttpResponse.json(rewards[idx]);
+      }),
+
+      http.delete(`${V1}/loyalty/rewards/:id`, async ({ params }) => {
+        await lat();
+        const idx = rewards.findIndex(r => r.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        rewards[idx] = { ...rewards[idx], status: "archived", updated_at: Date.now() };
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Notifications ──────────────────────────────────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    interface NotifRecord {
+      id: string; type: string; severity: string;
+      title: string; body: string;
+      resource_id: string | null; resource_type: string | null;
+      read: boolean; created_at: number;
+    }
+    let seq = 0;
+    let notifs: NotifRecord[] = [
+      { id: "notif_1", type: "low_stock", severity: "warning", title: "Low stock: Blue Widget", body: "Only 3 units remaining at Main Floor.", resource_id: "prod_demo_1", resource_type: "product", read: false, created_at: BASE - 600000 },
+      { id: "notif_2", type: "payment_failed", severity: "critical", title: "Payment failed", body: "Card declined on order ORD-0042.", resource_id: "ord_demo_42", resource_type: "order", read: false, created_at: BASE - 1800000 },
+      { id: "notif_3", type: "new_order", severity: "info", title: "New online order", body: "Order ORD-0043 placed via ecommerce.", resource_id: "ord_demo_43", resource_type: "order", read: false, created_at: BASE - 3600000 },
+      { id: "notif_4", type: "order_fulfilled", severity: "info", title: "Order fulfilled", body: "Order ORD-0039 shipped via DHL.", resource_id: "ord_demo_39", resource_type: "order", read: true, created_at: BASE - 86400000 },
+      { id: "notif_5", type: "purchase_order_received", severity: "info", title: "PO received", body: "Purchase order PO-0011 fully received at Warehouse.", resource_id: "po_demo_11", resource_type: "purchase_order", read: true, created_at: BASE - 86400000 * 2 },
+      { id: "notif_6", type: "low_stock", severity: "warning", title: "Low stock: Red T-Shirt (L)", body: "Only 1 unit remaining at Main Floor.", resource_id: "prod_demo_5", resource_type: "product", read: false, created_at: BASE - 7200000 },
+      { id: "notif_7", type: "sync_error", severity: "critical", title: "Sync error: Shopify", body: "Product sync failed with HTTP 503. Retry scheduled.", resource_id: null, resource_type: null, read: false, created_at: BASE - 300000 },
+    ];
+
+    return [
+      http.get(`${V1}/notifications`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const unreadOnly = url.searchParams.get("unread") === "true";
+        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        let filtered = unreadOnly ? notifs.filter(n => !n.read) : [...notifs];
+        filtered.sort((a, b) => b.created_at - a.created_at);
+        const unread_count = notifs.filter(n => !n.read).length;
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total: filtered.length, unread_count });
+      }),
+
+      http.patch(`${V1}/notifications/:id/read`, async ({ params }) => {
+        await lat();
+        const idx = notifs.findIndex(n => n.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        notifs[idx] = { ...notifs[idx], read: true };
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      http.post(`${V1}/notifications/mark-all-read`, async () => {
+        await lat();
+        notifs = notifs.map(n => ({ ...n, read: true }));
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      http.post(`${V1}/notifications`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<NotifRecord>;
+        const n: NotifRecord = {
+          id: `notif_${++seq}`,
+          type: b.type ?? "system",
+          severity: b.severity ?? "info",
+          title: b.title ?? "Notification",
+          body: b.body ?? "",
+          resource_id: b.resource_id ?? null,
+          resource_type: b.resource_type ?? null,
+          read: false,
+          created_at: Date.now(),
+        };
+        notifs.unshift(n);
+        return HttpResponse.json(n, { status: 201 });
+      }),
+    ];
+  })(),
+
+  // ── Audit Log ──────────────────────────────────────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    interface AuditRecord {
+      id: string;
+      actor: { id: string; email: string; role: string };
+      action: string; resource_type: string; resource_id: string; resource_label: string;
+      changes: Record<string, { from: unknown; to: unknown }> | null;
+      ip_address: string | null; created_at: number;
+    }
+    const events: AuditRecord[] = [
+      { id: "aud_1", actor: { id: "usr_owner", email: "owner@example.com", role: "owner" }, action: "login", resource_type: "session", resource_id: "sess_1", resource_label: "Session", changes: null, ip_address: "192.168.1.10", created_at: BASE - 300000 },
+      { id: "aud_2", actor: { id: "usr_owner", email: "owner@example.com", role: "owner" }, action: "updated", resource_type: "product", resource_id: "prod_demo_1", resource_label: "Blue Widget", changes: { price_cents: { from: 2499, to: 2999 } }, ip_address: "192.168.1.10", created_at: BASE - 600000 },
+      { id: "aud_3", actor: { id: "usr_mgr1", email: "manager@example.com", role: "manager" }, action: "approved", resource_type: "purchase_order", resource_id: "po_demo_11", resource_label: "PO-0011", changes: null, ip_address: "192.168.1.15", created_at: BASE - 3600000 },
+      { id: "aud_4", actor: { id: "usr_cash1", email: "cashier@example.com", role: "cashier" }, action: "refunded", resource_type: "order", resource_id: "ord_demo_39", resource_label: "ORD-0039", changes: null, ip_address: "192.168.1.22", created_at: BASE - 7200000 },
+      { id: "aud_5", actor: { id: "usr_owner", email: "owner@example.com", role: "owner" }, action: "created", resource_type: "discount", resource_id: "disc_demo_1", resource_label: "Summer Sale 10%", changes: null, ip_address: "192.168.1.10", created_at: BASE - 86400000 },
+      { id: "aud_6", actor: { id: "usr_mgr1", email: "manager@example.com", role: "manager" }, action: "deleted", resource_type: "custom_role", resource_id: "role_demo_1", resource_label: "Stockroom Staff", changes: null, ip_address: "192.168.1.15", created_at: BASE - 86400000 * 2 },
+      { id: "aud_7", actor: { id: "usr_owner", email: "owner@example.com", role: "owner" }, action: "exported", resource_type: "report", resource_id: "rpt_sales_2025_q1", resource_label: "Sales Q1 2025", changes: null, ip_address: "192.168.1.10", created_at: BASE - 86400000 * 3 },
+      { id: "aud_8", actor: { id: "usr_cash2", email: "cashier2@example.com", role: "cashier" }, action: "voided", resource_type: "order", resource_id: "ord_demo_41", resource_label: "ORD-0041", changes: null, ip_address: "192.168.1.30", created_at: BASE - 86400000 * 4 },
+      { id: "aud_9", actor: { id: "usr_owner", email: "owner@example.com", role: "owner" }, action: "updated", resource_type: "settings", resource_id: "settings_tax", resource_label: "Tax Settings", changes: { tax_rate: { from: 0.08, to: 0.0875 } }, ip_address: "192.168.1.10", created_at: BASE - 86400000 * 5 },
+      { id: "aud_10", actor: { id: "usr_mgr1", email: "manager@example.com", role: "manager" }, action: "login", resource_type: "session", resource_id: "sess_2", resource_label: "Session", changes: null, ip_address: "192.168.1.15", created_at: BASE - 86400000 * 6 },
+    ];
+
+    return [
+      http.get(`${V1}/audit-log`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const actor = url.searchParams.get("actor");
+        const resource_type = url.searchParams.get("resource_type");
+        const action = url.searchParams.get("action");
+        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        let filtered = [...events];
+        if (actor) filtered = filtered.filter(e => e.actor.email.includes(actor));
+        if (resource_type) filtered = filtered.filter(e => e.resource_type === resource_type);
+        if (action) filtered = filtered.filter(e => e.action === action);
+        filtered.sort((a, b) => b.created_at - a.created_at);
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset });
+      }),
+    ];
+  })(),
 );

@@ -48,7 +48,10 @@ type NavKey =
   | "integrations"
   | "imports-exports"
   | "workflows"
-  | "quotes";
+  | "quotes"
+  | "loyalty"
+  | "notifications"
+  | "audit-log";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -78,6 +81,7 @@ const NAV_ITEMS: Array<{
   { key: "gift-cards", label: "Gift Cards", href: "/gift-cards", icon: "gift-cards", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "team",      label: "Team",      href: "/team",      icon: "team",      group: "Manage" },
   { key: "workflows", label: "Workflows", href: "/workflows", icon: "workflows", group: "Manage" },
+  { key: "loyalty", label: "Loyalty", href: "/loyalty", icon: "loyalty", group: "Manage", editionFlag: "groupRetailPOS" },
   { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
   { key: "tax-compliance", label: "Tax Compliance", href: "/tax-compliance", icon: "tax-compliance", group: "Analyze", editionFlag: "groupWholesale" },
@@ -86,6 +90,8 @@ const NAV_ITEMS: Array<{
   { key: "reports", label: "Reports", href: "/reports", icon: "reports", group: "Analyze" },
   { key: "integrations", label: "Integrations", href: "/integrations", icon: "integrations", group: "Platform", editionFlag: "groupEnterprise" },
   { key: "imports-exports", label: "Imports/Exports", href: "/imports-exports", icon: "imports-exports", group: "Platform" },
+  { key: "notifications", label: "Notifications", href: "/notifications", icon: "notifications", group: "Platform" },
+  { key: "audit-log", label: "Audit Log", href: "/audit-log", icon: "audit-log", group: "Platform" },
   { key: "settings", label: "Settings", href: "/settings", icon: "settings", group: "Platform" },
 ];
 
@@ -461,6 +467,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <CatalogIcon />;
     case "workflows":
       return <WorkflowsIcon />;
+    case "loyalty":
+      return <LoyaltyIcon />;
     case "gift-cards":
       return <GiftCardIcon />;
     case "quotes":
@@ -477,6 +485,10 @@ function NavIcon({ name }: { name: NavKey }) {
       return <OperationsIcon />;
     case "imports-exports":
       return <ReportsIcon />;
+    case "notifications":
+      return <NotificationsIcon />;
+    case "audit-log":
+      return <AuditLogIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -756,6 +768,35 @@ function WorkflowsIcon() {
       <path d="M7 18h10" />
       <path d="M5 8v8" />
       <path d="M19 8v8" />
+    </svg>
+  );
+}
+
+function LoyaltyIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
+function NotificationsIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+function AuditLogIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
     </svg>
   );
 }

@@ -100,6 +100,29 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
   const status = statusConfig[currentOrder.status];
 
   return (
+    <>
+      {/* Thermal receipt print styles — only active when window.print() is called */}
+      {/* eslint-disable-next-line react/no-danger */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          body * { visibility: hidden !important; }
+          .receipt-printable, .receipt-printable * { visibility: visible !important; }
+          .receipt-printable {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 80mm !important;
+            margin: 0 auto !important;
+            padding: 4mm 4mm !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 11px !important;
+            line-height: 1.4 !important;
+            color: #000 !important;
+            background: #fff !important;
+          }
+          .receipt-printable .no-print { display: none !important; }
+          @page { size: 80mm auto; margin: 0; }
+        }
+      ` }} />
     <div
       role="dialog"
       aria-modal="true"
@@ -110,7 +133,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
 
       {/* Modal */}
-      <div className="relative flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
+      <div className="receipt-printable relative flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-t-lg bg-white shadow-2xl sm:rounded-lg">
         {/* Header */}
         <div className="flex-none flex flex-col items-center gap-2 pt-8 pb-4 px-6 bg-success-50 border-b border-success-100">
           <div
@@ -220,7 +243,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
         </div>
 
         {/* Actions */}
-        <div className="flex-none px-6 pb-6 pt-3 border-t border-gray-100 space-y-2">
+        <div className="no-print flex-none px-6 pb-6 pt-3 border-t border-gray-100 space-y-2">
           <Button
             ref={newSaleRef}
             variant="primary"
@@ -295,6 +318,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
         </div>
       </div>
     </div>
+    </>
   );
 }
 
