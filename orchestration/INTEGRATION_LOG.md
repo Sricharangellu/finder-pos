@@ -105,3 +105,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Mock audit of lightspeedHandlers.ts vs live backend. One path mismatch fixed: /api/v1/imports/products → /api/v1/catalog/import-csv (same body shape, live endpoint exists). Three new Backend-lane items queued (BE-19 notifications, BE-20 audit-log read, BE-21 loyalty programme).
 - **Consumes:** POST /api/v1/catalog/import-csv (live, catalog module)
 - **Verified:** typecheck clean (backend npm run typecheck, frontend npm run typecheck); npm test 304/304 pass
+
+## 2026-06-20 — Backend cycle: BE-19
+
+- **Shipped:** Notifications module (src/modules/notifications/). Table + indexes created on boot. GET /api/v1/notifications (paginated, unread filter), PATCH /:id/read, POST /mark-all-read, POST / (create). EventBus listeners for inventory.adjusted (low_stock) and invoice.overdue (overdue_invoice) automatically emit notifications.
+- **Verified:** typecheck clean (npm run typecheck); npm test pass with 16 pre-existing payment test failures unrelated to this change (confirmed by running payments.test.ts on clean tree — same failures).
+- **Contract changes:** New module mounted at /api/v1/notifications. All four endpoints are now live.
