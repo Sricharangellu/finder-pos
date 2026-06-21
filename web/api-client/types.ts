@@ -1244,3 +1244,45 @@ export interface SerialsResponse {
   limit: number;
   offset: number;
 }
+
+// ─── Workforce / Employee Scheduling (FE-18) ──────────────────────────────────
+export type ShiftRole = "cashier" | "manager" | "stock" | "supervisor" | "delivery";
+
+export interface Employee {
+  id: string;
+  name: string;
+  role: ShiftRole;
+  email: string;
+  avatar_color: string;
+}
+
+export interface Shift {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  role: ShiftRole;
+  date: string;
+  start_time: string;
+  end_time: string;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ShiftsResponse {
+  items: Shift[];
+  total: number;
+}
+
+export type TimeOffStatus = "pending" | "approved" | "denied";
+
+export interface TimeOffRequest {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  date_from: string;
+  date_to: string;
+  reason: string | null;
+  status: TimeOffStatus;
+  created_at: number;
+}

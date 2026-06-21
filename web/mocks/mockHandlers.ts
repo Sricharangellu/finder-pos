@@ -3126,4 +3126,145 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ─── Workforce — Employees + Shifts + Time-off (FE-18) ───────────────────────
+  ...(() => {
+    type Emp = { id: string; name: string; role: string; email: string; avatar_color: string };
+    type Sh = { id: string; employee_id: string; employee_name: string; role: string; date: string; start_time: string; end_time: string; notes: string | null; created_at: number; updated_at: number };
+    type TO = { id: string; employee_id: string; employee_name: string; date_from: string; date_to: string; reason: string | null; status: string; created_at: number };
+
+    const employees: Emp[] = [
+      { id: "emp_001", name: "Alex Rivera",   role: "manager",    email: "alex@finder.local",   avatar_color: "#7c3aed" },
+      { id: "emp_002", name: "Jordan Lee",    role: "cashier",    email: "jordan@finder.local",  avatar_color: "#2563eb" },
+      { id: "emp_003", name: "Sam Patel",     role: "cashier",    email: "sam@finder.local",     avatar_color: "#0891b2" },
+      { id: "emp_004", name: "Morgan Kim",    role: "stock",      email: "morgan@finder.local",  avatar_color: "#d97706" },
+      { id: "emp_005", name: "Taylor Brooks", role: "supervisor", email: "taylor@finder.local",  avatar_color: "#059669" },
+    ];
+
+    // Anchor to Monday of the current week
+    function mondayOf(d: Date): Date {
+      const day = d.getDay(); // 0=Sun
+      const diff = day === 0 ? -6 : 1 - day;
+      const m = new Date(d);
+      m.setDate(d.getDate() + diff);
+      m.setHours(0, 0, 0, 0);
+      return m;
+    }
+    function isoDate(d: Date): string {
+      return d.toISOString().slice(0, 10);
+    }
+
+    const now = Date.now();
+    const mon = mondayOf(new Date());
+    const D = (offset: number) => isoDate(new Date(mon.getTime() + offset * 86_400_000));
+
+    let seq = 0;
+    const shifts: Sh[] = [
+      // Alex (manager) — Mon, Wed, Fri
+      { id: "sh_001", employee_id: "emp_001", employee_name: "Alex Rivera",   role: "manager",    date: D(0), start_time: "08:00", end_time: "16:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_002", employee_id: "emp_001", employee_name: "Alex Rivera",   role: "manager",    date: D(2), start_time: "08:00", end_time: "16:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_003", employee_id: "emp_001", employee_name: "Alex Rivera",   role: "manager",    date: D(4), start_time: "08:00", end_time: "16:00", notes: null, created_at: now, updated_at: now },
+      // Jordan (cashier) — Mon–Fri
+      { id: "sh_004", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(0), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_005", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(1), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_006", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(2), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_007", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(3), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_008", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(4), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
+      // Sam (cashier) — Tue, Thu, Sat, Sun
+      { id: "sh_009", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(1), start_time: "12:00", end_time: "20:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_010", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(3), start_time: "12:00", end_time: "20:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_011", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(5), start_time: "10:00", end_time: "18:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_012", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(6), start_time: "10:00", end_time: "18:00", notes: null, created_at: now, updated_at: now },
+      // Morgan (stock) — early mornings Mon, Wed, Fri
+      { id: "sh_013", employee_id: "emp_004", employee_name: "Morgan Kim",    role: "stock",      date: D(0), start_time: "05:00", end_time: "13:00", notes: "Stock delivery expected", created_at: now, updated_at: now },
+      { id: "sh_014", employee_id: "emp_004", employee_name: "Morgan Kim",    role: "stock",      date: D(2), start_time: "05:00", end_time: "13:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_015", employee_id: "emp_004", employee_name: "Morgan Kim",    role: "stock",      date: D(4), start_time: "05:00", end_time: "13:00", notes: null, created_at: now, updated_at: now },
+      // Taylor (supervisor) — Thu, Fri, Sat, Sun
+      { id: "sh_016", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(3), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_017", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(4), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_018", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(5), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
+      { id: "sh_019", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(6), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
+    ];
+
+    const timeoff: TO[] = [
+      { id: "to_001", employee_id: "emp_003", employee_name: "Sam Patel",     date_from: D(7),  date_to: D(8),  reason: "Family event", status: "pending",  created_at: now - 86_400_000 },
+      { id: "to_002", employee_id: "emp_004", employee_name: "Morgan Kim",    date_from: D(14), date_to: D(14), reason: "Medical appointment", status: "approved", created_at: now - 172_800_000 },
+      { id: "to_003", employee_id: "emp_002", employee_name: "Jordan Lee",    date_from: D(21), date_to: D(25), reason: "Annual leave", status: "pending",  created_at: now - 43_200_000 },
+      { id: "to_004", employee_id: "emp_001", employee_name: "Alex Rivera",   date_from: D(-3), date_to: D(-2), reason: "Sick leave", status: "approved", created_at: now - 604_800_000 },
+    ];
+
+    return [
+      // Employees
+      http.get(`${V1}/workforce/employees`, async () => {
+        await lat();
+        return HttpResponse.json({ items: employees, total: employees.length });
+      }),
+
+      // Shifts — filter by date range or employee
+      http.get(`${V1}/workforce/shifts`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const dateFrom = url.searchParams.get("date_from");
+        const dateTo   = url.searchParams.get("date_to");
+        const empId    = url.searchParams.get("employee_id");
+        let filtered = [...shifts];
+        if (dateFrom) filtered = filtered.filter(s => s.date >= dateFrom);
+        if (dateTo)   filtered = filtered.filter(s => s.date <= dateTo);
+        if (empId)    filtered = filtered.filter(s => s.employee_id === empId);
+        return HttpResponse.json({ items: filtered, total: filtered.length });
+      }),
+
+      http.post(`${V1}/workforce/shifts`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<Sh>;
+        const emp = employees.find(e => e.id === b.employee_id);
+        const n = Date.now();
+        const sh: Sh = {
+          id: `sh_${++seq}`,
+          employee_id: b.employee_id ?? "",
+          employee_name: emp?.name ?? "Unknown",
+          role: emp?.role ?? "cashier",
+          date: b.date ?? D(0),
+          start_time: b.start_time ?? "09:00",
+          end_time: b.end_time ?? "17:00",
+          notes: b.notes ?? null,
+          created_at: n, updated_at: n,
+        };
+        shifts.push(sh);
+        return HttpResponse.json(sh, { status: 201 });
+      }),
+
+      http.patch(`${V1}/workforce/shifts/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = shifts.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<Sh>;
+        shifts[idx] = { ...shifts[idx]!, ...b, updated_at: Date.now() };
+        return HttpResponse.json(shifts[idx]);
+      }),
+
+      http.delete(`${V1}/workforce/shifts/:id`, async ({ params }) => {
+        await lat();
+        const idx = shifts.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        shifts.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // Time-off requests
+      http.get(`${V1}/workforce/time-off`, async () => {
+        await lat();
+        return HttpResponse.json({ items: timeoff, total: timeoff.length });
+      }),
+
+      http.patch(`${V1}/workforce/time-off/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = timeoff.findIndex(t => t.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<TO>;
+        timeoff[idx] = { ...timeoff[idx]!, ...b };
+        return HttpResponse.json(timeoff[idx]);
+      }),
+    ];
+  })(),
 );

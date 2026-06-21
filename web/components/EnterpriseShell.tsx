@@ -55,7 +55,8 @@ type NavKey =
   | "inventory-locations"
   | "inventory-expiry"
   | "invoicing"
-  | "inventory-serials";
+  | "inventory-serials"
+  | "workforce";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -78,6 +79,7 @@ const NAV_ITEMS: Array<{
   { key: "inventory-locations", label: "Store Map", href: "/inventory/locations", icon: "inventory-locations", group: "Manage" },
   { key: "inventory-expiry", label: "Expiry Tracking", href: "/inventory/expiry", icon: "inventory-expiry", group: "Manage" },
   { key: "inventory-serials", label: "Serialized Inventory", href: "/inventory/serials", icon: "inventory-serials", group: "Manage" },
+  { key: "workforce", label: "Workforce", href: "/workforce", icon: "workforce", group: "Manage" },
   { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
   { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
@@ -508,6 +510,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <ExpiryIcon />;
     case "inventory-serials":
       return <SerialsIcon />;
+    case "workforce":
+      return <WorkforceIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -866,6 +870,17 @@ function SerialsIcon() {
       <path d="M12 10v4" />
       <path d="M15 10v4" />
       <path d="M18 10v4" />
+    </svg>
+  );
+}
+
+function WorkforceIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
