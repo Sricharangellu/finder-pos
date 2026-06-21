@@ -231,10 +231,10 @@ records, only triaged into "build now" vs. "documented for later."
       /api/v1/notifications/:id/read`, `POST /api/v1/notifications/mark-all-read`.
       Emit notifications from EventBus handlers in other modules (low-stock, overdue
       invoice). See FE-6 audit: /notifications page and dashboard widget both call these. (done in 00c515a)
-- [ ] BE-20: Audit log read endpoint — the `audit_log` table already exists (Wave 0).
+- [x] BE-20: Audit log read endpoint — the `audit_log` table already exists (Wave 0).
       Add `GET /api/v1/audit-log` to the identity router (no new module needed):
       filter by `?actor=`, `?resourceType=`, `?action=`, `?limit=`, `?offset=`.
-      Returns `{ items: AuditEvent[], total }`. See FE-6 audit: /audit-log page uses this.
+      Returns `{ items: AuditEvent[], total }`. See FE-6 audit: /audit-log page uses this. (done in 15f4f4a)
 - [ ] BE-21: Loyalty programme — `GET/POST/PATCH/DELETE /api/v1/loyalty/tiers` (tier
       objects with UUID `id`, `name`, `level`, `points_required`, `discount_pct`,
       `description`); `GET /api/v1/loyalty/members` + `POST /api/v1/loyalty/members/:id/adjust`
@@ -295,6 +295,7 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-18 human/assistant ROADMAP: marked BE-2..18, FE-3..5, FE-10, FE-13 as done (all were implemented in prior sessions).
 - 2026-06-20 frontend FE-6 -> e85f0a9: mock audit complete; flipped /imports/products to live /catalog/import-csv; queued BE-19/20/21 for mock-only endpoints.
 - 2026-06-20 backend BE-19 -> 00c515a: notifications module; GET/PATCH/POST endpoints; EventBus low_stock + invoice.overdue listeners.
+- 2026-06-20 backend BE-20 -> 15f4f4a: audit-log read module; GET /api/v1/audit-log with actor/resource_type/action filters; JOIN users for actor fields.
 - 2026-06-20 frontend FE-14 -> ceceff3: compliance flags on catalog/[id]; state enforcement on terminal; flavored vape restricted CA/MA/NJ/RI/IL.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
