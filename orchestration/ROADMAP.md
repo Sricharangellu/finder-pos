@@ -214,6 +214,17 @@ records, only triaged into "build now" vs. "documented for later."
       group toggles for custom mixes. Consumes BE-18. See
       `gaps/PRODUCT_SEGMENTATION.md`.
 
+- [x] FE-14: Compliance product flags + state enforcement — catalog/[id] gets a
+      Compliance card (tobacco_type, flavored, menthol, msa_reportable, 50-state
+      restricted_states grid) saved via PATCH /api/v1/catalog/:id/compliance. Terminal
+      blocks add-to-cart when product.restrictedStates includes the outlet's state code.
+      Types updated; MSW flavored vape seeded as restricted in CA/MA/NJ/RI/IL. (done in ceceff3)
+
+- [ ] FE-15: Terminal UX polish — CardReaderScreen component (4-state animation:
+      waiting→reading→processing→approved, ~3300ms total, pulsing ring + progress bar)
+      wired into TenderScreen for card payments. NumpadModal (3×4 grid, keyboard support,
+      max 4 digits, qty≥1 validation) wired into CartPanel quantity display.
+
 - [x] BE-19: Notifications module — new `src/modules/notifications/` module. Table
       `notifications(id, tenant_id, type, severity, title, message, read, created_at)`.
       `GET /api/v1/notifications` (filter `?unread=true`, paginated), `PATCH
@@ -231,6 +242,13 @@ records, only triaged into "build now" vs. "documented for later."
       `name`, `points_cost`, `reward_type`, `status`). New `loyalty` module. Note: the
       simpler `loyalty_tier_rules` table used by /settings already lives in the customers
       module — this is a richer separate programme management feature.
+
+- [ ] BE-22: Compliance columns on products table — add `tobacco_type TEXT`,
+      `flavored INTEGER DEFAULT 0`, `menthol INTEGER DEFAULT 0`,
+      `msa_reportable INTEGER DEFAULT 0`, `restricted_states TEXT` (JSON array)
+      to the `products` table via a migration. Expose `PATCH /api/v1/catalog/:id/compliance`
+      (manager-gated) that updates those columns. Note: FE-14 already built the UI
+      against a mock of this endpoint.
 
 ## Cross-cutting (claim into your lane when picked up)
 
@@ -277,5 +295,6 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-18 human/assistant ROADMAP: marked BE-2..18, FE-3..5, FE-10, FE-13 as done (all were implemented in prior sessions).
 - 2026-06-20 frontend FE-6 -> e85f0a9: mock audit complete; flipped /imports/products to live /catalog/import-csv; queued BE-19/20/21 for mock-only endpoints.
 - 2026-06-20 backend BE-19 -> 00c515a: notifications module; GET/PATCH/POST endpoints; EventBus low_stock + invoice.overdue listeners.
+- 2026-06-20 frontend FE-14 -> ceceff3: compliance flags on catalog/[id]; state enforcement on terminal; flavored vape restricted CA/MA/NJ/RI/IL.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
