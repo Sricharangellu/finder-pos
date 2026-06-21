@@ -53,7 +53,8 @@ function TerminalInner() {
   const [scannedName, setScannedName] = useState<string | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [activeOutletId, setActiveOutletId] = useState<string>("loc_main");
-  const [outlets, setOutlets] = useState<{ id: string; name: string }[]>([]);
+  const [outlets, setOutlets] = useState<{ id: string; name: string; state?: string }[]>([]);
+  const [outletState, setOutletState] = useState<string>("");
 
   // Keyboard shortcut: ? toggles shortcuts overlay
   useEffect(() => {
@@ -71,10 +72,21 @@ function TerminalInner() {
   }, []);
 
   useEffect(() => {
-    apiGet<{ items: { id: string; name: string }[] }>("/api/v1/inventory/locations")
-      .then((d) => setOutlets(d.items ?? []))
+    apiGet<{ items: { id: string; name: string; state?: string }[] }>("/api/v1/inventory/locations")
+      .then((d) => {
+        const locs = d.items ?? [];
+        setOutlets(locs);
+        const initial = locs.find((l) => l.id === "loc_main") ?? locs[0];
+        if (initial?.state) setOutletState(initial.state);
+      })
       .catch(() => {});
   }, []);
+
+  // Sync outletState when active outlet changes
+  useEffect(() => {
+    const loc = outlets.find((o) => o.id === activeOutletId);
+    if (loc?.state) setOutletState(loc.state);
+  }, [activeOutletId, outlets]);
 
   // Debounce ref for order sync
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -153,9 +165,17 @@ function TerminalInner() {
 
   const handleAddProduct = useCallback(
     (product: Product) => {
+      if (outletState && product.restrictedStates?.includes(outletState)) {
+        addToast({
+          title: "Product restricted",
+          description: `${product.name} cannot be sold in ${outletState} (state product ban).`,
+          variant: "error",
+        });
+        return;
+      }
       cart.addProduct(product);
     },
-    [cart]
+    [cart, outletState, addToast]
   );
 
   // Keyboard-wedge barcode scanner: look up product by barcode and add to cart.

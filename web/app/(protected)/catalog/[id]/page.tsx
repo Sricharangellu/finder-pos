@@ -31,6 +31,24 @@ interface ProductStock {
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
+const TOBACCO_TYPES = [
+  { value: "", label: "None (not tobacco/vape)" },
+  { value: "cigarette", label: "Cigarette" },
+  { value: "cigar", label: "Cigar / Cigarillo" },
+  { value: "smokeless", label: "Smokeless / Chewing" },
+  { value: "ecigarette", label: "E-Cigarette / Vape" },
+] as const;
+
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY",
+] as const;
+
+type TobaccoType = "" | "cigarette" | "cigar" | "smokeless" | "ecigarette";
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ProductDetailPage() {
@@ -44,6 +62,22 @@ export default function ProductDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingCompliance, setSavingCompliance] = useState(false);
+  const [complianceSaveError, setComplianceSaveError] = useState<string | null>(null);
+
+  const [complianceForm, setComplianceForm] = useState<{
+    tobacco_type: TobaccoType;
+    flavored: boolean;
+    menthol: boolean;
+    msa_reportable: boolean;
+    restricted_states: string[];
+  }>({
+    tobacco_type: "",
+    flavored: false,
+    menthol: false,
+    msa_reportable: false,
+    restricted_states: [],
+  });
 
   // Edit form state (mirrors editable CatalogProduct fields)
   const [form, setForm] = useState({
@@ -86,6 +120,13 @@ export default function ProductDetailPage() {
         width_mm: prod.width_mm != null ? String(prod.width_mm) : "",
         height_mm: prod.height_mm != null ? String(prod.height_mm) : "",
       });
+      setComplianceForm({
+        tobacco_type: (prod.tobacco_type ?? "") as TobaccoType,
+        flavored: !!prod.flavored,
+        menthol: !!prod.menthol,
+        msa_reportable: !!prod.msa_reportable,
+        restricted_states: prod.restricted_states ?? [],
+      });
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load product.");
     } finally { setLoading(false); }
@@ -120,6 +161,23 @@ export default function ProductDetailPage() {
     } catch (e) {
       setSaveError(e instanceof ApiResponseError ? e.message : "Save failed.");
     } finally { setSaving(false); }
+  };
+
+  const saveCompliance = async () => {
+    if (!product) return;
+    setSavingCompliance(true); setComplianceSaveError(null);
+    try {
+      const updated = await apiPatch<CatalogProduct>(`/api/v1/catalog/${id}/compliance`, {
+        tobacco_type: complianceForm.tobacco_type || null,
+        flavored: complianceForm.flavored ? 1 : 0,
+        menthol: complianceForm.menthol ? 1 : 0,
+        msa_reportable: complianceForm.msa_reportable ? 1 : 0,
+        restricted_states: complianceForm.restricted_states,
+      });
+      setProduct(updated);
+    } catch (e) {
+      setComplianceSaveError(e instanceof ApiResponseError ? e.message : "Failed to save compliance flags.");
+    } finally { setSavingCompliance(false); }
   };
 
   const totalOnHand = stock?.locations.reduce((s, l) => s + l.quantity_on_hand, 0) ?? 0;
@@ -278,6 +336,72 @@ export default function ProductDetailPage() {
                   <DetailRow label="Weight" value={product.weight_grams != null ? `${product.weight_grams} g` : "—"} />
                 </dl>
               )}
+            </Card>
+
+            {/* Compliance */}
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-900">Compliance</h2>
+                <Button size="sm" variant="primary" loading={savingCompliance} onClick={() => void saveCompliance()}>
+                  Save compliance
+                </Button>
+              </div>
+              {complianceSaveError && (
+                <p role="alert" className="text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">{complianceSaveError}</p>
+              )}
+              <div className="space-y-4">
+                <Field label="Tobacco / vape type">
+                  <select
+                    value={complianceForm.tobacco_type}
+                    onChange={e => setComplianceForm(f => ({ ...f, tobacco_type: e.target.value as TobaccoType }))}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    {TOBACCO_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </Field>
+                <div className="space-y-2">
+                  {(["flavored", "menthol", "msa_reportable"] as const).map((key) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={complianceForm[key]}
+                        onChange={e => setComplianceForm(f => ({ ...f, [key]: e.target.checked }))}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">{key.replace(/_/g, " ")}</span>
+                    </label>
+                  ))}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-2">
+                    Restricted states ({complianceForm.restricted_states.length} selected)
+                  </p>
+                  <div className="grid grid-cols-5 gap-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 p-2">
+                    {US_STATES.map((st) => (
+                      <label key={st} className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={complianceForm.restricted_states.includes(st)}
+                          onChange={e => setComplianceForm(f => ({
+                            ...f,
+                            restricted_states: e.target.checked
+                              ? [...f.restricted_states, st]
+                              : f.restricted_states.filter(s => s !== st),
+                          }))}
+                          className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-600">{st}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {product.restricted_states && product.restricted_states.length > 0 && (
+                  <p className="text-xs text-red-600">
+                    <span aria-hidden="true">&#9888; </span>
+                    Currently blocked in: {product.restricted_states.join(", ")}
+                  </p>
+                )}
+              </div>
             </Card>
           </div>
 
