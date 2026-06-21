@@ -262,11 +262,11 @@ records, only triaged into "build now" vs. "documented for later."
       `PATCH /api/v1/service-orders/:id`. Types: `ServiceOrder`, `ServiceOrderStatus`.
       Nav group: Operate.
 
-- [ ] FE-17: Serialized Inventory page (`/inventory/serials`) — track individual units
+- [x] FE-17: Serialized Inventory page (`/inventory/serials`) — track individual units
       by serial number for electronics and jewelry. List view of serial numbers with
       status (in_stock/sold/returned/service), search by serial, and link to product.
       Mock endpoints: `GET /api/v1/inventory/serials`, `POST /api/v1/inventory/serials`.
-      Nav group: Operate.
+      Nav group: Manage. (done in 9ff2cc3)
 
 - [ ] FE-18: Workforce — Employee Scheduling (`/workforce`) — weekly schedule grid
       (Mon–Sun × employee rows), shift blocks with color coding by role, add/edit/delete
@@ -276,18 +276,20 @@ records, only triaged into "build now" vs. "documented for later."
 
 ### Backend lane (Phase 2)
 
-- [ ] BE-23: Service Orders module (`src/modules/service-orders/`) — table:
+- [x] BE-23: Service Orders module (`src/modules/service_orders/`) — table:
       `service_orders (id, tenant_id, customer_id, title, description, status,
       assigned_to, estimate_cents, actual_cents, created_at, updated_at)`.
       CRUD endpoints: `GET/POST /api/v1/service-orders`,
       `GET/PATCH /api/v1/service-orders/:id`. Status transitions:
       draft→open→in_progress→ready→closed. EventBus: `service_order.status_changed`.
+      (done in 9ff2cc3)
 
-- [ ] BE-24: Serialized Inventory module — table: `serial_numbers (id, tenant_id,
+- [x] BE-24: Serialized Inventory module — table: `serial_numbers (id, tenant_id,
       product_id, serial, status, sold_at, service_order_id, created_at)`.
       Endpoints: `GET /api/v1/inventory/serials` (filterable by product/status),
       `POST /api/v1/inventory/serials` (receive), `PATCH /api/v1/inventory/serials/:id`
       (status update). Index on `(tenant_id, product_id)` and `(tenant_id, serial)`.
+      (done in 9ff2cc3)
 
 ## Cross-cutting (claim into your lane when picked up)
 
