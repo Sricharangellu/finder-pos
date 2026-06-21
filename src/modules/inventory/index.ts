@@ -2,6 +2,7 @@ import type { PosModule } from "../types.js";
 import { InventoryService } from "./service.js";
 import { registerRoutes } from "./routes.js";
 import { dropLegacyNoTenant } from "../../shared/migrate.js";
+import { PurchasingService } from "../purchasing/index.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
 // inventory PK is (tenant_id, product_id) since product_ids are tenant-scoped.
@@ -178,7 +179,8 @@ END $$;
   ],
   register({ db, events, router }) {
     const service = new InventoryService(db, events);
-    registerRoutes(router, service);
+    const purchasing = new PurchasingService(db, events);
+    registerRoutes(router, service, purchasing);
 
     // order.created -> decrement stock for each line (reason 'sale', ref = order id).
     events.on("order.created", async (event) => {

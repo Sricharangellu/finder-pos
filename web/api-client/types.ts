@@ -1315,3 +1315,19 @@ export interface CustomerAddress {
   created_at: number;
   updated_at: number;
 }
+
+// ── Reorder Suggestions (BE-27) ───────────────────────────────────────────────
+export interface ReorderSuggestion {
+  product_id: string;
+  product_name: string;
+  sku: string | null;
+  stock_qty: number;
+  reorder_pt: number;
+  suggested_qty: number;
+  preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
+}
+
+export interface ReorderSuggestionsResponse {
+  items: ReorderSuggestion[];
+}

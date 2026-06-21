@@ -3299,4 +3299,45 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Reorder Suggestions (BE-27 / FE-23) ──────────────────────────────────
+  ...(() => {
+    interface RS {
+      product_id: string; product_name: string; sku: string | null;
+      stock_qty: number; reorder_pt: number; suggested_qty: number;
+      preferred_vendor_id: string | null; preferred_vendor_name: string | null;
+    }
+
+    const suggestions: RS[] = [
+      { product_id: "prod_001", product_name: "Marlboro Red King", sku: "MRL-RED-K", stock_qty: 3, reorder_pt: 10, suggested_qty: 20, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North" },
+      { product_id: "prod_002", product_name: "Newport Menthol 100s", sku: "NWP-M100", stock_qty: 1, reorder_pt: 8, suggested_qty: 16, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North" },
+      { product_id: "prod_003", product_name: "Camel Blue Box", sku: "CAM-BLU", stock_qty: 0, reorder_pt: 6, suggested_qty: 12, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North" },
+      { product_id: "prod_004", product_name: "Swisher Sweets Original", sku: "SWI-OG", stock_qty: 4, reorder_pt: 15, suggested_qty: 30, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company" },
+      { product_id: "prod_005", product_name: "White Owl Cigarillos", sku: "WOW-CIG", stock_qty: 2, reorder_pt: 12, suggested_qty: 24, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company" },
+      { product_id: "prod_006", product_name: "Backwoods Honey Berry", sku: "BKW-HB", stock_qty: 0, reorder_pt: 10, suggested_qty: 20, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company" },
+      { product_id: "prod_007", product_name: "5-Hour Energy Berry", sku: "5HR-BRY", stock_qty: 5, reorder_pt: 24, suggested_qty: 48, preferred_vendor_id: "sup_003", preferred_vendor_name: "Eby-Brown" },
+      { product_id: "prod_008", product_name: "Monster Energy Original", sku: "MON-OG", stock_qty: 3, reorder_pt: 12, suggested_qty: 24, preferred_vendor_id: null, preferred_vendor_name: null },
+    ];
+
+    return [
+      http.get(`${V1}/inventory/reorder-suggestions`, async () => {
+        await lat();
+        return HttpResponse.json({ items: suggestions });
+      }),
+
+      http.post(`${V1}/inventory/reorder-suggestions/create-po`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { lines: { productId: string; vendorId: string; quantity: number; unitCostCents: number }[] };
+        const vendorIds = [...new Set(body.lines.map(l => l.vendorId))];
+        const orders = vendorIds.map((vid, i) => ({
+          id: `po_reorder_${Date.now()}_${i}`,
+          supplier_id: vid,
+          status: "ordered",
+          lines: body.lines.filter(l => l.vendorId === vid),
+          created_at: Date.now(),
+        }));
+        return HttpResponse.json({ orders }, { status: 201 });
+      }),
+    ];
+  })(),
 );

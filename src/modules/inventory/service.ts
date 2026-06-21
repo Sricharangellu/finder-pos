@@ -389,6 +389,40 @@ export class InventoryService {
     return row ?? { product_id: productId, tenant_id: tenantId, stock_qty: 0, reorder_pt: 0, updated_at: 0 };
   }
 
+  async getReorderSuggestions(tenantId: string): Promise<ReorderSuggestion[]> {
+    const rows = await this.db.query<{
+      product_id: string; name: string; sku: string | null;
+      stock_qty: number; reorder_pt: number; reorder_quantity: number;
+      preferred_vendor_id: string | null; preferred_vendor_name: string | null;
+    }>(
+      `SELECT i.product_id,
+              COALESCE(p.name, '') AS name,
+              p.sku,
+              COALESCE(i.stock_qty, 0) AS stock_qty,
+              i.reorder_pt,
+              COALESCE(p.reorder_quantity, 0) AS reorder_quantity,
+              p.preferred_vendor_id,
+              p.preferred_vendor_name
+         FROM inventory i
+         JOIN catalog_products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
+        WHERE i.tenant_id = @tenantId
+          AND i.reorder_pt > 0
+          AND COALESCE(i.stock_qty, 0) <= i.reorder_pt
+        ORDER BY p.preferred_vendor_name NULLS LAST, p.name`,
+      { tenantId },
+    );
+    return rows.map((r) => ({
+      product_id: r.product_id,
+      product_name: r.name,
+      sku: r.sku,
+      stock_qty: Number(r.stock_qty),
+      reorder_pt: Number(r.reorder_pt),
+      suggested_qty: Number(r.reorder_quantity) > 0 ? Number(r.reorder_quantity) : Number(r.reorder_pt),
+      preferred_vendor_id: r.preferred_vendor_id,
+      preferred_vendor_name: r.preferred_vendor_name,
+    }));
+  }
+
   async setReorderPoint(productId: string, reorderPt: number, tenantId: string): Promise<InventoryRow> {
     return this.db.tx(async (tdb) => {
       const now = Date.now();
@@ -747,6 +781,17 @@ export class InventoryService {
       ))!;
     });
   }
+}
+
+export interface ReorderSuggestion {
+  product_id: string;
+  product_name: string;
+  sku: string | null;
+  stock_qty: number;
+  reorder_pt: number;
+  suggested_qty: number;
+  preferred_vendor_id: string | null;
+  preferred_vendor_name: string | null;
 }
 
 function clampLimit(limit?: number): number {

@@ -4,6 +4,7 @@ import { handler, parseBody } from "../../shared/http.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { InventoryService, MovementReason } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import type { PurchasingService } from "../purchasing/index.js";
 
 const lotEntrySchema = z.object({
   quantity: z.number().int().positive(),
@@ -82,7 +83,7 @@ function userId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).userId ?? "unknown";
 }
 
-export function registerRoutes(router: Router, service: InventoryService): void {
+export function registerRoutes(router: Router, service: InventoryService, purchasing: PurchasingService): void {
   const mgr = requireRole("manager");
   router.get(
     "/",
@@ -257,5 +258,43 @@ export function registerRoutes(router: Router, service: InventoryService): void 
 
   router.get("/locations/:id/stock", handler(async (req, res) => {
     res.json({ items: await service.getStockByLocation(tenantId(res), String(req.params.id)) });
+  }));
+
+  // BE-27: Reorder suggestions ─────────────────────────────────────────────
+  // Sub-path must be before any /:productId routes — already satisfied here.
+  router.get("/reorder-suggestions", handler(async (_req, res) => {
+    res.json({ items: await service.getReorderSuggestions(tenantId(res)) });
+  }));
+
+  const createPOSchema = z.object({
+    lines: z.array(z.object({
+      productId: z.string().min(1),
+      productName: z.string().optional(),
+      vendorId: z.string().min(1),
+      quantity: z.number().int().positive(),
+      unitCostCents: z.number().int().nonnegative(),
+    })).min(1),
+  });
+
+  router.post("/reorder-suggestions/create-po", mgr, handler(async (req, res) => {
+    const body = parseBody(createPOSchema, req.body);
+    const tid = tenantId(res);
+    // Group lines by vendorId and create one PO per vendor.
+    const byVendor = new Map<string, typeof body.lines>();
+    for (const l of body.lines) {
+      const existing = byVendor.get(l.vendorId) ?? [];
+      existing.push(l);
+      byVendor.set(l.vendorId, existing);
+    }
+    const orders: unknown[] = [];
+    for (const [vendorId, lines] of byVendor) {
+      const po = await purchasing.createOrder(
+        vendorId,
+        lines.map((l) => ({ productId: l.productId, productName: l.productName, quantity: l.quantity, unitCostCents: l.unitCostCents })),
+        tid,
+      );
+      orders.push(po);
+    }
+    res.status(201).json({ orders });
   }));
 }
