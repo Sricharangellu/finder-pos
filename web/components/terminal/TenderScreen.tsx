@@ -16,6 +16,7 @@ import { apiPost } from "@/api-client/client";
 import type { Order, Payment, CapturePaymentRequest, PaymentMethod } from "@/api-client/types";
 import { formatMoney, parseToCents, calcChange } from "@/lib/money";
 import { Button } from "@/components/Button";
+import { CardReaderScreen } from "@/components/terminal/CardReaderScreen";
 
 interface TenderScreenProps {
   order: Order;
@@ -39,6 +40,7 @@ export function TenderScreen({
   const [cardLast4, setCardLast4] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCardReader, setShowCardReader] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
@@ -102,8 +104,17 @@ export function TenderScreen({
   };
 
   const handleCardSubmit = () => {
-    void capture("card", 0, totalCents, cardLast4 || "0000");
+    setShowCardReader(true);
   };
+
+  const handleCardReaderSuccess = useCallback(() => {
+    setShowCardReader(false);
+    void capture("card", 0, totalCents, cardLast4 || "0000");
+  }, [capture, totalCents, cardLast4]);
+
+  const handleCardReaderCancel = useCallback(() => {
+    setShowCardReader(false);
+  }, []);
 
   const handleSplitSubmit = () => {
     const cash = parseToCents(splitCash);
@@ -273,6 +284,14 @@ export function TenderScreen({
           )}
         </div>
       </div>
+
+      {showCardReader && (
+        <CardReaderScreen
+          amountCents={totalCents}
+          onSuccess={handleCardReaderSuccess}
+          onCancel={handleCardReaderCancel}
+        />
+      )}
     </div>
   );
 }

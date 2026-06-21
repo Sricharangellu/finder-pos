@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -315,22 +316,27 @@ function ForecastingTab() {
   const [loading, setLoading] = useState(true);
   const [creatingPOs, setCreatingPOs] = useState(false);
   const { addToast } = useToast();
+  const router = useRouter();
 
   const handleCreateReorderPOs = useCallback(async () => {
     setCreatingPOs(true);
     try {
-      const result = await apiPost<{ created: number; pos: Array<{ id: string; supplierId: string | null; lineCount: number }> }>(
-        "/api/v1/insights/create-reorder-pos", {},
+      const result = await apiPost<{ created: number; draft_po_ids: string[] }>(
+        "/api/v1/purchasing/orders/auto-draft", {},
       );
-      if (result.created === 0) {
-        addToast({ title: "No POs needed", description: "All products above reorder point", variant: "info" });
-      } else {
-        addToast({ title: `${result.created} draft PO${result.created > 1 ? "s" : ""} created`, description: `Go to Purchasing to review`, variant: "success" });
-      }
+      addToast({
+        title: `Created ${result.created} draft purchase order${result.created === 1 ? "" : "s"}`,
+        variant: "success",
+      });
+      router.push("/purchasing");
     } catch (e) {
-      addToast({ title: "Failed to create POs", description: e instanceof Error ? e.message : undefined, variant: "error" });
+      addToast({
+        title: "Could not create draft POs — try again",
+        description: e instanceof ApiResponseError ? e.message : undefined,
+        variant: "error",
+      });
     } finally { setCreatingPOs(false); }
-  }, [addToast]);
+  }, [addToast, router]);
 
   useEffect(() => {
     let cancelled = false;

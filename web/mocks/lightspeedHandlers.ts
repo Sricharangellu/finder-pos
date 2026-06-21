@@ -136,6 +136,10 @@ export const lightspeedHandlers = [
     await lat();
     return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", total_cost_cents: 24000, created_at: Date.now() - 3600000, received_at: Date.now(), lines: [] });
   }),
+  http.post(`${V1}/purchasing/orders/auto-draft`, async () => {
+    await delay(800);
+    return HttpResponse.json({ created: 3, draft_po_ids: ["po_draft_001", "po_draft_002", "po_draft_003"] });
+  }),
 
   // ── Inventory: near-expiry report ─────────────────────────────────────────
   http.get(`${V1}/inventory/expiring`, async () => {
@@ -547,6 +551,13 @@ export const lightspeedHandlers = [
       price_cents: priceCents, tax_class: taxClass, age_restricted: ageRestricted ? 1 : 0,
       raw_cost_price_cents: costCents, description: null, brand: null,
       image_url: null, msrp_cents: null, parent_product_id: null, variant_label: null,
+      // Compliance fields — safe defaults
+      tobacco_type: null as string | null,
+      flavored: false,
+      menthol: false,
+      msa_reportable: false,
+      min_age: 21,
+      restricted_states: [] as string[],
     });
 
     let products = [
@@ -637,6 +648,15 @@ export const lightspeedHandlers = [
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         products[idx] = { ...products[idx], status: "archived", updatedAt: Date.now() };
         return HttpResponse.json(products[idx]);
+      }),
+
+      http.patch(`${V1}/catalog/:id/compliance`, async ({ params, request }) => {
+        await lat();
+        const b = (await request.json()) as Record<string, unknown>;
+        const idx = products.findIndex((x) => x.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        products[idx] = { ...products[idx], ...b, updatedAt: Date.now() };
+        return HttpResponse.json({ id: products[idx].id, ...b, updated_at: Date.now() });
       }),
 
       http.get(`${V1}/catalog/barcode/:code`, async ({ params }) => {
@@ -1627,10 +1647,11 @@ customerAddresses.set("cus_demo_1", [
 customerContacts.set("cus_demo_1", []);
 customerNotes.set("cus_demo_1", []);
 
-let invLocSeq = 2;
+let invLocSeq = 3;
 const inventoryLocations: any[] = [
-  { id: "invloc_1", code: "MAIN-FLR", name: "Main Floor", location_type: "floor", outlet_id: "otl_main", is_sellable: true, is_receiving_location: false, is_active: true },
-  { id: "invloc_2", code: "BACK-WH", name: "Back Warehouse", location_type: "warehouse", outlet_id: "otl_main", is_sellable: false, is_receiving_location: true, is_active: true },
+  { id: "loc_main", code: "MAIN-STR", name: "Main Store", location_type: "floor", outlet_id: "otl_main", is_sellable: true, is_receiving_location: false, is_active: true, state: "TX" },
+  { id: "loc_wh",   code: "BACK-WH",  name: "Warehouse",  location_type: "warehouse", outlet_id: "otl_main", is_sellable: false, is_receiving_location: true,  is_active: true, state: "TX" },
+  { id: "loc_dt",   code: "DTOWN",    name: "Downtown",   location_type: "floor", outlet_id: "otl_dt",   is_sellable: true, is_receiving_location: false, is_active: true, state: "CA" },
 ];
 
 lightspeedHandlers.push(

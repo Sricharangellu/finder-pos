@@ -36,6 +36,12 @@ import { useFlag } from "@/flags/useFlag";
 
 // ─── Terminal inner (has access to cart context) ──────────────────────────────
 
+interface OutletLocation {
+  id: string;
+  name: string;
+  state: string;
+}
+
 function TerminalInner() {
   const { user } = useAuth();
   const { isOffline } = useOffline();
@@ -48,6 +54,29 @@ function TerminalInner() {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ageVerified, setAgeVerified] = useState(false);
   const [returnMode, setReturnMode] = useState(false);
+
+  const [outlets, setOutlets] = useState<OutletLocation[]>([]);
+  const [activeOutletId, setActiveOutletId] = useState<string>("");
+  const [outletState, setOutletState] = useState<string>("TX");
+
+  useEffect(() => {
+    apiGet<{ items: OutletLocation[] }>("/api/v1/inventory/locations")
+      .then(({ items }) => {
+        setOutlets(items);
+        if (items.length > 0) {
+          setActiveOutletId(items[0].id);
+          setOutletState(items[0].state ?? "TX");
+        }
+      })
+      .catch(() => {/* non-fatal */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleOutletChange = useCallback((id: string) => {
+    setActiveOutletId(id);
+    const found = outlets.find((o) => o.id === id);
+    if (found) setOutletState(found.state ?? "TX");
+  }, [outlets]);
 
   // Debounce ref for order sync
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,9 +155,16 @@ function TerminalInner() {
 
   const handleAddProduct = useCallback(
     (product: Product) => {
+      if (product.restricted_states?.includes(outletState)) {
+        addToast({
+          title: `${product.name} restricted in ${outletState}`,
+          variant: "error",
+        });
+        return;
+      }
       cart.addProduct(product);
     },
-    [cart]
+    [cart, outletState, addToast]
   );
 
   // Keyboard-wedge barcode scanner: look up product by barcode and add to cart.

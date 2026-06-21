@@ -93,6 +93,9 @@ export interface TerminalProduct {
   barcode?: string;
   status: "active" | "draft" | "archived";
   ageRestricted?: boolean;
+  restricted_states?: string[];
+  flavored?: boolean;
+  age_restricted?: boolean;
   createdAt: number;
   updatedAt: number;
 }

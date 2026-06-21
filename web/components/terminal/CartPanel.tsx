@@ -9,11 +9,12 @@
  * Accessibility: labelled region, keyboard controls, ≥44px targets.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { clsx } from "clsx";
 import type { CartLine, CartContextValue } from "@/lib/useCart";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
+import { NumpadModal } from "@/components/terminal/NumpadModal";
 
 interface CartPanelProps {
   cart: CartContextValue;
@@ -188,6 +189,7 @@ interface CartLineItemProps {
 function CartLineItem({ line, onQtyChange, onRemove }: CartLineItemProps) {
   const { product, quantity } = line;
   const lineCents = product.priceCents * quantity;
+  const [numpadOpen, setNumpadOpen] = useState(false);
 
   const decrement = useCallback(() => {
     if (quantity === 1) {
@@ -202,74 +204,86 @@ function CartLineItem({ line, onQtyChange, onRemove }: CartLineItemProps) {
   }, [quantity, onQtyChange]);
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50">
-      {/* Name + unit price */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-        <p className="text-xs text-gray-400">{formatMoney(product.priceCents)} each</p>
-      </div>
+    <>
+      <li className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50">
+        {/* Name + unit price */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+          <p className="text-xs text-gray-400">{formatMoney(product.priceCents)} each</p>
+        </div>
 
-      {/* Qty controls */}
-      <div
-        className="flex items-center gap-1"
-        role="group"
-        aria-label={`${product.name} quantity`}
-      >
-        <button
-          type="button"
-          onClick={decrement}
-          aria-label={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
-          title={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
-          className={clsx(
-            "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
-            "bg-gray-100 text-gray-600 hover:bg-danger-100 hover:text-danger-700",
-            "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
-            "min-h-[44px] min-w-[44px]"
-          )}
-        >
-          {quantity === 1 ? <TrashIcon /> : <MinusIcon />}
-        </button>
-
-        <input
-          type="number"
-          min={1}
-          max={999}
-          value={quantity}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
-            if (!isNaN(v) && v > 0) onQtyChange(v);
-          }}
+        {/* Qty controls */}
+        <div
+          className="flex items-center gap-1"
+          role="group"
           aria-label={`${product.name} quantity`}
-          className={clsx(
-            "w-11 border-0 bg-transparent text-center text-sm font-semibold",
-            "focus:outline-none focus:ring-0",
-            "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          )}
-        />
-
-        <button
-          type="button"
-          onClick={increment}
-          aria-label={`Increase ${product.name} quantity`}
-          title={`Increase ${product.name} quantity`}
-          className={clsx(
-            "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
-            "bg-gray-100 text-gray-600 hover:bg-brand-100 hover:text-brand-700",
-            "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
-            "min-h-[44px] min-w-[44px]"
-          )}
         >
-          <PlusIcon />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={decrement}
+            aria-label={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
+            title={quantity === 1 ? `Remove ${product.name}` : `Decrease ${product.name} quantity`}
+            className={clsx(
+              "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
+              "bg-gray-100 text-gray-600 hover:bg-danger-100 hover:text-danger-700",
+              "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
+              "min-h-[44px] min-w-[44px]"
+            )}
+          >
+            {quantity === 1 ? <TrashIcon /> : <MinusIcon />}
+          </button>
 
-      {/* Line total */}
-      <div className="w-16 text-right">
-        <span className="text-sm font-semibold text-gray-900">
-          {formatMoney(lineCents)}
-        </span>
-      </div>
-    </li>
+          <button
+            type="button"
+            onClick={() => setNumpadOpen(true)}
+            aria-label={`${product.name} quantity: ${quantity}. Tap to edit`}
+            title="Tap to set quantity"
+            className={clsx(
+              "w-11 rounded text-center text-sm font-semibold text-gray-900",
+              "hover:bg-brand-50 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
+              "min-h-[44px]"
+            )}
+          >
+            {quantity}
+          </button>
+
+          <button
+            type="button"
+            onClick={increment}
+            aria-label={`Increase ${product.name} quantity`}
+            title={`Increase ${product.name} quantity`}
+            className={clsx(
+              "flex h-8 w-8 items-center justify-center rounded text-sm font-bold transition-colors",
+              "bg-gray-100 text-gray-600 hover:bg-brand-100 hover:text-brand-700",
+              "focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:outline-none",
+              "min-h-[44px] min-w-[44px]"
+            )}
+          >
+            <PlusIcon />
+          </button>
+        </div>
+
+        {/* Line total */}
+        <div className="w-16 text-right">
+          <span className="text-sm font-semibold text-gray-900">
+            {formatMoney(lineCents)}
+          </span>
+        </div>
+      </li>
+
+      {numpadOpen && (
+        <NumpadModal
+          value={quantity}
+          label={product.name}
+          max={999}
+          onConfirm={(qty) => {
+            onQtyChange(qty);
+            setNumpadOpen(false);
+          }}
+          onClose={() => setNumpadOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
