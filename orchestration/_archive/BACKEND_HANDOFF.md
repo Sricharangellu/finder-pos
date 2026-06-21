@@ -25,7 +25,7 @@ Three new tenant-scoped bounded contexts. The backend now serves **10 modules**.
 | **giftcards** | `POST /giftcards`, `GET /giftcards/:code`, `POST /giftcards/:code/redeem` | Stored value; atomic `FOR UPDATE` draw-down, never negative |
 | **webhooks** | `POST/GET /webhooks`, `GET /webhooks/deliveries`, `DELETE /webhooks/:id` | HMAC-SHA256 signed delivery on domain events; `X-Finder-Signature: sha256=…` |
 
-## Lightspeed X-Series MVP — backend endpoints for your pages (all live)
+## Finder MVP — backend endpoints for your pages (all live)
 Added to support your enterprise shell pages. Same-origin via the Next proxy, Bearer auth.
 
 - **`/inventory` page** → `GET /api/v1/inventory/overview` → `{ items: [{ id, sku, name, price_cents, category, status, stock_qty, reorder_pt, low_stock }] }`. One call renders the whole inventory grid (products joined with stock). Receive stock: `POST /api/v1/inventory/:productId/receive {quantity}`; adjust: `POST /api/v1/inventory/:productId/adjust {delta, reason}`.
@@ -41,14 +41,14 @@ MSW mocks for these aren't authored on the frontend yet — say the word and I'l
 - **Customer contract** for your `/customers` CRM screen → `GET /api/v1/customers` is live (id, name, email, phone, points, created_at). Spend/visit/timeline metrics need order-history aggregation — tell me the exact fields you want and I'll add a `GET /api/v1/customers/:id/summary`.
 
 ## MSW mocks — added (per your request)
-- New file **`web/mocks/lightspeedHandlers.ts`** (kept separate to avoid clobbering your `handlers.ts` edits) with handlers for: `/inventory/levels`, `/inventory/overview`, `/customers` (+create/redeem), `/giftcards` (+redeem), `/team`, `/webhooks` (+create/delete). Shapes mirror the live API.
-- Wired via a 2-line change in `handlers.ts` (`import { lightspeedHandlers }` + `...lightspeedHandlers` in the array). **Frontend gate stays green: `npm test` 82/82.** Left in the working tree for you to commit (I don't commit `web/*` — your domain) so it merges cleanly with your shell work.
+- New file **`web/mocks/mockHandlers.ts`** (kept separate to avoid clobbering your `handlers.ts` edits) with handlers for: `/inventory/levels`, `/inventory/overview`, `/customers` (+create/redeem), `/giftcards` (+redeem), `/team`, `/webhooks` (+create/delete). Shapes mirror the live API.
+- Wired via a 2-line change in `handlers.ts` (`import { mockHandlers }` + `...mockHandlers` in the array). **Frontend gate stays green: `npm test` 82/82.** Left in the working tree for you to commit (I don't commit `web/*` — your domain) so it merges cleanly with your shell work.
 
 ## Outlets + registers (store/register selector) — LIVE
 Your `EnterpriseShell` store/register selector now has a real backend.
 - `GET /api/v1/outlets` → `{ items: [{ id, name, timezone, registers: [{ id, name, status: "open"|"closed", outlet_id }] }] }`. Seeded with **Main Store / Register 1** for the demo tenant on boot.
 - `POST /api/v1/outlets {name, timezone?}` · `POST /api/v1/outlets/:outletId/registers {name}` · `POST /api/v1/outlets/registers/:registerId/status {status}` (open/close a register session).
-- MSW mock added to `lightspeedHandlers.ts` (returns Main Store + Downtown with registers) so you can wire the selector offline.
+- MSW mock added to `mockHandlers.ts` (returns Main Store + Downtown with registers) so you can wire the selector offline.
 
 ## Analytics de-hardcoding (for your enhanced dashboards) — LIVE
 Your reports dashboard hardcodes top-products + the range selector; your CRM page seeds spend/visit metrics. Real endpoints now exist:
@@ -56,10 +56,10 @@ Your reports dashboard hardcodes top-products + the range selector; your CRM pag
 - `GET /api/v1/reports/top-products?range=…&limit=…` → `{ items: [{ productId, name, units, revenueCents }] }` (best sellers by revenue from completed orders). Replaces the hardcoded `topProducts` in `ReportsDashboard`.
 - `GET /api/v1/customers/:id/summary` → `{ customer:{id,name,email,phone,points}, visits, totalSpentCents, avgOrderCents, lastVisitAt, recentOrders:[{id,orderNumber,status,totalCents,createdAt}] }` — lifetime spend/visits + recent-order timeline for the clienteling panel.
 - `GET /api/v1/reports/hourly?range=…` → `{ items: [{ hour(0-23), label("8 AM"), orderCount, revenueCents, value(0-100 index) }] }` (24 buckets) — replaces the hardcoded `hourlySales` "sales rhythm" chart.
-- MSW mocks for all four added to `lightspeedHandlers.ts`. **The entire Reports dashboard is now backed by real endpoints** — swap the three hardcoded arrays (`topProducts`, `hourlySales`, and any static summary) for `apiGet` calls passing the selected `range`.
+- MSW mocks for all four added to `mockHandlers.ts`. **The entire Reports dashboard is now backed by real endpoints** — swap the three hardcoded arrays (`topProducts`, `hourlySales`, and any static summary) for `apiGet` calls passing the selected `range`.
 
 ## Purchasing (suppliers + POs + receiving) — LIVE
-Lightspeed-style restock flow. Receiving emits `purchase_order.received`; inventory listens and increments stock (decoupled), and unit costs are captured → **`/inventory/levels` now returns real `costCents`** (was null).
+Finder restock flow. Receiving emits `purchase_order.received`; inventory listens and increments stock (decoupled), and unit costs are captured → **`/inventory/levels` now returns real `costCents`** (was null).
 - `GET/POST /api/v1/purchasing/suppliers` → `{ items:[{ id, name, email }] }` / create.
 - `POST /api/v1/purchasing/orders {supplierId, lines:[{productId, quantity, unitCostCents}]}` → PO (status `ordered`, computed `total_cost_cents`, nested `lines`).
 - `GET /api/v1/purchasing/orders` (list) · `GET /api/v1/purchasing/orders/:id` (with lines).
@@ -109,8 +109,8 @@ Item locations, product→location placement, and order pick/pack. Answers "item
 - Suggested UI: an **Operations → Locations** grid (assign products to bins) and a **Pick & Pack** queue (open order → generate pick list in path order → check off lines → Pack).
 
 ## Benchmark update → Wholesale/Distribution ERP
-New benchmark `ERP-Prompt-Guide.html` (erp.fairtradetx.com, 18 prompts) supersedes the Lightspeed POS
-target. See **`orchestration/ERP_BENCHMARK.md`** for the full parity matrix (built/partial/missing across
+New benchmark `ERP-Prompt-Guide.html` (erp.fairtradetx.com, 18 prompts) supersedes the prior POS
+benchmark target. See **`orchestration/ERP_BENCHMARK.md`** for the full parity matrix (built/partial/missing across
 all 18 areas) and the Wave A–H roadmap. Headline gaps still open: Accounting/COA + batch deposits (#9),
 Shipping orders from invoices (#8), Discounts engine (#11), 60+ reports build-out (#10), Settings + RBAC
 enforcement (#12/#13), multi-store `storeIds[]` filter (#18). Frontend owns the DataTable, all module

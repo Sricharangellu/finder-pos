@@ -41,7 +41,7 @@ mutations with `requireRole("manager")` from `src/gateway/auth.ts`.
 
 Verify a change with: `npm run typecheck`, then a standalone request test against the in-memory PG
 harness (`scripts/pg-harness.js` — see any recent module's verify pattern). Keep Codex's MSW mocks in
-`web/mocks/lightspeedHandlers.ts` in sync so the frontend can run offline.
+`web/mocks/mockHandlers.ts` in sync so the frontend can run offline.
 
 ## 5. Read these next
 - `orchestration/ERP_BENCHMARK.md` — the benchmark + parity matrix + wave roadmap (A–H, all done).

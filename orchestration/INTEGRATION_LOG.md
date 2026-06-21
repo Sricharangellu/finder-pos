@@ -36,12 +36,12 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (80/80); `npm run test:components` PASS (21/21). Dependency-tree repair required restoring missing Rollup/esbuild optional native packages in local `node_modules`; no contract changes proposed.
 
 ## Wave 1 — enterprise shell benchmark pass (2026-06-12)
-- **Frontend** → added a Lightspeed X-Series-inspired enterprise POS shell in `web/app/(protected)/terminal/page.tsx`: desktop rail, mobile bottom navigation, store/register selector, device online/offline status, user/role context, and placeholders for Inventory, Customers, Reports, and Settings.
+- **Frontend** → added an enterprise POS shell in `web/app/(protected)/terminal/page.tsx`: desktop rail, mobile bottom navigation, store/register selector, device online/offline status, user/role context, and placeholders for Inventory, Customers, Reports, and Settings.
 - **Rationale** → establishes the enterprise navigation frame before building the Wave 2 operations surfaces, while keeping the Register workflow as the first-screen task.
 - **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (80/80); `npm run test:components` PASS (21/21); `curl -I http://localhost:3000/terminal` returned 200.
 
-## Wave 1 — Lightspeed X-Series benchmark adoption (2026-06-12)
-- **Benchmark set for Frontend/Claude coordination** → use Lightspeed Retail X-Series as the UX reference for module framing and operational depth: register-first workflow, persistent operations navigation, store/register context, user/role context, device readiness, inventory control, customer profiles, reporting, and settings/security posture. This is a benchmark, not a visual copy.
+## Wave 1 — enterprise UX benchmark adoption (2026-06-12)
+- **Benchmark set for Frontend/Claude coordination** → use enterprise POS UX patterns as the reference for module framing and operational depth: register-first workflow, persistent operations navigation, store/register context, user/role context, device readiness, inventory control, customer profiles, reporting, and settings/security posture.
 - **Frontend** → extracted the shell into `web/components/EnterpriseShell.tsx`; wired real navigation across `/terminal`, `/inventory`, `/customers`, `/reports`, and `/settings`; added first-pass enterprise Inventory, Customers, and Settings pages; refit Reports into the shared shell.
 - **Verification** → `cd web && npm run typecheck` PASS; `npm test` PASS (82/82); `npm run test:components` PASS (21/21); local routes `/terminal`, `/inventory`, `/customers`, `/reports`, `/settings` returned 200 from the Next dev server.
 
@@ -102,7 +102,7 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 
 ## 2026-06-20 — Frontend cycle: FE-6
 
-- **Shipped:** Mock audit of lightspeedHandlers.ts vs live backend. One path mismatch fixed: /api/v1/imports/products → /api/v1/catalog/import-csv (same body shape, live endpoint exists). Three new Backend-lane items queued (BE-19 notifications, BE-20 audit-log read, BE-21 loyalty programme).
+- **Shipped:** Mock audit of mockHandlers.ts vs live backend. One path mismatch fixed: /api/v1/imports/products → /api/v1/catalog/import-csv (same body shape, live endpoint exists). Three new Backend-lane items queued (BE-19 notifications, BE-20 audit-log read, BE-21 loyalty programme).
 - **Consumes:** POST /api/v1/catalog/import-csv (live, catalog module)
 - **Verified:** typecheck clean (backend npm run typecheck, frontend npm run typecheck); npm test 304/304 pass
 
