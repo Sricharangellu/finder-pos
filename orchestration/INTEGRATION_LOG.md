@@ -173,3 +173,11 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Consumes:** GET /api/v1/inventory/serials (mocked), POST /api/v1/inventory/serials (mocked), GET /api/v1/inventory/serials/:id (mocked), PATCH /api/v1/inventory/serials/:id (mocked).
 - **Remaining open:** FE-18 (Workforce scheduling).
 - **Verified:** npm run typecheck — 0 errors (backend + frontend in single tsc pass).
+
+## 2026-06-21 — Frontend cycle: FE-18 (Workforce / Employee Scheduling)
+
+- **Shipped:** `/workforce` page — weekly Mon–Sun schedule grid (employee rows × day columns). Shift blocks color-coded by role: manager=purple, supervisor=emerald, cashier=blue, stock=amber, delivery=orange. Click empty cell → ShiftModal pre-filled for that day+employee. Click shift block → edit/delete modal. Week navigation (< > + Today button). Time-off panel below grid with approve/deny actions for pending requests. 4 stat cards: employee count, shifts this week, hours scheduled, pending requests.
+- **Consumes:** GET /api/v1/workforce/employees, GET/POST/PATCH/DELETE /api/v1/workforce/shifts, GET/PATCH /api/v1/workforce/time-off — all mocked with 5 employees + 19 seed shifts + 4 time-off requests.
+- **Types added:** Employee, Shift, ShiftsResponse, TimeOffRequest, ShiftRole, TimeOffStatus.
+- **Phase 2 complete:** All FE-16–FE-18 (frontend) and BE-23–BE-24 (backend) roadmap items are now checked off.
+- **Verified:** npm run typecheck — 0 errors.
