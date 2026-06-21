@@ -117,3 +117,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Compliance product flags + state enforcement. TerminalProduct and CatalogProduct types gain tobacco_type, flavored, menthol, msa_reportable, restricted_states fields. Catalog /catalog/[id] page gains a Compliance card: tobacco type select, flag checkboxes (flavored/menthol/msa_reportable), 50-state restricted-states grid — saved via PATCH /api/v1/catalog/:id/compliance. Terminal blocks add-to-cart when product.restrictedStates includes the active outlet's state code (derived from inventory locations state field). MSW mocks updated: locations seed includes state: "CA"; flavored vape product restricted in ["CA","MA","NJ","RI","IL"] for demo enforcement. BE-22 queued for backend compliance columns.
 - **Consumes:** GET /api/v1/inventory/locations (live, inventory module; extended to include state field in mock); PATCH /api/v1/catalog/:id/compliance (mocked, pending BE-22).
 - **Verified:** typecheck clean (tsc --noEmit exit 0); web tests skipped (pre-existing jsdom/rettime dependency issue in test runner, unrelated to FE-14 changes).
+
+## 2026-06-20 — Backend cycle: BE-20
+
+- **Shipped:** Audit log read module (src/modules/audit_log/). GET /api/v1/audit-log with filters: ?actor= (email ILIKE), ?resource_type=, ?action=, ?limit= (max 200), ?offset=. JOINs users table for actor email/role. Parses before_state/after_state JSON into field-level {from, to} diff. Adds two indexes on the existing audit_log table.
+- **Verified:** typecheck clean (npm run typecheck); pre-existing payment test failures unrelated (confirmed on clean tree).
+- **Contract changes:** New module mounted at /api/v1/audit-log. No schema changes (table pre-exists in identity migrations).
