@@ -129,3 +129,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** CardReaderScreen component (web/components/terminal/CardReaderScreen.tsx) — 4-state animation (waiting→reading→processing→approved) over 3300ms with pulsing ring, rAF progress bar, step indicators, and ESC-to-cancel. Wired into TenderScreen: card and split payment paths now play the animation before POST /api/v1/payments fires. NumpadModal (web/components/terminal/NumpadModal.tsx) — 3×4 grid, keyboard support (digits, Backspace, Enter, Escape), max 4 digits, qty≥1 validation. Wired into CartPanel: quantity display replaced with a button that opens NumpadModal; confirmed via onQtyChange callback.
 - **Consumes:** No new API endpoints (pure UI).
 - **Verified:** typecheck clean (npm run typecheck exit 0); tests running (pre-existing 16-failure payment test noise expected; unrelated to this change).
+
+## 2026-06-20 — Backend cycle: BE-21
+
+- **Shipped:** Loyalty programme module (`src/modules/loyalty/`). Three tables: `loyalty_tiers`, `loyalty_members`, `loyalty_rewards`. Mounted at `/api/v1/loyalty`. Tiers CRUD (manager-gated mutations) with `member_count` computed via subquery. Members list (JOIN customers + tiers for display fields) + `POST /members/:id/adjust` which updates `points_balance` and `points_lifetime`, auto-promotes `tier_id` to the highest eligible tier, and emits `loyalty.tier_upgraded` (picked up by SSE broker in app.ts). Rewards CRUD. All manager-level mutations require `requireRole("manager")`.
+- **Consumes:** customers table (JOIN for member display names), EventBus (`loyalty.tier_upgraded`).
+- **Verified:** `npm run typecheck` 0 errors; `npm test` 304 pass, 0 fail (pre-existing CSRF failure in purchasing integration test is unchanged).
