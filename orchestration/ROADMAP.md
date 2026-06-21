@@ -291,6 +291,63 @@ records, only triaged into "build now" vs. "documented for later."
       (status update). Index on `(tenant_id, product_id)` and `(tenant_id, serial)`.
       (done in 9ff2cc3)
 
+## Phase 3 — Operations Depth (Workforce, Accounts, Reports, Reorder)
+
+### Backend lane (Phase 3)
+
+- [x] BE-25: Workforce backend module (`src/modules/workforce/`) — three tables:
+      `employees (id, tenant_id, name, role, email, avatar_color, created_at)`,
+      `shifts (id, tenant_id, employee_id, date, start_time, end_time, notes, created_at, updated_at)`,
+      `time_off_requests (id, tenant_id, employee_id, date_from, date_to, reason, status, created_at)`.
+      CRUD endpoints matching FE-18 mock handlers exactly:
+      `GET /workforce/employees`, `GET/POST/PATCH/DELETE /workforce/shifts`,
+      `GET/PATCH /workforce/time-off`. Completes the real backend for FE-18. (done in 261c8cc)
+
+- [x] BE-26: Customer contacts + addresses — two new tables:
+      `customer_contacts (id, tenant_id, customer_id, name, role, email, phone, is_primary, created_at, updated_at)`,
+      `customer_addresses (id, tenant_id, customer_id, label, line1, line2, city, state, zip, country, is_default, created_at, updated_at)`.
+      Endpoints: `GET/POST/PATCH/DELETE /customers/:id/contacts`,
+      `GET/POST/PATCH/DELETE /customers/:id/addresses`.
+      Indexes on `(tenant_id, customer_id)` for both tables.
+      Tables already existed; added PATCH+DELETE endpoints + ContactsPanel
+      edit/remove UI on `/customers/[id]`. (done in 261c8cc)
+
+- [ ] BE-27: Reorder management — `GET /inventory/reorder-suggestions` returns
+      products where `on_hand <= reorder_point` (non-zero reorder_point only),
+      joined with preferred_vendor from catalog, grouped by vendor for
+      bulk-PO creation. `POST /inventory/reorder-suggestions/create-po` accepts
+      `[{ product_id, quantity, vendor_id }]` and creates a draft PO via
+      purchasing module's service. EventBus: `inventory.reorder_triggered`.
+
+### Frontend lane (Phase 3)
+
+- [ ] FE-22: Customer Account Detail — enhance `/customers/[id]` with two new
+      tabs: Contacts (add/edit/delete contacts per account, star to set primary)
+      and Addresses (add/edit/delete delivery addresses, set default). Consumes
+      BE-26 endpoints. Mock handlers for both resources.
+
+- [ ] FE-23: Reorder Dashboard (`/inventory/reorder`) — page showing all products
+      at or below reorder point, grouped by vendor. Stat cards: SKUs below
+      reorder, total vendors affected. Table: product, current stock, reorder
+      point, suggested qty, vendor. Checkbox select + "Create Draft PO" bulk
+      action calling BE-27. Mock endpoint: `GET /inventory/reorder-suggestions`.
+      Nav group: Manage.
+
+- [ ] FE-24: Enhanced Reports (`/reports`) — replace static stub with a real
+      analytics page. Date-range picker (last 7d/30d/90d/custom). Report cards:
+      Sales by Product (top 20, sortable), Margin by Category (bar chart),
+      Inventory Valuation (total cost value by category), Low Stock SKUs.
+      CSV export button per report. Consumes existing
+      `/reports/summary`, `/reports/top-products`, `/reports/inventory-valuation`,
+      plus new mock for `/reports/sales-by-product`.
+
+- [ ] FE-25: Receipt Templates (`/settings/receipts`) — per-outlet receipt
+      customization. Fields: header text, footer text, show_logo (toggle),
+      show_barcode (toggle), show_tax_breakdown (toggle), contact_info,
+      return_policy (textarea). Live preview panel (thermal receipt mockup).
+      Mock endpoints: `GET/POST/PATCH /settings/receipts/:outletId`.
+      Nav: sub-item under Settings.
+
 ## Cross-cutting (claim into your lane when picked up)
 
 - [x] DB-1: Enable Postgres row-level security on tenant tables as
