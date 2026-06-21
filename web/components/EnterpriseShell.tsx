@@ -50,7 +50,8 @@ type NavKey =
   | "quotes"
   | "loyalty"
   | "notifications"
-  | "audit-log";
+  | "audit-log"
+  | "service-orders";
 
 // editionFlag: if set, this nav item is hidden when the corresponding feature
 // flag is false. Items with no editionFlag are always shown.
@@ -68,6 +69,7 @@ const NAV_ITEMS: Array<{
   { key: "orders", label: "Orders", href: "/orders", icon: "orders", group: "Operate" },
   { key: "quotes", label: "Quotations", href: "/quotes", icon: "quotes", group: "Operate" },
   { key: "returns", label: "Returns", href: "/returns", icon: "returns", group: "Operate", editionFlag: "groupRetailPOS" },
+  { key: "service-orders", label: "Service Orders", href: "/service-orders", icon: "service-orders", group: "Operate" },
   { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
   { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
@@ -488,6 +490,8 @@ function NavIcon({ name }: { name: NavKey }) {
       return <NotificationsIcon />;
     case "audit-log":
       return <AuditLogIcon />;
+    case "service-orders":
+      return <ServiceOrdersIcon />;
     default:
       return <ReportsIcon />;
   }
@@ -796,6 +800,14 @@ function AuditLogIcon() {
       <line x1="16" y1="13" x2="8" y2="13" />
       <line x1="16" y1="17" x2="8" y2="17" />
       <polyline points="10 9 9 9 8 9" />
+    </svg>
+  );
+}
+
+function ServiceOrdersIcon() {
+  return (
+    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </svg>
   );
 }

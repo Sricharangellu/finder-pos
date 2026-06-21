@@ -2650,4 +2650,110 @@ mockHandlers.push(
     await lat();
     return HttpResponse.json({ batch_id: `batch_${Date.now()}`, total: 12, status: "queued" }, { status: 201 });
   }),
+
+  // ── Service Orders ────────────────────────────────────────────────────────
+  ...(() => {
+    let seq = 0;
+    const BASE = Date.now();
+
+    interface SO {
+      id: string; customer_id: string; customer_name: string;
+      title: string; description: string; status: string;
+      assigned_to: string | null; assigned_to_name: string | null;
+      estimate_cents: number; actual_cents: number | null;
+      created_at: number; updated_at: number;
+    }
+
+    let orders: SO[] = [
+      {
+        id: "so_demo_1", customer_id: "cust_1", customer_name: "Alice Johnson",
+        title: "Trek FX3 — brake cable replacement", description: "Front and rear brake cables frayed. Customer provided cables.",
+        status: "in_progress", assigned_to: "emp_1", assigned_to_name: "Marcus T.",
+        estimate_cents: 4500, actual_cents: null, created_at: BASE - 86400000 * 3, updated_at: BASE - 86400000,
+      },
+      {
+        id: "so_demo_2", customer_id: "cust_2", customer_name: "Bob Martinez",
+        title: "iPhone 13 — cracked screen", description: "Screen shattered, touch still works. OEM glass replacement.",
+        status: "ready", assigned_to: "emp_2", assigned_to_name: "Priya S.",
+        estimate_cents: 18900, actual_cents: 18900, created_at: BASE - 86400000 * 5, updated_at: BASE - 3600000,
+      },
+      {
+        id: "so_demo_3", customer_id: "cust_3", customer_name: "Carol White",
+        title: "Specialized Sirrus — tune-up + new chain", description: "Full tune-up: derailleur adjustment, new KMC chain, lube.",
+        status: "open", assigned_to: null, assigned_to_name: null,
+        estimate_cents: 7500, actual_cents: null, created_at: BASE - 86400000, updated_at: BASE - 86400000,
+      },
+      {
+        id: "so_demo_4", customer_id: "cust_4", customer_name: "David Lee",
+        title: "MacBook Pro — battery replacement", description: "Battery swells, machine shuts off under load. Battery sourced.",
+        status: "closed", assigned_to: "emp_1", assigned_to_name: "Marcus T.",
+        estimate_cents: 22000, actual_cents: 21500, created_at: BASE - 86400000 * 14, updated_at: BASE - 86400000 * 7,
+      },
+      {
+        id: "so_demo_5", customer_id: "cust_5", customer_name: "Eva Chen",
+        title: "Giant Escape 3 — flat repair", description: "Rear tube punctured. Customer wants tube + tire boot.",
+        status: "draft", assigned_to: null, assigned_to_name: null,
+        estimate_cents: 1800, actual_cents: null, created_at: BASE - 3600000, updated_at: BASE - 3600000,
+      },
+    ];
+
+    return [
+      http.get(`${V1}/service-orders`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const q = url.searchParams.get("q");
+        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+
+        let filtered = orders;
+        if (status && status !== "all") filtered = filtered.filter(o => o.status === status);
+        if (q) {
+          const lq = q.toLowerCase();
+          filtered = filtered.filter(o =>
+            o.title.toLowerCase().includes(lq) || o.customer_name.toLowerCase().includes(lq)
+          );
+        }
+        const total = filtered.length;
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total, limit, offset });
+      }),
+
+      http.post(`${V1}/service-orders`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<SO>;
+        const now = Date.now();
+        const o: SO = {
+          id: `so_${++seq}`,
+          customer_id: b.customer_id ?? "",
+          customer_name: b.customer_name ?? "Unknown Customer",
+          title: b.title ?? "Untitled",
+          description: b.description ?? "",
+          status: "draft",
+          assigned_to: b.assigned_to ?? null,
+          assigned_to_name: b.assigned_to_name ?? null,
+          estimate_cents: b.estimate_cents ?? 0,
+          actual_cents: null,
+          created_at: now, updated_at: now,
+        };
+        orders.unshift(o);
+        return HttpResponse.json(o, { status: 201 });
+      }),
+
+      http.get(`${V1}/service-orders/:id`, async ({ params }) => {
+        await lat();
+        const o = orders.find(x => x.id === String(params["id"]));
+        if (!o) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(o);
+      }),
+
+      http.patch(`${V1}/service-orders/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = orders.findIndex(x => x.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<SO>;
+        orders[idx] = { ...orders[idx], ...b, updated_at: Date.now() };
+        return HttpResponse.json(orders[idx]);
+      }),
+    ];
+  })(),
 );

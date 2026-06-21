@@ -1060,3 +1060,34 @@ export interface AuditLogResponse {
   limit: number;
   offset: number;
 }
+
+// ── Service Orders ────────────────────────────────────────────────────────────
+
+export type ServiceOrderStatus =
+  | "draft"
+  | "open"
+  | "in_progress"
+  | "ready"
+  | "closed";
+
+export interface ServiceOrder {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  title: string;
+  description: string;
+  status: ServiceOrderStatus;
+  assigned_to: string | null;
+  assigned_to_name: string | null;
+  estimate_cents: number;
+  actual_cents: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ServiceOrderResponse {
+  items: ServiceOrder[];
+  total: number;
+  limit: number;
+  offset: number;
+}
