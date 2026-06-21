@@ -214,12 +214,12 @@ records, only triaged into "build now" vs. "documented for later."
       group toggles for custom mixes. Consumes BE-18. See
       `gaps/PRODUCT_SEGMENTATION.md`.
 
-- [ ] BE-19: Notifications module — new `src/modules/notifications/` module. Table
+- [x] BE-19: Notifications module — new `src/modules/notifications/` module. Table
       `notifications(id, tenant_id, type, severity, title, message, read, created_at)`.
       `GET /api/v1/notifications` (filter `?unread=true`, paginated), `PATCH
       /api/v1/notifications/:id/read`, `POST /api/v1/notifications/mark-all-read`.
       Emit notifications from EventBus handlers in other modules (low-stock, overdue
-      invoice). See FE-6 audit: /notifications page and dashboard widget both call these.
+      invoice). See FE-6 audit: /notifications page and dashboard widget both call these. (done in 00c515a)
 - [ ] BE-20: Audit log read endpoint — the `audit_log` table already exists (Wave 0).
       Add `GET /api/v1/audit-log` to the identity router (no new module needed):
       filter by `?actor=`, `?resourceType=`, `?action=`, `?limit=`, `?offset=`.
@@ -276,5 +276,6 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-18 human/assistant S4-LOYALTY: loyalty_tier_rules table + CRUD + auto-upgrade in awardPoints + Loyalty Tiers section in /settings.
 - 2026-06-18 human/assistant ROADMAP: marked BE-2..18, FE-3..5, FE-10, FE-13 as done (all were implemented in prior sessions).
 - 2026-06-20 frontend FE-6 -> e85f0a9: mock audit complete; flipped /imports/products to live /catalog/import-csv; queued BE-19/20/21 for mock-only endpoints.
+- 2026-06-20 backend BE-19 -> 00c515a: notifications module; GET/PATCH/POST endpoints; EventBus low_stock + invoice.overdue listeners.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
