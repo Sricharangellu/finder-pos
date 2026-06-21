@@ -2,7 +2,7 @@
  * MSW handlers for the Cycle-3 backend modules (customers, gift cards, webhooks,
  * inventory overview, team). Kept in a separate file so the backend agent can
  * add/maintain these without colliding with the frontend's edits to handlers.ts.
- * Wired into the main array via `...lightspeedHandlers`.
+ * Wired into the main array via `...mockHandlers`.
  *
  * Shapes mirror the live API (see orchestration/BACKEND_HANDOFF.md).
  */
@@ -79,7 +79,7 @@ function seed() {
 }
 seed();
 
-export const lightspeedHandlers = [
+export const mockHandlers = [
   // ── Inventory overview ────────────────────────────────────────────────────
   http.get(`${V1}/inventory/overview`, async () => {
     await lat();
@@ -1141,7 +1141,7 @@ function resolveSalesLines(parentId: string, lines: any[], tier: number) {
   return { out, subtotal, discount };
 }
 
-lightspeedHandlers.push(
+mockHandlers.push(
   http.post(`${V1}/sales/quotations`, async ({ request }) => {
     await lat();
     const b = (await request.json()) as any;
@@ -1232,7 +1232,7 @@ lightspeedHandlers.push(
 );
 
 // ── Accounting mock handlers (Chart of Accounts + Batch Deposits) ───────────
-lightspeedHandlers.push(
+mockHandlers.push(
   http.post(`${V1}/accounting/accounts/seed`, async () => {
     await lat();
     if (accounts.length > 0) return HttpResponse.json({ seeded: 0 });
@@ -1311,7 +1311,7 @@ lightspeedHandlers.push(
 );
 
 // ── Ecommerce: storefront + checkout + portal ───────────────────────────────
-lightspeedHandlers.push(
+mockHandlers.push(
   http.get(`${V1}/ecommerce/catalog`, async ({ request }) => {
     await lat();
     const u = new URL(request.url);
@@ -1362,7 +1362,7 @@ lightspeedHandlers.push(
 
 // ── Settings + global search ────────────────────────────────────────────────
 let smSeq = 0, ptSeq = 0, pmSeq = 0, txSeq = 0;
-lightspeedHandlers.push(
+mockHandlers.push(
   http.post(`${V1}/settings/seed`, async () => {
     await lat();
     if (shippingMethods.length === 0) {
@@ -1405,7 +1405,7 @@ function scopeLines(d: any, lines: any[]): any[] {
   if (d.apply_to === "product") return lines.filter((l) => l.productId === d.target_id);
   return lines.filter((l) => (l.category ?? "") === d.target_id);
 }
-lightspeedHandlers.push(
+mockHandlers.push(
   http.post(`${V1}/discounts`, async ({ request }) => {
     await lat();
     const b = (await request.json()) as any;
@@ -1494,7 +1494,7 @@ lightspeedHandlers.push(
 );
 
 // ── Shipping mock handlers (shipping orders from invoices) ──────────────────
-lightspeedHandlers.push(
+mockHandlers.push(
   http.post(`${V1}/shipping`, async ({ request }) => {
     await lat();
     const b = (await request.json()) as any;
@@ -1768,12 +1768,12 @@ const exportBatches: any[] = [
 ];
 let importSeq = 3;
 
-lightspeedHandlers.push(
+mockHandlers.push(
   // ── Integration providers ──────────────────────────────────────────────────
   http.get(`${V1}/sync/integration-providers`, async () => {
     await lat();
     return HttpResponse.json({ items: [
-      { id: "prov_shopify", name: "Shopify", provider_type: "ecommerce", is_active: true },
+      { id: "prov_ecommerce", name: "Ecommerce Platform", provider_type: "ecommerce", is_active: true },
       { id: "prov_quickbooks", name: "QuickBooks", provider_type: "accounting", is_active: true },
       { id: "prov_stripe", name: "Stripe", provider_type: "payment", is_active: true },
       { id: "prov_avalara", name: "Avalara", provider_type: "tax", is_active: true },
@@ -1839,7 +1839,7 @@ const inventoryLocations: any[] = [
   { id: "invloc_2", code: "BACK-WH", name: "Back Warehouse", location_type: "warehouse", outlet_id: "otl_main", state: "CA", is_sellable: false, is_receiving_location: true, is_active: true },
 ];
 
-lightspeedHandlers.push(
+mockHandlers.push(
   // ── Customer addresses ────────────────────────────────────────────────────
   http.get(`${V1}/customers/:id/addresses`, async ({ params }) => {
     await lat();
@@ -2354,7 +2354,7 @@ lightspeedHandlers.push(
       { id: "notif_4", type: "order_fulfilled", severity: "info", title: "Order fulfilled", body: "Order ORD-0039 shipped via DHL.", resource_id: "ord_demo_39", resource_type: "order", read: true, created_at: BASE - 86400000 },
       { id: "notif_5", type: "purchase_order_received", severity: "info", title: "PO received", body: "Purchase order PO-0011 fully received at Warehouse.", resource_id: "po_demo_11", resource_type: "purchase_order", read: true, created_at: BASE - 86400000 * 2 },
       { id: "notif_6", type: "low_stock", severity: "warning", title: "Low stock: Red T-Shirt (L)", body: "Only 1 unit remaining at Main Floor.", resource_id: "prod_demo_5", resource_type: "product", read: false, created_at: BASE - 7200000 },
-      { id: "notif_7", type: "sync_error", severity: "critical", title: "Sync error: Shopify", body: "Product sync failed with HTTP 503. Retry scheduled.", resource_id: null, resource_type: null, read: false, created_at: BASE - 300000 },
+      { id: "notif_7", type: "sync_error", severity: "critical", title: "Sync error: Ecommerce Platform", body: "Product sync failed with HTTP 503. Retry scheduled.", resource_id: null, resource_type: null, read: false, created_at: BASE - 300000 },
     ];
 
     return [

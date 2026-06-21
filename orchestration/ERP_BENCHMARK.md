@@ -1,7 +1,7 @@
 # Finder ERP — Benchmark & Parity Matrix
 
 **Benchmark source:** `ERP-Prompt-Guide.html` (analysis of erp.fairtradetx.com) — an 18-prompt
-spec for a **wholesale / distribution ERP**. This supersedes the earlier "Lightspeed X-Series POS"
+spec for a **wholesale / distribution ERP**. This supersedes the earlier POS-only
 benchmark: the target is now a full order-to-cash + procure-to-pay ERP with multi-store, tiered
 B2B pricing, accounting, 60+ reports, and a tablet fulfillment surface.
 

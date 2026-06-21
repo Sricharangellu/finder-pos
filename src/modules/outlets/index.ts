@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS cash_drawer_movements (
 CREATE INDEX IF NOT EXISTS cash_movements_shift_idx ON cash_drawer_movements (tenant_id, shift_id, created_at DESC);
 `;
 
-/** Outlets + registers — Lightspeed-style multi-location core. Seeds a default
+/** Outlets + registers — multi-location core. Seeds a default
  *  "Main Store / Register 1" for the demo tenant so the store selector has data. */
 export const outletsModule: PosModule = {
   name: "outlets",

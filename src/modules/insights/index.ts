@@ -25,7 +25,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS reorder_point  INTEGER;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS lead_time_days INTEGER;
 `;
 
-/** Insights module — scheduled report emails, inventory forecasting, order recommendations (Lightspeed Plus parity). */
+/** Insights module — scheduled report emails, inventory forecasting, order recommendations. */
 export const insightsModule: PosModule = {
   name: "insights",
   migrations: [CREATE_SCHEDULED_REPORTS, ADD_PRODUCT_FORECAST_COLUMNS],

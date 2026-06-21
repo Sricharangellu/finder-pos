@@ -27,7 +27,7 @@ import type {
   CapturePaymentRequest,
   SalesSummary,
 } from "@/api-client/types";
-import { lightspeedHandlers } from "./lightspeedHandlers";
+import { mockHandlers } from "./mockHandlers";
 
 // Match both relative (browser) and absolute (Node/test) URL forms.
 const IDENTITY = "*/api/identity";
@@ -1045,7 +1045,7 @@ export const handlers = [
 
   // Cycle-3 modules (customers, gift cards, webhooks, inventory overview, team).
   // Maintained in a separate file to avoid cross-agent edit collisions.
-  ...lightspeedHandlers,
+  ...mockHandlers,
 
   // ── API Keys (Sprint 10B) ────────────────────────────────────────────────────
   ...(() => {

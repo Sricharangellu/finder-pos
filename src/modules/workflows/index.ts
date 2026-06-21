@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS workflow_steps (
 CREATE INDEX IF NOT EXISTS workflow_steps_workflow_idx ON workflow_steps (workflow_id, position ASC);
 `;
 
-/** Workflows module — configurable checkout process steps per outlet (Lightspeed Plus parity). */
+/** Workflows module — configurable checkout process steps per outlet. */
 export const workflowsModule: PosModule = {
   name: "workflows",
   migrations: [CREATE_WORKFLOW_DEFINITIONS, CREATE_WORKFLOW_STEPS],

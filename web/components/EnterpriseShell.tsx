@@ -3,8 +3,7 @@
 /**
  * EnterpriseShell — shared retail operations frame.
  *
- * Benchmark: Lightspeed Retail X-Series patterns, adapted for Finder:
- * register-first workflow, persistent module navigation, store/register
+ * Register-first workflow, persistent module navigation, store/register
  * context, user context, and device connectivity status.
  */
 

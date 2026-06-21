@@ -40,7 +40,7 @@ committed, and pushed. Not a marathon, not a redesign.
     actions not permitted for `cashier` per the same rule the backend
     enforces (`owner|manager` for sensitive actions).
   - MSW mocks live in `web/mocks/handlers.ts` and
-    `web/mocks/lightspeedHandlers.ts`. Any new live endpoint call needs a
+    `web/mocks/mockHandlers.ts`. Any new live endpoint call needs a
     matching mock added/updated so `npm test` and offline dev keep working.
 
 ---
@@ -118,7 +118,7 @@ Scope your change to exactly what the roadmap item describes.
 - New API calls: use the `apiGet`/`apiPost`/etc. helpers from `web/lib/`
   with the exact path from `BACKEND_HANDOFF.md` (or the new Backend-lane
   item's path if not yet live — same path, served by mock for now).
-- Update `web/mocks/handlers.ts` and/or `web/mocks/lightspeedHandlers.ts`
+- Update `web/mocks/handlers.ts` and/or `web/mocks/mockHandlers.ts`
   with a handler for every new endpoint path used (live or pending).
 - Match existing component patterns: grep for a similar existing page
   (e.g. `web/app/inventory/page.tsx`) and follow its structure for layout,

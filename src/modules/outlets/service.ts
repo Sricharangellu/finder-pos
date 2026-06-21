@@ -2,7 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { HttpError } from "../../shared/http.js";
 
-/** Outlets (locations) + registers (tills). Lightspeed-style multi-location core.
+/** Outlets (locations) + registers (tills). Multi-location core.
  *  Tenant-scoped. A register opens/closes for a trading session. */
 
 export interface Register {

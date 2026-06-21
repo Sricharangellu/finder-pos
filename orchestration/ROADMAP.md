@@ -177,7 +177,7 @@ records, only triaged into "build now" vs. "documented for later."
 - [x] FE-5: Settings — Chart of Accounts tree editor
       (`/accounting/accounts*`) + Batch Deposits list/create/approve
       (`/accounting/deposits*`).
-- [x] FE-6: Audit existing `web/mocks/lightspeedHandlers.ts` against live
+- [x] FE-6: Audit existing `web/mocks/mockHandlers.ts` against live
       backend routes; flip any still-mocked endpoints used by built pages to
       live `apiGet`/`apiPost` calls. (done in e85f0a9)
 - [x] FE-7: Catalog filter/bulk-select UI on `/inventory` — category-tree

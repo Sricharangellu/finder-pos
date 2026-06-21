@@ -9,7 +9,7 @@ both a non-technical stakeholder and a developer picking up the project.
 ## 1. Plain-language summary (non-technical)
 
 **What Finder is:** A standalone point-of-sale / business-management app
-(like a simpler, custom alternative to tools such as Lightspeed). It has a
+(a custom enterprise point-of-sale and business-management platform). It has a
 backend (the "engine" that stores data and runs the business logic) and a
 frontend (the website/app screens staff and owners use).
 

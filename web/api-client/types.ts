@@ -303,7 +303,7 @@ export interface SalesSummary {
   };
 }
 
-// ── Lightspeed-style retail operations (Cycle 3 backend) ───────────────────
+// ── Retail operations (Cycle 3 backend) ────────────────────────────────────
 export interface InventoryLevel {
   id: string;
   sku: string;

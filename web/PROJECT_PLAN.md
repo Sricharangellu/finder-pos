@@ -3,7 +3,7 @@ Last updated: 2026-06-20
 
 ## What we built so far
 
-FinderPOS is a full-stack enterprise POS platform competing directly with Lightspeed POS across three verticals: **Retail** (tobacco, vape, CBD, liquor, apparel, electronics, pet, sporting goods, jewelry, gift), **Restaurant** (bar, brewery, cafe, fine dining, quick service, hotel), and **Golf** (tee sheet, pro shop, driving range, resort). The frontend has 33 protected pages covering every area of a retail business — from a real-time POS terminal to MSA compliance reporting and loyalty program management. Phase 1 targets tobacco/vape/liquor retail where FinderPOS has a compliance edge Lightspeed lacks.
+FinderPOS is a full-stack enterprise POS platform across three verticals: **Retail** (tobacco, vape, CBD, liquor, apparel, electronics, pet, sporting goods, jewelry, gift), **Restaurant** (bar, brewery, cafe, fine dining, quick service, hotel), and **Golf** (tee sheet, pro shop, driving range, resort). The frontend has 33 protected pages covering every area of a retail business — from a real-time POS terminal to MSA compliance reporting and loyalty program management. Phase 1 targets tobacco/vape/liquor retail where FinderPOS has a strong compliance advantage.
 
 ---
 
@@ -98,7 +98,7 @@ FinderPOS is a full-stack enterprise POS platform competing directly with Lights
 - **Public API + webhooks** — documented REST API for third-party integrations
 - **Redis rate limiting** — Replace in-memory token bucket for multi-instance deployments
 - **Customer portal** — B2B customers log in, view invoices, reorder
-- **Lightspeed AI equivalent** — demand forecasting, smart reorder suggestions, AI-written product descriptions
+- **AI intelligence** — demand forecasting, smart reorder suggestions, AI-written product descriptions
 - **Multi-company** — Per-tenant schemas for franchise/multi-brand operators
 - **Data warehouse ETL** — Nightly aggregation for fast dashboard queries
 
