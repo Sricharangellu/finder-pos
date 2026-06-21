@@ -312,12 +312,13 @@ records, only triaged into "build now" vs. "documented for later."
       Tables already existed; added PATCH+DELETE endpoints + ContactsPanel
       edit/remove UI on `/customers/[id]`. (done in 261c8cc)
 
-- [ ] BE-27: Reorder management — `GET /inventory/reorder-suggestions` returns
+- [x] BE-27: Reorder management — `GET /inventory/reorder-suggestions` returns
       products where `on_hand <= reorder_point` (non-zero reorder_point only),
       joined with preferred_vendor from catalog, grouped by vendor for
       bulk-PO creation. `POST /inventory/reorder-suggestions/create-po` accepts
       `[{ product_id, quantity, vendor_id }]` and creates a draft PO via
       purchasing module's service. EventBus: `inventory.reorder_triggered`.
+      (done in 3ee1aa2)
 
 ### Frontend lane (Phase 3)
 
@@ -326,12 +327,12 @@ records, only triaged into "build now" vs. "documented for later."
       and Addresses (add/edit/delete delivery addresses, set default). Consumes
       BE-26 endpoints. Mock handlers for both resources.
 
-- [ ] FE-23: Reorder Dashboard (`/inventory/reorder`) — page showing all products
+- [x] FE-23: Reorder Dashboard (`/inventory/reorder`) — page showing all products
       at or below reorder point, grouped by vendor. Stat cards: SKUs below
       reorder, total vendors affected. Table: product, current stock, reorder
       point, suggested qty, vendor. Checkbox select + "Create Draft PO" bulk
       action calling BE-27. Mock endpoint: `GET /inventory/reorder-suggestions`.
-      Nav group: Manage.
+      Nav group: Manage. (done in 3ee1aa2)
 
 - [ ] FE-24: Enhanced Reports (`/reports`) — replace static stub with a real
       analytics page. Date-range picker (last 7d/30d/90d/custom). Report cards:
