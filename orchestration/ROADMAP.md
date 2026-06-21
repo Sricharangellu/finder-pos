@@ -177,9 +177,9 @@ records, only triaged into "build now" vs. "documented for later."
 - [x] FE-5: Settings — Chart of Accounts tree editor
       (`/accounting/accounts*`) + Batch Deposits list/create/approve
       (`/accounting/deposits*`).
-- [ ] FE-6: Audit existing `web/mocks/lightspeedHandlers.ts` against live
+- [x] FE-6: Audit existing `web/mocks/lightspeedHandlers.ts` against live
       backend routes; flip any still-mocked endpoints used by built pages to
-      live `apiGet`/`apiPost` calls.
+      live `apiGet`/`apiPost` calls. (done in e85f0a9)
 - [x] FE-7: Catalog filter/bulk-select UI on `/inventory` — category-tree
       filter, row checkboxes + "Actions" menu (bulk status/category update,
       CSV export), consuming BE-6/BE-7. See `CATALOG_PRODUCT_FINDER.md`.
@@ -213,6 +213,24 @@ records, only triaged into "build now" vs. "documented for later."
       `/settings/business` calling `POST /settings/edition`, plus the three
       group toggles for custom mixes. Consumes BE-18. See
       `gaps/PRODUCT_SEGMENTATION.md`.
+
+- [ ] BE-19: Notifications module — new `src/modules/notifications/` module. Table
+      `notifications(id, tenant_id, type, severity, title, message, read, created_at)`.
+      `GET /api/v1/notifications` (filter `?unread=true`, paginated), `PATCH
+      /api/v1/notifications/:id/read`, `POST /api/v1/notifications/mark-all-read`.
+      Emit notifications from EventBus handlers in other modules (low-stock, overdue
+      invoice). See FE-6 audit: /notifications page and dashboard widget both call these.
+- [ ] BE-20: Audit log read endpoint — the `audit_log` table already exists (Wave 0).
+      Add `GET /api/v1/audit-log` to the identity router (no new module needed):
+      filter by `?actor=`, `?resourceType=`, `?action=`, `?limit=`, `?offset=`.
+      Returns `{ items: AuditEvent[], total }`. See FE-6 audit: /audit-log page uses this.
+- [ ] BE-21: Loyalty programme — `GET/POST/PATCH/DELETE /api/v1/loyalty/tiers` (tier
+      objects with UUID `id`, `name`, `level`, `points_required`, `discount_pct`,
+      `description`); `GET /api/v1/loyalty/members` + `POST /api/v1/loyalty/members/:id/adjust`
+      (points delta); `GET/POST/PATCH/DELETE /api/v1/loyalty/rewards` (reward catalogue:
+      `name`, `points_cost`, `reward_type`, `status`). New `loyalty` module. Note: the
+      simpler `loyalty_tier_rules` table used by /settings already lives in the customers
+      module — this is a richer separate programme management feature.
 
 ## Cross-cutting (claim into your lane when picked up)
 
@@ -257,5 +275,6 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-18 human/assistant S4-CHARTS: revenue-trend endpoint + SVG LineChart/BarChart components + dashboard revenue trend + hourly bar chart cards.
 - 2026-06-18 human/assistant S4-LOYALTY: loyalty_tier_rules table + CRUD + auto-upgrade in awardPoints + Loyalty Tiers section in /settings.
 - 2026-06-18 human/assistant ROADMAP: marked BE-2..18, FE-3..5, FE-10, FE-13 as done (all were implemented in prior sessions).
+- 2026-06-20 frontend FE-6 -> e85f0a9: mock audit complete; flipped /imports/products to live /catalog/import-csv; queued BE-19/20/21 for mock-only endpoints.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
