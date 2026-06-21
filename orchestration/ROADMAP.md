@@ -252,10 +252,10 @@ records, only triaged into "build now" vs. "documented for later."
 
 ## Cross-cutting (claim into your lane when picked up)
 
-- [ ] DB-1: Enable Postgres row-level security on tenant tables as
-      defense-in-depth (DB_REVIEW §6).
-- [ ] DB-2: Distributed rate limiting via Redis (SECURITY_AUDIT H1 follow-up) —
-      the in-memory limiter doesn't share state across serverless instances.
+- [x] DB-1: Enable Postgres row-level security on tenant tables as
+      defense-in-depth (DB_REVIEW §6). (done in 15a1228)
+- [x] DB-2: Distributed rate limiting via Redis (SECURITY_AUDIT H1 follow-up) —
+      the in-memory limiter doesn't share state across serverless instances. (done in c5fe02c)
 - [x] PERF-1: Cursor pagination on the largest list endpoints (orders,
       inventory, invoices, sales orders). (done in d7c40dc)
 - [x] PROD-1: Reconciled `master` with `backend-cycle3`/`dev`/`testing`/`prod`
@@ -302,5 +302,8 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-20 backend BE-22 -> 41cd91e: compliance columns (tobacco_type/flavored/menthol/msa_reportable/restricted_states) + PATCH /api/v1/catalog/:id/compliance (manager-gated).
 - 2026-06-20 backend PERF-1 -> d7c40dc: cursor pagination on inventory, invoices, sales-orders (replaces OFFSET/LIMIT 500).
 - 2026-06-20 backend BE-21 -> 2b681b7: loyalty module; tiers/members/rewards CRUD; auto-tier-upgrade on points adjust; SSE loyalty.tier_upgraded.
+
+- 2026-06-20 backend DB-1 -> 15a1228: RLS migration (DO block enables tenant_isolation policy on all tenant_id tables); DB.withTenant(tenantId) helper wraps queries in mini-tx with set_config for safe pool use.
+- 2026-06-20 backend DB-2 -> c5fe02c: ioredis client + atomic Lua INCR/PEXPIRE in both rate limiters; REDIS_URL absent = in-memory fallback; Redis error = fail open.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
