@@ -52,6 +52,8 @@ function TerminalInner() {
   const [returnMode, setReturnMode] = useState(false);
   const [scannedName, setScannedName] = useState<string | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [activeOutletId, setActiveOutletId] = useState<string>("loc_main");
+  const [outlets, setOutlets] = useState<{ id: string; name: string }[]>([]);
 
   // Keyboard shortcut: ? toggles shortcuts overlay
   useEffect(() => {
@@ -66,6 +68,12 @@ function TerminalInner() {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    apiGet<{ items: { id: string; name: string }[] }>("/api/v1/inventory/locations")
+      .then((d) => setOutlets(d.items ?? []))
+      .catch(() => {});
   }, []);
 
   // Debounce ref for order sync
@@ -193,8 +201,16 @@ function TerminalInner() {
       setCompletedPayment(payment);
       setCompletedOrder(cart.state.order);
       setScreen("receipt");
+      const lines = cart.state.lines;
+      if (lines.length > 0 && activeOutletId) {
+        apiPost("/api/v1/inventory/deduct", {
+          location_id: activeOutletId,
+          lines: lines.map((l) => ({ product_id: l.product.id, qty: l.quantity })),
+          order_id: cart.state.order?.id ?? null,
+        }).catch(() => {});
+      }
     },
-    [cart.state.order]
+    [cart.state.order, cart.state.lines, activeOutletId]
   );
 
   const handleTenderCancel = useCallback(() => {
@@ -243,6 +259,9 @@ function TerminalInner() {
             returnMode={returnMode}
             itemCount={cart.itemCount}
             onShortcuts={() => setShortcutsOpen(true)}
+            activeOutletId={activeOutletId}
+            outlets={outlets}
+            onOutletChange={setActiveOutletId}
           />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             {/* Left: Product grid */}
@@ -308,12 +327,18 @@ function CheckoutStatusStrip({
   returnMode,
   itemCount,
   onShortcuts,
+  activeOutletId,
+  outlets,
+  onOutletChange,
 }: {
   cashier: string;
   isOffline: boolean;
   returnMode: boolean;
   itemCount: number;
   onShortcuts: () => void;
+  activeOutletId: string;
+  outlets: { id: string; name: string }[];
+  onOutletChange: (id: string) => void;
 }) {
   return (
     <div className="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-xs sm:px-4">
@@ -324,10 +349,24 @@ function CheckoutStatusStrip({
       <StatusPill label="Network" value={isOffline ? "Offline queue" : "Online"} tone={isOffline ? "warning" : "success"} />
       <StatusPill label="Cart" value={`${itemCount} item${itemCount === 1 ? "" : "s"}`} tone={itemCount > 0 ? "brand" : "neutral"} />
       {returnMode && <StatusPill label="Mode" value="Return" tone="warning" />}
+      {outlets.length > 0 && (
+        <select
+          value={activeOutletId}
+          onChange={(e) => onOutletChange(e.target.value)}
+          className="ml-auto rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-950"
+          aria-label="Active outlet"
+        >
+          {outlets.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+      )}
       <button
         type="button"
         onClick={onShortcuts}
-        className="ml-auto flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         aria-label="Keyboard shortcuts"
         title="Keyboard shortcuts (?)"
       >

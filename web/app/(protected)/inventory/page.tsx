@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { useToast } from "@/components/Toast";
 import type {
   InventoryLevel,
   InventoryLevelsResponse,
@@ -17,6 +18,18 @@ import type {
   CatalogCategoriesResponse,
   CatalogCategory,
 } from "@/api-client/types";
+
+// ─── Stock movement types ──────────────────────────────────────────────────────
+
+interface StockMovement {
+  id: string;
+  type: "sale" | "adjustment" | "receive" | "transfer" | "return";
+  delta: number;
+  location: string;
+  actor: string;
+  note: string | null;
+  created_at: number;
+}
 
 // ─── Stock ledger types ───────────────────────────────────────────────────────
 
@@ -77,6 +90,296 @@ function formatVelocity(value: number) {
   return value > 0 ? `${value}/wk` : "Learning";
 }
 
+// ─── AdjustModal ─────────────────────────────────────────────────────────────
+
+interface AdjustModalProps {
+  product: { id: string; name: string; sku: string; onHand: number } | null;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function AdjustModal({ product, onClose, onSaved }: AdjustModalProps) {
+  const { addToast } = useToast();
+  const [reason, setReason] = useState("cycle_count");
+  const [sign, setSign] = useState<1 | -1>(1);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [locationId, setLocationId] = useState("loc_main");
+  const [locationOptions, setLocationOptions] = useState<{ id: string; name: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ items: { id: string; name: string }[] }>("/api/v1/inventory/locations")
+      .then((d) => {
+        const items = d.items ?? [];
+        setLocationOptions(items);
+        if (items.length > 0 && items[0]) setLocationId(items[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!product) return null;
+
+  const delta = sign * (parseInt(amount, 10) || 0);
+  const newQty = product.onHand + delta;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!amount || parseInt(amount, 10) <= 0) return;
+    setSaving(true);
+    try {
+      await apiPost("/api/v1/inventory/adjustments", {
+        product_id: product!.id,
+        location_id: locationId,
+        delta,
+        reason,
+        note: note.trim() || null,
+      });
+      addToast({ title: "Stock adjusted", variant: "success" });
+      onSaved();
+      onClose();
+    } catch (err) {
+      addToast({
+        title: "Adjustment failed",
+        description: err instanceof ApiResponseError ? err.message : "Unknown error",
+        variant: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Adjust stock</h2>
+            <p className="text-sm text-slate-500">{product.name} · {product.sku}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            aria-label="Close"
+          >
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Reason</span>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            >
+              <option value="cycle_count">Cycle count</option>
+              <option value="damage">Damage</option>
+              <option value="theft">Theft</option>
+              <option value="received">Received</option>
+              <option value="correction">Correction</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <div>
+            <span className="text-sm font-medium text-slate-700">Adjustment</span>
+            <div className="mt-1 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSign(1)}
+                className={`min-h-[44px] rounded-md border px-4 text-sm font-semibold transition-colors ${sign === 1 ? "border-success-600 bg-success-50 text-success-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setSign(-1)}
+                className={`min-h-[44px] rounded-md border px-4 text-sm font-semibold transition-colors ${sign === -1 ? "border-danger-600 bg-danger-50 text-danger-700" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="1"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                className="min-h-[44px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+                required
+              />
+            </div>
+            {amount && parseInt(amount, 10) > 0 && (
+              <p className="mt-1 text-xs text-slate-500">
+                New quantity:{" "}
+                <span className="font-semibold text-slate-950">{newQty}</span>
+              </p>
+            )}
+          </div>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Location</span>
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            >
+              {locationOptions.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Note (optional)</span>
+            <input
+              type="text"
+              maxLength={255}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Broken in transit"
+              className="mt-1 min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            />
+          </label>
+
+          <div className="flex gap-2 pt-2">
+            <Button variant="secondary" size="sm" fullWidth onClick={onClose} type="button">
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" fullWidth loading={saving} type="submit">
+              Save adjustment
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── MovementsDrawer ──────────────────────────────────────────────────────────
+
+const MOVEMENT_TYPE_BADGE: Record<StockMovement["type"], { label: string; color: string }> = {
+  sale:       { label: "Sale",       color: "bg-blue-50 text-blue-700 ring-blue-200" },
+  adjustment: { label: "Adjustment", color: "bg-warning-50 text-warning-700 ring-warning-200" },
+  receive:    { label: "PO Receive", color: "bg-success-50 text-success-700 ring-success-200" },
+  transfer:   { label: "Transfer",   color: "bg-purple-50 text-purple-700 ring-purple-200" },
+  return:     { label: "Return",     color: "bg-slate-100 text-slate-600 ring-slate-200" },
+};
+
+function MovementsDrawer({
+  product,
+  onClose,
+}: {
+  product: { id: string; name: string; sku: string } | null;
+  onClose: () => void;
+}) {
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    if (!product) return;
+    setLoading(true);
+    setError(null);
+    apiGet<{ items: StockMovement[] }>(`/api/v1/inventory/movements?product_id=${encodeURIComponent(product.id)}&limit=20`)
+      .then((d) => setMovements(d.items ?? []))
+      .catch((err) => setError(err instanceof ApiResponseError ? err.message : "Failed to load movements"))
+      .finally(() => setLoading(false));
+  }, [product]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!product) return null;
+
+  function fmt(ts: number) {
+    return new Date(ts).toLocaleString("en-US", {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/30"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl">
+        <div className="flex flex-none items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Stock movements</h2>
+            <p className="text-sm text-slate-500">{product.name} · {product.sku}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-950"
+            aria-label="Close drawer"
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="p-6 text-sm text-slate-500" aria-busy="true">Loading movements…</div>
+          ) : error ? (
+            <div className="p-6 text-sm text-danger-700" role="alert">{error}</div>
+          ) : movements.length === 0 ? (
+            <div className="p-6 text-sm text-slate-500">No movements recorded yet.</div>
+          ) : (
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 text-right">Delta</th>
+                  <th className="px-4 py-3">Location</th>
+                  <th className="px-4 py-3">Actor</th>
+                  <th className="px-4 py-3">Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {movements.map((m) => {
+                  const badge = MOVEMENT_TYPE_BADGE[m.type as StockMovement["type"]];
+                  return (
+                    <tr key={m.id} className="hover:bg-slate-50">
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fmt(m.created_at)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums ${m.delta < 0 ? "text-danger-600" : "text-success-600"}`}>
+                        {m.delta > 0 ? `+${m.delta}` : String(m.delta)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{m.location}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{m.actor}</td>
+                      <td className="px-4 py-3 text-slate-500">{m.note ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Catalog view ─────────────────────────────────────────────────────────────
 
 type ProductStatus = "active" | "draft" | "archived";
@@ -118,6 +421,8 @@ export default function InventoryPage() {
   const [ledgerCategory, setLedgerCategory] = useState("All");
   const [ledgerStatus, setLedgerStatus] = useState<StockStatusFilter>("All");
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [adjustProduct, setAdjustProduct] = useState<{ id: string; name: string; sku: string; onHand: number } | null>(null);
+  const [movementsProduct, setMovementsProduct] = useState<{ id: string; name: string; sku: string } | null>(null);
 
   // Catalog state
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -130,7 +435,7 @@ export default function InventoryPage() {
   const router = useRouter();
 
   // Load stock ledger via useQuery (SWR caching)
-  const { data: ledgerData, loading: ledgerLoading, error: ledgerError } =
+  const { data: ledgerData, loading: ledgerLoading, error: ledgerError, invalidate: invalidateLedger } =
     useQuery("inventory:levels", () => apiGet<InventoryLevelsResponse>("/api/v1/inventory/levels?pageSize=200"), { staleMs: 30_000 });
   const rows = useMemo(() => {
     const nextRows = (ledgerData?.items ?? []).map(toInventoryRow);
@@ -437,6 +742,7 @@ export default function InventoryPage() {
                         <th className="px-4 py-3 text-right">Avg cost</th>
                         <th className="px-4 py-3 text-right">Margin</th>
                         <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -481,6 +787,26 @@ export default function InventoryPage() {
                           </td>
                           <td className="whitespace-nowrap px-4 py-3">
                             <LedgerStatus label={row.stockStatus} />
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setAdjustProduct({ id: row.id, name: row.name, sku: row.sku, onHand: row.onHand })}
+                                className="inline-flex min-h-[32px] items-center rounded border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950"
+                              >
+                                Adjust
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMovementsProduct({ id: row.id, name: row.name, sku: row.sku })}
+                                className="inline-flex min-h-[32px] items-center gap-1 rounded border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950"
+                                aria-label={`View movement history for ${row.name}`}
+                              >
+                                <ClockIcon />
+                                History
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -546,11 +872,21 @@ export default function InventoryPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" fullWidth>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      fullWidth
+                      onClick={() => setAdjustProduct({ id: selectedRow.id, name: selectedRow.name, sku: selectedRow.sku, onHand: selectedRow.onHand })}
+                    >
                       Adjust
                     </Button>
-                    <Button variant="primary" size="sm" fullWidth>
-                      Receive
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      fullWidth
+                      onClick={() => setMovementsProduct({ id: selectedRow.id, name: selectedRow.name, sku: selectedRow.sku })}
+                    >
+                      History
                     </Button>
                   </div>
                 </div>
@@ -767,6 +1103,20 @@ export default function InventoryPage() {
           </Card>
         )}
       </div>
+      {adjustProduct && (
+        <AdjustModal
+          product={adjustProduct}
+          onClose={() => setAdjustProduct(null)}
+          onSaved={invalidateLedger}
+        />
+      )}
+
+      {movementsProduct && (
+        <MovementsDrawer
+          product={movementsProduct}
+          onClose={() => setMovementsProduct(null)}
+        />
+      )}
     </EnterpriseShell>
   );
 }
@@ -852,6 +1202,15 @@ function Metric({
       </span>
       <span className="text-xs text-slate-500">{detail}</span>
     </Card>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </svg>
   );
 }
 
