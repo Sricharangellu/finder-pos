@@ -256,8 +256,8 @@ records, only triaged into "build now" vs. "documented for later."
       defense-in-depth (DB_REVIEW §6).
 - [ ] DB-2: Distributed rate limiting via Redis (SECURITY_AUDIT H1 follow-up) —
       the in-memory limiter doesn't share state across serverless instances.
-- [ ] PERF-1: Cursor pagination on the largest list endpoints (orders,
-      inventory, invoices, sales orders).
+- [x] PERF-1: Cursor pagination on the largest list endpoints (orders,
+      inventory, invoices, sales orders). (done in d7c40dc)
 - [x] PROD-1: Reconciled `master` with `backend-cycle3`/`dev`/`testing`/`prod`
       (done in `216fc4c`) — merged the 28 Cycle 3 backend commits into
       `master`. Two conflicts (scripts/smoke.ts, giftcards/service.ts)
@@ -300,6 +300,7 @@ records, only triaged into "build now" vs. "documented for later."
 
 - 2026-06-20 frontend FE-15 -> 6de146e: CardReaderScreen 4-state animation + NumpadModal qty editor wired into TenderScreen + CartPanel.
 - 2026-06-20 backend BE-22 -> 41cd91e: compliance columns (tobacco_type/flavored/menthol/msa_reportable/restricted_states) + PATCH /api/v1/catalog/:id/compliance (manager-gated).
+- 2026-06-20 backend PERF-1 -> d7c40dc: cursor pagination on inventory, invoices, sales-orders (replaces OFFSET/LIMIT 500).
 - 2026-06-20 backend BE-21 -> 2b681b7: loyalty module; tiers/members/rewards CRUD; auto-tier-upgrade on points adjust; SSE loyalty.tier_upgraded.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._

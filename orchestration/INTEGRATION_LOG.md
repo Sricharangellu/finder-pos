@@ -141,3 +141,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Compliance columns on products table. Migration: ALTER TABLE adds tobacco_type TEXT, flavored/menthol/msa_reportable INTEGER (0|1 stored as SQLite integers), restricted_states TEXT (JSON array of 2-letter state codes). All columns use IF NOT EXISTS — safe on existing DBs. CatalogService.updateCompliance() patches only the five compliance fields and emits product.updated. Product interface extended; CREATE initialises all five to null/0. Route: PATCH /api/v1/catalog/:id/compliance, requireRole("manager"), zod-validated (restricted_states elements must be 2-char strings). The FE-14 compliance UI in /catalog/[id] was already wired to this endpoint path — it now hits the live backend.
 - **Consumes:** No new external dependencies.
 - **Verified:** typecheck clean (npm run typecheck exit 0).
+
+## 2026-06-20 — Backend cycle: PERF-1
+
+- **Shipped:** Cursor pagination on the three largest list endpoints. GET /api/v1/inventory replaces OFFSET with keyset cursor on (updated_at DESC, product_id DESC). GET /api/v1/billing/invoices replaces LIMIT 500 with cursor on (issued_at DESC, id DESC). GET /api/v1/sales/sales-orders replaces LIMIT 500 with cursor on (created_at DESC, id DESC). All three return { items, nextCursor, limit } — pass ?cursor=<token> for the next page. Default page size 50, max 200 (clamped). Orders endpoint was already cursor-paginated; unchanged. Cursors are base64url-encoded JSON { at, id } — opaque to callers.
+- **Contract changes:** Response shape for the three endpoints changed from { items, total, offset } / plain array to { items, nextCursor, limit }. Frontend pages that called these with hardcoded LIMIT 500 will receive at most 200 items per page; they should implement "load more" using nextCursor if needed.
+- **Verified:** typecheck clean (npm run typecheck — only pre-existing scripts/test.ts error).
