@@ -217,7 +217,7 @@ function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
     }, 100);
 
     try {
-      const res = await apiPost<{ batch_id: string; total: number; status: string }>("/api/v1/imports/products", {
+      const res = await apiPost<{ batch_id: string; total: number; status: string }>("/api/v1/catalog/import-csv", {
         csv: csvText,
         mappings,
       });
