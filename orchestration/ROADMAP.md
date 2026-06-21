@@ -243,12 +243,12 @@ records, only triaged into "build now" vs. "documented for later."
       simpler `loyalty_tier_rules` table used by /settings already lives in the customers
       module — this is a richer separate programme management feature. (done in 2b681b7)
 
-- [ ] BE-22: Compliance columns on products table — add `tobacco_type TEXT`,
+- [x] BE-22: Compliance columns on products table — add `tobacco_type TEXT`,
       `flavored INTEGER DEFAULT 0`, `menthol INTEGER DEFAULT 0`,
       `msa_reportable INTEGER DEFAULT 0`, `restricted_states TEXT` (JSON array)
       to the `products` table via a migration. Expose `PATCH /api/v1/catalog/:id/compliance`
       (manager-gated) that updates those columns. Note: FE-14 already built the UI
-      against a mock of this endpoint.
+      against a mock of this endpoint. (done in 41cd91e)
 
 ## Cross-cutting (claim into your lane when picked up)
 
@@ -299,6 +299,7 @@ records, only triaged into "build now" vs. "documented for later."
 - 2026-06-20 frontend FE-14 -> ceceff3: compliance flags on catalog/[id]; state enforcement on terminal; flavored vape restricted CA/MA/NJ/RI/IL.
 
 - 2026-06-20 frontend FE-15 -> 6de146e: CardReaderScreen 4-state animation + NumpadModal qty editor wired into TenderScreen + CartPanel.
+- 2026-06-20 backend BE-22 -> 41cd91e: compliance columns (tobacco_type/flavored/menthol/msa_reportable/restricted_states) + PATCH /api/v1/catalog/:id/compliance (manager-gated).
 - 2026-06-20 backend BE-21 -> 2b681b7: loyalty module; tiers/members/rewards CRUD; auto-tier-upgrade on points adjust; SSE loyalty.tier_upgraded.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._

@@ -135,3 +135,9 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Shipped:** Loyalty programme module (`src/modules/loyalty/`). Three tables: `loyalty_tiers`, `loyalty_members`, `loyalty_rewards`. Mounted at `/api/v1/loyalty`. Tiers CRUD (manager-gated mutations) with `member_count` computed via subquery. Members list (JOIN customers + tiers for display fields) + `POST /members/:id/adjust` which updates `points_balance` and `points_lifetime`, auto-promotes `tier_id` to the highest eligible tier, and emits `loyalty.tier_upgraded` (picked up by SSE broker in app.ts). Rewards CRUD. All manager-level mutations require `requireRole("manager")`.
 - **Consumes:** customers table (JOIN for member display names), EventBus (`loyalty.tier_upgraded`).
 - **Verified:** `npm run typecheck` 0 errors; `npm test` 304 pass, 0 fail (pre-existing CSRF failure in purchasing integration test is unchanged).
+
+## 2026-06-20 — Backend cycle: BE-22
+
+- **Shipped:** Compliance columns on products table. Migration: ALTER TABLE adds tobacco_type TEXT, flavored/menthol/msa_reportable INTEGER (0|1 stored as SQLite integers), restricted_states TEXT (JSON array of 2-letter state codes). All columns use IF NOT EXISTS — safe on existing DBs. CatalogService.updateCompliance() patches only the five compliance fields and emits product.updated. Product interface extended; CREATE initialises all five to null/0. Route: PATCH /api/v1/catalog/:id/compliance, requireRole("manager"), zod-validated (restricted_states elements must be 2-char strings). The FE-14 compliance UI in /catalog/[id] was already wired to this endpoint path — it now hits the live backend.
+- **Consumes:** No new external dependencies.
+- **Verified:** typecheck clean (npm run typecheck exit 0).
