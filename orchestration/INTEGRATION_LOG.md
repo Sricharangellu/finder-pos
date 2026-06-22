@@ -395,3 +395,9 @@ before this commit. No new errors introduced.
 - **Types added**: `CycleCountStatus`, `CycleCountSession`, `CycleCountSessionsResponse`, `CycleCountLine`, `CycleCountLinesResponse`.
 - **Nav**: `"inventory-counts"` key added to NavKey union + NAV_ITEMS (group: Manage) + `CycleCountIcon` (clipboard-check SVG).
 - **Verified:** npm run typecheck — 0 errors.
+
+## 2026-06-22 — Backend cycle: BE-33
+
+- **Shipped:** Webhook delivery system with exponential backoff retries (×5), owner-only route guards on all management endpoints, PATCH /:id toggle endpoint, and `attempt_count` + `last_response_body` columns on `webhook_deliveries`. BE-32 closed as duplicate of already-complete BE-30. Production hardening commits also included: RLS withTenant() on all 22 write-path transactions, account lockout, Stripe Terminal server-driven flow, startup env-var fail-fast validation.
+- **Verified:** typecheck clean; npm test 308/308 pass.
+- **Contract changes:** PATCH /api/v1/webhooks/:id (toggle active); webhook_deliveries now returns attempt_count and last_response_body fields.
