@@ -368,18 +368,19 @@ identified in the gaps analysis that survived the "defer" filter.
       `POST /inventory/counts/:id/close`. Mock handlers + types.
       Nav key: `"inventory-counts"`, group: Manage. (done in 84df7e8)
 
-- [ ] FE-27: Purchasing order detail page (`/purchasing/[id]`) — full PO detail
+- [x] FE-27: Purchasing order detail page (`/purchasing/[id]`) — full PO detail
       view: header (vendor, status, PO number, created date), line items table
       (product, qty ordered, qty received, unit cost, line total), receive
       flow with per-line qty inputs (partial receiving per BE-11). Status
       chips: open / partially_received / received / cancelled. Link from
       `/purchasing` list rows. Mock handler for `GET /purchasing/orders/:id`.
+      (already implemented — confirmed present in web/app/(protected)/purchasing/[id]/page.tsx + mock handler at line 1486)
 
-- [ ] FE-28: AR Dunning dashboard — surface `invoices.dunning_level` in the
+- [x] FE-28: AR Dunning dashboard — surface `invoices.dunning_level` in the
       Accounting page's invoices list (colored badge: 30d/60d/90d overdue).
       Add a "Run Dunning Sweep" button (`POST /api/v1/reports/ar-aging/sweep`,
       manager) that flags overdue invoices and shows a count of records updated.
-      Consumes BE-14.
+      Consumes BE-14. (done in cf32d47)
 
 ### Backend lane (Phase 4)
 
