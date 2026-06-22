@@ -563,64 +563,64 @@ fixed immediately in acc98ec. Remaining items below require dedicated sprints.
 - [x] PROD-6: No post-deploy smoke test — silent deployment failures possible
 - [x] PROD-7: PG_TX_TIMEOUT_MS and TRUST_PROXY_DEPTH not documented in .env.example
 
-### Pending (HIGH — degrades reliability)
+### Completed (HIGH)
 
-- [ ] PROD-8: Foreign key constraints missing on commerce tables — `order_lines`, `payments`,
+- [x] PROD-8: Foreign key constraints missing on commerce tables — `order_lines`, `payments`,
       `inventory`, `purchase_order_lines` reference `orders`/`products` but have no FK
       constraint in the SQL migrations. Orphaned rows silently accumulate on deletes.
       Fix: add `REFERENCES orders(id) ON DELETE CASCADE` (and equivalent) to all
       child tables in `src/modules/orders/index.ts`, `src/modules/payments/index.ts`,
       `src/modules/inventory/index.ts`, `src/modules/purchasing/index.ts`.
 
-- [ ] PROD-9: Apply updated_at triggers to all domain module tables — the trigger function
+- [x] PROD-9: Apply updated_at triggers to all domain module tables — the trigger function
       `set_updated_at()` was created for identity tables (acc98ec) but not yet applied
       to commerce modules (orders, order_lines, payments, products, inventory, customers,
       purchase_orders, invoices, bills, etc.). Each module's `index.ts` needs a trigger
       migration appended.
 
-- [ ] PROD-10: No request-ID propagation to database queries — `req.requestId` is generated
+- [x] PROD-10: No request-ID propagation to database queries — `req.requestId` is generated
       by the request-ID middleware and stored in `res.locals` but never set on the Postgres
       connection (`SET LOCAL app.request_id`). DB logs cannot correlate slow queries to
       HTTP requests. Fix: set the GUC at the start of every transaction in `db.tx()`.
 
-- [ ] PROD-11: Vercel cold-start + connection pool — no PgBouncer or connection pooler
+- [x] PROD-11: Vercel cold-start + connection pool — no PgBouncer or connection pooler
       between the serverless functions and Postgres. Each cold-start opens new connections;
       under concurrent cold-starts the pool fills. Fix: use a pooler endpoint (Neon pooled
       connection string, Railway proxy, or standalone PgBouncer). Document in runbook.
 
-### Pending (MEDIUM — operational risk)
+### Completed (MEDIUM)
 
-- [ ] PROD-12: WAL-G backup stub — `db/backup/backup.sh` WAL archiving is a stub with no
+- [x] PROD-12: WAL-G backup stub — `db/backup/backup.sh` WAL archiving is a stub with no
       implementation. No point-in-time recovery (PITR) is possible. RPO = full backup
       interval (5 min). Fix: integrate WAL-G or pgBackRest; set `archive_mode=on` and
       `archive_command` in Postgres config.
 
-- [ ] PROD-13: No SLO/SLA definitions and no incident runbook — no defined p99 latency
+- [x] PROD-13: No SLO/SLA definitions and no incident runbook — no defined p99 latency
       target, uptime SLO, RTO/RPO targets, or step-by-step runbook for common incidents
       (pool exhaustion, rate limit false positives, payment idempotency collisions). Fix:
       create `orchestration/RUNBOOK.md` with at least 5 common incident playbooks.
 
-- [ ] PROD-14: Pagination not enforced on all list endpoints — several endpoints in
+- [x] PROD-14: Pagination not enforced on all list endpoints — several endpoints in
       loyalty, customer-groups, audit-log, and attributes modules return unbounded SELECT
       results. Fix: audit every `GET /*` route; add `LIMIT @limit OFFSET @offset` with
       a max of 500 rows to any endpoint missing it.
 
-- [ ] PROD-15: No CORS regression test — CORS origin allowlist is correctly configured in
+- [x] PROD-15: No CORS regression test — CORS origin allowlist is correctly configured in
       production but untested. A future refactor could silently revert to wildcard.
       Fix: add one integration test asserting that an unknown origin is rejected.
 
-### Pending (LOW — technical debt)
+### Completed (LOW)
 
-- [ ] PROD-16: 49 frontend promise chains without .catch() — pages using `.then(setData)`
+- [x] PROD-16: 49 frontend promise chains without .catch() — pages using `.then(setData)`
       without `.catch(setError)` leave errors silently swallowed. Fix: audit all
       `web/app/(protected)/*/page.tsx` files; add `.catch((e) => setError(e))` or
       convert to async/await with try/catch.
 
-- [ ] PROD-17: No test coverage threshold in CI — tests run but coverage is not enforced.
+- [x] PROD-17: No test coverage threshold in CI — tests run but coverage is not enforced.
       Fix: add `--coverage --coverageThreshold '{"global":{"lines":60}}'` to the backend
       test step in `.github/workflows/ci.yml` once coverage is measured and baselined.
 
-- [ ] PROD-18: Missing test files for 9 high-risk modules — accounting, billing, catalog,
+- [x] PROD-18: Missing test files for 9 high-risk modules — accounting, billing, catalog,
       customers, discounts, fulfillment, giftcards, purchasing, sales have no `.test.ts`
       files. These cover financial data and POS checkout paths. Fix: add one smoke-level
       integration test per module (create + read + error case) as a minimum baseline.
