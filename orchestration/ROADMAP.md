@@ -416,6 +416,76 @@ identified in the gaps analysis that survived the "defer" filter.
       `master` only per the agent playbooks. Those branches are left as-is
       (frozen, no data lost) — no further action needed.
 
+- [x] SEC-1: Security audit + hardening (2026-06-21, done in 5af7a24) —
+      full application security audit covering auth, authz, input validation,
+      SQL injection, XSS, secrets, and rate limiting. Six vulnerabilities fixed:
+      (HIGH) customer PATCH/POST privilege escalation — split schema into
+      staff/manager tiers, added requireRole("manager") to PATCH /:id;
+      (MED) receipt template endpoints missing role guard — added mgr to
+      POST/PATCH /settings/receipts/:outletId;
+      (MED) /metrics publicly accessible — added METRICS_TOKEN bearer guard;
+      (MED) quotation state transitions (send/accept/cancel/convert) missing
+      mgr guard;
+      (LOW) logout read tenantId from request body — now taken from JWT only;
+      (LOW) no frontend security headers — added web/middleware.ts with CSP,
+      X-Frame-Options, Referrer-Policy, Permissions-Policy.
+      See `orchestration/SYSTEM_DESIGN.md` for the production architecture
+      document that was also created this session.
+
+## Phase 5 — Production Hardening & Architecture (System Design)
+
+These items are documented designs and future production-readiness work
+identified during Phase 4. They are not ordered by priority — pick based
+on go-live readiness needs.
+
+### Backend lane (Phase 5)
+
+- [ ] BE-31: Move auth tokens to httpOnly cookies — currently access token is
+      in-memory and refresh token in sessionStorage. Switching to `httpOnly;
+      Secure; SameSite=Lax` cookies for the refresh token and short-lived
+      bearer for the access token enables server-side session verification in
+      Next.js middleware. Requires changes to identity/routes.ts (Set-Cookie
+      header on login/refresh, clear on logout) and web/lib/auth.ts.
+      See `orchestration/SYSTEM_DESIGN.md §Auth`.
+
+- [ ] BE-32: Early payment discount on bills — add `discount_pct` and
+      `discount_date` to `bills`; when `PATCH /billing/bills/:id/pay` is called
+      before `discount_date`, apply the discount and record
+      `discount_applied_cents`. Surface in `GET /billing/bills`. (BE-30 renamed
+      to BE-32 to keep Phase 4 numbering clean; same spec as the Phase 4 item.)
+      See `gaps/PURCHASING_GAPS.md`.
+
+- [ ] BE-33: Webhook delivery system — persist `webhook_subscriptions` per
+      tenant (event type, target URL, signing secret); on EventBus publish,
+      enqueue a delivery job (BullMQ or pg-cron), POST to the URL with
+      HMAC-SHA256 signature, retry on failure (exponential backoff × 5),
+      log results in `webhook_deliveries`. Owner-only management endpoints.
+      See `orchestration/SYSTEM_DESIGN.md §Webhooks`.
+
+- [ ] BE-34: Background job queue — introduce BullMQ (Redis-backed) for
+      async work: dunning sweep, Core-Mark ETL sync, report pre-cache,
+      webhook delivery, scheduled report emails. Add a `/api/v1/jobs` status
+      endpoint (owner). Replaces the current synchronous sweep approach.
+      See `orchestration/SYSTEM_DESIGN.md §Jobs`.
+
+### Frontend lane (Phase 5)
+
+- [ ] FE-29: Offline-first POS terminal — implement Service Worker + IndexedDB
+      cache for the terminal page. Cache product catalog, pending orders queue
+      (drain when online), and last-used payment modes. Show offline indicator
+      in the EnterpriseShell header. See `orchestration/SYSTEM_DESIGN.md §Offline`.
+
+- [ ] FE-30: Real-time dashboard updates — replace polling with SSE subscription
+      (`GET /api/v1/stream`) on the Dashboard and Terminal pages. Show live
+      order count, low-stock alerts, and payment notifications without manual
+      reload. See `orchestration/SYSTEM_DESIGN.md §Realtime`.
+
+- [ ] FE-31: Customer-facing receipt / display — second-screen support for a
+      customer display (customer pole display or tablet). Shows cart items,
+      subtotal, discount, tax, and total in real-time as items are added.
+      Web-based (iframe or separate route `/display`) driven by BroadcastChannel.
+      See `orchestration/SYSTEM_DESIGN.md §Hardware`.
+
 ---
 
 ## Run log (most recent first)
@@ -461,5 +531,7 @@ identified in the gaps analysis that survived the "defer" filter.
 - 2026-06-21 human/assistant fix(ci): VERCEL_SCOPE optional via shell param expansion -> 9c726f0
 - 2026-06-21 frontend FE-24 -> d1cf2a0: enhanced reports — date-range picker (7d/30d/90d/custom), sales-by-product top-20 sortable table, margin-by-category bar chart, inventory valuation with potential-margin stat, low-stock SKUs; CSV export per section; 2 new mock endpoints + types.
 - 2026-06-21 frontend FE-25 -> 8a4cc57: receipt templates section in Settings — per-outlet form (header/footer/contact/return policy + 3 toggles), live thermal receipt preview panel, GET/POST/PATCH mock handlers.
+
+- 2026-06-21 human/assistant SEC-1 -> 5af7a24: full security audit; 6 fixes (customer privilege escalation, receipts/quotation guards, metrics token, logout body injection, CSP headers). Phase 5 system design items added to roadmap; SYSTEM_DESIGN.md created.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
