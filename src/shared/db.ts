@@ -97,6 +97,10 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       const client = await pool.connect();
       const tdb = makeDb(client, { isTx: true });
       try {
+        // Prevent runaway transactions from holding locks indefinitely.
+        // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
+        const txTimeoutMs = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+        await client.query(`SET LOCAL statement_timeout = ${txTimeoutMs}`);
         await client.query("BEGIN");
         const out = await fn(tdb);
         await client.query("COMMIT");

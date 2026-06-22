@@ -76,3 +76,32 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
+
+  smoke-test:
+    name: Post-deploy smoke test
+    needs: [deploy-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - name: Wait for Vercel propagation
+        run: sleep 15
+      - name: Health check — backend liveness
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            https://finder-pos-backend.vercel.app/healthz \
+            || (echo "❌ /healthz failed" && exit 1)
+      - name: Health check — backend readiness
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            https://finder-pos-backend.vercel.app/readyz \
+            || (echo "❌ /readyz failed" && exit 1)
+      - name: Health check — feature flags endpoint
+        run: |
+          curl -f --retry 2 --retry-delay 5 \
+            https://finder-pos-backend.vercel.app/api/v1/flags \
+            || (echo "❌ /api/v1/flags failed" && exit 1)
+      - name: Health check — frontend
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            https://finder-pos-frontend.vercel.app/ \
+            || (echo "❌ frontend failed" && exit 1)

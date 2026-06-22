@@ -247,6 +247,39 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NUL
 ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until_ms BIGINT;
 `;
 
+/**
+ * Shared trigger function: automatically stamps updated_at (epoch-ms) on any
+ * table that calls it. Applied as a BEFORE UPDATE trigger.
+ * Uses CREATE OR REPLACE so re-running is idempotent.
+ */
+export const CREATE_UPDATED_AT_TRIGGER_FN = `
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  RETURN NEW;
+END;
+$$;
+`;
+
+/** Apply the updated_at trigger to all core identity tables. */
+export const APPLY_UPDATED_AT_TRIGGERS = `
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY['users','tenants','custom_roles','devices','user_mfa','api_keys']
+  LOOP
+    EXECUTE format(
+      'CREATE TRIGGER %I_updated_at BEFORE UPDATE ON %I
+       FOR EACH ROW EXECUTE FUNCTION set_updated_at()',
+      tbl, tbl
+    );
+  END LOOP;
+EXCEPTION WHEN duplicate_object THEN NULL; -- idempotent
+END;
+$$;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -265,4 +298,6 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_API_KEYS_TABLE,
   CREATE_PASSWORD_RESET_TABLE,
   ADD_LOGIN_LOCKOUT_TO_USERS,
+  CREATE_UPDATED_AT_TRIGGER_FN,
+  APPLY_UPDATED_AT_TRIGGERS,
 ];

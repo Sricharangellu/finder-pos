@@ -2,6 +2,33 @@ import type { Request, Response, NextFunction } from "express";
 import { HttpError } from "../shared/http.js";
 import type { RedisClient } from "../shared/redis.js";
 
+/**
+ * Extract the real client IP safely.
+ *
+ * In production behind Vercel/Cloudflare, the true client IP is the LAST
+ * IP added by our trusted proxy (rightmost), not the first (which an attacker
+ * controls). Using the first IP allows X-Forwarded-For spoofing to bypass
+ * per-IP rate limits.
+ *
+ * TRUST_PROXY_DEPTH env var (default 1): how many proxy hops to strip from
+ * the right of the XFF header before taking the client IP. Set to 2 if your
+ * traffic passes through two proxy layers (e.g., Cloudflare → Vercel).
+ */
+function extractClientIp(req: Request): string {
+  const depth = Number(process.env["TRUST_PROXY_DEPTH"] ?? 1);
+  const xff = req.headers["x-forwarded-for"] as string | undefined;
+  if (xff) {
+    const ips = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    // The rightmost `depth` entries are added by our own proxies.
+    // The entry just before those is the real client IP.
+    const clientIndex = ips.length - depth - 1;
+    if (clientIndex >= 0 && ips[clientIndex]) return ips[clientIndex]!;
+    // Fewer hops than expected — fall back to leftmost (safest fallback).
+    return ips[0] ?? req.socket.remoteAddress ?? "unknown";
+  }
+  return req.socket.remoteAddress ?? "unknown";
+}
+
 // Lua: atomic fixed-window counter.
 // Returns 1 if the request is allowed, 0 if rate-limited.
 const INCR_SCRIPT = `
@@ -47,11 +74,7 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   const refillRate = options.refillRate ?? 20; // tokens/sec
   const windowMs = options.windowMs ?? 60_000;
   const keyFn = options.keyFn ?? ((req: Request) => {
-    return (
-      (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
-      req.socket.remoteAddress ??
-      "unknown"
-    );
+    return extractClientIp(req);
   });
   const redis = options.redis ?? null;
 
@@ -157,10 +180,7 @@ export function tenantRateLimitMiddleware(options: TenantRateLimitOptions = {}) 
   const fallbackKey =
     options.fallbackKey ??
     ((req: Request) =>
-      "ip:" +
-      ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
-        req.socket.remoteAddress ??
-        "unknown"));
+      "ip:" + extractClientIp(req));
 
   // ── Redis path ──────────────────────────────────────────────────────────────
   if (redis) {

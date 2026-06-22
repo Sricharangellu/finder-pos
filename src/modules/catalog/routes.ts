@@ -445,6 +445,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
 
   router.patch(
     "/:id",
+    requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(updateSchema, req.body);
       const product = await service.update(String(req.params.id), body, tenantId(res));
@@ -454,6 +455,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
 
   router.delete(
     "/:id",
+    requireRole("manager"),
     handler(async (req, res) => {
       const product = await service.archive(String(req.params.id), tenantId(res));
       res.json(product);

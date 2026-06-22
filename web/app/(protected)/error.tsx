@@ -11,7 +11,7 @@ export default function ProtectedError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[PageError]", error);
+    if (process.env.NODE_ENV !== "production") console.error("[PageError]", error);
   }, [error]);
 
   return (
