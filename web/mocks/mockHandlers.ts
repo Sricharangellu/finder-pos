@@ -79,18 +79,6 @@ function seed() {
 }
 seed();
 
-// ── Receipt templates store (FE-25) ──────────────────────────────────────────
-const receiptTemplatesStore = new Map<string, any>();
-const receiptDefaultTemplate = (outletId: string) => ({
-  outletId,
-  headerText: "Thank you for visiting!",
-  footerText: "See you again soon.",
-  showLogo: true,
-  showBarcode: true,
-  showTaxBreakdown: true,
-  contactInfo: "",
-  returnPolicy: "Returns accepted within 30 days with receipt.",
-});
 
 export const mockHandlers = [
   // ── Inventory overview ────────────────────────────────────────────────────
@@ -318,41 +306,6 @@ export const mockHandlers = [
     return HttpResponse.json({ rows, totalCostCents, totalRetailCents });
   }),
 
-  http.get(`${V1}/reports/sales-by-product`, async () => {
-    await lat();
-    return HttpResponse.json({ items: [
-      { productId: "ps01", sku: "BEV-LAT-001", name: "Latte", category: "Beverages", units: 340, revenueCents: 169660, costCents: 101796, marginPct: 40 },
-      { productId: "ps02", sku: "BEV-CB-001",  name: "Cold Brew", category: "Beverages", units: 280, revenueCents: 153720, costCents: 84546, marginPct: 45 },
-      { productId: "ps03", sku: "BEV-CAP-001", name: "Cappuccino", category: "Beverages", units: 220, revenueCents: 103180, costCents: 61908, marginPct: 40 },
-      { productId: "ps04", sku: "BEV-ESP-001", name: "Espresso", category: "Beverages", units: 195, revenueCents: 77025, costCents: 38513, marginPct: 50 },
-      { productId: "ps05", sku: "BEV-MAT-001", name: "Matcha Latte", category: "Beverages", units: 180, revenueCents: 95040, costCents: 57024, marginPct: 40 },
-      { productId: "ps06", sku: "FOO-CRO-001", name: "Butter Croissant", category: "Food", units: 210, revenueCents: 68250, costCents: 41838, marginPct: 39 },
-      { productId: "ps07", sku: "FOO-MUF-001", name: "Blueberry Muffin", category: "Food", units: 165, revenueCents: 57750, costCents: 34650, marginPct: 40 },
-      { productId: "ps08", sku: "FOO-AVO-001", name: "Avocado Toast", category: "Food", units: 148, revenueCents: 110520, costCents: 66312, marginPct: 40 },
-      { productId: "ps09", sku: "FOO-SAN-001", name: "Turkey Sandwich", category: "Food", units: 132, revenueCents: 91080, costCents: 54648, marginPct: 40 },
-      { productId: "ps10", sku: "FOO-SAL-001", name: "Caesar Salad", category: "Food", units: 120, revenueCents: 95400, costCents: 52470, marginPct: 45 },
-      { productId: "ps11", sku: "RET-MUG-001", name: "Finder Mug", category: "Retail", units: 95, revenueCents: 113525, costCents: 45410, marginPct: 60 },
-      { productId: "ps12", sku: "RET-TSH-001", name: "Finder T-Shirt", category: "Retail", units: 88, revenueCents: 193600, costCents: 83248, marginPct: 57 },
-      { productId: "ps13", sku: "RET-BAG-001", name: "Tote Bag", category: "Retail", units: 76, revenueCents: 83600, costCents: 29260, marginPct: 65 },
-      { productId: "ps14", sku: "GRO-COF-001", name: "Whole Bean Coffee 1lb", category: "Groceries", units: 68, revenueCents: 101932, costCents: 47163, marginPct: 54 },
-      { productId: "ps15", sku: "GRO-TEA-001", name: "Loose Leaf Tea", category: "Groceries", units: 54, revenueCents: 64260, costCents: 30845, marginPct: 52 },
-      { productId: "ps16", sku: "BEV-HOT-001", name: "Hot Chocolate", category: "Beverages", units: 98, revenueCents: 45668, costCents: 27401, marginPct: 40 },
-      { productId: "ps17", sku: "BEV-OAT-001", name: "Oat Milk Latte", category: "Beverages", units: 85, revenueCents: 46325, costCents: 27795, marginPct: 40 },
-      { productId: "ps18", sku: "FOO-GRN-001", name: "Granola Bar", category: "Food", units: 144, revenueCents: 33120, costCents: 18216, marginPct: 45 },
-      { productId: "ps19", sku: "GRO-JAM-001", name: "Artisan Jam", category: "Groceries", units: 42, revenueCents: 50400, costCents: 23688, marginPct: 53 },
-      { productId: "ps20", sku: "BEV-SMO-001", name: "Smoothie", category: "Beverages", units: 66, revenueCents: 51546, costCents: 29432, marginPct: 43 },
-    ]});
-  }),
-
-  http.get(`${V1}/reports/margin-by-category`, async () => {
-    await lat();
-    return HttpResponse.json({ items: [
-      { category: "Retail",     revenueCents: 390725, costCents: 157918, marginPct: 60, units: 259 },
-      { category: "Groceries",  revenueCents: 216592, costCents: 101696, marginPct: 53, units: 164 },
-      { category: "Beverages",  revenueCents: 742164, costCents: 428415, marginPct: 42, units: 1264 },
-      { category: "Food",       revenueCents: 456120, costCents: 268134, marginPct: 41, units: 919 },
-    ]});
-  }),
 
   // ── Outlets + registers (store/register selector) ─────────────────────────
   http.get(`${V1}/outlets`, async () => {
@@ -389,7 +342,11 @@ export const mockHandlers = [
   http.get(`${V1}/inventory/levels`, async () => {
     await lat();
     const mk = (id: string, sku: string, name: string, category: string, priceCents: number, onHand: number, reorderPoint: number) => ({
-      id, sku, name, category, status: "active", priceCents, onHand, committed: 0, available: onHand, reorderPoint, lowStock: reorderPoint > 0 && onHand <= reorderPoint, costCents: null, velocity: 0,
+      id, sku, name, category, status: "active", priceCents,
+      onHand, committed: 0, available: onHand, reorderPoint,
+      // snake_case aliases consumed by LowStockSection in reports page
+      stock_qty: onHand, reorder_pt: reorderPoint,
+      lowStock: reorderPoint > 0 && onHand <= reorderPoint, costCents: null, velocity: 0,
     });
     return HttpResponse.json({
       pageSize: 100,
@@ -939,155 +896,6 @@ export const mockHandlers = [
     ];
   })(),
 
-  // ── Workflows ─────────────────────────────────────────────────────────────
-  ...(() => {
-    let wfSeq   = 10;
-    let stepSeq = 10;
-
-    type Step = {
-      id: string; workflowId: string; tenantId: string; name: string;
-      stepType: string; triggerCondition: string;
-      config: Record<string, unknown>; position: number;
-      enabled: boolean; createdAt: number; updatedAt: number;
-    };
-    type WF = {
-      id: string; tenantId: string; name: string; description: string | null;
-      outletId: string | null; enabled: boolean; steps: Step[];
-      createdAt: number; updatedAt: number;
-    };
-
-    const now = Date.now();
-    let workflows: WF[] = [
-      {
-        id: "wf_demo_1", tenantId: "t1",
-        name: "Age Verification",
-        description: "Require age check before selling restricted items",
-        outletId: null, enabled: true,
-        createdAt: now - 60 * 86_400_000, updatedAt: now - 10 * 86_400_000,
-        steps: [
-          {
-            id: "step_demo_1", workflowId: "wf_demo_1", tenantId: "t1",
-            name: "Prompt cashier for ID",
-            stepType: "prompt", triggerCondition: "age_verification",
-            config: { message: "Check customer ID before proceeding." },
-            position: 1, enabled: true,
-            createdAt: now - 60 * 86_400_000, updatedAt: now - 10 * 86_400_000,
-          },
-          {
-            id: "step_demo_2", workflowId: "wf_demo_1", tenantId: "t1",
-            name: "Gate: confirm 18+",
-            stepType: "gate", triggerCondition: "age_verification",
-            config: { minAge: 18 },
-            position: 2, enabled: true,
-            createdAt: now - 60 * 86_400_000, updatedAt: now - 10 * 86_400_000,
-          },
-        ],
-      },
-      {
-        id: "wf_demo_2", tenantId: "t1",
-        name: "Loyalty Capture",
-        description: "Capture loyalty member info at checkout",
-        outletId: null, enabled: false,
-        createdAt: now - 30 * 86_400_000, updatedAt: now - 5 * 86_400_000,
-        steps: [
-          {
-            id: "step_demo_3", workflowId: "wf_demo_2", tenantId: "t1",
-            name: "Ask for loyalty ID",
-            stepType: "capture", triggerCondition: "loyalty_capture",
-            config: { field: "loyalty_id", label: "Loyalty card number" },
-            position: 1, enabled: true,
-            createdAt: now - 30 * 86_400_000, updatedAt: now - 5 * 86_400_000,
-          },
-        ],
-      },
-    ];
-
-    function withSteps(wf: WF) { return { ...wf, steps: workflows.find((w) => w.id === wf.id)?.steps ?? [] }; }
-
-    return [
-      http.get(`${V1}/workflows`, async () => {
-        await lat();
-        return HttpResponse.json({ items: workflows });
-      }),
-
-      http.get(`${V1}/workflows/:id`, async ({ params }) => {
-        await lat();
-        const wf = workflows.find((w) => w.id === String(params["id"]));
-        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return HttpResponse.json(wf);
-      }),
-
-      http.post(`${V1}/workflows`, async ({ request }) => {
-        await lat();
-        const b = (await request.json()) as { name: string; description?: string; outletId?: string | null };
-        const wf: WF = {
-          id: `wf_${++wfSeq}`, tenantId: "t1", name: b.name,
-          description: b.description ?? null, outletId: b.outletId ?? null,
-          enabled: false, steps: [],
-          createdAt: Date.now(), updatedAt: Date.now(),
-        };
-        workflows.push(wf);
-        return HttpResponse.json(wf, { status: 201 });
-      }),
-
-      http.patch(`${V1}/workflows/:id`, async ({ params, request }) => {
-        await lat();
-        const b = (await request.json()) as Partial<{ name: string; description: string; enabled: boolean; outletId: string | null }>;
-        const idx = workflows.findIndex((w) => w.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        workflows[idx] = { ...workflows[idx], ...b, updatedAt: Date.now() };
-        return HttpResponse.json(withSteps(workflows[idx]));
-      }),
-
-      http.delete(`${V1}/workflows/:id`, async ({ params }) => {
-        await lat();
-        const before = workflows.length;
-        workflows = workflows.filter((w) => w.id !== String(params["id"]));
-        if (workflows.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return new HttpResponse(null, { status: 204 });
-      }),
-
-      // Steps
-      http.post(`${V1}/workflows/:workflowId/steps`, async ({ params, request }) => {
-        await lat();
-        const wfId = String(params["workflowId"]);
-        const wf = workflows.find((w) => w.id === wfId);
-        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as { name: string; stepType: string; triggerCondition: string; config?: Record<string, unknown>; position?: number };
-        const step: Step = {
-          id: `step_${++stepSeq}`, workflowId: wfId, tenantId: "t1",
-          name: b.name, stepType: b.stepType, triggerCondition: b.triggerCondition,
-          config: b.config ?? {},
-          position: b.position ?? wf.steps.length + 1,
-          enabled: true, createdAt: Date.now(), updatedAt: Date.now(),
-        };
-        wf.steps.push(step);
-        return HttpResponse.json(step, { status: 201 });
-      }),
-
-      http.patch(`${V1}/workflows/:workflowId/steps/:stepId`, async ({ params, request }) => {
-        await lat();
-        const wf = workflows.find((w) => w.id === String(params["workflowId"]));
-        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as Partial<{ name: string; enabled: boolean; config: Record<string, unknown> }>;
-        const idx = wf.steps.findIndex((s) => s.id === String(params["stepId"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        wf.steps[idx] = { ...wf.steps[idx], ...b, updatedAt: Date.now() };
-        return HttpResponse.json(wf.steps[idx]);
-      }),
-
-      http.delete(`${V1}/workflows/:workflowId/steps/:stepId`, async ({ params }) => {
-        await lat();
-        const wf = workflows.find((w) => w.id === String(params["workflowId"]));
-        if (!wf) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const before = wf.steps.length;
-        wf.steps = wf.steps.filter((s) => s.id !== String(params["stepId"]));
-        if (wf.steps.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return new HttpResponse(null, { status: 204 });
-      }),
-    ];
-  })(),
-
   // ── Webhooks (Settings → Webhooks) ────────────────────────────────────────
   http.get(`${V1}/webhooks`, async () => {
     await lat();
@@ -1442,26 +1250,6 @@ mockHandlers.push(
   http.post(`${V1}/settings/tax-rates`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `tax_${++txSeq}`, tenant_id: "tnt_demo", name: b.name, rate_bps: b.rateBps, apply_to_category: b.applyToCategory ?? null, state: b.state ?? null, active: 1 }; taxRates.push(r); return HttpResponse.json(r, { status: 201 }); }),
   http.post(`${V1}/settings/edition`, async ({ request }) => { await lat(); const b = (await request.json()) as { edition: string }; return HttpResponse.json({ ok: true, edition: b.edition }); }),
 
-  // ── Receipt templates (FE-25) ─────────────────────────────────────────────
-  http.get(`${V1}/settings/receipts/:outletId`, async ({ params }) => {
-    await lat();
-    const id = String(params.outletId);
-    return HttpResponse.json(receiptTemplatesStore.get(id) ?? receiptDefaultTemplate(id));
-  }),
-  http.post(`${V1}/settings/receipts/:outletId`, async ({ params, request }) => {
-    await lat();
-    const id = String(params.outletId);
-    const b = (await request.json()) as any;
-    receiptTemplatesStore.set(id, { ...receiptDefaultTemplate(id), ...b, outletId: id });
-    return HttpResponse.json(receiptTemplatesStore.get(id));
-  }),
-  http.patch(`${V1}/settings/receipts/:outletId`, async ({ params, request }) => {
-    await lat();
-    const id = String(params.outletId);
-    const b = (await request.json()) as any;
-    receiptTemplatesStore.set(id, { ...(receiptTemplatesStore.get(id) ?? receiptDefaultTemplate(id)), ...b, outletId: id });
-    return HttpResponse.json(receiptTemplatesStore.get(id));
-  }),
   http.get(`${V1}/search`, async ({ request }) => {
     await lat();
     const q = (new URL(request.url).searchParams.get("q") ?? "").toLowerCase();
@@ -1744,71 +1532,6 @@ mockHandlers.push(
       { vendorId: "sup_other", vendorName: "General Goods", orderCount: 15, revenueCents: 32000, unitsSold: 87 },
     ]});
   }),
-
-  // ── Insights: Scheduled Reports ────────────────────────────────────────────
-  ...(() => {
-    let srpSeq = 0;
-    let scheduledReports: Array<{
-      id: string; name: string; reportType: string; frequency: string;
-      recipientEmails: string[]; enabled: boolean;
-      lastSentAt: number | null; nextSendAt: number; createdAt: number; updatedAt: number;
-    }> = [
-      {
-        id: "srp_demo_1", name: "Weekly Sales Summary", reportType: "sales_summary",
-        frequency: "weekly", recipientEmails: ["owner@finder-pos.dev"], enabled: true,
-        lastSentAt: Date.now() - 7 * 86_400_000, nextSendAt: Date.now() + 7 * 86_400_000,
-        createdAt: Date.now() - 30 * 86_400_000, updatedAt: Date.now() - 7 * 86_400_000,
-      },
-      {
-        id: "srp_demo_2", name: "Monthly P&L Report", reportType: "p_l",
-        frequency: "monthly", recipientEmails: ["owner@finder-pos.dev", "cfo@finder-pos.dev"], enabled: true,
-        lastSentAt: Date.now() - 30 * 86_400_000, nextSendAt: Date.now() + 30 * 86_400_000,
-        createdAt: Date.now() - 60 * 86_400_000, updatedAt: Date.now() - 30 * 86_400_000,
-      },
-    ];
-    return [
-      http.get(`${V1}/insights/scheduled-reports`, async () => {
-        await lat();
-        return HttpResponse.json({ items: scheduledReports });
-      }),
-      http.post(`${V1}/insights/scheduled-reports`, async ({ request }) => {
-        await lat();
-        const b = (await request.json()) as { name: string; reportType: string; frequency: string; recipientEmails: string[] };
-        const r = {
-          id: `srp_${++srpSeq}`, name: b.name, reportType: b.reportType,
-          frequency: b.frequency, recipientEmails: b.recipientEmails, enabled: true,
-          lastSentAt: null as number | null, nextSendAt: Date.now() + 86_400_000,
-          createdAt: Date.now(), updatedAt: Date.now(),
-        };
-        scheduledReports.push(r);
-        return HttpResponse.json(r, { status: 201 });
-      }),
-      http.patch(`${V1}/insights/scheduled-reports/:id`, async ({ params, request }) => {
-        await lat();
-        const b = (await request.json()) as Partial<{ name: string; reportType: string; frequency: string; recipientEmails: string[]; enabled: boolean }>;
-        const idx = scheduledReports.findIndex((x) => x.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        scheduledReports[idx] = { ...scheduledReports[idx], ...b, updatedAt: Date.now() };
-        return HttpResponse.json(scheduledReports[idx]);
-      }),
-      http.delete(`${V1}/insights/scheduled-reports/:id`, async ({ params }) => {
-        await lat();
-        const before = scheduledReports.length;
-        scheduledReports = scheduledReports.filter((x) => x.id !== String(params["id"]));
-        if (scheduledReports.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return new HttpResponse(null, { status: 204 });
-      }),
-      http.post(`${V1}/insights/scheduled-reports/:id/trigger`, async ({ params }) => {
-        await lat();
-        const r = scheduledReports.find((x) => x.id === String(params["id"]));
-        if (!r) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        r.lastSentAt = Date.now();
-        r.nextSendAt = Date.now() + 86_400_000;
-        r.updatedAt = Date.now();
-        return HttpResponse.json(r);
-      }),
-    ];
-  })(),
 
   // ── Insights: Inventory Forecasting ───────────────────────────────────────
   http.get(`${V1}/insights/reorder`, async () => {
@@ -2257,189 +1980,6 @@ mockHandlers.push(
         const payment = payments.find(p => p.id === String(params["id"]));
         if (!payment) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         return HttpResponse.json(payment);
-      }),
-    ];
-  })(),
-
-  // ── Loyalty Programme ─────────────────────────────────────────────────────
-  ...(() => {
-    const LY_BASE = Date.now();
-
-    // ---- Tiers ----
-    interface TierRecord {
-      id: string; name: string; level: string;
-      points_required: number; discount_pct: number;
-      description: string | null; member_count: number;
-      created_at: number; updated_at: number;
-    }
-    let tierSeq = 4;
-    let tiers: TierRecord[] = [
-      { id: "tier_1", name: "Bronze",   level: "bronze",   points_required: 0,    discount_pct: 0,  description: "Entry level for all new members.",       member_count: 142, created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
-      { id: "tier_2", name: "Silver",   level: "silver",   points_required: 500,  discount_pct: 3,  description: "3% discount on every purchase.",          member_count: 67,  created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
-      { id: "tier_3", name: "Gold",     level: "gold",     points_required: 1500, discount_pct: 7,  description: "7% discount plus priority support.",      member_count: 28,  created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
-      { id: "tier_4", name: "Platinum", level: "platinum", points_required: 5000, discount_pct: 12, description: "12% discount and exclusive early access.", member_count: 9,   created_at: LY_BASE - 86400000 * 90, updated_at: LY_BASE - 86400000 * 90 },
-    ];
-
-    // ---- Members ----
-    interface MemberRecord {
-      id: string; customer_id: string; customer_name: string; customer_email: string | null;
-      tier_id: string; tier_name: string; tier_level: string;
-      points_balance: number; points_lifetime: number;
-      joined_at: number; last_activity_at: number | null;
-    }
-    const members: MemberRecord[] = [
-      { id: "lm_1",  customer_id: "cust_001", customer_name: "Alice Johnson",   customer_email: "alice@example.com",   tier_id: "tier_3", tier_name: "Gold",     tier_level: "gold",     points_balance: 320,  points_lifetime: 2140, joined_at: LY_BASE - 86400000 * 180, last_activity_at: LY_BASE - 86400000 * 2  },
-      { id: "lm_2",  customer_id: "cust_002", customer_name: "Bob Martinez",    customer_email: "bob@example.com",     tier_id: "tier_2", tier_name: "Silver",   tier_level: "silver",   points_balance: 88,   points_lifetime: 620,  joined_at: LY_BASE - 86400000 * 120, last_activity_at: LY_BASE - 86400000 * 5  },
-      { id: "lm_3",  customer_id: "cust_003", customer_name: "Carol White",     customer_email: null,                  tier_id: "tier_4", tier_name: "Platinum", tier_level: "platinum", points_balance: 1200, points_lifetime: 7800, joined_at: LY_BASE - 86400000 * 365, last_activity_at: LY_BASE - 86400000 * 1  },
-      { id: "lm_4",  customer_id: "cust_004", customer_name: "David Kim",       customer_email: "david@example.com",   tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 45,   points_lifetime: 45,   joined_at: LY_BASE - 86400000 * 14,  last_activity_at: LY_BASE - 86400000 * 3  },
-      { id: "lm_5",  customer_id: "cust_005", customer_name: "Emma Davis",      customer_email: "emma@example.com",    tier_id: "tier_2", tier_name: "Silver",   tier_level: "silver",   points_balance: 210,  points_lifetime: 890,  joined_at: LY_BASE - 86400000 * 200, last_activity_at: LY_BASE - 86400000 * 8  },
-      { id: "lm_6",  customer_id: "cust_006", customer_name: "Frank Brown",     customer_email: "frank@example.com",   tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 170,  points_lifetime: 420,  joined_at: LY_BASE - 86400000 * 60,  last_activity_at: LY_BASE - 86400000 * 12 },
-      { id: "lm_7",  customer_id: "cust_007", customer_name: "Grace Lee",       customer_email: "grace@example.com",   tier_id: "tier_3", tier_name: "Gold",     tier_level: "gold",     points_balance: 55,   points_lifetime: 1650, joined_at: LY_BASE - 86400000 * 270, last_activity_at: LY_BASE - 86400000 * 4  },
-      { id: "lm_8",  customer_id: "cust_008", customer_name: "Henry Wilson",    customer_email: null,                  tier_id: "tier_1", tier_name: "Bronze",   tier_level: "bronze",   points_balance: 30,   points_lifetime: 30,   joined_at: LY_BASE - 86400000 * 7,   last_activity_at: LY_BASE - 86400000 * 7  },
-    ];
-
-    // ---- Rewards ----
-    interface RewardRecord {
-      id: string; name: string; description: string | null;
-      points_cost: number; discount_cents: number;
-      status: string; redemption_count: number;
-      created_at: number; updated_at: number;
-    }
-    let rewardSeq = 5;
-    let rewards: RewardRecord[] = [
-      { id: "rwd_1", name: "$5 Off Next Purchase",   description: "Redeem for $5 off any order over $20.",       points_cost: 100,  discount_cents: 500,  status: "active",   redemption_count: 312, created_at: LY_BASE - 86400000 * 60, updated_at: LY_BASE - 86400000 * 60 },
-      { id: "rwd_2", name: "$10 Off Next Purchase",  description: "Redeem for $10 off any order over $40.",      points_cost: 200,  discount_cents: 1000, status: "active",   redemption_count: 148, created_at: LY_BASE - 86400000 * 60, updated_at: LY_BASE - 86400000 * 60 },
-      { id: "rwd_3", name: "Free Beverage",          description: "One complimentary beverage of your choice.",  points_cost: 150,  discount_cents: 350,  status: "active",   redemption_count: 94,  created_at: LY_BASE - 86400000 * 45, updated_at: LY_BASE - 86400000 * 45 },
-      { id: "rwd_4", name: "Double Points Weekend",  description: "Earn 2× points on all purchases this weekend.", points_cost: 50, discount_cents: 0,    status: "inactive", redemption_count: 23,  created_at: LY_BASE - 86400000 * 30, updated_at: LY_BASE - 86400000 * 15 },
-      { id: "rwd_5", name: "$25 Off (Gold+ only)",   description: "Exclusive $25 reward for Gold and Platinum members.", points_cost: 400, discount_cents: 2500, status: "active", redemption_count: 41, created_at: LY_BASE - 86400000 * 20, updated_at: LY_BASE - 86400000 * 20 },
-    ];
-
-    return [
-      // ── TIERS ─────────────────────────────────────────────────────────────
-      http.get(`${V1}/loyalty/tiers`, async () => {
-        await lat();
-        return HttpResponse.json({ items: [...tiers].sort((a, b) => a.points_required - b.points_required) });
-      }),
-
-      http.post(`${V1}/loyalty/tiers`, async ({ request }) => {
-        await lat();
-        const b = (await request.json()) as Partial<TierRecord>;
-        const now = Date.now();
-        const tier: TierRecord = {
-          id: `tier_${++tierSeq}`,
-          name: b.name ?? "New Tier",
-          level: b.level ?? "bronze",
-          points_required: b.points_required ?? 0,
-          discount_pct: b.discount_pct ?? 0,
-          description: b.description ?? null,
-          member_count: 0,
-          created_at: now, updated_at: now,
-        };
-        tiers.push(tier);
-        return HttpResponse.json(tier, { status: 201 });
-      }),
-
-      http.patch(`${V1}/loyalty/tiers/:id`, async ({ request, params }) => {
-        await lat();
-        const idx = tiers.findIndex(t => t.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as Partial<TierRecord>;
-        tiers[idx] = { ...tiers[idx], ...b, updated_at: Date.now() };
-        return HttpResponse.json(tiers[idx]);
-      }),
-
-      http.delete(`${V1}/loyalty/tiers/:id`, async ({ params }) => {
-        await lat();
-        const idx = tiers.findIndex(t => t.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        if (tiers[idx].member_count > 0) {
-          return HttpResponse.json({ error: { code: "has_members", message: "Cannot delete a tier with active members. Move them to another tier first." } }, { status: 422 });
-        }
-        tiers.splice(idx, 1);
-        return new HttpResponse(null, { status: 204 });
-      }),
-
-      // ── MEMBERS ───────────────────────────────────────────────────────────
-      http.get(`${V1}/loyalty/members`, async ({ request }) => {
-        await lat();
-        const url = new URL(request.url);
-        const q       = url.searchParams.get("q");
-        const tierId  = url.searchParams.get("tier_id");
-        const limit   = Number(url.searchParams.get("limit")  ?? 50);
-        const offset  = Number(url.searchParams.get("offset") ?? 0);
-
-        let filtered = members;
-        if (q)      filtered = filtered.filter(m => m.customer_name.toLowerCase().includes(q.toLowerCase()) || (m.customer_email ?? "").toLowerCase().includes(q.toLowerCase()));
-        if (tierId) filtered = filtered.filter(m => m.tier_id === tierId);
-
-        const total = filtered.length;
-        const page  = filtered.slice(offset, offset + limit);
-        return HttpResponse.json({ items: page, total });
-      }),
-
-      http.get(`${V1}/loyalty/members/:id`, async ({ params }) => {
-        await lat();
-        const member = members.find(m => m.id === String(params["id"]));
-        if (!member) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return HttpResponse.json(member);
-      }),
-
-      // Adjust points manually (manager action)
-      http.post(`${V1}/loyalty/members/:id/adjust`, async ({ request, params }) => {
-        await lat();
-        const idx = members.findIndex(m => m.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as { delta: number; reason?: string };
-        const member = members[idx];
-        const newBalance  = Math.max(0, member.points_balance + b.delta);
-        const newLifetime = b.delta > 0 ? member.points_lifetime + b.delta : member.points_lifetime;
-        members[idx] = { ...member, points_balance: newBalance, points_lifetime: newLifetime, last_activity_at: Date.now() };
-        return HttpResponse.json(members[idx]);
-      }),
-
-      // ── REWARDS ───────────────────────────────────────────────────────────
-      http.get(`${V1}/loyalty/rewards`, async ({ request }) => {
-        await lat();
-        const url = new URL(request.url);
-        const status = url.searchParams.get("status");
-        let filtered = rewards;
-        if (status && status !== "all") filtered = filtered.filter(r => r.status === status);
-        return HttpResponse.json({ items: [...filtered].sort((a, b) => a.points_cost - b.points_cost) });
-      }),
-
-      http.post(`${V1}/loyalty/rewards`, async ({ request }) => {
-        await lat();
-        const b = (await request.json()) as Partial<RewardRecord>;
-        const now = Date.now();
-        const reward: RewardRecord = {
-          id: `rwd_${++rewardSeq}`,
-          name: b.name ?? "New Reward",
-          description: b.description ?? null,
-          points_cost: b.points_cost ?? 100,
-          discount_cents: b.discount_cents ?? 0,
-          status: "active",
-          redemption_count: 0,
-          created_at: now, updated_at: now,
-        };
-        rewards.push(reward);
-        return HttpResponse.json(reward, { status: 201 });
-      }),
-
-      http.patch(`${V1}/loyalty/rewards/:id`, async ({ request, params }) => {
-        await lat();
-        const idx = rewards.findIndex(r => r.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as Partial<RewardRecord>;
-        rewards[idx] = { ...rewards[idx], ...b, updated_at: Date.now() };
-        return HttpResponse.json(rewards[idx]);
-      }),
-
-      http.delete(`${V1}/loyalty/rewards/:id`, async ({ params }) => {
-        await lat();
-        const idx = rewards.findIndex(r => r.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        rewards[idx] = { ...rewards[idx], status: "archived", updated_at: Date.now() };
-        return new HttpResponse(null, { status: 204 });
       }),
     ];
   })(),
@@ -3034,112 +2574,6 @@ mockHandlers.push(
     ];
   })(),
 
-  // ── Service Orders ────────────────────────────────────────────────────────
-  ...(() => {
-    let seq = 0;
-    const BASE = Date.now();
-
-    interface SO {
-      id: string; customer_id: string; customer_name: string;
-      title: string; description: string; status: string;
-      assigned_to: string | null; assigned_to_name: string | null;
-      estimate_cents: number; actual_cents: number | null;
-      created_at: number; updated_at: number;
-    }
-
-    let orders: SO[] = [
-      {
-        id: "so_demo_1", customer_id: "cust_1", customer_name: "Alice Johnson",
-        title: "Trek FX3 — brake cable replacement", description: "Front and rear brake cables frayed. Customer provided cables.",
-        status: "in_progress", assigned_to: "emp_1", assigned_to_name: "Marcus T.",
-        estimate_cents: 4500, actual_cents: null, created_at: BASE - 86400000 * 3, updated_at: BASE - 86400000,
-      },
-      {
-        id: "so_demo_2", customer_id: "cust_2", customer_name: "Bob Martinez",
-        title: "iPhone 13 — cracked screen", description: "Screen shattered, touch still works. OEM glass replacement.",
-        status: "ready", assigned_to: "emp_2", assigned_to_name: "Priya S.",
-        estimate_cents: 18900, actual_cents: 18900, created_at: BASE - 86400000 * 5, updated_at: BASE - 3600000,
-      },
-      {
-        id: "so_demo_3", customer_id: "cust_3", customer_name: "Carol White",
-        title: "Specialized Sirrus — tune-up + new chain", description: "Full tune-up: derailleur adjustment, new KMC chain, lube.",
-        status: "open", assigned_to: null, assigned_to_name: null,
-        estimate_cents: 7500, actual_cents: null, created_at: BASE - 86400000, updated_at: BASE - 86400000,
-      },
-      {
-        id: "so_demo_4", customer_id: "cust_4", customer_name: "David Lee",
-        title: "MacBook Pro — battery replacement", description: "Battery swells, machine shuts off under load. Battery sourced.",
-        status: "closed", assigned_to: "emp_1", assigned_to_name: "Marcus T.",
-        estimate_cents: 22000, actual_cents: 21500, created_at: BASE - 86400000 * 14, updated_at: BASE - 86400000 * 7,
-      },
-      {
-        id: "so_demo_5", customer_id: "cust_5", customer_name: "Eva Chen",
-        title: "Giant Escape 3 — flat repair", description: "Rear tube punctured. Customer wants tube + tire boot.",
-        status: "draft", assigned_to: null, assigned_to_name: null,
-        estimate_cents: 1800, actual_cents: null, created_at: BASE - 3600000, updated_at: BASE - 3600000,
-      },
-    ];
-
-    return [
-      http.get(`${V1}/service-orders`, async ({ request }) => {
-        await lat();
-        const url = new URL(request.url);
-        const status = url.searchParams.get("status");
-        const q = url.searchParams.get("q");
-        const limit = Number(url.searchParams.get("limit") ?? 50);
-        const offset = Number(url.searchParams.get("offset") ?? 0);
-
-        let filtered = orders;
-        if (status && status !== "all") filtered = filtered.filter(o => o.status === status);
-        if (q) {
-          const lq = q.toLowerCase();
-          filtered = filtered.filter(o =>
-            o.title.toLowerCase().includes(lq) || o.customer_name.toLowerCase().includes(lq)
-          );
-        }
-        const total = filtered.length;
-        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total, limit, offset });
-      }),
-
-      http.post(`${V1}/service-orders`, async ({ request }) => {
-        await lat();
-        const b = (await request.json()) as Partial<SO>;
-        const now = Date.now();
-        const o: SO = {
-          id: `so_${++seq}`,
-          customer_id: b.customer_id ?? "",
-          customer_name: b.customer_name ?? "Unknown Customer",
-          title: b.title ?? "Untitled",
-          description: b.description ?? "",
-          status: "draft",
-          assigned_to: b.assigned_to ?? null,
-          assigned_to_name: b.assigned_to_name ?? null,
-          estimate_cents: b.estimate_cents ?? 0,
-          actual_cents: null,
-          created_at: now, updated_at: now,
-        };
-        orders.unshift(o);
-        return HttpResponse.json(o, { status: 201 });
-      }),
-
-      http.get(`${V1}/service-orders/:id`, async ({ params }) => {
-        await lat();
-        const o = orders.find(x => x.id === String(params["id"]));
-        if (!o) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        return HttpResponse.json(o);
-      }),
-
-      http.patch(`${V1}/service-orders/:id`, async ({ params, request }) => {
-        await lat();
-        const idx = orders.findIndex(x => x.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as Partial<SO>;
-        orders[idx] = { ...orders[idx], ...b, updated_at: Date.now() };
-        return HttpResponse.json(orders[idx]);
-      }),
-    ];
-  })(),
-
   // ─── Serial Numbers (FE-17 / BE-24) ─────────────────────────────────────────
   ...(() => {
     type SN = {
@@ -3234,147 +2668,6 @@ mockHandlers.push(
     ];
   })(),
 
-  // ─── Workforce — Employees + Shifts + Time-off (FE-18) ───────────────────────
-  ...(() => {
-    type Emp = { id: string; name: string; role: string; email: string; avatar_color: string };
-    type Sh = { id: string; employee_id: string; employee_name: string; role: string; date: string; start_time: string; end_time: string; notes: string | null; created_at: number; updated_at: number };
-    type TO = { id: string; employee_id: string; employee_name: string; date_from: string; date_to: string; reason: string | null; status: string; created_at: number };
-
-    const employees: Emp[] = [
-      { id: "emp_001", name: "Alex Rivera",   role: "manager",    email: "alex@finder.local",   avatar_color: "#7c3aed" },
-      { id: "emp_002", name: "Jordan Lee",    role: "cashier",    email: "jordan@finder.local",  avatar_color: "#2563eb" },
-      { id: "emp_003", name: "Sam Patel",     role: "cashier",    email: "sam@finder.local",     avatar_color: "#0891b2" },
-      { id: "emp_004", name: "Morgan Kim",    role: "stock",      email: "morgan@finder.local",  avatar_color: "#d97706" },
-      { id: "emp_005", name: "Taylor Brooks", role: "supervisor", email: "taylor@finder.local",  avatar_color: "#059669" },
-    ];
-
-    // Anchor to Monday of the current week
-    function mondayOf(d: Date): Date {
-      const day = d.getDay(); // 0=Sun
-      const diff = day === 0 ? -6 : 1 - day;
-      const m = new Date(d);
-      m.setDate(d.getDate() + diff);
-      m.setHours(0, 0, 0, 0);
-      return m;
-    }
-    function isoDate(d: Date): string {
-      return d.toISOString().slice(0, 10);
-    }
-
-    const now = Date.now();
-    const mon = mondayOf(new Date());
-    const D = (offset: number) => isoDate(new Date(mon.getTime() + offset * 86_400_000));
-
-    let seq = 0;
-    const shifts: Sh[] = [
-      // Alex (manager) — Mon, Wed, Fri
-      { id: "sh_001", employee_id: "emp_001", employee_name: "Alex Rivera",   role: "manager",    date: D(0), start_time: "08:00", end_time: "16:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_002", employee_id: "emp_001", employee_name: "Alex Rivera",   role: "manager",    date: D(2), start_time: "08:00", end_time: "16:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_003", employee_id: "emp_001", employee_name: "Alex Rivera",   role: "manager",    date: D(4), start_time: "08:00", end_time: "16:00", notes: null, created_at: now, updated_at: now },
-      // Jordan (cashier) — Mon–Fri
-      { id: "sh_004", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(0), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_005", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(1), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_006", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(2), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_007", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(3), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_008", employee_id: "emp_002", employee_name: "Jordan Lee",    role: "cashier",    date: D(4), start_time: "09:00", end_time: "17:00", notes: null, created_at: now, updated_at: now },
-      // Sam (cashier) — Tue, Thu, Sat, Sun
-      { id: "sh_009", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(1), start_time: "12:00", end_time: "20:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_010", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(3), start_time: "12:00", end_time: "20:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_011", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(5), start_time: "10:00", end_time: "18:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_012", employee_id: "emp_003", employee_name: "Sam Patel",     role: "cashier",    date: D(6), start_time: "10:00", end_time: "18:00", notes: null, created_at: now, updated_at: now },
-      // Morgan (stock) — early mornings Mon, Wed, Fri
-      { id: "sh_013", employee_id: "emp_004", employee_name: "Morgan Kim",    role: "stock",      date: D(0), start_time: "05:00", end_time: "13:00", notes: "Stock delivery expected", created_at: now, updated_at: now },
-      { id: "sh_014", employee_id: "emp_004", employee_name: "Morgan Kim",    role: "stock",      date: D(2), start_time: "05:00", end_time: "13:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_015", employee_id: "emp_004", employee_name: "Morgan Kim",    role: "stock",      date: D(4), start_time: "05:00", end_time: "13:00", notes: null, created_at: now, updated_at: now },
-      // Taylor (supervisor) — Thu, Fri, Sat, Sun
-      { id: "sh_016", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(3), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_017", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(4), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_018", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(5), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
-      { id: "sh_019", employee_id: "emp_005", employee_name: "Taylor Brooks", role: "supervisor", date: D(6), start_time: "14:00", end_time: "22:00", notes: null, created_at: now, updated_at: now },
-    ];
-
-    const timeoff: TO[] = [
-      { id: "to_001", employee_id: "emp_003", employee_name: "Sam Patel",     date_from: D(7),  date_to: D(8),  reason: "Family event", status: "pending",  created_at: now - 86_400_000 },
-      { id: "to_002", employee_id: "emp_004", employee_name: "Morgan Kim",    date_from: D(14), date_to: D(14), reason: "Medical appointment", status: "approved", created_at: now - 172_800_000 },
-      { id: "to_003", employee_id: "emp_002", employee_name: "Jordan Lee",    date_from: D(21), date_to: D(25), reason: "Annual leave", status: "pending",  created_at: now - 43_200_000 },
-      { id: "to_004", employee_id: "emp_001", employee_name: "Alex Rivera",   date_from: D(-3), date_to: D(-2), reason: "Sick leave", status: "approved", created_at: now - 604_800_000 },
-    ];
-
-    return [
-      // Employees
-      http.get(`${V1}/workforce/employees`, async () => {
-        await lat();
-        return HttpResponse.json({ items: employees, total: employees.length });
-      }),
-
-      // Shifts — filter by date range or employee
-      http.get(`${V1}/workforce/shifts`, async ({ request }) => {
-        await lat();
-        const url = new URL(request.url);
-        const dateFrom = url.searchParams.get("date_from");
-        const dateTo   = url.searchParams.get("date_to");
-        const empId    = url.searchParams.get("employee_id");
-        let filtered = [...shifts];
-        if (dateFrom) filtered = filtered.filter(s => s.date >= dateFrom);
-        if (dateTo)   filtered = filtered.filter(s => s.date <= dateTo);
-        if (empId)    filtered = filtered.filter(s => s.employee_id === empId);
-        return HttpResponse.json({ items: filtered, total: filtered.length });
-      }),
-
-      http.post(`${V1}/workforce/shifts`, async ({ request }) => {
-        await lat();
-        const b = (await request.json()) as Partial<Sh>;
-        const emp = employees.find(e => e.id === b.employee_id);
-        const n = Date.now();
-        const sh: Sh = {
-          id: `sh_${++seq}`,
-          employee_id: b.employee_id ?? "",
-          employee_name: emp?.name ?? "Unknown",
-          role: emp?.role ?? "cashier",
-          date: b.date ?? D(0),
-          start_time: b.start_time ?? "09:00",
-          end_time: b.end_time ?? "17:00",
-          notes: b.notes ?? null,
-          created_at: n, updated_at: n,
-        };
-        shifts.push(sh);
-        return HttpResponse.json(sh, { status: 201 });
-      }),
-
-      http.patch(`${V1}/workforce/shifts/:id`, async ({ params, request }) => {
-        await lat();
-        const idx = shifts.findIndex(s => s.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as Partial<Sh>;
-        shifts[idx] = { ...shifts[idx]!, ...b, updated_at: Date.now() };
-        return HttpResponse.json(shifts[idx]);
-      }),
-
-      http.delete(`${V1}/workforce/shifts/:id`, async ({ params }) => {
-        await lat();
-        const idx = shifts.findIndex(s => s.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        shifts.splice(idx, 1);
-        return new HttpResponse(null, { status: 204 });
-      }),
-
-      // Time-off requests
-      http.get(`${V1}/workforce/time-off`, async () => {
-        await lat();
-        return HttpResponse.json({ items: timeoff, total: timeoff.length });
-      }),
-
-      http.patch(`${V1}/workforce/time-off/:id`, async ({ params, request }) => {
-        await lat();
-        const idx = timeoff.findIndex(t => t.id === String(params["id"]));
-        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        const b = (await request.json()) as Partial<TO>;
-        timeoff[idx] = { ...timeoff[idx]!, ...b };
-        return HttpResponse.json(timeoff[idx]);
-      }),
-    ];
-  })(),
-
   // ── Reorder Suggestions (BE-27 / FE-23) ──────────────────────────────────
   ...(() => {
     interface RS {
@@ -3418,39 +2711,39 @@ mockHandlers.push(
 
   // ── Enhanced Reports (FE-24) ──────────────────────────────────────────────
   ...(() => {
-    interface SBP { product_id: string; product_name: string; sku: string | null; category: string | null; units_sold: number; revenue_cents: number; cost_cents: number; margin_cents: number; margin_pct: number; }
-    interface MBC { category: string; revenue_cents: number; cost_cents: number; margin_cents: number; margin_pct: number; }
+    interface SBP { productId: string; name: string; sku: string; category: string; units: number; revenueCents: number; costCents: number; marginPct: number; }
+    interface MBC { category: string; units: number; revenueCents: number; costCents: number; marginPct: number; }
 
     const salesByProduct: SBP[] = [
-      { product_id: "p01", product_name: "Marlboro Red King",       sku: "MRL-RED-K",  category: "Tobacco",    units_sold: 312, revenue_cents: 1934880, cost_cents: 1393114, margin_cents: 541766, margin_pct: 28.0 },
-      { product_id: "p02", product_name: "Newport Menthol 100s",    sku: "NWP-M100",   category: "Tobacco",    units_sold: 248, revenue_cents: 1537360, cost_cents: 1106900, margin_cents: 430460, margin_pct: 28.0 },
-      { product_id: "p03", product_name: "Monster Energy Original", sku: "MON-OG",     category: "Beverages",  units_sold: 540, revenue_cents:  972000, cost_cents:  583200, margin_cents: 388800, margin_pct: 40.0 },
-      { product_id: "p04", product_name: "Red Bull 8.4oz",          sku: "RDB-84",     category: "Beverages",  units_sold: 480, revenue_cents:  806400, cost_cents:  483840, margin_cents: 322560, margin_pct: 40.0 },
-      { product_id: "p05", product_name: "Swisher Sweets Original", sku: "SWI-OG",     category: "Tobacco",    units_sold: 195, revenue_cents:  624000, cost_cents:  436800, margin_cents: 187200, margin_pct: 30.0 },
-      { product_id: "p06", product_name: "Backwoods Honey Berry",   sku: "BKW-HB",     category: "Tobacco",    units_sold: 180, revenue_cents:  576000, cost_cents:  403200, margin_cents: 172800, margin_pct: 30.0 },
-      { product_id: "p07", product_name: "5-Hour Energy Berry",     sku: "5HR-BRY",    category: "Beverages",  units_sold: 360, revenue_cents:  540000, cost_cents:  270000, margin_cents: 270000, margin_pct: 50.0 },
-      { product_id: "p08", product_name: "Camel Blue Box",          sku: "CAM-BLU",    category: "Tobacco",    units_sold: 144, revenue_cents:  892800, cost_cents:  642816, margin_cents: 249984, margin_pct: 28.0 },
-      { product_id: "p09", product_name: "Lottery Tickets (avg)",   sku: "LOT-AVG",    category: "Lottery",    units_sold: 820, revenue_cents:  820000, cost_cents:  779000, margin_cents:  41000, margin_pct:  5.0 },
-      { product_id: "p10", product_name: "Doritos Nacho Cheese",    sku: "DOR-NCH",    category: "Snacks",     units_sold: 295, revenue_cents:  295000, cost_cents:  177000, margin_cents: 118000, margin_pct: 40.0 },
-      { product_id: "p11", product_name: "Lay's Classic",           sku: "LAY-CLS",    category: "Snacks",     units_sold: 270, revenue_cents:  270000, cost_cents:  162000, margin_cents: 108000, margin_pct: 40.0 },
-      { product_id: "p12", product_name: "Gatorade Blue 32oz",      sku: "GAT-BLU-32", category: "Beverages",  units_sold: 210, revenue_cents:  378000, cost_cents:  226800, margin_cents: 151200, margin_pct: 40.0 },
-      { product_id: "p13", product_name: "Coca-Cola 20oz",          sku: "COK-20",     category: "Beverages",  units_sold: 390, revenue_cents:  507000, cost_cents:  304200, margin_cents: 202800, margin_pct: 40.0 },
-      { product_id: "p14", product_name: "White Owl Cigarillos",    sku: "WOW-CIG",    category: "Tobacco",    units_sold: 132, revenue_cents:  422400, cost_cents:  295680, margin_cents: 126720, margin_pct: 30.0 },
-      { product_id: "p15", product_name: "Trolli Sour Worms",       sku: "TRL-SW",     category: "Candy",      units_sold: 185, revenue_cents:  185000, cost_cents:  103600, margin_cents:  81400, margin_pct: 44.0 },
-      { product_id: "p16", product_name: "Reese's Peanut Butter",   sku: "RES-PB",     category: "Candy",      units_sold: 200, revenue_cents:  200000, cost_cents:  110000, margin_cents:  90000, margin_pct: 45.0 },
-      { product_id: "p17", product_name: "Pepsi 20oz",              sku: "PEP-20",     category: "Beverages",  units_sold: 330, revenue_cents:  429000, cost_cents:  257400, margin_cents: 171600, margin_pct: 40.0 },
-      { product_id: "p18", product_name: "Kind Bar Almond",         sku: "KND-ALM",    category: "Snacks",     units_sold: 145, revenue_cents:  261000, cost_cents:  156600, margin_cents: 104400, margin_pct: 40.0 },
-      { product_id: "p19", product_name: "Juul Pod Mint",           sku: "JUL-MNT",    category: "Vapor",      units_sold:  90, revenue_cents:  360000, cost_cents:  252000, margin_cents: 108000, margin_pct: 30.0 },
-      { product_id: "p20", product_name: "Vuse Alto Pod",           sku: "VUS-ALT",    category: "Vapor",      units_sold:  78, revenue_cents:  312000, cost_cents:  218400, margin_cents:  93600, margin_pct: 30.0 },
+      { productId: "p01", name: "Marlboro Red King",       sku: "MRL-RED-K",  category: "Tobacco",   units: 312, revenueCents: 1934880, costCents: 1393114, marginPct: 28 },
+      { productId: "p02", name: "Newport Menthol 100s",    sku: "NWP-M100",   category: "Tobacco",   units: 248, revenueCents: 1537360, costCents: 1106900, marginPct: 28 },
+      { productId: "p03", name: "Monster Energy Original", sku: "MON-OG",     category: "Beverages", units: 540, revenueCents:  972000, costCents:  583200, marginPct: 40 },
+      { productId: "p04", name: "Red Bull 8.4oz",          sku: "RDB-84",     category: "Beverages", units: 480, revenueCents:  806400, costCents:  483840, marginPct: 40 },
+      { productId: "p05", name: "Swisher Sweets Original", sku: "SWI-OG",     category: "Tobacco",   units: 195, revenueCents:  624000, costCents:  436800, marginPct: 30 },
+      { productId: "p06", name: "Backwoods Honey Berry",   sku: "BKW-HB",     category: "Tobacco",   units: 180, revenueCents:  576000, costCents:  403200, marginPct: 30 },
+      { productId: "p07", name: "5-Hour Energy Berry",     sku: "5HR-BRY",    category: "Beverages", units: 360, revenueCents:  540000, costCents:  270000, marginPct: 50 },
+      { productId: "p08", name: "Camel Blue Box",          sku: "CAM-BLU",    category: "Tobacco",   units: 144, revenueCents:  892800, costCents:  642816, marginPct: 28 },
+      { productId: "p09", name: "Lottery Tickets (avg)",   sku: "LOT-AVG",    category: "Lottery",   units: 820, revenueCents:  820000, costCents:  779000, marginPct:  5 },
+      { productId: "p10", name: "Doritos Nacho Cheese",    sku: "DOR-NCH",    category: "Snacks",    units: 295, revenueCents:  295000, costCents:  177000, marginPct: 40 },
+      { productId: "p11", name: "Lay's Classic",           sku: "LAY-CLS",    category: "Snacks",    units: 270, revenueCents:  270000, costCents:  162000, marginPct: 40 },
+      { productId: "p12", name: "Gatorade Blue 32oz",      sku: "GAT-BLU-32", category: "Beverages", units: 210, revenueCents:  378000, costCents:  226800, marginPct: 40 },
+      { productId: "p13", name: "Coca-Cola 20oz",          sku: "COK-20",     category: "Beverages", units: 390, revenueCents:  507000, costCents:  304200, marginPct: 40 },
+      { productId: "p14", name: "White Owl Cigarillos",    sku: "WOW-CIG",    category: "Tobacco",   units: 132, revenueCents:  422400, costCents:  295680, marginPct: 30 },
+      { productId: "p15", name: "Trolli Sour Worms",       sku: "TRL-SW",     category: "Candy",     units: 185, revenueCents:  185000, costCents:  103600, marginPct: 44 },
+      { productId: "p16", name: "Reese's Peanut Butter",   sku: "RES-PB",     category: "Candy",     units: 200, revenueCents:  200000, costCents:  110000, marginPct: 45 },
+      { productId: "p17", name: "Pepsi 20oz",              sku: "PEP-20",     category: "Beverages", units: 330, revenueCents:  429000, costCents:  257400, marginPct: 40 },
+      { productId: "p18", name: "Kind Bar Almond",         sku: "KND-ALM",    category: "Snacks",    units: 145, revenueCents:  261000, costCents:  156600, marginPct: 40 },
+      { productId: "p19", name: "Juul Pod Mint",           sku: "JUL-MNT",    category: "Vapor",     units:  90, revenueCents:  360000, costCents:  252000, marginPct: 30 },
+      { productId: "p20", name: "Vuse Alto Pod",           sku: "VUS-ALT",    category: "Vapor",     units:  78, revenueCents:  312000, costCents:  218400, marginPct: 30 },
     ];
 
     const marginByCategory: MBC[] = [
-      { category: "Tobacco",   revenue_cents: 5387440, cost_cents: 3878510, margin_cents: 1508930, margin_pct: 28.0 },
-      { category: "Beverages", revenue_cents: 3632400, cost_cents: 2125440, margin_cents: 1506960, margin_pct: 41.5 },
-      { category: "Lottery",   revenue_cents:  820000, cost_cents:  779000, margin_cents:   41000, margin_pct:  5.0 },
-      { category: "Snacks",    revenue_cents:  826000, cost_cents:  495600, margin_cents:  330400, margin_pct: 40.0 },
-      { category: "Candy",     revenue_cents:  385000, cost_cents:  213600, margin_cents:  171400, margin_pct: 44.5 },
-      { category: "Vapor",     revenue_cents:  672000, cost_cents:  470400, margin_cents:  201600, margin_pct: 30.0 },
+      { category: "Tobacco",   units: 1011, revenueCents: 5387440, costCents: 3878510, marginPct: 28 },
+      { category: "Beverages", units: 2310, revenueCents: 3632400, costCents: 2125440, marginPct: 42 },
+      { category: "Lottery",   units:  820, revenueCents:  820000, costCents:  779000, marginPct:  5 },
+      { category: "Snacks",    units:  710, revenueCents:  826000, costCents:  495600, marginPct: 40 },
+      { category: "Candy",     units:  385, revenueCents:  385000, costCents:  213600, marginPct: 45 },
+      { category: "Vapor",     units:  168, revenueCents:  672000, costCents:  470400, marginPct: 30 },
     ];
 
     return [
@@ -3465,4 +2758,5 @@ mockHandlers.push(
       }),
     ];
   })(),
-);
+];
+
