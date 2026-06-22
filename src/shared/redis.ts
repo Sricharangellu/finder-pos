@@ -1,4 +1,5 @@
 import { Redis } from "ioredis";
+import { logger } from "./logger.js";
 
 export type { Redis };
 
@@ -32,7 +33,7 @@ export function openRedis(url?: string): Redis | null {
 
   client.on("error", (err) => {
     // Non-fatal — rate limiting and event fan-out degrade gracefully without Redis.
-    console.error("[redis] connection error:", (err as Error).message);
+    logger.error({ err: (err as Error).message }, "[redis] connection error");
   });
 
   return client;
