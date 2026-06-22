@@ -401,3 +401,14 @@ before this commit. No new errors introduced.
 - **Shipped:** Webhook delivery system with exponential backoff retries (×5), owner-only route guards on all management endpoints, PATCH /:id toggle endpoint, and `attempt_count` + `last_response_body` columns on `webhook_deliveries`. BE-32 closed as duplicate of already-complete BE-30. Production hardening commits also included: RLS withTenant() on all 22 write-path transactions, account lockout, Stripe Terminal server-driven flow, startup env-var fail-fast validation.
 - **Verified:** typecheck clean; npm test 308/308 pass.
 - **Contract changes:** PATCH /api/v1/webhooks/:id (toggle active); webhook_deliveries now returns attempt_count and last_response_body fields.
+
+## 2026-06-22 — Infrastructure sprint: INF-1..4
+
+- **Shipped:** Four enterprise blockers addressed in one commit (3fabb55):
+  - INF-1: `pg_advisory_xact_lock` around all module migrations in `db.tx()` — prevents multi-instance ALTER TABLE races on deploy.
+  - INF-2: SIGTERM/SIGINT graceful shutdown in `server.ts` — `server.close()` + `db.close()` with 10 s force-exit fallback.
+  - INF-3: `pino` structured logging (`src/shared/logger.ts`) replacing `console.*` in `app.ts`/`server.ts`.
+  - INF-4: `POST /api/stripe/webhook` with `express.raw()` + `stripe.webhooks.constructEvent()` signature verification; publishes verified events to EventBus.
+- **Roadmap:** INF lane added with 11 items (INF-1..4 closed; INF-5..11 queued as priority over feature work).
+- **Verified:** typecheck clean; npm test pass.
+- **Contract changes:** `POST /api/stripe/webhook` (unauthenticated, raw body, requires `STRIPE_WEBHOOK_SECRET` env var).
