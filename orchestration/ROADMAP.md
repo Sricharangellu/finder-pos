@@ -130,9 +130,10 @@ records, only triaged into "build now" vs. "documented for later."
       `requireScope(scope)` middleware factory. app.ts now uses
       makeAuthMiddleware(db) on /api/v1/*. Plain authMiddleware() kept for
       test compatibility. Exported from gateway/index.ts. (done in d74a87f)
-- [ ] INF-11: Replace remaining `console.*` — audit all `src/modules/**` for
-      `console.log`/`console.error`; replace with `moduleLogger(name)` child
-      loggers. Estimated effort: 1 day.
+- [x] INF-11: Replace remaining `console.*` — deleted debug _repro.ts; added
+      moduleLogger to 14 source files across gateway, payments, orchestration
+      jobs, sagas, queue-consumer, and workflow-runner. Zero console.* calls
+      remain in non-test src/ (redis.ts done by parallel agent). (done in b67c080)
 
 ---
 

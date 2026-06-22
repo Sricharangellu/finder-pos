@@ -427,3 +427,11 @@ before this commit. No new errors introduced.
 - **Shipped:** `.env.example` comprehensively documented — `PG_POOL_MAX` with pool sizing formula and Neon/Railway pooler guidance, plus all other env vars now used (Redis, Stripe, APP_URL, BACKEND_URL, METRICS_TOKEN, CORS). redis.ts console.error replaced with structured pino logger (last remaining console.* in src/shared/). /readyz pool-saturation 503 was already done in a957060 (INF-1..6 sprint).
 - **Verified:** typecheck clean; npm test 308/308 pass.
 - **Contract changes:** none — .env.example is documentation only.
+
+## 2026-06-22 — Infrastructure sprint: INF-7 (readyz) + INF-11 (console cleanup)
+
+- **Shipped:**
+  - INF-7 (pool stats): `DB.poolStats()` method added returning `{ total, idle, waiting }` from pg.Pool; `/readyz` returns pool stats and 503 when `waiting > 0` for load-balancer shedding. `.env.example` `PG_POOL_MAX` guidance already landed in parallel agent commit.
+  - INF-11 (zero console.*): deleted `_repro.ts` debug file; added `moduleLogger(name)` to 14 source files — gateway/errorEnvelope, payments/service, orchestration commands/compensations/idempotency/jobs(×5)/saga/queue-consumer/workflow-runner. `redis.ts` handled by parallel backend agent. Zero `console.*` remain in non-test `src/`.
+- **Verified:** typecheck clean; npm test pass.
+- **Contract changes:** `DB` interface gains `poolStats(): PoolStats | null`; `/readyz` response now includes `pool` and `poolMax` fields; returns 503 on pool exhaustion.
