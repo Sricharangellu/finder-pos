@@ -90,14 +90,27 @@ CREATE TABLE IF NOT EXISTS product_tier_prices (
   PRIMARY KEY (tenant_id, product_id, tier)
 );`;
 
+// BE-29 — Sales reps CRUD + performance reporting.
+const CREATE_SALES_REPS = `
+CREATE TABLE IF NOT EXISTS sales_reps (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  name           TEXT NOT NULL,
+  email          TEXT,
+  commission_pct NUMERIC(5,2) NOT NULL DEFAULT 0,
+  active         INTEGER NOT NULL DEFAULT 1,
+  created_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sales_reps_tenant_idx ON sales_reps (tenant_id, active);`;
+
 /** Sales — quotations + sales orders (B2B order-to-cash front half). */
 export const salesModule: PosModule = {
   name: "sales",
-  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES],
+  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES, CREATE_SALES_REPS],
   register({ db, events, router }) {
     registerRoutes(router, new SalesService(db, events));
   },
 };
 
 export { SalesService } from "./service.js";
-export type { Quotation, SalesOrder, SalesLine, QuoteStatus, SOStatus } from "./service.js";
+export type { Quotation, SalesOrder, SalesLine, QuoteStatus, SOStatus, SalesRep, SalesRepPerformance } from "./service.js";

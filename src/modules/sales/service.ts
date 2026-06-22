@@ -98,6 +98,43 @@ interface ResolvedLine {
 
 const QUOTE_TERMINAL = new Set<QuoteStatus>(["expired", "cancelled"]);
 
+// ── Sales reps (BE-29) ────────────────────────────────────────────────────────
+
+export interface SalesRep {
+  id: string;
+  tenant_id: string;
+  name: string;
+  email: string | null;
+  commission_pct: number;
+  active: boolean;
+  created_at: number;
+}
+
+/** Raw DB row — SQLite stores booleans as 0/1. Coerced before returning. */
+interface SalesRepRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  email: string | null;
+  commission_pct: number;
+  active: number;
+  created_at: number;
+}
+
+function rowToRep(r: SalesRepRow): SalesRep {
+  return { ...r, commission_pct: Number(r.commission_pct), active: r.active === 1 };
+}
+
+export interface SalesRepPerformance {
+  rep_id: string;
+  rep_name: string;
+  total_revenue_cents: number;
+  order_count: number;
+  avg_deal_cents: number;
+  from_ts: number;
+  to_ts: number;
+}
+
 export class SalesService {
   constructor(
     private readonly db: DB,
@@ -389,5 +426,81 @@ export class SalesService {
     if (so.status === "invoiced") throw conflict("cannot cancel an invoiced sales order");
     await this.db.query("UPDATE sales_orders SET status = 'cancelled', updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
     return { ...so, status: "cancelled" };
+  }
+
+  // ── Sales reps (BE-29) ───────────────────────────────────────────────────────
+
+  async listReps(tenantId: string, activeOnly = false): Promise<SalesRep[]> {
+    const where = activeOnly ? "tenant_id = @t AND active = 1" : "tenant_id = @t";
+    const rows = await this.db.query<SalesRepRow>(
+      `SELECT * FROM sales_reps WHERE ${where} ORDER BY name`,
+      { t: tenantId },
+    );
+    return rows.map(rowToRep);
+  }
+
+  async createRep(input: { name: string; email?: string | null; commission_pct?: number }, tenantId: string): Promise<SalesRep> {
+    if (!input.name.trim()) throw badRequest("name is required");
+    const id = `rep_${uuidv7()}`;
+    const now = Date.now();
+    const rep: SalesRep = {
+      id,
+      tenant_id: tenantId,
+      name: input.name.trim(),
+      email: input.email ?? null,
+      commission_pct: input.commission_pct ?? 0,
+      active: true,
+      created_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO sales_reps (id, tenant_id, name, email, commission_pct, active, created_at)
+       VALUES (@id, @tenant_id, @name, @email, @commission_pct, 1, @created_at)`,
+      { id: rep.id, tenant_id: rep.tenant_id, name: rep.name, email: rep.email, commission_pct: rep.commission_pct, created_at: rep.created_at },
+    );
+    return rep;
+  }
+
+  async updateRep(id: string, input: { name?: string; email?: string | null; commission_pct?: number; active?: boolean }, tenantId: string): Promise<SalesRep> {
+    const row = await this.db.one<SalesRepRow>(
+      "SELECT * FROM sales_reps WHERE id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    if (!row) throw notFound(`sales rep '${id}' not found`);
+    const name = input.name ?? row.name;
+    const email = input.email !== undefined ? input.email : row.email;
+    const commission_pct = input.commission_pct ?? Number(row.commission_pct);
+    const active = input.active !== undefined ? (input.active ? 1 : 0) : row.active;
+    await this.db.query(
+      `UPDATE sales_reps SET name = @name, email = @email, commission_pct = @cp, active = @active WHERE id = @id AND tenant_id = @t`,
+      { name, email, cp: commission_pct, active, id, t: tenantId },
+    );
+    return { ...row, name, email, commission_pct, active: active === 1 };
+  }
+
+  async getRepPerformance(id: string, tenantId: string, from: number, to: number): Promise<SalesRepPerformance> {
+    const repRow = await this.db.one<SalesRepRow>(
+      "SELECT * FROM sales_reps WHERE id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    if (!repRow) throw notFound(`sales rep '${id}' not found`);
+    const rep = rowToRep(repRow);
+    const row = await this.db.one<{ total_revenue_cents: number; order_count: number }>(
+      `SELECT COALESCE(SUM(total_cents), 0) AS total_revenue_cents, COUNT(*) AS order_count
+       FROM sales_orders
+       WHERE tenant_id = @t AND sales_rep_id = @id AND status != 'cancelled'
+         AND created_at BETWEEN @from AND @to`,
+      { t: tenantId, id, from, to },
+    );
+    const total = Number(row?.total_revenue_cents ?? 0);
+    const count = Number(row?.order_count ?? 0);
+    return {
+      rep_id: id,
+      rep_name: rep.name,
+      total_revenue_cents: total,
+      order_count: count,
+      avg_deal_cents: count > 0 ? Math.round(total / count) : 0,
+      from_ts: from,
+      to_ts: to,
+    };
   }
 }

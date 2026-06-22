@@ -2853,5 +2853,83 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Sales Reps (BE-29) ────────────────────────────────────────────────────
+  ...(() => {
+    interface SR {
+      id: string; name: string; email: string | null;
+      commission_pct: number; active: boolean; created_at: number;
+    }
+    const BASE_TS = Date.now();
+    let repSeq = 0;
+
+    let reps: SR[] = [
+      { id: "rep_001", name: "Jordan Walsh",    email: "jordan@demo.com", commission_pct: 5,   active: true,  created_at: BASE_TS - 180 * 86400_000 },
+      { id: "rep_002", name: "Maya Patel",      email: "maya@demo.com",   commission_pct: 6.5, active: true,  created_at: BASE_TS - 120 * 86400_000 },
+      { id: "rep_003", name: "Chris Nguyen",    email: "chris@demo.com",  commission_pct: 4.5, active: false, created_at: BASE_TS - 365 * 86400_000 },
+      { id: "rep_004", name: "Dana Okonkwo",    email: null,              commission_pct: 5,   active: true,  created_at: BASE_TS - 60 * 86400_000  },
+    ];
+
+    const PERF_SEED: Record<string, { revenue: number; orders: number }> = {
+      rep_001: { revenue: 4_820_00,  orders: 18 },
+      rep_002: { revenue: 7_340_00,  orders: 26 },
+      rep_003: { revenue: 1_100_00,  orders:  5 },
+      rep_004: { revenue: 2_550_00,  orders: 11 },
+    };
+
+    return [
+      http.get(`${V1}/sales/reps`, async ({ request }) => {
+        await lat();
+        const active = new URL(request.url).searchParams.get("active");
+        const items = active === "true" ? reps.filter(r => r.active) : reps;
+        return HttpResponse.json({ items });
+      }),
+
+      http.post(`${V1}/sales/reps`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<SR>;
+        const rep: SR = {
+          id: `rep_${++repSeq}_${Date.now()}`,
+          name: b.name ?? "New Rep",
+          email: b.email ?? null,
+          commission_pct: b.commission_pct ?? 0,
+          active: true,
+          created_at: Date.now(),
+        };
+        reps.push(rep);
+        return HttpResponse.json(rep, { status: 201 });
+      }),
+
+      http.get(`${V1}/sales/reps/:id/performance`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const rep = reps.find(r => r.id === id);
+        if (!rep) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const url = new URL(request.url);
+        const from = Number(url.searchParams.get("from") ?? Date.now() - 30 * 86400_000);
+        const to   = Number(url.searchParams.get("to")   ?? Date.now());
+        const seed = PERF_SEED[id] ?? { revenue: 0, orders: 0 };
+        return HttpResponse.json({
+          rep_id: id,
+          rep_name: rep.name,
+          total_revenue_cents: seed.revenue,
+          order_count: seed.orders,
+          avg_deal_cents: seed.orders > 0 ? Math.round(seed.revenue / seed.orders) : 0,
+          from_ts: from,
+          to_ts: to,
+        });
+      }),
+
+      http.patch(`${V1}/sales/reps/:id`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const idx = reps.findIndex(r => r.id === id);
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<SR>;
+        reps[idx] = { ...reps[idx]!, ...b };
+        return HttpResponse.json(reps[idx]);
+      }),
+    ];
+  })(),
 );
 

@@ -1385,6 +1385,30 @@ export interface ReorderSuggestionsResponse {
   items: ReorderSuggestion[];
 }
 
+// ── Sales Reps (BE-29) ────────────────────────────────────────────────────────
+export interface SalesRep {
+  id: string;
+  name: string;
+  email: string | null;
+  commission_pct: number;
+  active: boolean;
+  created_at: number;
+}
+
+export interface SalesRepsResponse {
+  items: SalesRep[];
+}
+
+export interface SalesRepPerformance {
+  rep_id: string;
+  rep_name: string;
+  total_revenue_cents: number;
+  order_count: number;
+  avg_deal_cents: number;
+  from_ts: number;
+  to_ts: number;
+}
+
 // ── Cycle Count Sessions (BE-10 / FE-26) ─────────────────────────────────────
 export type CycleCountStatus = "open" | "closed";
 

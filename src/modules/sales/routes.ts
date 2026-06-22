@@ -5,6 +5,19 @@ import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { SalesService, QuoteStatus, SOStatus } from "./service.js";
 
+const repSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email().optional().nullable(),
+  commission_pct: z.number().min(0).max(100).optional(),
+});
+
+const repPatchSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional().nullable(),
+  commission_pct: z.number().min(0).max(100).optional(),
+  active: z.boolean().optional(),
+});
+
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
@@ -103,6 +116,27 @@ export function registerRoutes(router: Router, service: SalesService): void {
     const prices: Record<number, number> = {};
     for (const [k, v] of Object.entries(b.prices)) prices[Number(k)] = v;
     res.json(await service.setTierPrices(String(req.params.productId), prices, tenantId(res)));
+  }));
+
+  // ── Sales reps (BE-29) ───────────────────────────────────────────────────────
+  router.get("/reps", handler(async (req, res) => {
+    const activeOnly = req.query.active === "true";
+    res.json({ items: await service.listReps(tenantId(res), activeOnly) });
+  }));
+  router.post("/reps", mgr, handler(async (req, res) => {
+    const b = parseBody(repSchema, req.body);
+    res.status(201).json(await service.createRep(b, tenantId(res)));
+  }));
+  // sub-path BEFORE /:id so "performance" is not treated as an id
+  router.get("/reps/:id/performance", handler(async (req, res) => {
+    const now = Date.now();
+    const from = typeof req.query.from === "string" ? Number(req.query.from) : now - 30 * 86400_000;
+    const to   = typeof req.query.to   === "string" ? Number(req.query.to)   : now;
+    res.json(await service.getRepPerformance(String(req.params.id), tenantId(res), from, to));
+  }));
+  router.patch("/reps/:id", mgr, handler(async (req, res) => {
+    const b = parseBody(repPatchSchema, req.body);
+    res.json(await service.updateRep(String(req.params.id), b, tenantId(res)));
   }));
 
   // GET /orders — alias for sales-orders with optional ?type filter (used by ecommerce page).
