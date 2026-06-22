@@ -39,6 +39,12 @@ export interface BuildAppOptions {
  * Wave 0: gateway middleware + identity module + health probes + feature flags.
  */
 export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
+  // Fail fast in production if the JWT signing key is absent — a missing key
+  // would cause every authenticated request to error at runtime.
+  if (process.env["NODE_ENV"] === "production" && !process.env["JWT_SECRET"]) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set. Set it before starting the server.");
+  }
+
   const schema = options.schema ?? "public";
   const db = openDb({ connectionString: options.connectionString, schema });
   const events = new EventBus();
@@ -53,6 +59,38 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    next();
+  });
+
+  // ── CORS ────────────────────────────────────────────────────────────────────
+  // Restrict cross-origin requests to known frontend origins. In development
+  // all origins are permitted. In production the allowlist is read from the
+  // ALLOWED_ORIGINS env var (comma-separated) with a safe default.
+  const CORS_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+  const CORS_HEADERS = "Authorization,Content-Type,Accept,X-Request-Id";
+  const rawOrigins = process.env["ALLOWED_ORIGINS"] ?? "";
+  const allowedOrigins: Set<string> =
+    rawOrigins.trim()
+      ? new Set(rawOrigins.split(",").map((o) => o.trim()).filter(Boolean))
+      : new Set(["https://finder-pos.vercel.app", "https://finder-pos-web.vercel.app"]);
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin ?? "";
+    const isDev = process.env["NODE_ENV"] !== "production";
+    const allowed = isDev || allowedOrigins.has(origin);
+
+    if (allowed && origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+    }
+    res.setHeader("Access-Control-Allow-Methods", CORS_METHODS);
+    res.setHeader("Access-Control-Allow-Headers", CORS_HEADERS);
+    res.setHeader("Access-Control-Max-Age", "86400");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
     next();
   });
 
@@ -93,8 +131,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     res.json({ status: "ok", ts: Date.now() });
   });
 
-  // ── Prometheus metrics (no auth — scrape target; RED metrics per route)
-  app.get("/metrics", (_req, res) => {
+  // ── Prometheus metrics — bearer token required (set METRICS_TOKEN env var;
+  //    configure Prometheus scraper to send Authorization: Bearer <token>).
+  app.get("/metrics", (req, res) => {
+    const expected = process.env["METRICS_TOKEN"];
+    if (expected) {
+      const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+      if (provided !== expected) { res.status(401).end(); return; }
+    }
     res.set("content-type", "text/plain; version=0.0.4").send(renderMetrics());
   });
 
@@ -120,8 +164,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // ── Identity routes (/api/identity/login and /refresh are PUBLIC; /me is protected)
   // Security: public auth endpoints are brute-force surfaces, so apply a strict
   // per-IP limiter (≈20/min sustained, small burst) in front of the router.
+  // Registration gets an extra-tight limiter (5 burst, ~3/min) to prevent
+  // automated account creation.
   const identityRouter = Router();
   await identityModule.register({ db, events, router: identityRouter });
+  app.use(
+    "/api/identity/register",
+    rateLimitMiddleware({ capacity: 5, refillRate: 0.05, redis }),
+  );
   app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes

@@ -64,16 +64,16 @@ export function registerRoutes(router: Router, service: SalesService): void {
   router.get("/quotations/:id", handler(async (req, res) => {
     res.json(await service.getQuotation(String(req.params.id), tenantId(res)));
   }));
-  router.post("/quotations/:id/send", handler(async (req, res) => {
+  router.post("/quotations/:id/send", mgr, handler(async (req, res) => {
     res.json(await service.sendQuotation(String(req.params.id), tenantId(res)));
   }));
-  router.post("/quotations/:id/accept", handler(async (req, res) => {
+  router.post("/quotations/:id/accept", mgr, handler(async (req, res) => {
     res.json(await service.acceptQuotation(String(req.params.id), tenantId(res)));
   }));
-  router.post("/quotations/:id/cancel", handler(async (req, res) => {
+  router.post("/quotations/:id/cancel", mgr, handler(async (req, res) => {
     res.json(await service.cancelQuotation(String(req.params.id), tenantId(res)));
   }));
-  router.post("/quotations/:id/convert", handler(async (req, res) => {
+  router.post("/quotations/:id/convert", mgr, handler(async (req, res) => {
     res.status(201).json(await service.convertQuotationToSO(String(req.params.id), tenantId(res)));
   }));
 

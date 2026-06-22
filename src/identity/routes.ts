@@ -54,7 +54,12 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
     "/login",
     handler(async (req, res) => {
       const body = parseBody(loginSchema, req.body);
-      const tokens = await service.login(body);
+      // Resolve real client IP — trust X-Forwarded-For behind a proxy (Vercel/Cloudflare).
+      const ip =
+        (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
+        req.socket.remoteAddress ??
+        null;
+      const tokens = await service.login(body, ip);
       res.status(200).json(tokens);
     }),
   );
@@ -68,16 +73,17 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
     }),
   );
 
-  // /logout can be called both authenticated and unauthenticated (token may be expired).
-  // We gracefully handle missing auth by falling back to a tenantId from the request body.
+  // /logout accepts an optional refreshToken — validated via schema if provided.
+  // tenantId is taken only from the verified JWT; never from the request body.
   router.post(
     "/logout",
     handler(async (req, res) => {
-      const { refreshToken } = req.body as { refreshToken?: string };
-      if (refreshToken) {
+      const body = req.body as Record<string, unknown>;
+      const rawToken = body["refreshToken"];
+      if (typeof rawToken === "string" && rawToken.length > 0) {
+        const { refreshToken } = parseBody(refreshSchema, body);
         const auth = res.locals["auth"] as { tenantId?: string } | undefined;
-        const tenantId = auth?.tenantId ?? (req.body as Record<string, unknown>).tenantId as string ?? "";
-        await service.revokeRefreshToken(refreshToken, tenantId);
+        await service.revokeRefreshToken(refreshToken, auth?.tenantId ?? "");
       }
       res.json({ ok: true });
     }),

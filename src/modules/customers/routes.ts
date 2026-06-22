@@ -9,7 +9,7 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
-// All customer profile fields shared by create and update schemas.
+// Fields any authenticated user can supply when creating/updating a customer.
 const profileFieldsSchema = {
   firstName: z.string().nullable().optional(),
   lastName: z.string().nullable().optional(),
@@ -48,16 +48,22 @@ const profileFieldsSchema = {
   // Legacy address blobs
   billingAddress: z.string().nullable().optional(),
   shippingAddress: z.string().nullable().optional(),
-  // Financial
-  tier: z.number().int().min(1).max(5).optional(),
-  paymentTermDays: z.number().int().nonnegative().nullable().optional(),
-  creditLimitCents: z.number().int().nonnegative().nullable().optional(),
   bankName: z.string().nullable().optional(),
   // Retail
   dateOfBirth: z.number().int().positive().nullable().optional(),
   drivingLicenseNumber: z.string().nullable().optional(),
   // Shared
   notes: z.string().nullable().optional(),
+};
+
+// Privileged fields that require manager role — affect credit, pricing tier, and account status.
+const managerFieldsSchema = {
+  tier: z.number().int().min(1).max(5).optional(),
+  paymentTermDays: z.number().int().nonnegative().nullable().optional(),
+  creditLimitCents: z.number().int().nonnegative().nullable().optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+  verified: z.boolean().optional(),
+  achVerified: z.boolean().optional(),
 };
 
 const createSchema = z.object({
@@ -72,9 +78,7 @@ const redeemSchema = z.object({
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   ...profileFieldsSchema,
-  status: z.enum(["active", "inactive"]).optional(),
-  verified: z.boolean().optional(),
-  achVerified: z.boolean().optional(),
+  ...managerFieldsSchema,
 });
 
 export function registerRoutes(router: Router, service: CustomersService): void {
@@ -122,6 +126,7 @@ export function registerRoutes(router: Router, service: CustomersService): void 
 
   router.patch(
     "/:id",
+    requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(updateSchema, req.body);
       res.json(await service.update(String(req.params.id), body, tenantId(res)));

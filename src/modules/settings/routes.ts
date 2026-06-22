@@ -107,12 +107,12 @@ export function registerRoutes(router: Router, service: SettingsService): void {
     res.json(await service.getReceiptTemplate(String(req.params.outletId), tenantId(res)));
   }));
 
-  router.post("/receipts/:outletId", handler(async (req, res) => {
+  router.post("/receipts/:outletId", requireRole("manager"), handler(async (req, res) => {
     const body = parseBody(receiptSchema, req.body);
     res.status(201).json(await service.setReceiptTemplate(String(req.params.outletId), body as Record<string, unknown>, tenantId(res)));
   }));
 
-  router.patch("/receipts/:outletId", handler(async (req, res) => {
+  router.patch("/receipts/:outletId", requireRole("manager"), handler(async (req, res) => {
     const body = parseBody(receiptSchema, req.body);
     res.json(await service.setReceiptTemplate(String(req.params.outletId), body as Record<string, unknown>, tenantId(res)));
   }));
