@@ -115,11 +115,11 @@ records, only triaged into "build now" vs. "documented for later."
       `DATABASE_URL` at the pool proxy endpoint (not the direct DB). Add a
       `/readyz` pool-saturation check that returns 503 when all connections
       are in use. (done in ed732b4; /readyz + poolStats() already done in a957060)
-- [ ] INF-8: Offline terminal — IndexedDB write-ahead queue for checkout
+- [x] INF-8: Offline terminal — IndexedDB write-ahead queue for checkout
       commands when the network is unavailable; replay on reconnect with
       idempotency key deduplication. Extends the shell Service Worker
       (`web/public/sw.js`) already in place. See SYSTEM_DESIGN.md §7.
-      Estimated effort: 3–4 days (FE-heavy).
+      (done in 74241ec)
 - [ ] INF-9: E2E test suite (Playwright) — cover the golden paths: login →
       checkout, inventory receive, invoice pay. Run in CI against a real
       backend + Postgres (reuse the CI job's postgres service container).
@@ -801,5 +801,7 @@ current codebase. Ordered by value/dependency within each lane.
 
 - 2026-06-22 human/assistant BE-33 -> c1b8816: webhook delivery — exponential backoff retries (×5), owner guards, toggle endpoint, attempt_count + last_response_body delivery log.
 - 2026-06-22 human/assistant INF-7 -> ed732b4: .env.example pool sizing docs + redis.ts structured logging.
+
+- 2026-06-22 human/assistant INF-8 -> 74241ec: offline checkout outbox — IndexedDB write-ahead queue, Background Sync, TenderScreen fallback, OfflineBanner with sync status.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._

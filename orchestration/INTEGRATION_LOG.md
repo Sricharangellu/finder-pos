@@ -435,3 +435,9 @@ before this commit. No new errors introduced.
   - INF-11 (zero console.*): deleted `_repro.ts` debug file; added `moduleLogger(name)` to 14 source files — gateway/errorEnvelope, payments/service, orchestration commands/compensations/idempotency/jobs(×5)/saga/queue-consumer/workflow-runner. `redis.ts` handled by parallel backend agent. Zero `console.*` remain in non-test `src/`.
 - **Verified:** typecheck clean; npm test pass.
 - **Contract changes:** `DB` interface gains `poolStats(): PoolStats | null`; `/readyz` response now includes `pool` and `poolMax` fields; returns 503 on pool exhaustion.
+
+## 2026-06-22 — Infrastructure cycle: INF-8
+
+- **Shipped:** Offline checkout write-ahead queue using IndexedDB (replaces localStorage syncOutbox). SW Background Sync tag "checkout-replay" drains queue on reconnect. TenderScreen queues cash-only payments when offline with optimistic UI. OfflineBanner shows queued count + sync status. Safari/Firefox fallback via postMessage + main-thread drain.
+- **Verified:** frontend typecheck clean; backend npm test 311/311 pass.
+- **Contract changes:** none — outbox is client-side only; replays against existing POST /api/v1/payments with X-Idempotency-Key header (already supported).
