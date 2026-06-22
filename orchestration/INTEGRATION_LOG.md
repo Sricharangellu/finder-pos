@@ -263,6 +263,34 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Mock handlers (IIFE)**: 4 seed reps (Jordan Walsh 5%, Maya Patel 6.5%, Chris Nguyen 4.5% inactive, Dana Okonkwo 5%); GET list (filter ?active=true), POST create, GET :id/performance (seeded revenue/order counts), PATCH update.
 - **Verified:** npm run typecheck — 0 errors (both backend + frontend).
 
+### BE-30: Early payment discount on bills (af7d7a7)
+
+Adds prompt-payment discount (early-pay discount / 2/10 net 30 style) to the
+AP bills module.
+
+**Migration** (`billing/index.ts`): three `ALTER TABLE IF NOT EXISTS` columns on `bills`:
+- `discount_pct NUMERIC(5,2)` — percentage discount (e.g. 2.00 for 2%)
+- `discount_date BIGINT` — epoch ms deadline for the discount to qualify
+- `discount_applied_cents BIGINT NOT NULL DEFAULT 0` — records the discount taken on first payment
+
+**Service** (`billing/service.ts`):
+- `Bill` interface: added `discount_pct | null`, `discount_date | null`, `discount_applied_cents`.
+- `createBill(input)`: accepts optional `discountPct` + `discountDate`; INSERT includes new columns.
+- `payBill()`: discount computed on first payment (`discount_applied_cents === 0`) when `now <= discount_date`.
+  `effectiveTotal = total_cents − discountApplied`. Overpayment guard and status derivation use `effectiveTotal`.
+  UPDATE writes `discount_applied_cents` so subsequent partial payments see the already-recorded discount.
+  Uses `this.db.withTenant(tenantId).tx(...)` for RLS-safe locking.
+
+**Routes** (`billing/routes.ts`): `billSchema` extended with optional `discountPct` (z.number 0–100) and `discountDate`.
+
+**Frontend types** (`web/api-client/types.ts`): `Bill` interface updated with the three new fields.
+
+**Mocks** (`web/mocks/mockHandlers.ts`):
+- `BASE_BILLS`: bil_1 (2% discount, expires +10d), bil_2 (1% expired −5d), bil_3 (no discount).
+- `POST /billing/bills/:id/pay` handler mirrors backend logic: applies discount if active, uses effectiveTotal for overpayment check, sets `discount_applied_cents` on the stored record.
+
+**Verified**: backend `tsc` 0 errors; frontend `tsc` 1 pre-existing error (handlers.ts:644 — `cardLast4` type in mock, unrelated).
+
 ### SEC-1: Security audit + hardening (5af7a24)
 
 Full application security audit conducted 2026-06-21. Covered: authentication,
