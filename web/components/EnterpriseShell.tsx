@@ -17,7 +17,7 @@ import { apiGet } from "@/api-client/client";
 import type { OutletsResponse } from "@/api-client/types";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
-import { useAccountMode } from "@/lib/useAccountMode";
+import { useFinderContext } from "@/lib/useFinderContext";
 
 type NavKey =
   | "dashboard"
@@ -59,63 +59,36 @@ type NavKey =
   | "inventory-counts"
   | "workforce";
 
-// editionFlag: if set, this nav item is hidden when the corresponding feature
-// flag is false. Items with no editionFlag are always shown.
 const NAV_ITEMS: Array<{
   key: NavKey;
   label: string;
   href: string;
   icon: NavKey;
   group: "Operate" | "Manage" | "Analyze" | "Platform";
-  editionFlag?: "groupRetailPOS" | "groupWholesale" | "groupEnterprise";
 }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", group: "Operate" },
-  { key: "register", label: "Register", href: "/terminal", icon: "register", group: "Operate", editionFlag: "groupRetailPOS" },
-  { key: "sales", label: "Sales", href: "/sales", icon: "sales", group: "Operate" },
-  { key: "orders", label: "Orders", href: "/orders", icon: "orders", group: "Operate" },
-  { key: "quotes", label: "Quotations", href: "/quotes", icon: "quotes", group: "Operate" },
-  { key: "returns", label: "Returns", href: "/returns", icon: "returns", group: "Operate", editionFlag: "groupRetailPOS" },
-  { key: "service-orders", label: "Service Orders", href: "/service-orders", icon: "service-orders", group: "Operate" },
-  { key: "invoicing", label: "Invoicing", href: "/invoicing", icon: "invoicing", group: "Operate" },
-  { key: "inventory-locations", label: "Store Map", href: "/inventory/locations", icon: "inventory-locations", group: "Manage" },
-  { key: "inventory-expiry", label: "Expiry Tracking", href: "/inventory/expiry", icon: "inventory-expiry", group: "Manage" },
-  { key: "inventory-serials", label: "Serialized Inventory", href: "/inventory/serials", icon: "inventory-serials", group: "Manage" },
-  { key: "inventory-reorder", label: "Reorder Dashboard", href: "/inventory/reorder", icon: "inventory-reorder", group: "Manage" },
-  { key: "inventory-counts", label: "Cycle Counts", href: "/inventory/counts", icon: "inventory-counts", group: "Manage" },
-  { key: "workforce", label: "Workforce", href: "/workforce", icon: "workforce", group: "Manage" },
-  { key: "payments", label: "Payments", href: "/payments", icon: "payments", group: "Operate" },
-  { key: "catalog",   label: "Catalog",   href: "/catalog",   icon: "catalog",   group: "Manage" },
+  { key: "register", label: "Sell", href: "/sell", icon: "register", group: "Operate" },
+  { key: "reports", label: "Reporting", href: "/reporting", icon: "reports", group: "Analyze" },
+  { key: "catalog", label: "Catalog", href: "/catalog", icon: "catalog", group: "Manage" },
   { key: "inventory", label: "Inventory", href: "/inventory", icon: "inventory", group: "Manage" },
-  { key: "operations", label: "Operations", href: "/operations", icon: "operations", group: "Manage" },
-  { key: "purchasing", label: "Purchasing", href: "/purchasing", icon: "purchasing", group: "Manage", editionFlag: "groupWholesale" },
-  { key: "vendors", label: "Vendors", href: "/vendors", icon: "vendors", group: "Manage", editionFlag: "groupWholesale" },
-  { key: "shipping", label: "Shipping", href: "/shipping", icon: "shipping", group: "Manage", editionFlag: "groupWholesale" },
-  { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage", editionFlag: "groupRetailPOS" },
-  { key: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", group: "Manage", editionFlag: "groupRetailPOS" },
-  { key: "gift-cards", label: "Gift Cards", href: "/gift-cards", icon: "gift-cards", group: "Manage", editionFlag: "groupRetailPOS" },
-  { key: "team",      label: "Team",      href: "/team",      icon: "team",      group: "Manage" },
-  { key: "workflows", label: "Workflows", href: "/workflows", icon: "workflows", group: "Manage" },
-  { key: "loyalty", label: "Loyalty", href: "/loyalty", icon: "loyalty", group: "Manage", editionFlag: "groupRetailPOS" },
-  { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze", editionFlag: "groupWholesale" },
-  { key: "accounting", label: "Accounting", href: "/accounting", icon: "accounting", group: "Analyze", editionFlag: "groupWholesale" },
-  { key: "tax-compliance", label: "Tax Compliance", href: "/tax-compliance", icon: "tax-compliance", group: "Analyze", editionFlag: "groupWholesale" },
-  { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce", group: "Analyze", editionFlag: "groupEnterprise" },
-  { key: "insights", label: "Insights", href: "/insights", icon: "insights", group: "Analyze" },
-  { key: "reports", label: "Reports", href: "/reports", icon: "reports", group: "Analyze" },
-  { key: "integrations", label: "Integrations", href: "/integrations", icon: "integrations", group: "Platform", editionFlag: "groupEnterprise" },
-  { key: "imports-exports", label: "Imports/Exports", href: "/imports-exports", icon: "imports-exports", group: "Platform" },
-  { key: "notifications", label: "Notifications", href: "/notifications", icon: "notifications", group: "Platform" },
-  { key: "audit-log", label: "Audit Log", href: "/audit-log", icon: "audit-log", group: "Platform" },
-  { key: "settings", label: "Settings", href: "/settings", icon: "settings", group: "Platform" },
+  { key: "customers", label: "Customers", href: "/customers", icon: "customers", group: "Manage" },
+  { key: "finance", label: "Finance", href: "/finance", icon: "finance", group: "Analyze" },
+  { key: "settings", label: "Setup", href: "/setup", icon: "settings", group: "Platform" },
+  { key: "ecommerce", label: "Ecommerce", href: "/ecommerce", icon: "ecommerce", group: "Platform" },
 ];
 
-const APP_SWITCHER = [
-  { label: "POS", href: "/terminal", activeKeys: ["register"] },
-  { label: "Admin", href: "/dashboard", activeKeys: ["dashboard", "sales", "orders", "catalog", "customers", "reports", "settings"] },
-  { label: "Warehouse", href: "/operations", activeKeys: ["operations", "inventory", "shipping", "purchasing", "vendors"] },
-  { label: "B2B", href: "/ecommerce", activeKeys: ["ecommerce", "finance", "accounting", "payments"] },
-  { label: "Kiosk", href: "/terminal", activeKeys: [] },
-];
+const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
+  dashboard: "dashboard", register: "register", sales: "register", orders: "register",
+  quotes: "register", returns: "register", "service-orders": "register", invoicing: "register",
+  payments: "finance", reports: "reports", insights: "reports", "tax-compliance": "reports",
+  catalog: "catalog", discounts: "catalog", "gift-cards": "catalog", vendors: "catalog",
+  inventory: "inventory", operations: "inventory", purchasing: "inventory", shipping: "inventory",
+  "inventory-locations": "inventory", "inventory-expiry": "inventory", "inventory-serials": "inventory",
+  "inventory-reorder": "inventory", "inventory-counts": "inventory", workforce: "settings",
+  customers: "customers", loyalty: "customers", finance: "finance", accounting: "finance",
+  ecommerce: "ecommerce", settings: "settings", team: "settings", workflows: "settings",
+  integrations: "settings", "imports-exports": "settings", notifications: "settings", "audit-log": "settings",
+};
 
 interface EnterpriseShellProps {
   active: NavKey;
@@ -137,7 +110,6 @@ export function EnterpriseShell({
   const { user, logout } = useAuth();
   const { isOffline } = useOffline();
   const pathname = usePathname();
-  const { editionFlags: flags } = useAccountMode();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   // ⌘K / Ctrl+K global shortcut
@@ -155,7 +127,7 @@ export function EnterpriseShell({
 
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: "var(--color-page-bg)" }}>
-      <EnterpriseRail active={active} pathname={pathname} flags={flags} />
+      <EnterpriseRail active={active} pathname={pathname} />
 
       <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
         {banner}
@@ -173,34 +145,11 @@ export function EnterpriseShell({
             className="flex items-center justify-between gap-3 px-4 py-2"
             style={{ borderBottom: "1px solid var(--color-header-border)" }}
           >
-            {/* Left: app switcher */}
-            <div className="flex items-center gap-1 overflow-x-auto" aria-label="Application areas">
-              {APP_SWITCHER.map((app) => {
-                const selected = app.activeKeys.includes(active);
-                return (
-                  <Link
-                    key={app.label}
-                    href={app.href}
-                    aria-current={selected ? "page" : undefined}
-                    className={clsx(
-                      "whitespace-nowrap rounded px-3 py-1.5 text-[13px] font-medium transition-colors",
-                      selected
-                        ? "text-white"
-                        : "text-[rgba(0,0,0,0.65)] hover:bg-black/5 hover:text-[rgba(0,0,0,0.88)]"
-                    )}
-                    style={selected ? { backgroundColor: "var(--color-primary)" } : undefined}
-                  >
-                    {app.label}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Center: search bar */}
+            {/* Global search */}
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}
-              className="hidden flex-1 max-w-sm items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 h-8 text-[13px] text-[rgba(0,0,0,0.45)] transition-colors hover:border-brand-600 sm:flex"
+              className="hidden max-w-xl flex-1 items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 h-8 text-[13px] text-[rgba(0,0,0,0.45)] transition-colors hover:border-brand-600 sm:flex"
               aria-label="Open search (⌘K)"
             >
               <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
@@ -240,7 +189,7 @@ export function EnterpriseShell({
                 </Link>
                 <ChevronRight />
                 <Link
-                  href={NAV_ITEMS.find((i) => i.key === active)?.href ?? "/"}
+                  href={NAV_ITEMS.find((i) => i.key === MODULE_BY_ACTIVE[active])?.href ?? "/"}
                   className="transition-colors hover:text-brand-600"
                   style={{ color: "var(--color-link)" }}
                 >
@@ -264,7 +213,7 @@ export function EnterpriseShell({
         </main>
       </div>
 
-      <MobileNav active={active} flags={flags} />
+      <MobileNav active={active} />
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
@@ -274,15 +223,11 @@ export function EnterpriseShell({
 function EnterpriseRail({
   active,
   pathname,
-  flags,
 }: {
   active: NavKey;
   pathname: string;
-  flags: Record<string, boolean>;
 }) {
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.editionFlag || flags[item.editionFlag] !== false,
-  );
+  const selectedModule = MODULE_BY_ACTIVE[active];
 
   return (
     <aside
@@ -313,8 +258,8 @@ function EnterpriseRail({
             <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30 xl:block">
               {group}
             </p>
-            {visibleItems.filter((item) => item.group === group).map((item) => {
-              const selected = active === item.key || pathname === item.href;
+            {NAV_ITEMS.filter((item) => item.group === group).map((item) => {
+              const selected = selectedModule === item.key || pathname === item.href;
               return (
                 <Link
                   key={item.key}
@@ -351,24 +296,22 @@ function EnterpriseRail({
   );
 }
 
-function MobileNav({ active, flags }: { active: NavKey; flags: Record<string, boolean> }) {
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.editionFlag || flags[item.editionFlag] !== false,
-  );
+function MobileNav({ active }: { active: NavKey }) {
+  const selectedModule = MODULE_BY_ACTIVE[active];
   return (
     <nav
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-white/10 md:hidden"
       style={{ backgroundColor: "var(--color-sidebar-bg)", boxShadow: "0 -4px 16px rgba(0,0,0,0.3)" }}
     >
-      {visibleItems.slice(0, 6).map((item) => (
+      {NAV_ITEMS.map((item) => (
         <Link
           key={item.key}
           href={item.href}
-          aria-current={active === item.key ? "page" : undefined}
+          aria-current={selectedModule === item.key ? "page" : undefined}
           className={clsx(
             "flex min-h-[56px] min-w-[72px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
-            active === item.key ? "text-white" : "text-white/50 hover:text-white"
+            selectedModule === item.key ? "text-white" : "text-white/50 hover:text-white"
           )}
         >
           <NavIcon name={item.icon} />
@@ -380,13 +323,14 @@ function MobileNav({ active, flags }: { active: NavKey; flags: Record<string, bo
 }
 
 function StoreSwitcher() {
+  const { outletId, registerId, setLocation } = useFinderContext();
   const fallbackOptions = useMemo(
     () => [{ value: "demo-store:register-01", label: "Demo Store / Register 01" }],
     []
   );
   const [options, setOptions] = useState(fallbackOptions);
-  const [selected, setSelected] = useState(fallbackOptions[0]!.value);
   const [loading, setLoading] = useState(false);
+  const selected = `${outletId}:${registerId}`;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -404,20 +348,23 @@ function StoreSwitcher() {
         });
         const normalized = nextOptions.length > 0 ? nextOptions : fallbackOptions;
         setOptions(normalized);
-        setSelected((current) =>
-          normalized.some((option) => option.value === current) ? current : normalized[0]!.value
-        );
+        if (!normalized.some((option) => option.value === selected)) {
+          const [nextOutlet, nextRegister] = normalized[0]!.value.split(":");
+          setLocation(nextOutlet!, nextRegister!);
+        }
       })
       .catch(() => {
         setOptions(fallbackOptions);
-        setSelected(fallbackOptions[0]!.value);
+        if (selected !== fallbackOptions[0]!.value) {
+          setLocation("demo-store", "register-01");
+        }
       })
       .finally(() => setLoading(false));
 
     return () => {
       controller.abort();
     };
-  }, [fallbackOptions]);
+  }, [fallbackOptions, selected, setLocation]);
 
   return (
     <label
@@ -429,7 +376,10 @@ function StoreSwitcher() {
       <select
         className="bg-transparent text-[13px] font-medium text-[rgba(0,0,0,0.88)] outline-none"
         value={selected}
-        onChange={(event) => setSelected(event.target.value)}
+        onChange={(event) => {
+          const [nextOutlet, nextRegister] = event.target.value.split(":");
+          setLocation(nextOutlet!, nextRegister!);
+        }}
         aria-label="Current store and register"
       >
         {options.map((option) => (
@@ -473,7 +423,7 @@ function UserContext({
     <button
       type="button"
       onClick={onLogout}
-      title={onLogout ? "Sign out" : "User switching coming soon"}
+      title={onLogout ? "Sign out" : "Current user"}
       className="hidden h-8 items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 text-left transition-colors hover:border-brand-600 hover:bg-gray-50 sm:flex"
     >
       <UserIcon />
@@ -571,7 +521,7 @@ function NavIcon({ name }: { name: NavKey }) {
 }
 
 function activeLabel(active: NavKey) {
-  return NAV_ITEMS.find((item) => item.key === active)?.label ?? "Workspace";
+  return NAV_ITEMS.find((item) => item.key === MODULE_BY_ACTIVE[active])?.label ?? "Workspace";
 }
 
 function ChevronRight() {

@@ -65,6 +65,7 @@ export function setSession(
   // Persist user profile so silentRefresh can restore it across page loads.
   if (typeof window !== "undefined") {
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
   }
 }
 
@@ -87,6 +88,7 @@ export function clearSession(): void {
   _user = null;
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(USER_KEY);
+    document.cookie = "finder_session_hint=; Path=/; Max-Age=0; SameSite=Lax";
   }
 }
 

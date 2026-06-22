@@ -10,7 +10,14 @@ import type { NextRequest } from "next/server";
  * unreadable by JavaScript, sent automatically by the browser to /refresh.
  */
 
-const PUBLIC_PATH_PREFIXES = ["/login", "/_next", "/favicon", "/icons", "/api"];
+const PUBLIC_PATH_PREFIXES = [
+  "/login",
+  "/_next",
+  "/favicon",
+  "/icons",
+  "/api",
+  "/mockServiceWorker.js",
+];
 
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
@@ -43,11 +50,14 @@ export function middleware(request: NextRequest): NextResponse {
   // connect-src allows the backend API origin via NEXT_PUBLIC_API_BASE_URL.
   const apiOrigin = process.env["NEXT_PUBLIC_API_BASE_URL"] ?? "";
   const connectSrc = apiOrigin ? `'self' ${apiOrigin}` : "'self'";
+  const scriptSrc = process.env.NODE_ENV === "development"
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'";
   response.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'", // Next.js requires unsafe-inline for hydration
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       `connect-src ${connectSrc}`,
