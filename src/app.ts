@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { openDb, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
+import { logger } from "./shared/logger.js";
 import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { identityModule } from "./identity/index.js";
@@ -60,7 +61,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     ];
     for (const [name, reason] of WARNED_VARS) {
       if (!process.env[name]) {
-        console.warn(`[startup] WARNING: ${name} is not set — ${reason}`);
+        logger.warn({ envVar: name }, `${name} is not set — ${reason}`);
       }
     }
   }
@@ -70,6 +71,39 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const events = new EventBus();
   const redis = openRedis();
   const app = express();
+
+  // ── Stripe webhook — must be registered with raw body parser BEFORE express.json()
+  // so we can verify the Stripe-Signature header against the raw payload bytes.
+  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+    if (!webhookSecret) {
+      logger.warn("STRIPE_WEBHOOK_SECRET not set — webhook endpoint disabled");
+      res.status(503).end();
+      return;
+    }
+    if (!sig) { res.status(400).end(); return; }
+
+    let event: import("stripe").Stripe.Event;
+    try {
+      const { getStripe } = await import("./modules/payments/stripe.js");
+      event = getStripe().webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
+    } catch (err) {
+      logger.warn({ err }, "Stripe webhook signature verification failed");
+      res.status(400).end();
+      return;
+    }
+
+    logger.info({ type: event.type, id: event.id }, "stripe webhook received");
+
+    // Stripe requires a 200 response quickly — fire-and-forget internal event.
+    void events.publish(`stripe.${event.type}`, event.data.object).catch((err) => {
+      logger.error({ err, eventType: event.type }, "stripe webhook event handler failed");
+    });
+
+    res.status(200).json({ received: true });
+  });
+
   app.use(express.json());
   app.use(helmet({
     contentSecurityPolicy: false, // disabled — API-only server, no HTML served
@@ -116,30 +150,42 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   await db.exec(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
 
-  // Schema migration tracker — prevents re-running migrations on every cold start
+  // Schema migration tracker — prevents re-running migrations on every cold start.
+  // Created outside the advisory lock because IF NOT EXISTS is idempotent and
+  // Postgres serializes concurrent DDL internally.
   await db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     hash   TEXT PRIMARY KEY,
     name   TEXT NOT NULL,
     ran_at BIGINT NOT NULL
   )`);
 
-  async function runIfNew(sql: string, name: string): Promise<void> {
+  // Run a migration only if its content hash hasn't been recorded yet.
+  // Accepts a transaction DB so callers can batch migrations under one lock.
+  async function runIfNew(sql: string, name: string, tdb: DB): Promise<void> {
     const hash = createHash("sha256").update(sql.trim()).digest("hex").slice(0, 24);
-    const existing = await db.one<{ hash: string }>("SELECT hash FROM schema_migrations WHERE hash = @hash", { hash });
+    const existing = await tdb.one<{ hash: string }>("SELECT hash FROM schema_migrations WHERE hash = @hash", { hash });
     if (existing) return;
-    await db.exec(sql);
-    await db.query("INSERT INTO schema_migrations (hash, name, ran_at) VALUES (@hash, @name, @now)", { hash, name, now: Date.now() });
+    await tdb.exec(sql);
+    await tdb.query("INSERT INTO schema_migrations (hash, name, ran_at) VALUES (@hash, @name, @now)", { hash, name, now: Date.now() });
   }
 
-  // ── Identity migrations run first (platform tables: tenants, users, audit_log, etc.)
-  for (const sql of identityModule.migrations) await runIfNew(sql, `identity`);
+  // Acquire a transaction-level advisory lock before running any migrations.
+  // pg_advisory_xact_lock blocks until the lock is free, then holds it for the
+  // duration of the transaction. Concurrent instances wait here and then skip
+  // all migrations (hash-checked above). Prevents simultaneous ALTER TABLE races.
+  await db.tx(async (tdb) => {
+    await tdb.exec("SELECT pg_advisory_xact_lock(7381920)"); // stable magic int for finder migrations
+    logger.info("migration lock acquired");
 
-  // ── Domain module migrations
-  for (const mod of modules) {
-    for (const [i, sql] of mod.migrations.entries()) {
-      await runIfNew(sql, `${mod.name}[${i}]`);
+    for (const sql of identityModule.migrations) await runIfNew(sql, `identity`, tdb);
+    for (const mod of modules) {
+      for (const [i, sql] of mod.migrations.entries()) {
+        await runIfNew(sql, `${mod.name}[${i}]`, tdb);
+      }
     }
-  }
+
+    logger.info("migrations complete");
+  });
 
   // ── Global gateway middleware (applied before all /api routes)
   app.use(requestIdMiddleware);

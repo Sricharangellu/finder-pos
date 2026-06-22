@@ -1,10 +1,33 @@
 import { buildApp } from "./app.js";
+import { logger } from "./shared/logger.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
-const { express: app } = await buildApp({ connectionString: process.env.DATABASE_URL });
+const { express: app, db } = await buildApp({ connectionString: process.env.DATABASE_URL });
 
-app.listen(PORT, () => {
-  console.log(`Finder POS listening on http://localhost:${PORT}`);
-  console.log(`Health: http://localhost:${PORT}/health`);
+const server = app.listen(PORT, () => {
+  logger.info({ port: PORT }, "Finder POS started");
 });
+
+// Drain in-flight requests on deploy or container stop.
+// Gives handlers up to 10 s to finish; forces exit after the timeout.
+function shutdown(signal: string): void {
+  logger.info({ signal }, "shutdown signal received — draining");
+  server.close(async () => {
+    try {
+      await db.close();
+    } catch {
+      // pool already closed — ignore
+    }
+    logger.info("graceful shutdown complete");
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    logger.error("shutdown timeout — forcing exit");
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
