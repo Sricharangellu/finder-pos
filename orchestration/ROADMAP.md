@@ -440,13 +440,13 @@ on go-live readiness needs.
 
 ### Backend lane (Phase 5)
 
-- [ ] BE-31: Move auth tokens to httpOnly cookies — currently access token is
-      in-memory and refresh token in sessionStorage. Switching to `httpOnly;
-      Secure; SameSite=Lax` cookies for the refresh token and short-lived
-      bearer for the access token enables server-side session verification in
-      Next.js middleware. Requires changes to identity/routes.ts (Set-Cookie
-      header on login/refresh, clear on logout) and web/lib/auth.ts.
-      See `orchestration/SYSTEM_DESIGN.md §Auth`.
+- [x] BE-31: Move auth tokens to httpOnly cookies — refresh token moved from
+      sessionStorage to httpOnly `finder_refresh` cookie set by the backend.
+      Non-httpOnly `finder_session_hint` cookie enables JS + middleware reads.
+      Next.js middleware now enforces auth server-side (redirect to /login).
+      silentRefresh() uses session hint as gate; sends empty body (cookie
+      sent automatically). logout() clears both cookies via clearAuthCookies().
+      See `orchestration/SYSTEM_DESIGN.md §Auth`. (done in f7da017)
 
 - [ ] BE-32: Early payment discount on bills — add `discount_pct` and
       `discount_date` to `bills`; when `PATCH /billing/bills/:id/pay` is called
@@ -534,5 +534,6 @@ on go-live readiness needs.
 
 - 2026-06-21 human/assistant SEC-1 -> 5af7a24: full security audit; 6 fixes (customer privilege escalation, receipts/quotation guards, metrics token, logout body injection, CSP headers). Phase 5 system design items added to roadmap; SYSTEM_DESIGN.md created.
 - 2026-06-21 backend BE-30 -> af7d7a7: early payment discount on bills — discount_pct/discount_date/discount_applied_cents columns; payBill applies discount on first payment before deadline; effectiveTotal guards overpayment; mocks seeded.
+- 2026-06-22 fullstack BE-31 -> f7da017: httpOnly cookie auth — finder_refresh (httpOnly) + finder_session_hint (non-httpOnly) set on login/refresh; middleware enforces auth; silentRefresh uses hint cookie; logout clears cookies.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
