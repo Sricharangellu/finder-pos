@@ -2,20 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Security middleware — adds HTTP security headers to all page responses.
+ * Security middleware — enforces auth and adds HTTP security headers.
  *
- * Auth enforcement note: the access token lives in-memory only (XSS-safe) and
- * the refresh token in sessionStorage. Because neither is in a cookie, the edge
- * middleware cannot verify auth. The client-side useAuth() hook in EnterpriseShell
- * handles the redirect-to-login flow.
- *
- * When the auth architecture moves to httpOnly cookies, add the enforcement block:
- *   const token = request.cookies.get("access_token")?.value;
- *   if (!token && request.nextUrl.pathname.startsWith("/(protected)")) {
- *     return NextResponse.redirect(new URL("/login", request.url));
- *   }
+ * Auth: reads the non-httpOnly `finder_session_hint` cookie set by the backend
+ * on login/refresh. If absent on a protected route, redirect to /login.
+ * The actual refresh token lives in the httpOnly `finder_refresh` cookie —
+ * unreadable by JavaScript, sent automatically by the browser to /refresh.
  */
+
+const PUBLIC_PATH_PREFIXES = ["/login", "/_next", "/favicon", "/icons", "/api"];
+
 export function middleware(request: NextRequest): NextResponse {
+  const { pathname } = request.nextUrl;
+
+  // Allow public paths and API routes through without auth check.
+  const isPublic = pathname === "/" || PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p));
+  if (!isPublic) {
+    const sessionHint = request.cookies.get("finder_session_hint")?.value;
+    if (!sessionHint) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   const response = NextResponse.next();
 
   // Prevent embedding in iframes (clickjacking protection)

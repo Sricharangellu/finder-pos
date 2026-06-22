@@ -4,10 +4,14 @@
  * Design:
  * - The access token lives ONLY in memory (a module-level variable).
  *   This protects against XSS leaking tokens from localStorage.
- * - The refresh token is stored in sessionStorage so it survives page
- *   refreshes within the same browser tab, but is wiped when the tab closes.
- * - On mount, if a refresh token exists, the app silently refreshes to
- *   re-hydrate the in-memory access token.
+ * - The refresh token lives in an httpOnly cookie set by the backend on
+ *   login/refresh. JavaScript cannot read it (XSS-safe). It is sent
+ *   automatically by the browser to /api/identity/refresh.
+ * - A non-httpOnly `finder_session_hint=1` cookie is also set — readable by
+ *   JavaScript and Next.js middleware — to signal that a session exists
+ *   without exposing the actual token.
+ * - On mount, if the session hint cookie is present, the app silently calls
+ *   /refresh (cookie sent automatically) to re-hydrate the in-memory token.
  */
 
 import type { UserProfile, Role } from "@/api-client/types";
@@ -18,7 +22,6 @@ let _accessToken: string | null = null;
 let _expiresAt: number | null = null; // unix ms
 let _user: UserProfile | null = null;
 
-const REFRESH_TOKEN_KEY = "finder_pos_refresh";
 const USER_KEY = "finder_pos_user";
 
 // ─── Public getters ───────────────────────────────────────────────────────────
@@ -52,16 +55,15 @@ export function hasRole(required: Role): boolean {
 export function setSession(
   accessToken: string,
   expiresIn: number,
-  refreshToken: string,
+  _refreshToken: string, // kept for API compatibility — token now lives in httpOnly cookie
   user: UserProfile
 ): void {
   _accessToken = accessToken;
   _expiresAt = Date.now() + expiresIn * 1000;
   _user = user;
 
-  // Persist refresh token + user profile across refreshes (same tab)
+  // Persist user profile so silentRefresh can restore it across page loads.
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 }
@@ -84,16 +86,16 @@ export function clearSession(): void {
   _expiresAt = null;
   _user = null;
   if (typeof window !== "undefined") {
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
   }
 }
 
-// ─── Refresh token helpers ────────────────────────────────────────────────────
+// ─── Session hint (non-httpOnly cookie — readable by JS and middleware) ───────
 
-export function getStoredRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(REFRESH_TOKEN_KEY);
+/** Returns true if the browser likely has a valid refresh cookie (session hint present). */
+export function hasSessionHint(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie.includes("finder_session_hint=");
 }
 
 export function getStoredUser(): UserProfile | null {
@@ -110,33 +112,32 @@ export function getStoredUser(): UserProfile | null {
 // ─── Silent refresh ───────────────────────────────────────────────────────────
 
 /**
- * Attempt a silent token refresh using the stored refresh token.
+ * Attempt a silent token refresh.
+ * The httpOnly `finder_refresh` cookie is sent automatically by the browser.
  * Returns true if the session is now valid.
  *
- * This is called on app init (in useAuth / route guards) before deciding
- * whether to redirect to /login.
+ * Guarded by the session hint cookie — if that cookie is absent the user is
+ * definitely logged out and there is no point hitting the network.
  */
 export async function silentRefresh(): Promise<boolean> {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) return false;
+  if (!hasSessionHint()) return false;
 
   try {
     // Import lazily to avoid circular deps (client imports auth)
     const { apiPost } = await import("@/api-client/client");
 
+    // No body needed — the refresh token is in the httpOnly cookie.
     const data = await apiPost<import("@/api-client/types").RefreshResponse>(
       "/api/identity/refresh",
-      { refreshToken },
+      {},
       { anonymous: true }
     );
 
     setRefreshedToken(data.accessToken, data.expiresIn);
 
-    // Re-hydrate user from sessionStorage (refresh endpoint only returns token)
+    // Re-hydrate user from sessionStorage (refresh endpoint only returns tokens)
     const storedUser = getStoredUser();
-    if (storedUser) {
-      _user = storedUser;
-    }
+    if (storedUser) _user = storedUser;
 
     return true;
   } catch {

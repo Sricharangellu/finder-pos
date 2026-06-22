@@ -102,14 +102,16 @@ export function useAuth(): UseAuthReturn {
   );
 
   const logout = useCallback(async () => {
-    // Logout is client-side only — the backend issues stateless JWTs with no
-    // server-side logout endpoint, so we simply drop the local session.
-    {
-      clearSession();
-      setUser(null);
-      setStatus("unauthenticated");
-      router.replace("/login");
-    }
+    // Clear local session immediately so concurrent requests stop retrying.
+    clearSession();
+    setUser(null);
+    setStatus("unauthenticated");
+
+    // Revoke the refresh token on the backend. The httpOnly cookie is sent
+    // automatically; the backend also clears both auth cookies in the response.
+    void apiPost("/api/identity/logout", {}, { anonymous: true }).catch(() => {});
+
+    router.replace("/login");
   }, [router]);
 
   return { status, user, login, logout, loginError, isLoading };

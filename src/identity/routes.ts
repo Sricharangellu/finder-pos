@@ -1,12 +1,43 @@
-import type { Router, Response } from "express";
+import type { Request, Router, Response, CookieOptions } from "express";
 import { z } from "zod";
-import { handler, parseBody } from "../shared/http.js";
+import { handler, parseBody, badRequest } from "../shared/http.js";
 import type { IdentityService } from "./service.js";
 import type { AuthPayload } from "../gateway/auth.js";
 import { requireRole } from "../gateway/auth.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
+}
+
+// ─── Cookie helpers ───────────────────────────────────────────────────────────
+const isProd = process.env["NODE_ENV"] === "production";
+
+const COOKIE_BASE: CookieOptions = {
+  secure: isProd,
+  sameSite: "lax",
+  path: "/",
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days ms
+};
+
+/** Parse a named cookie from the request header without cookie-parser. */
+function getCookie(req: Request, name: string): string | undefined {
+  const raw = req.headers.cookie;
+  if (!raw) return undefined;
+  const seg = raw.split(";").find((s) => s.trim().startsWith(`${name}=`));
+  return seg ? decodeURIComponent(seg.trim().slice(name.length + 1)) : undefined;
+}
+
+/** Set httpOnly refresh token cookie + non-httpOnly session hint for middleware. */
+function setAuthCookies(res: Response, refreshToken: string): void {
+  res.cookie("finder_refresh", refreshToken, { ...COOKIE_BASE, httpOnly: true });
+  // Non-httpOnly hint: JavaScript and Next.js middleware can read it to know a session exists.
+  res.cookie("finder_session_hint", "1", { ...COOKIE_BASE, httpOnly: false });
+}
+
+/** Clear both auth cookies on logout. */
+function clearAuthCookies(res: Response): void {
+  res.clearCookie("finder_refresh", { ...COOKIE_BASE, httpOnly: true });
+  res.clearCookie("finder_session_hint", { ...COOKIE_BASE, httpOnly: false });
 }
 
 const registerDeviceSchema = z.object({
@@ -60,6 +91,7 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
         req.socket.remoteAddress ??
         null;
       const tokens = await service.login(body, ip);
+      setAuthCookies(res, tokens.refreshToken);
       res.status(200).json(tokens);
     }),
   );
@@ -67,24 +99,32 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
   router.post(
     "/refresh",
     handler(async (req, res) => {
-      const body = parseBody(refreshSchema, req.body);
-      const tokens = await service.refresh(body.refreshToken);
+      // Accept token from httpOnly cookie (preferred) or request body (backward compat).
+      const cookieToken = getCookie(req, "finder_refresh");
+      const rawBody = req.body as Record<string, unknown>;
+      const bodyToken = typeof rawBody["refreshToken"] === "string" ? rawBody["refreshToken"] : undefined;
+      const refreshToken = cookieToken ?? bodyToken;
+      if (!refreshToken) throw badRequest("refreshToken is required (cookie or body)");
+      const tokens = await service.refresh(refreshToken);
+      setAuthCookies(res, tokens.refreshToken);
       res.status(200).json(tokens);
     }),
   );
 
-  // /logout accepts an optional refreshToken — validated via schema if provided.
-  // tenantId is taken only from the verified JWT; never from the request body.
+  // /logout: revoke token found in cookie (preferred) or body; clear both auth cookies.
+  // tenantId sourced from the verified JWT only — never from the request body.
   router.post(
     "/logout",
     handler(async (req, res) => {
-      const body = req.body as Record<string, unknown>;
-      const rawToken = body["refreshToken"];
-      if (typeof rawToken === "string" && rawToken.length > 0) {
-        const { refreshToken } = parseBody(refreshSchema, body);
+      const cookieToken = getCookie(req, "finder_refresh");
+      const rawBody = req.body as Record<string, unknown>;
+      const bodyToken = typeof rawBody["refreshToken"] === "string" ? rawBody["refreshToken"] : undefined;
+      const tokenToRevoke = cookieToken ?? bodyToken;
+      if (tokenToRevoke) {
         const auth = res.locals["auth"] as { tenantId?: string } | undefined;
-        await service.revokeRefreshToken(refreshToken, auth?.tenantId ?? "");
+        await service.revokeRefreshToken(tokenToRevoke, auth?.tenantId ?? "");
       }
+      clearAuthCookies(res);
       res.json({ ok: true });
     }),
   );
