@@ -25,3 +25,11 @@ export { Badge, statusBadge } from "./Badge";
 export { Skeleton, SkeletonCard, SkeletonPage } from "./Skeleton";
 
 export { EmptyState } from "./EmptyState";
+
+export { KpiCard } from "./KpiCard";
+
+export { Select } from "./Select";
+export type { SelectOption } from "./Select";
+
+export { DateRangePicker } from "./DateRangePicker";
+export type { DateRange, DatePreset } from "./DateRangePicker";

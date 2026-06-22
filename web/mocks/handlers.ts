@@ -641,7 +641,7 @@ export const handlers = [
       cashCents,
       cardCents,
       changeCents,
-      cardLast4: body.cardLast4,
+      cardLast4: body.stripePaymentIntentId ? "4242" : undefined,
       authCode: body.method !== "cash" ? `AUTH${Math.floor(Math.random() * 999999)}` : undefined,
       status: "captured",
       createdAt: Date.now(),
