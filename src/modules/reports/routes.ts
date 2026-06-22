@@ -115,4 +115,46 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     const date = typeof req.query.date === "string" ? req.query.date : new Date().toISOString().slice(0, 10);
     res.json(await service.aggregateDailySales(tenantId(res), date));
   }));
+
+  // ── BE-36: Register Closures ───────────────────────────────────────────────
+
+  // GET /api/v1/reports/register-closures?registerId=&from=&to=&limit=
+  router.get("/register-closures", handler(async (req, res) => {
+    const t = tenantId(res);
+    const registerId = typeof req.query.registerId === "string" ? req.query.registerId : undefined;
+    const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
+    const to   = typeof req.query.to   === "string" ? Number(req.query.to)   : undefined;
+    const limit = Math.min(Number(req.query.limit ?? 100), 500);
+    res.json({ items: await service.registerClosures(t, { registerId, from, to, limit }) });
+  }));
+
+  // GET /api/v1/reports/register-closures/:sessionId — session detail
+  router.get("/register-closures/:sessionId", handler(async (req, res) => {
+    res.json(await service.registerClosureDetail(tenantId(res), String(req.params.sessionId)));
+  }));
+
+  // ── BE-37: Cash Movement ──────────────────────────────────────────────────
+
+  // GET /api/v1/reports/cash-movement?registerId=&sessionId=&from=&to=&limit=
+  router.get("/cash-movement", handler(async (req, res) => {
+    const t = tenantId(res);
+    const registerId = typeof req.query.registerId === "string" ? req.query.registerId : undefined;
+    const sessionId  = typeof req.query.sessionId  === "string" ? req.query.sessionId  : undefined;
+    const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
+    const to   = typeof req.query.to   === "string" ? Number(req.query.to)   : undefined;
+    const limit = Math.min(Number(req.query.limit ?? 200), 500);
+    res.json(await service.cashMovement(t, { registerId, sessionId, from, to, limit }));
+  }));
+
+  // ── BE-38: Purchase/AP Report ─────────────────────────────────────────────
+
+  // GET /api/v1/reports/purchases?vendorId=&from=&to=&limit=
+  router.get("/purchases", handler(async (req, res) => {
+    const t = tenantId(res);
+    const vendorId = typeof req.query.vendorId === "string" ? req.query.vendorId : undefined;
+    const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
+    const to   = typeof req.query.to   === "string" ? Number(req.query.to)   : undefined;
+    const limit = Math.min(Number(req.query.limit ?? 200), 500);
+    res.json({ items: await service.purchasesReport(t, { vendorId, from, to, limit }) });
+  }));
 }
