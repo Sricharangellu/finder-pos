@@ -263,6 +263,60 @@ Verdict: Wave 0 foundation stands up (backend green, frontend green, schema cons
 - **Mock handlers (IIFE)**: 4 seed reps (Jordan Walsh 5%, Maya Patel 6.5%, Chris Nguyen 4.5% inactive, Dana Okonkwo 5%); GET list (filter ?active=true), POST create, GET :id/performance (seeded revenue/order counts), PATCH update.
 - **Verified:** npm run typecheck — 0 errors (both backend + frontend).
 
+### SEC-1: Security audit + hardening (5af7a24)
+
+Full application security audit conducted 2026-06-21. Covered: authentication,
+authorization, input validation, SQL injection, XSS, secret exposure, rate limiting,
+and security headers. Six vulnerabilities fixed:
+
+**HIGH — Customer privilege escalation**
+- `src/modules/customers/routes.ts`: split `profileFieldsSchema` (staff-accessible) from
+  `managerFieldsSchema` (tier, creditLimitCents, paymentTermDays, verified, achVerified,
+  status). Added `requireRole("manager")` to `PATCH /:id`. `createSchema` (open to all)
+  no longer includes privileged financial fields.
+
+**MEDIUM — Receipt templates unprotected**
+- `src/modules/settings/routes.ts`: added `requireRole("manager")` to
+  `POST /settings/receipts/:outletId` and `PATCH /settings/receipts/:outletId`.
+
+**MEDIUM — Prometheus metrics publicly accessible**
+- `src/app.ts`: `/metrics` now checks `Authorization: Bearer <METRICS_TOKEN>` header
+  when `METRICS_TOKEN` env var is set. Falls back to open (dev mode) when unset.
+
+**MEDIUM — Quotation state transitions missing role guard**
+- `src/modules/sales/routes.ts`: added `mgr` middleware to `send`, `accept`,
+  `cancel`, and `convert` quotation endpoints. Draft creation remains open to staff.
+
+**LOW — Logout reads tenantId from request body**
+- `src/identity/routes.ts`: logout now validates `refreshToken` via `refreshSchema`
+  (`parseBody`). `tenantId` is sourced only from the verified JWT, never from `req.body`.
+
+**LOW — No frontend security headers**
+- `web/middleware.ts` (new file): adds `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(self)`,
+  and a `Content-Security-Policy` with `frame-ancestors 'none'` to all page responses.
+  Matcher: all routes except `_next/static`, `_next/image`, `favicon.ico`.
+  Documents the httpOnly-cookie upgrade path for future server-side auth enforcement.
+
+**System design document**
+- `orchestration/SYSTEM_DESIGN.md` (new file): production architecture reference
+  covering the full stack diagram, auth design + cookie upgrade plan, multi-tenancy
+  model, module system, EventBus, payments (PCI scope), offline-first design,
+  real-time SSE, background jobs (BullMQ plan), webhooks, hardware integration
+  (scanner/printer/cash drawer/card reader), scaling plan, production go-live
+  security checklist, and data model index.
+
+**Phase 5 roadmap items added**
+- BE-31 (httpOnly cookie auth), BE-32 (early payment discount), BE-33 (webhooks),
+  BE-34 (BullMQ job queue), FE-29 (offline-first terminal), FE-30 (real-time SSE),
+  FE-31 (customer display). See `orchestration/ROADMAP.md §Phase 5`.
+
+**Verified**: `npx tsc --noEmit --skipLibCheck` — backend 1 pre-existing error
+(Stripe SDK version string mismatch in `payments/stripe.ts`, unrelated to this work);
+frontend 1 pre-existing error (`cardLast4` type in mock handler). Both were present
+before this commit. No new errors introduced.
+
 ### FE-26: Cycle Count UI (84df7e8)
 - **Roadmap**: Phase 4 section added covering FE-26/27/28 + BE-29/30 derived from all gaps/*.md files.
 - **Page**: `web/app/(protected)/inventory/counts/page.tsx` — sessions list (stat cards, click-to-expand) + session detail panel.
