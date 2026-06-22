@@ -73,6 +73,66 @@ records, only triaged into "build now" vs. "documented for later."
 
 ---
 
+## Infrastructure / Ops lane — FIRST PRIORITY (blocks enterprise deployment)
+
+> **These items take priority over any feature work in the Backend or Frontend
+> lanes.** Pick the first unchecked INF item before any BE or FE item.
+>
+> Assessment date: 2026-06-22. Eight issues identified as enterprise blockers.
+> CI/CD and partial Service Worker already existed — see run log.
+
+- [x] INF-1: Migration locking — wrap all module migrations in `db.tx()` with
+      `pg_advisory_xact_lock(7381920)` so concurrent cold-starts on a
+      multi-instance deploy serialize instead of racing. `schema_migrations`
+      table created before the lock since `CREATE TABLE IF NOT EXISTS` is
+      idempotent. `runIfNew` refactored to accept a transaction DB. (done in this commit)
+- [x] INF-2: Graceful shutdown — replace bare `app.listen` in `server.ts`
+      with a stored `server` handle; `SIGTERM`/`SIGINT` handlers call
+      `server.close()` + `db.close()` with a 10 s force-exit fallback.
+      Prevents lost in-flight requests during rolling deploys. (done in this commit)
+- [x] INF-3: Structured logging — install `pino`; create `src/shared/logger.ts`
+      with ISO timestamps and level labels; replace `console.warn`/`console.log`
+      in `app.ts` and `server.ts` with typed `logger.*` calls. (done in this commit)
+- [x] INF-4: Stripe webhook verification — register `POST /api/stripe/webhook`
+      with `express.raw({ type: 'application/json' })` BEFORE `express.json()`
+      so the raw buffer is available; verify using
+      `stripe.webhooks.constructEvent()` + `STRIPE_WEBHOOK_SECRET` env var;
+      publish verified events to the internal EventBus. (done in this commit)
+- [ ] INF-5: Durable EventBus — replace in-process `EventBus` with a
+      Postgres-backed LISTEN/NOTIFY or Redis-Streams broker so events survive
+      across multiple instances. All existing `.on()` / `.publish()` call sites
+      must remain compatible. See `orchestration/SYSTEM_DESIGN.md` §6.
+      Estimated effort: 2–3 days.
+- [ ] INF-6: Background job queue (BullMQ) — add `bullmq` + Redis; move the
+      AR dunning sweep, webhook delivery retries, and report pre-computation
+      out of synchronous request handlers into durable workers. Depends on
+      INF-5 (shared Redis) but can start in parallel. See SYSTEM_DESIGN.md §9.
+      Estimated effort: 1–2 days.
+- [ ] INF-7: Connection pool sizing — add `PG_POOL_MAX` env var guidance to
+      `.env.example`; document that Neon / Railway users should point
+      `DATABASE_URL` at the pool proxy endpoint (not the direct DB). Add a
+      `/readyz` pool-saturation check that returns 503 when all connections
+      are in use. Estimated effort: 0.5 day.
+- [ ] INF-8: Offline terminal — IndexedDB write-ahead queue for checkout
+      commands when the network is unavailable; replay on reconnect with
+      idempotency key deduplication. Extends the shell Service Worker
+      (`web/public/sw.js`) already in place. See SYSTEM_DESIGN.md §7.
+      Estimated effort: 3–4 days (FE-heavy).
+- [ ] INF-9: E2E test suite (Playwright) — cover the golden paths: login →
+      checkout, inventory receive, invoice pay. Run in CI against a real
+      backend + Postgres (reuse the CI job's postgres service container).
+      Estimated effort: 2–3 days.
+- [ ] INF-10: API key scope enforcement — add a `requireScope(scope)` Express
+      middleware that reads parsed API-key scopes from `res.locals.auth.scopes`
+      and rejects 403 when the scope is absent. Apply `requireScope("write")`
+      on all mutation routes and `requireScope("admin")` on management routes.
+      Estimated effort: 0.5 day.
+- [ ] INF-11: Replace remaining `console.*` — audit all `src/modules/**` for
+      `console.log`/`console.error`; replace with `moduleLogger(name)` child
+      loggers. Estimated effort: 1 day.
+
+---
+
 ## Backend lane (src/, db/, contracts/, scripts/)
 
 - [x] BE-1: Finish the RBAC matrix — apply `requireRole("manager")` from
