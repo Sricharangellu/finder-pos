@@ -125,6 +125,7 @@ import { closeRegisterJob } from "./jobs/close-register.job.js";
 import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
+import { outboxRelayJob, OUTBOX_RELAY_INTERVAL_MS } from "./jobs/outbox-relay.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -245,6 +246,26 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   // Seed on first startup.
   void jobProducer.enqueueOnce({
     type: QueueNames.IDEMPOTENCY_EXPIRY,
+    tenantId: "system",
+    payload: {},
+    runAt: Date.now(),
+    maxAttempts: 3,
+  }).catch(() => {});
+
+  // DB-8: Outbox relay — dispatches pending event_outbox rows every 5 seconds.
+  jobConsumer.register(QueueNames.OUTBOX_RELAY, async (job) => {
+    await outboxRelayJob(job, db, events);
+    // Re-schedule immediately for fast at-least-once delivery.
+    await jobProducer.enqueueOnce({
+      type: QueueNames.OUTBOX_RELAY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + OUTBOX_RELAY_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  void jobProducer.enqueueOnce({
+    type: QueueNames.OUTBOX_RELAY,
     tenantId: "system",
     payload: {},
     runAt: Date.now(),

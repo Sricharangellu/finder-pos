@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import { useQuery } from "@/lib/useQuery";
+import { useQuery, invalidateQuery } from "@/lib/useQuery";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
@@ -18,6 +18,7 @@ import { formatMoney } from "@/lib/money";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
 import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
+import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -345,6 +346,16 @@ export default function DashboardPage() {
       .then((d) => setOutlets(d.items ?? []))
       .catch(() => {});
   }, []);
+
+  // FE-30: Real-time updates — invalidate summary + products on live events.
+  useRealtimeStream(
+    useCallback((event) => {
+      if (event.type === "order_created" || event.type === "payment_captured") {
+        invalidateQuery(`dashboard:summary:${range}:${scope}`);
+        invalidateQuery(`dashboard:top-products:${range}:${scope}`);
+      }
+    }, [range, scope]),
+  );
 
   const { data: summary, loading: loadingSummary, error: errorSummary } =
     useQuery(`dashboard:summary:${range}:${scope}`, fetchSummary, { staleMs: 60_000 });

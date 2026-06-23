@@ -389,6 +389,88 @@ END;
 $$;
 `;
 
+// DB-8: Event outbox — durable event log written in the same DB transaction as
+// the business mutation. A background poller reads and re-dispatches to EventBus.
+// Guarantees at-least-once delivery even if the process crashes after the commit.
+export const CREATE_EVENT_OUTBOX_TABLE = `
+CREATE TABLE IF NOT EXISTS event_outbox (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  type         TEXT NOT NULL,
+  aggregate_id TEXT NOT NULL,
+  payload      TEXT NOT NULL,
+  occurred_at  TEXT NOT NULL,
+  dispatched   BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at   BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS event_outbox_pending_idx
+  ON event_outbox (created_at ASC)
+  WHERE dispatched = FALSE;
+`;
+
+// DB-15: Field-level audit trigger — captures changed fields as JSONB diff on UPDATE.
+// Creates a generic trigger function that writes to entity_change_logs.
+// Applied per-table; new tables can be audited by calling
+// SELECT audit.create_trigger('table_name').
+export const CREATE_AUDIT_TRIGGER_FN = `
+CREATE OR REPLACE FUNCTION log_field_changes()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+  old_vals JSONB;
+  new_vals JSONB;
+  changed_fields JSONB := '{}';
+  k TEXT;
+BEGIN
+  old_vals := to_jsonb(OLD);
+  new_vals := to_jsonb(NEW);
+  FOR k IN SELECT jsonb_object_keys(new_vals)
+  LOOP
+    IF (old_vals ->> k) IS DISTINCT FROM (new_vals ->> k) AND k NOT IN ('updated_at') THEN
+      changed_fields := changed_fields
+        || jsonb_build_object(k, jsonb_build_object('old', old_vals -> k, 'new', new_vals -> k));
+    END IF;
+  END LOOP;
+  IF changed_fields <> '{}' THEN
+    INSERT INTO entity_change_logs (id, tenant_id, entity_type, entity_id, change_type, old_values, new_values, changed_at)
+    VALUES (
+      gen_random_uuid()::text,
+      COALESCE(NEW.tenant_id::text, ''),
+      TG_TABLE_NAME,
+      NEW.id::text,
+      'UPDATE',
+      old_vals::text,
+      new_vals::text,
+      extract(epoch from clock_timestamp()) * 1000
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+`;
+
+// Apply the audit trigger to core commerce tables.
+// Uses information_schema check so it's safe to run multiple times.
+export const APPLY_AUDIT_TRIGGERS = `
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'log_field_changes') THEN RETURN; END IF;
+  FOREACH tbl IN ARRAY ARRAY['orders','customers']
+  LOOP
+    BEGIN
+      EXECUTE format(
+        'CREATE TRIGGER %I_audit_log AFTER UPDATE ON %I
+         FOR EACH ROW EXECUTE FUNCTION log_field_changes()',
+        tbl, tbl
+      );
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    WHEN undefined_table THEN NULL;
+    END;
+  END LOOP;
+END;
+$$;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -414,4 +496,7 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_CURRENCIES_TABLE,
   ADD_SOFT_DELETE_COLUMNS,
   ADD_SOFT_DELETE_INDEXES,
+  CREATE_AUDIT_TRIGGER_FN,
+  APPLY_AUDIT_TRIGGERS,
+  CREATE_EVENT_OUTBOX_TABLE,
 ];

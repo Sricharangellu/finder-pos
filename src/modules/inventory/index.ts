@@ -201,6 +201,9 @@ BEGIN
 END;
 $$;
 `,
+    // DB-14: FIFO/FEFO costing — add unit_cost_cents to inventory_movements.
+    // Populated on stock-in (PO receive) so COGS = SUM(|delta| × unit_cost_cents).
+    `ALTER TABLE inventory_movements ADD COLUMN IF NOT EXISTS unit_cost_cents BIGINT;`,
   ],
   register({ db, events, router }) {
     const service = new InventoryService(db, events);
