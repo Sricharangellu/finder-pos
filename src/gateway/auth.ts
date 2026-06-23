@@ -233,6 +233,46 @@ export function requireScope(scope: string) {
  * (e.g. in tests that bypass the DB). The auth check above already rejected any
  * request without a valid tenant, so we can trust `res.locals.auth.tenantId`.
  */
+// DB-13: Subscription plan hierarchy — each plan includes all plans below it.
+const PLAN_ORDER = ["starter", "growth", "professional", "enterprise", "platform"] as const;
+type Plan = typeof PLAN_ORDER[number];
+
+function planSatisfies(actual: string, required: Plan): boolean {
+  const ai = PLAN_ORDER.indexOf(actual as Plan);
+  const ri = PLAN_ORDER.indexOf(required);
+  return ai >= ri;
+}
+
+/**
+ * requirePlan(plan) — middleware that checks the tenant's subscription plan.
+ * Reads from the `subscriptions` table on every request (no caching — plans
+ * can change without restart). Fails open if the table is unavailable.
+ *
+ * Usage: router.get("/advanced", requirePlan("professional"), handler(...))
+ */
+export function requirePlan(required: Plan): RequestHandler {
+  return async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    if (!auth?.tenantId) { next(new HttpError(401, "unauthenticated", "Not authenticated.")); return; }
+    const db = res.locals["db"] as DB | undefined;
+    if (!db) { next(); return; } // no DB context — fail open (shouldn't happen in prod)
+    try {
+      const sub = await db.one<{ plan: string }>(
+        "SELECT plan FROM subscriptions WHERE tenant_id = @t LIMIT 1",
+        { t: auth.tenantId },
+      );
+      const plan = sub?.plan ?? "starter";
+      if (!planSatisfies(plan, required)) {
+        next(new HttpError(403, "plan_required", `This feature requires the '${required}' plan or higher. Current plan: '${plan}'.`));
+        return;
+      }
+    } catch {
+      // Subscriptions table unavailable — fail open so existing tenants are not blocked.
+    }
+    next();
+  };
+}
+
 export function tenantResolver(_req: Request, _res: Response, next: NextFunction): void {
   // The DB layer sets `app.tenant_id` inside each transaction via the service
   // layer helpers (`withTenant`). The middleware records the tenantId so those

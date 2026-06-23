@@ -1,6 +1,7 @@
 import type { Router, Request, Response } from "express";
 import { handler } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requirePlan } from "../../gateway/auth.js";
 import type { ReportsService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -148,8 +149,8 @@ export function registerRoutes(router: Router, service: ReportsService): void {
 
   // ── BE-38: Purchase/AP Report ─────────────────────────────────────────────
 
-  // GET /api/v1/reports/purchases?vendorId=&from=&to=&limit=
-  router.get("/purchases", handler(async (req, res) => {
+  // GET /api/v1/reports/purchases?vendorId=&from=&to=&limit= (professional+)
+  router.get("/purchases", requirePlan("professional"), handler(async (req, res) => {
     const t = tenantId(res);
     const vendorId = typeof req.query.vendorId === "string" ? req.query.vendorId : undefined;
     const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
@@ -160,8 +161,8 @@ export function registerRoutes(router: Router, service: ReportsService): void {
 
   // ── BE-40: Time Cards report ──────────────────────────────────────────────
 
-  // GET /api/v1/reports/time-cards?employeeId=&from=&to=
-  router.get("/time-cards", handler(async (req, res) => {
+  // GET /api/v1/reports/time-cards?employeeId=&from=&to= (growth+)
+  router.get("/time-cards", requirePlan("growth"), handler(async (req, res) => {
     const t = tenantId(res);
     const employeeId = typeof req.query.employeeId === "string" ? req.query.employeeId : undefined;
     const from = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
