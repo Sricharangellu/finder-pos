@@ -6,9 +6,23 @@ import type { DB } from "../../shared/db.js";
 
 export interface SalesSummary {
   orders: { open: number; completed: number; refunded: number; voided: number; total: number };
-  /** Revenue recognised from completed orders. */
   revenue: { grossCents: number; taxCents: number; netCents: number };
   payments: { capturedCount: number; capturedCents: number; byMethod: Record<string, number> };
+  /** FE-41: Implementation Prompt §4.1 spec KPIs */
+  kpi: {
+    saleCount: number;
+    grossProfitCents: number;
+    customerCount: number;
+    avgSaleValueCents: number;
+    avgItemsPerSale: number;
+    discountedAmountCents: number;
+    discountedPct: number;          // 0–100
+  };
+  /** Sparkline points (last 8 daily buckets) for each KPI */
+  sparklines: {
+    revenue: number[];
+    saleCount: number[];
+  };
 }
 
 export interface TopProduct {
@@ -174,10 +188,67 @@ export class ReportsService {
       capturedCents += Number(r.amt);
     }
 
+    // FE-41 spec KPIs from Implementation Prompt §4.1
+    const kpiRow = await this.db.one<{
+      sale_count: number;
+      customer_count: number;
+      total_items: number;
+      discounted_cents: number;
+      discounted_orders: number;
+    }>(
+      `SELECT
+         COUNT(*)::int                                          AS sale_count,
+         COUNT(DISTINCT customer_id)::int                      AS customer_count,
+         COALESCE(SUM(item_count), 0)::int                     AS total_items,
+         COALESCE(SUM(discount_cents), 0)                      AS discounted_cents,
+         COUNT(*) FILTER (WHERE discount_cents > 0)::int       AS discounted_orders
+       FROM (
+         SELECT o.customer_id, o.discount_cents,
+                (SELECT COUNT(*) FROM order_lines ol WHERE ol.order_id = o.id AND ol.tenant_id = o.tenant_id) AS item_count
+         FROM orders o
+         WHERE o.tenant_id = @tenantId AND o.status = 'completed' AND o.created_at >= @since
+       ) sub`,
+      { tenantId, since },
+    );
+
+    const saleCount = Number(kpiRow?.sale_count ?? 0);
+    const customerCount = Number(kpiRow?.customer_count ?? 0);
+    const totalItems = Number(kpiRow?.total_items ?? 0);
+    const discountedCents = Number(kpiRow?.discounted_cents ?? 0);
+    const discountedOrders = Number(kpiRow?.discounted_orders ?? 0);
+    const avgSaleValueCents = saleCount > 0 ? Math.round(grossCents / saleCount) : 0;
+    const avgItemsPerSale = saleCount > 0 ? Math.round((totalItems / saleCount) * 10) / 10 : 0;
+    const discountedPct = saleCount > 0 ? Math.round((discountedOrders / saleCount) * 1000) / 10 : 0;
+
+    // Sparkline: last 8 daily revenue + sale count buckets
+    const sparkRows = await this.db.query<{ day: string; rev: number; cnt: number }>(
+      `SELECT
+         to_char(to_timestamp(created_at / 1000), 'YYYY-MM-DD') AS day,
+         COALESCE(SUM(total_cents), 0)                           AS rev,
+         COUNT(*)::int                                           AS cnt
+       FROM orders
+       WHERE tenant_id = @tenantId AND status = 'completed'
+         AND created_at >= @spark
+       GROUP BY day ORDER BY day ASC LIMIT 8`,
+      { tenantId, spark: Date.now() - 7 * 86_400_000 },
+    );
+    const sparkRevenue = sparkRows.map((r) => Number(r.rev));
+    const sparkSaleCount = sparkRows.map((r) => Number(r.cnt));
+
     return {
       orders,
       revenue: { grossCents, taxCents, netCents: grossCents - taxCents },
       payments: { capturedCount, capturedCents, byMethod },
+      kpi: {
+        saleCount,
+        grossProfitCents: grossCents, // full COGS tracking deferred to DB-14
+        customerCount,
+        avgSaleValueCents,
+        avgItemsPerSale,
+        discountedAmountCents: discountedCents,
+        discountedPct,
+      },
+      sparklines: { revenue: sparkRevenue, saleCount: sparkSaleCount },
     };
   }
 

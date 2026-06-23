@@ -531,10 +531,10 @@ on go-live readiness needs.
 
 ### Frontend lane (Phase 5)
 
-- [ ] FE-29: Offline-first POS terminal — implement Service Worker + IndexedDB
+- [x] FE-29: Offline-first POS terminal — implement Service Worker + IndexedDB
       cache for the terminal page. Cache product catalog, pending orders queue
       (drain when online), and last-used payment modes. Show offline indicator
-      in the EnterpriseShell header. See `orchestration/SYSTEM_DESIGN.md §Offline`.
+      in the EnterpriseShell header. See `orchestration/SYSTEM_DESIGN.md §Offline`. (done via INF-8 in 74241ec — IndexedDB outbox, Background Sync, SW cache, OfflineBanner)
 
 - [ ] FE-30: Real-time dashboard updates — replace polling with SSE subscription
       (`GET /api/v1/stream`) on the Dashboard and Terminal pages. Show live
@@ -717,26 +717,26 @@ current codebase. Ordered by value/dependency within each lane.
       Guards: store credit payment cannot exceed customer balance (rule #10).
       See §9 (Customer record > Store Credit tab) and §14 rule #10. (done in b4b420e)
 
-- [ ] BE-36: Register Closures report endpoint — `GET /api/v1/reports/register-closures`
+- [x] BE-36: Register Closures report endpoint — `GET /api/v1/reports/register-closures`
       (list: outlet, register, opened_by, opened_at, closed_at, opening_cash,
       closing_cash, expected_cash, discrepancy, payment breakdown by mode);
       `GET /api/v1/reports/register-closures/:sessionId` (detail: header +
       payment breakdown table + transaction log of invoices in session +
       cash drawer movements in session). Reads from `register_sessions` +
       `cash_drawer_movements` + `payments` tables.
-      See §6.2 Register Closures and §6.3 Register Closure Detail View.
+      See §6.2 Register Closures and §6.3 Register Closure Detail View. (done in 6f2ee4c)
 
-- [ ] BE-37: Cash Movement report endpoint — `GET /api/v1/reports/cash-movement`
+- [x] BE-37: Cash Movement report endpoint — `GET /api/v1/reports/cash-movement`
       (filter by `?registerId=&sessionId=&from=&to=`); reads `cash_drawer_movements`
       table; returns rows with direction (cash_in/cash_out), amount, reason,
       user, timestamp. Aggregates: total_in, total_out, net.
       See §6.2 Cash Movement and §15 POS Transaction → Report Feed Map.
 
-- [ ] BE-38: Purchase/AP report endpoint — `GET /api/v1/reports/purchases`
+- [x] BE-38: Purchase/AP report endpoint — `GET /api/v1/reports/purchases`
       (filter by `?vendorId=&productId=&categoryId=&from=&to=`); joins
       `purchase_orders` + `purchase_order_lines` + `suppliers` + `products`;
       returns qty ordered, cost, units received, due amount per vendor/product/
-      category pivot. See §6.2 Reporting sub-pages (Purchase Report).
+      category pivot. See §6.2 Reporting sub-pages (Purchase Report). (done in 6f2ee4c)
 
 - [ ] BE-39: Customer-specific product price overrides — new table
       `customer_product_prices (id, tenant_id, customer_id, product_id, price_cents,

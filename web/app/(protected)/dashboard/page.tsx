@@ -41,7 +41,23 @@ interface SummaryResponse {
     capturedCents: number;
     byMethod: Record<string, number>;
   };
+  /** FE-41: Implementation Prompt §4.1 spec KPIs */
+  kpi?: {
+    saleCount: number;
+    grossProfitCents: number;
+    customerCount: number;
+    avgSaleValueCents: number;
+    avgItemsPerSale: number;
+    discountedAmountCents: number;
+    discountedPct: number;
+  };
+  sparklines?: {
+    revenue: number[];
+    saleCount: number[];
+  };
 }
+
+interface OutletItem { id: string; name: string; }
 
 interface TopProductItem {
   id?: string;
@@ -321,6 +337,15 @@ export default function DashboardPage() {
     [range, scope],
   );
 
+  // Outlet list for the filter dropdown
+  const [outlets, setOutlets] = useState<OutletItem[]>([]);
+  const [selectedOutletId, setSelectedOutletId] = useState<string>(outletId);
+  useEffect(() => {
+    apiGet<{ items: OutletItem[] }>("/api/v1/outlets")
+      .then((d) => setOutlets(d.items ?? []))
+      .catch(() => {});
+  }, []);
+
   const { data: summary, loading: loadingSummary, error: errorSummary } =
     useQuery(`dashboard:summary:${range}:${scope}`, fetchSummary, { staleMs: 60_000 });
   const { data: topProductsData, loading: loadingProducts } =
@@ -353,16 +378,20 @@ export default function DashboardPage() {
   const hourlyPoints = (hourlyData?.items ?? []).map((d) => ({ label: d.label, value: d.revenueCents }));
   const categoryItems = (categoryData?.items ?? []).slice(0, 6);
 
-  // ── Derived KPI values ────────────────────────────────────────────────────
+  // ── Derived KPI values (Implementation Prompt §4.1 spec) ─────────────────
 
   const gross = summary?.revenue.grossCents ?? 0;
-  const net = summary?.revenue.netCents ?? 0;
-  const tax = summary?.revenue.taxCents ?? 0;
-  const totalOrders = summary?.orders.total ?? 0;
-  const completedOrders = summary?.orders.completed ?? 0;
-  const openOrders = summary?.orders.open ?? 0;
-  const avgOrderCents =
-    completedOrders > 0 ? Math.trunc(gross / completedOrders) : 0;
+  const kpi = summary?.kpi;
+  const spark = summary?.sparklines;
+  const saleCount = kpi?.saleCount ?? summary?.orders.completed ?? 0;
+  const grossProfit = kpi?.grossProfitCents ?? gross;
+  const customerCount = kpi?.customerCount ?? 0;
+  const avgSaleValue = kpi?.avgSaleValueCents ?? (saleCount > 0 ? Math.trunc(gross / saleCount) : 0);
+  const avgItems = kpi?.avgItemsPerSale ?? 0;
+  const discountedAmt = kpi?.discountedAmountCents ?? 0;
+  const discountedPct = kpi?.discountedPct ?? 0;
+  const sparkRev = (spark?.revenue ?? []).map((v) => ({ value: v }));
+  const sparkSales = (spark?.saleCount ?? []).map((v) => ({ value: v }));
 
   return (
     <EnterpriseShell
@@ -373,29 +402,46 @@ export default function DashboardPage() {
     >
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
 
-        {/* ── Date range toggle ──────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+        {/* ── Filter bar (date range + outlet) ─────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-table-border)] pb-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-950">
+            <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
               Business Overview
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
               Revenue, orders, inventory movement, and tender mix.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div role="group" aria-label="Report granularity" className="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+            {/* Outlet filter — Implementation Prompt §4.3 */}
+            {outlets.length > 0 && (
+              <select
+                aria-label="Filter by outlet"
+                value={selectedOutletId}
+                onChange={(e) => setSelectedOutletId(e.target.value)}
+                className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+              >
+                <option value="">All Outlets</option>
+                {outlets.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            )}
+            {/* Day/Week/Month granularity toggle */}
+            <div role="group" aria-label="Report granularity" className="inline-flex rounded-md border border-[#D9D9D9] bg-white p-1">
               {(["day", "week", "month"] as const).map((value) => (
                 <button key={value} type="button" onClick={() => setGranularity(value)} aria-pressed={granularity === value}
-                  className={`min-h-[36px] rounded px-3 text-sm font-medium capitalize transition-colors ${granularity === value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+                  className={`min-h-[28px] rounded px-3 text-[12px] font-medium capitalize transition-colors ${granularity === value ? "bg-brand-600 text-white" : "text-[var(--color-text-secondary)] hover:bg-gray-50"}`}>
                   {value}
                 </button>
               ))}
             </div>
-            <label className="sr-only" htmlFor="dashboard-date-preset">Date range</label>
-            <select id="dashboard-date-preset" value={dateRange.preset === "custom" ? "current_week" : dateRange.preset}
-              onChange={(event) => setDateRange(dateRangeForPreset(event.target.value as FinderDateRange["preset"]))}
-              className="h-[46px] rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-brand-600">
+            <select
+              aria-label="Date range"
+              value={dateRange.preset === "custom" ? "current_week" : dateRange.preset}
+              onChange={(e) => setDateRange(dateRangeForPreset(e.target.value as FinderDateRange["preset"]))}
+              className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+            >
               <option value="today">Today</option>
               <option value="current_week">This Week</option>
               <option value="current_month">This Month</option>
@@ -403,73 +449,59 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Error banner ───────────────────────────────────────────────── */}
         {error && !loading && (
-          <Card>
-            <p role="alert" className="text-sm text-danger-700">
-              {error}
-            </p>
-          </Card>
+          <Card><p role="alert" className="text-sm text-danger-500">{error}</p></Card>
         )}
 
-        {/* ── KPI card grid ──────────────────────────────────────────────── */}
+        {/* ── KPI tiles — Implementation Prompt §4.1 (8 spec metrics) ──────── */}
         <section aria-label="Key performance indicators">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <KpiCard
-              title="Revenue"
-              value={formatMoney(gross)}
-              loading={loading}
-              tone="green"
-              icon={<IconDollar />}
-              trend={{ value: 12.5, label: "vs last period" }}
+            {/* 1. Revenue */}
+            <KpiCard title="Revenue" value={formatMoney(gross)} loading={loadingSummary}
+              tone="green" icon={<IconDollar />}
+              sparkline={sparkRev}
+              reportHref="/reporting/sales?metric=revenue"
             />
-            <KpiCard
-              title="Net Revenue"
-              value={formatMoney(net)}
-              loading={loading}
-              tone="green"
-              icon={<IconDollar />}
+            {/* 2. Sale Count */}
+            <KpiCard title="Sale Count" value={saleCount.toLocaleString()} loading={loadingSummary}
+              tone="blue" icon={<IconCart />}
+              sparkline={sparkSales}
+              reportHref="/reporting/sales?metric=sale_count"
             />
-            <KpiCard
-              title="Tax Collected"
-              value={formatMoney(tax)}
-              loading={loading}
-              tone="neutral"
-              icon={<IconCreditCard />}
+            {/* 3. Gross Profit */}
+            <KpiCard title="Gross Profit" value={formatMoney(grossProfit)} loading={loadingSummary}
+              tone="green" icon={<IconDollar />}
+              reportHref="/reporting/sales?metric=gross_profit"
             />
-            <KpiCard
-              title="Payments Captured"
-              value={formatMoney(summary?.payments.capturedCents ?? 0)}
-              loading={loading}
-              tone="blue"
-              icon={<IconCreditCard />}
+            {/* 4. Customer Count */}
+            <KpiCard title="Customer Count" value={customerCount.toLocaleString()} loading={loadingSummary}
+              tone="blue" icon={<IconPackage />}
+              reportHref="/reporting/sales?metric=customer_count"
             />
-            <KpiCard
-              title="Total Orders"
-              value={totalOrders}
-              loading={loading}
-              tone="blue"
-              icon={<IconCart />}
-              trend={{ value: 0, label: "vs yesterday" }}
+            {/* 5. Avg Sale Value */}
+            <KpiCard title="Avg Sale Value" value={formatMoney(avgSaleValue)} loading={loadingSummary}
+              tone="neutral" icon={<IconDollar />}
+              reportHref="/reporting/sales?metric=avg_sale_value"
             />
-            <KpiCard
-              title="Completed Sales"
-              value={completedOrders}
-              loading={loading}
-              tone="green"
-              icon={<IconPackage />}
+            {/* 6. Avg Items / Sale */}
+            <KpiCard title="Avg Items / Sale" value={avgItems.toFixed(1)} loading={loadingSummary}
+              tone="neutral" icon={<IconCart />}
+              reportHref="/reporting/sales?metric=avg_items_per_sale"
             />
-            <KpiCard
-              title="Open Orders"
-              value={openOrders}
-              loading={loading}
-              tone="amber"
-              icon={<IconCart />}
+            {/* 7. Discounted Amount */}
+            <KpiCard title="Discounted (amt)" value={formatMoney(discountedAmt)} loading={loadingSummary}
+              tone="amber" icon={<IconCreditCard />}
+              reportHref="/reporting/sales?metric=discounted"
+            />
+            {/* 8. Discounted % */}
+            <KpiCard title="Discounted (%)" value={`${discountedPct.toFixed(1)}%`} loading={loadingSummary}
+              tone="amber" icon={<IconCreditCard />}
+              reportHref="/reporting/sales?metric=discounted_pct"
             />
             <KpiCard
               title="Avg Order Value"
-              value={formatMoney(avgOrderCents)}
-              loading={loading}
+              value={formatMoney(avgSaleValue)}
+              loading={loadingSummary}
               tone="neutral"
               icon={<IconDollar />}
             />
