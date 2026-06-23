@@ -16,6 +16,8 @@ export const QueueNames = {
   AR_DUNNING: "ar_dunning",
   /** INF-6: Durable webhook delivery retry — survives process restart. */
   WEBHOOK_DELIVERY: "webhook_delivery",
+  /** DB-10: Idempotency key expiry sweep — deletes expired keys every 6 hours. */
+  IDEMPOTENCY_EXPIRY: "idempotency_expiry",
 } as const;
 
 export type QueueName = typeof QueueNames[keyof typeof QueueNames];

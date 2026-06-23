@@ -124,6 +124,7 @@ import { reconcilePaymentsJob } from "./jobs/reconcile-payments.job.js";
 import { closeRegisterJob } from "./jobs/close-register.job.js";
 import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 import { arDunningJob } from "./jobs/ar-dunning.job.js";
+import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -229,6 +230,26 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
       // Non-fatal — dunning jobs will be seeded on next startup or manual trigger.
     }
   })();
+
+  // DB-10: Idempotency key expiry — global job (not per-tenant), runs every 6h.
+  jobConsumer.register(QueueNames.IDEMPOTENCY_EXPIRY, async (job) => {
+    await idempotencyExpiryJob(job, db);
+    await jobProducer.enqueueOnce({
+      type: QueueNames.IDEMPOTENCY_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now() + IDEMPOTENCY_EXPIRY_INTERVAL_MS,
+      maxAttempts: 3,
+    });
+  });
+  // Seed on first startup.
+  void jobProducer.enqueueOnce({
+    type: QueueNames.IDEMPOTENCY_EXPIRY,
+    tenantId: "system",
+    payload: {},
+    runAt: Date.now(),
+    maxAttempts: 3,
+  }).catch(() => {});
 
   // Start polling background jobs.
   jobConsumer.start(10_000); // poll every 10 seconds

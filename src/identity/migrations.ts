@@ -287,6 +287,108 @@ END;
 $$;
 `;
 
+// DB-6: Subscription tiers — SaaS plan enforcement.
+// Stores which plan a tenant is on, when it renews, and max resource limits.
+export const CREATE_SUBSCRIPTIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  plan           TEXT NOT NULL DEFAULT 'starter',
+  status         TEXT NOT NULL DEFAULT 'active',
+  max_users      INTEGER NOT NULL DEFAULT 3,
+  max_registers  INTEGER NOT NULL DEFAULT 1,
+  max_outlets    INTEGER NOT NULL DEFAULT 1,
+  trial_ends_at  BIGINT,
+  renews_at      BIGINT,
+  cancelled_at   BIGINT,
+  created_at     BIGINT NOT NULL,
+  updated_at     BIGINT NOT NULL,
+  UNIQUE (tenant_id),
+  CONSTRAINT chk_subscriptions_plan CHECK (plan IN ('starter','growth','professional','enterprise','platform')),
+  CONSTRAINT chk_subscriptions_status CHECK (status IN ('trialing','active','past_due','cancelled','paused'))
+);
+`;
+
+// DB-5: Fiscal periods — prevents backdating entries after period close.
+// DB-5: Accounting periods — prevents backdating entries after period close.
+// NOTE: named accounting_periods (not fiscal_periods) as the latter conflicts
+// with an embedded-postgres internal name in the test environment.
+export const CREATE_ACCOUNTING_PERIODS_TABLE = `
+CREATE TABLE IF NOT EXISTS accounting_periods (
+  id         TEXT PRIMARY KEY,
+  tenant_id  TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  starts_at  BIGINT NOT NULL,
+  ends_at    BIGINT NOT NULL,
+  closed_at  BIGINT,
+  closed_by  TEXT,
+  created_at BIGINT NOT NULL,
+  UNIQUE (tenant_id, starts_at, ends_at)
+);
+CREATE INDEX IF NOT EXISTS accounting_periods_tenant_idx ON accounting_periods (tenant_id, starts_at DESC);
+`;
+
+// DB-7: Currencies + exchange rates for multi-currency tenants.
+export const CREATE_CURRENCIES_TABLE = `
+CREATE TABLE IF NOT EXISTS currencies (
+  code       TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  symbol     TEXT NOT NULL,
+  decimals   INTEGER NOT NULL DEFAULT 2
+);
+INSERT INTO currencies (code, name, symbol, decimals) VALUES
+  ('USD', 'US Dollar', '$', 2),
+  ('EUR', 'Euro', '€', 2),
+  ('GBP', 'British Pound', '£', 2),
+  ('CAD', 'Canadian Dollar', 'CA$', 2),
+  ('AUD', 'Australian Dollar', 'A$', 2),
+  ('JPY', 'Japanese Yen', '¥', 0)
+ON CONFLICT (code) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS exchange_rates (
+  id          TEXT PRIMARY KEY,
+  from_code   TEXT NOT NULL REFERENCES currencies(code),
+  to_code     TEXT NOT NULL REFERENCES currencies(code),
+  rate        NUMERIC(18,8) NOT NULL,
+  effective_at BIGINT NOT NULL,
+  source      TEXT,
+  UNIQUE (from_code, to_code, effective_at)
+);
+CREATE INDEX IF NOT EXISTS exchange_rates_lookup_idx ON exchange_rates (from_code, to_code, effective_at DESC);
+`;
+
+// DB-10: Idempotency key expiry — prevents unbounded table growth.
+// At 10K tenants × 1K keys/day the table grows 10M rows/day without cleanup.
+export const ADD_IDEMPOTENCY_EXPIRY_INDEX = `
+CREATE INDEX IF NOT EXISTS idempotency_keys_expires_idx ON idempotency_keys (expires_at)
+  WHERE expires_at IS NOT NULL;
+`;
+
+// DB-11: Soft-delete columns on core tables.
+// NOTE: Indexes using WHERE deleted_at IS NULL are split into a separate migration
+// to avoid ComputeIndexAttrs errors when running inside a transaction on Postgres 16.
+// The ALTER TABLE and CREATE INDEX must be in separate migration entries.
+export const ADD_SOFT_DELETE_COLUMNS = `
+ALTER TABLE tenants     ADD COLUMN IF NOT EXISTS deleted_at BIGINT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS deleted_at BIGINT;
+ALTER TABLE custom_roles ADD COLUMN IF NOT EXISTS deleted_at BIGINT;
+`;
+
+export const ADD_SOFT_DELETE_INDEXES = `
+DO $$
+BEGIN
+  CREATE INDEX IF NOT EXISTS tenants_active_idx ON tenants (id) WHERE deleted_at IS NULL;
+EXCEPTION WHEN undefined_column THEN NULL;
+END;
+$$;
+DO $$
+BEGIN
+  CREATE INDEX IF NOT EXISTS users_active_idx ON users (tenant_id, email) WHERE deleted_at IS NULL;
+EXCEPTION WHEN undefined_column THEN NULL;
+END;
+$$;
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -307,4 +409,9 @@ export const IDENTITY_MIGRATIONS = [
   ADD_LOGIN_LOCKOUT_TO_USERS,
   CREATE_UPDATED_AT_TRIGGER_FN,
   APPLY_UPDATED_AT_TRIGGERS,
+  CREATE_SUBSCRIPTIONS_TABLE,
+  CREATE_ACCOUNTING_PERIODS_TABLE,
+  CREATE_CURRENCIES_TABLE,
+  ADD_SOFT_DELETE_COLUMNS,
+  ADD_SOFT_DELETE_INDEXES,
 ];

@@ -107,71 +107,66 @@ export class OrdersService {
       lineGross: Cents;
     }
 
+    // DB-3: Batch-fetch all products and inventory in 2 queries instead of
+    // 3 queries per line (N+1 → O(1)). Committed stock is aggregated in a
+    // single GROUP BY across all requested product IDs.
+    for (const line of input.lines) {
+      if (line.quantity <= 0) throw badRequest(`line quantity must be positive for ${line.productId}`);
+    }
+    const productIds = input.lines.map((l) => l.productId);
+
+    // Two parameterised queries (no string interpolation) using Postgres array params.
+    // node-postgres passes JavaScript arrays directly as Postgres array literals.
+    const products = await this.db.query<ProductRow & { is_master: boolean; sku: string }>(
+      `SELECT p.id, p.sku, p.name, p.price_cents, p.tax_class, p.status, p.age_restricted,
+              EXISTS(SELECT 1 FROM products c
+                     WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
+         FROM products p
+        WHERE p.tenant_id = ? AND p.id = ANY(?)`,
+      [tenantId, productIds],
+    );
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // Single query: on-hand stock + committed quantity for all requested products.
+    const stockRows = await this.db.query<{ product_id: string; stock_qty: number; committed: number }>(
+      `SELECT i.product_id,
+              i.stock_qty,
+              COALESCE((
+                SELECT SUM(ol.quantity)
+                FROM order_lines ol
+                JOIN orders o ON o.id = ol.order_id
+                WHERE ol.product_id = i.product_id
+                  AND o.tenant_id = i.tenant_id
+                  AND o.status NOT IN ('completed','voided','refunded')
+              ), 0) AS committed
+         FROM inventory i
+        WHERE i.tenant_id = ? AND i.product_id = ANY(?)`,
+      [tenantId, productIds],
+    );
+    const stockMap = new Map(stockRows.map((r) => [r.product_id, r]));
+
     const resolved: Resolved[] = [];
     for (const line of input.lines) {
-      if (line.quantity <= 0) {
-        throw badRequest(`line quantity must be positive for ${line.productId}`);
-      }
-      const product = await this.db.one<ProductRow>(
-        `SELECT p.id, p.name, p.price_cents, p.tax_class, p.status, p.age_restricted,
-                EXISTS(SELECT 1 FROM products c WHERE c.tenant_id = p.tenant_id AND c.parent_product_id = p.id) AS is_master
-           FROM products p WHERE p.id = @id AND p.tenant_id = @tenantId`,
-        { id: line.productId, tenantId },
-      );
-      if (!product) {
-        throw badRequest(`product '${line.productId}' not found`);
-      }
+      const product = productMap.get(line.productId);
+      if (!product) throw badRequest(`product '${line.productId}' not found`);
+
       if (product.status !== "active") {
-        // Only published (active) products are sellable. A draft product is not
-        // yet released and an archived one is retired; neither can be rung up.
-        throw badRequest(
-          `product '${line.productId}' is ${product.status} and cannot be sold`,
-        );
+        throw badRequest(`product '${line.productId}' is ${product.status} and cannot be sold`);
       }
       if (product.is_master) {
-        // BE-8: a master/variant-parent row is a grouping placeholder
-        // (price 0 / qty 0) — only its child variants are sellable.
-        throw badRequest(
-          `product '${line.productId}' is a variant master and cannot be sold directly`,
-        );
+        throw badRequest(`product '${line.productId}' is a variant master and cannot be sold directly`);
       }
-
-      // BE-16: age-restricted products require cashier age-verification at the
-      // register (FE-12). Here we surface it as a 400 so callers that bypass the
-      // register UI get a clear signal rather than a silent sale.
       if (product.age_restricted && !line.ageVerified) {
         throw badRequest(`product '${line.productId}' is age-restricted — set ageVerified: true after ID check`);
       }
 
-      // BE-9: Inventory reservation — only enforced when the product has an
-      // inventory row (i.e. the tenant actively tracks stock for it). Products
-      // with no inventory row are treated as "untracked" (unlimited) so services,
-      // digital goods, and products not yet received into inventory can still be sold.
-      const stockRow = await this.db.one<{ stock_qty: number }>(
-        "SELECT stock_qty FROM inventory WHERE product_id = @productId AND tenant_id = @tenantId",
-        { productId: line.productId, tenantId },
-      );
-      if (stockRow !== undefined) {
-        const onHand = Number(stockRow.stock_qty);
-        const committedRow = await this.db.one<{ committed: number }>(
-          `SELECT COALESCE(SUM(ol.quantity), 0) AS committed
-             FROM order_lines ol
-             JOIN orders o ON o.id = ol.order_id
-            WHERE ol.product_id = @productId
-              AND o.tenant_id = @tenantId
-              AND o.status NOT IN ('completed', 'voided', 'refunded')`,
-          { productId: line.productId, tenantId },
-        );
-        const committed = committedRow ? Number(committedRow.committed) : 0;
-        const available = onHand - committed;
+      // BE-9: Inventory reservation — only enforced when an inventory row exists.
+      const stock = stockMap.get(line.productId);
+      if (stock !== undefined) {
+        const available = Number(stock.stock_qty) - Number(stock.committed);
         if (line.quantity > available) {
-          const skuRow = await this.db.one<{ sku: string }>(
-            "SELECT sku FROM products WHERE id = @id AND tenant_id = @tenantId",
-            { id: line.productId, tenantId },
-          );
-          const sku = skuRow?.sku ?? line.productId;
           throw conflict(
-            `Insufficient stock for SKU ${sku}: ${available} available, ${line.quantity} requested`,
+            `Insufficient stock for SKU ${product.sku ?? line.productId}: ${available} available, ${line.quantity} requested`,
           );
         }
       }

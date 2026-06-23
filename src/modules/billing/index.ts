@@ -67,11 +67,36 @@ ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_date    BIGINT;
 ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_applied_cents BIGINT NOT NULL DEFAULT 0;
 `;
 
+// DB-4: enterprise composite indexes for range queries on issued_at + status.
+// DB-12: CHECK constraints on billing status columns.
+const ADD_BILLING_ENTERPRISE = `
+CREATE INDEX IF NOT EXISTS invoices_tenant_issued_status_idx
+  ON invoices (tenant_id, issued_at DESC, status);
+CREATE INDEX IF NOT EXISTS bills_tenant_issued_status_idx
+  ON bills (tenant_id, issued_at DESC, status);
+DO $$
+BEGIN
+  ALTER TABLE invoices
+    ADD CONSTRAINT chk_invoices_status
+    CHECK (status IN ('open','partial','paid','void'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END;
+$$;
+DO $$
+BEGIN
+  ALTER TABLE bills
+    ADD CONSTRAINT chk_bills_status
+    CHECK (status IN ('open','partial','paid','void'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END;
+$$;
+`;
+
 /** Billing — supplier bills (AP) + customer invoices (AR). A received PO
  *  auto-drafts a bill (via the purchase_order.received event). */
 export const billingModule: PosModule = {
   name: "billing",
-  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_BILLS_DISCOUNT],
+  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE],
   async register({ db, events, router }) {
     const service = new BillingService(db, events);
     events.on("purchase_order.received", async (event) => {

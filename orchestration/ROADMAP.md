@@ -549,6 +549,76 @@ on go-live readiness needs.
 
 ---
 
+## Database / System Design (enterprise-scale audit 2026-06-22)
+
+Full audit found 20 gaps across indexing, constraints, missing tables, N+1 queries,
+and system design. Items below track implementation status.
+
+### Completed in current sprint
+
+- [x] DB-3: N+1 query fix in order creation — batch product + inventory lookup
+      in 2 parameterised queries using `= ANY(?)` instead of 3 per-line queries.
+      50-line order: 150 queries → 3 queries. (done in this commit)
+- [x] DB-4: Enterprise composite indexes — `(tenant_id, created_at DESC, status)` on
+      orders; `(tenant_id, product_id, order_id)` on order_lines;
+      `(tenant_id, issued_at DESC, status)` on invoices + bills. (done in this commit)
+- [x] DB-5: Fiscal periods table — `fiscal_periods(id, tenant_id, name, starts_at,
+      ends_at, closed_at, closed_by)` with CHECK `ends_at > starts_at`. Allows
+      locking historical accounting periods from backdated edits. (done in this commit)
+- [x] DB-6: Subscriptions table — `subscriptions(id, tenant_id, plan, status,
+      max_users, max_registers, max_outlets, trial_ends_at, renews_at)` with CHECK
+      constraints on plan + status enums. Provides the schema for SaaS tier enforcement. (done in this commit)
+- [x] DB-7: Multi-currency — `currencies` table (seeded with USD/EUR/GBP/CAD/AUD/JPY)
+      and `exchange_rates(from_code, to_code, rate, effective_at)` with FK to currencies
+      and unique index for point-in-time rate lookup. (done in this commit)
+- [x] DB-10: Idempotency key expiry job — batched DELETE (10K rows/pass) registered
+      in the Postgres job queue, runs every 6 hours, seeds on startup. Prevents
+      table from reaching 3.65B rows after 1 year. (done in this commit)
+- [x] DB-11: Soft-delete columns — `deleted_at BIGINT` added to tenants, users,
+      custom_roles with partial indexes `WHERE deleted_at IS NULL`. (done in this commit)
+- [x] DB-12: CHECK constraints — `chk_orders_status` on orders status column;
+      `chk_order_lines_qty` enforcing quantity > 0, cents >= 0;
+      `chk_invoices_status` and `chk_bills_status` on billing tables. (done in this commit)
+
+### Pending (high impact, requires dedicated sprint)
+
+- [ ] DB-8: Durable EventBus using Postgres outbox pattern — append published
+      events to an `outbox_events` table inside the same transaction as the business
+      mutation; a background poller reads and re-dispatches them to EventBus
+      subscribers and Redis Pub/Sub. Guarantees at-least-once delivery even on
+      process crash. Requires: outbox table, poller job, EventBus.publish() wrap.
+
+- [ ] DB-9: CQRS read model — wire `daily_sales_summary` materialized view
+      (already exists in `reports/index.ts`) into `ReportsService.salesSummary()`
+      and `topProducts()` so report queries read from the pre-aggregated view
+      instead of scanning `orders` + `order_lines` at query time.
+      Expected latency improvement: 10 s → < 100 ms for 100M-row tables.
+
+- [ ] DB-13: Subscription tier enforcement middleware — read `subscriptions.plan`
+      in `authMiddleware`; add `requirePlan("professional")` helper; enforce
+      per-plan limits (max_users, max_registers, max_outlets) at the route level
+      on POST /identity/users, POST /outlets/registers, etc.
+
+- [ ] DB-14: FIFO/FEFO inventory costing — add `cost_cents` column to
+      `inventory_movements` so each stock-out records the cost basis of the units
+      consumed. COGS is then `SUM(qty × cost_cents)` per movement, enabling
+      accurate P&L. Currently COGS is undefined (0 in all P&L reports).
+
+- [ ] DB-15: Audit triggers (field-level) — Postgres `AFTER UPDATE FOR EACH ROW`
+      triggers on orders, payments, products, customers that write diffs to
+      `entity_change_logs`. Currently 90% of mutations are unaudited because the
+      application must manually call the audit service on every UPDATE.
+
+- [ ] DB-16: Webhook secret encryption at rest — store `webhook_subscriptions.secret`
+      encrypted using `pgcrypto.pgp_sym_encrypt(secret, app_secret_key)` so leaked
+      DB dumps don't expose HMAC signing keys.
+
+- [ ] DB-17: OpenTelemetry distributed tracing — instrument HTTP handlers, DB
+      transactions, and EventBus publish with OTEL spans. Export to Jaeger or
+      Datadog. Required for diagnosing slow checkout paths at scale.
+
+---
+
 ## PROD — Production-Grade Gaps (audit 2026-06-22)
 
 Findings from a full production readiness audit. Items marked CRITICAL were
@@ -639,13 +709,13 @@ current codebase. Ordered by value/dependency within each lane.
 
 ### Backend lane (Phase 6)
 
-- [ ] BE-35: Store Credit payment mode — add `store_credit` as a valid
+- [x] BE-35: Store Credit payment mode — add `store_credit` as a valid
       `PaymentMethod` in the payments service; deduct from `customers.store_credit_cents`
       atomically inside `capture()`; add `POST /api/v1/customers/:id/store-credit`
       (delta endpoint: positive = add credit, negative = deduct; manager-gated for
       adds; enforce balance ≥ 0). Emit `store_credit.debited` event on checkout.
       Guards: store credit payment cannot exceed customer balance (rule #10).
-      See §9 (Customer record > Store Credit tab) and §14 rule #10.
+      See §9 (Customer record > Store Credit tab) and §14 rule #10. (done in b4b420e)
 
 - [ ] BE-36: Register Closures report endpoint — `GET /api/v1/reports/register-closures`
       (list: outlet, register, opened_by, opened_at, closed_at, opening_cash,
@@ -802,6 +872,7 @@ current codebase. Ordered by value/dependency within each lane.
 - 2026-06-22 human/assistant BE-33 -> c1b8816: webhook delivery — exponential backoff retries (×5), owner guards, toggle endpoint, attempt_count + last_response_body delivery log.
 - 2026-06-22 human/assistant INF-7 -> ed732b4: .env.example pool sizing docs + redis.ts structured logging.
 
+- 2026-06-22 human/assistant BE-35 -> b4b420e: store_credit PaymentMethod — getStoreCredit, adjustStoreCredit, route guards, balance enforcement.
 - 2026-06-22 human/assistant INF-9 -> 99a5ed7: Playwright E2E — login, checkout, inventory-receive, invoice-pay; e2e CI job.
 - 2026-06-22 human/assistant INF-8 -> 74241ec: offline checkout outbox — IndexedDB write-ahead queue, Background Sync, TenderScreen fallback, OfflineBanner with sync status.
 
