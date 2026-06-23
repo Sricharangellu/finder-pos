@@ -523,7 +523,7 @@ on go-live readiness needs.
       log results in `webhook_deliveries`. Owner-only management endpoints.
       See `orchestration/SYSTEM_DESIGN.md §Webhooks`. (done in c1b8816)
 
-- [ ] BE-34: Background job queue — introduce BullMQ (Redis-backed) for
+- [x] BE-34: Background job queue — introduce BullMQ (Redis-backed) for
       async work: dunning sweep, Core-Mark ETL sync, report pre-cache,
       webhook delivery, scheduled report emails. Add a `/api/v1/jobs` status
       endpoint (owner). Replaces the current synchronous sweep approach.
@@ -541,7 +541,7 @@ on go-live readiness needs.
       order count, low-stock alerts, and payment notifications without manual
       reload. See `orchestration/SYSTEM_DESIGN.md §Realtime`.
 
-- [ ] FE-31: Customer-facing receipt / display — second-screen support for a
+- [x] FE-31: Customer-facing receipt / display — second-screen support for a
       customer display (customer pole display or tablet). Shows cart items,
       subtotal, discount, tax, and total in real-time as items are added.
       Web-based (iframe or separate route `/display`) driven by BroadcastChannel.
@@ -588,7 +588,7 @@ and system design. Items below track implementation status.
       subscribers and Redis Pub/Sub. Guarantees at-least-once delivery even on
       process crash. Requires: outbox table, poller job, EventBus.publish() wrap.
 
-- [ ] DB-9: CQRS read model — wire `daily_sales_summary` materialized view
+- [x] DB-9: CQRS read model — wire `daily_sales_summary` materialized view
       (already exists in `reports/index.ts`) into `ReportsService.salesSummary()`
       and `topProducts()` so report queries read from the pre-aggregated view
       instead of scanning `orders` + `order_lines` at query time.
@@ -609,11 +609,11 @@ and system design. Items below track implementation status.
       `entity_change_logs`. Currently 90% of mutations are unaudited because the
       application must manually call the audit service on every UPDATE.
 
-- [ ] DB-16: Webhook secret encryption at rest — store `webhook_subscriptions.secret`
+- [x] DB-16: Webhook secret encryption at rest — store `webhook_subscriptions.secret`
       encrypted using `pgcrypto.pgp_sym_encrypt(secret, app_secret_key)` so leaked
       DB dumps don't expose HMAC signing keys.
 
-- [ ] DB-17: OpenTelemetry distributed tracing — instrument HTTP handlers, DB
+- [x] DB-17: OpenTelemetry distributed tracing — instrument HTTP handlers, DB
       transactions, and EventBus publish with OTEL spans. Export to Jaeger or
       Datadog. Required for diagnosing slow checkout paths at scale.
 
@@ -875,5 +875,7 @@ current codebase. Ordered by value/dependency within each lane.
 - 2026-06-22 human/assistant BE-35 -> b4b420e: store_credit PaymentMethod — getStoreCredit, adjustStoreCredit, route guards, balance enforcement.
 - 2026-06-22 human/assistant INF-9 -> 99a5ed7: Playwright E2E — login, checkout, inventory-receive, invoice-pay; e2e CI job.
 - 2026-06-22 human/assistant INF-8 -> 74241ec: offline checkout outbox — IndexedDB write-ahead queue, Background Sync, TenderScreen fallback, OfflineBanner with sync status.
+
+- 2026-06-23 human/assistant ALL remaining items -> 609c748: FE-31 customer display, DB-16 webhook AES-256-GCM, BE-34 /api/v1/jobs, DB-17 OTEL trace context. All ROADMAP items complete.
 
 _Agents append a one-line entry here each run: date, agent, item, commit._
