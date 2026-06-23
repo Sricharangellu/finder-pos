@@ -228,20 +228,20 @@ export class ReportsService {
     const avgItemsPerSale = saleCount > 0 ? Math.round((totalItems / saleCount) * 10) / 10 : 0;
     const discountedPct = saleCount > 0 ? Math.round((discountedOrders / saleCount) * 1000) / 10 : 0;
 
-    // Sparkline: last 8 daily revenue + sale count buckets (live query — 8 days is small)
-    // DB-9 CQRS upgrade deferred: daily_sales_summary query used to_char(to_timestamp())
-    // which behaves differently on embedded-postgres in CI.
-    const sparkSince = Date.now() - 7 * 86_400_000;
+    // DB-9: CQRS sparklines — read from daily_sales_summary (pre-aggregated).
+    // Uses pre-computed ISO date string for comparison (avoids to_char/to_timestamp
+    // which behaves differently on embedded-postgres vs production Postgres 16).
+    const sparkStartDate = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
     const sparkRows = await this.db.query<{ day: string; rev: number; cnt: number }>(
       `SELECT
-         to_char(to_timestamp(created_at / 1000), 'YYYY-MM-DD') AS day,
-         COALESCE(SUM(total_cents), 0)                           AS rev,
-         COUNT(*)::int                                           AS cnt
-       FROM orders
-       WHERE tenant_id = @tenantId AND status = 'completed'
-         AND created_at >= @sparkSince
-       GROUP BY day ORDER BY day ASC LIMIT 8`,
-      { tenantId, sparkSince },
+         summary_date        AS day,
+         gross_sales_cents   AS rev,
+         transaction_count   AS cnt
+       FROM daily_sales_summary
+       WHERE tenant_id = @tenantId
+         AND summary_date >= @sparkStartDate
+       ORDER BY summary_date ASC LIMIT 8`,
+      { tenantId, sparkStartDate },
     );
     const sparkRevenue = sparkRows.map((r) => Number(r.rev));
     const sparkSaleCount = sparkRows.map((r) => Number(r.cnt));

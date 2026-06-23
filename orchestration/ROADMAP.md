@@ -619,6 +619,61 @@ and system design. Items below track implementation status.
 
 ---
 
+## Phase 7 — Restaurant Vertical
+
+Phase 3 from the vertical roadmap. Targets Bar, Cafe, Fine Dining, QSR, Hotel.
+See `orchestration/gaps/` restaurant analysis and `memory/project_verticals.md`.
+
+### Backend lane (Phase 7)
+
+- [ ] BE-R1: Restaurant tables module — `tables(id, tenant_id, outlet_id,
+      table_number, capacity, status, floor_section)` + `table_sessions(id,
+      tenant_id, table_id, server_id, party_size, opened_at, closed_at,
+      status)`. Endpoints: CRUD `/restaurant/tables`, `POST /restaurant/tables/:id/open`
+      (start session), `POST /restaurant/tables/:id/close`. Status: available /
+      occupied / reserved / cleaning.
+
+- [ ] BE-R2: Open tabs — `bar_tabs(id, tenant_id, table_id, customer_name, 
+      order_ids[], opened_at, closed_at, status)`. Allows multiple rounds per
+      tab. `POST /restaurant/tabs`, `POST /restaurant/tabs/:id/add-round`
+      (links a new order), `POST /restaurant/tabs/:id/close` (final payment).
+
+- [ ] BE-R3: Course-based ordering — `order_courses(order_id, course, status)`
+      linking each order_line to a course (appetizer/main/dessert). Kitchen
+      can bump individual courses. `PATCH /orders/:id/lines/:lineId/course`.
+
+- [ ] BE-R4: Kitchen Display endpoint — `GET /restaurant/kitchen/queue` returns
+      pending/in-progress order lines grouped by course and table. `PATCH
+      /restaurant/kitchen/:lineId/bump` (marks a line as ready). Feeds the
+      KDS front-end display. Filter by `?outletId=&section=`.
+
+- [ ] BE-R5: Split check — `POST /orders/:id/split` accepts `splitCount` or
+      `{ lineIds[][] }` partition; creates N child orders each with a share of
+      the total. Each child can be paid separately via existing capture endpoint.
+
+### Frontend lane (Phase 7)
+
+- [ ] FE-R1: Floor plan page (`/restaurant/floor-plan`) — visual table grid
+      (drag-and-drop placement deferred; start with simple list). Shows table
+      number, capacity, status badge (available/occupied/reserved/cleaning).
+      Click → opens table detail: current session, party size, server, elapsed time.
+      Realtime updates via SSE (table status changes).
+
+- [ ] FE-R2: Kitchen Display System page (`/restaurant/kitchen`) — full-screen
+      KDS view showing pending order lines grouped by course and table.
+      "Bump" button marks line as ready. Auto-refreshes every 10 seconds.
+      Optimised for tablet landscape. Separate from the main nav.
+
+- [ ] FE-R3: Bar Tabs page (`/restaurant/tabs`) — list of open tabs with
+      customer name, table, running total, elapsed time. "Add round" opens
+      a new order linked to the tab. "Close tab" proceeds to payment.
+
+- [ ] FE-R4: Restaurant Dashboard — KPI overlay for F&B metrics: covers today,
+      avg ticket, table turn time, peak hour, top items by quantity.
+      Replaces generic dashboard when outlet.type = "restaurant".
+
+---
+
 ## PROD — Production-Grade Gaps (audit 2026-06-22)
 
 Findings from a full production readiness audit. Items marked CRITICAL were

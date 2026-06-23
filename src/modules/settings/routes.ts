@@ -4,6 +4,7 @@ import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { SettingsService } from "./service.js";
+import { MODULE_REGISTRY, BUSINESS_BUNDLES, CORE_MODULES, moduleFlag } from "../../shared/moduleRegistry.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
@@ -116,4 +117,94 @@ export function registerRoutes(router: Router, service: SettingsService): void {
     const body = parseBody(receiptSchema, req.body);
     res.json(await service.setReceiptTemplate(String(req.params.outletId), body as Record<string, unknown>, tenantId(res)));
   }));
+
+  // ── Business Profile (module registry) ────────────────────────────────────
+
+  /**
+   * GET /settings/business-profile
+   * Returns the full module registry + current enabled state for this tenant.
+   */
+  router.get("/business-profile", handler(async (_req, res) => {
+    const t = tenantId(res);
+    const [currentFlags, businessData] = await Promise.all([
+      service.getFlags(t) as Promise<Record<string, unknown>>,
+      service.getBusiness(t),
+    ]);
+
+    // Build enriched module list with enabled status
+    const modules = MODULE_REGISTRY.map((m) => ({
+      ...m,
+      enabled: m.core ? true : (currentFlags[moduleFlag(m.key)] !== false),
+      flagKey: moduleFlag(m.key),
+    }));
+
+    const businessType = (businessData as Record<string, unknown>)["businessType"] as string | undefined ?? "retail";
+
+    res.json({
+      businessType,
+      bundles: BUSINESS_BUNDLES,
+      modules,
+      coreModules: Array.from(CORE_MODULES),
+    });
+  }));
+
+  /**
+   * POST /settings/business-profile
+   * Sets the business type and enables the corresponding module bundle.
+   * Managers and owners can additionally toggle individual modules.
+   * body: { businessType, enabledModules?: string[] }
+   */
+  router.post(
+    "/business-profile",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(
+        z.object({
+          businessType: z.enum(["retail", "restaurant", "wholesale", "golf", "hybrid", "custom"]),
+          enabledModules: z.array(z.string().min(1)).optional(),
+        }),
+        req.body,
+      );
+
+      const t = tenantId(res);
+      const bundle = BUSINESS_BUNDLES[body.businessType];
+
+      // Start from the bundle's default modules, or the provided list for "custom"
+      const desiredModules = new Set(
+        body.enabledModules ?? bundle?.modules ?? [],
+      );
+
+      // Core modules are always on
+      for (const core of CORE_MODULES) desiredModules.add(core);
+
+      // Build flag updates: enable desired modules, disable others
+      const flagUpdates: Record<string, boolean> = {
+        business_type_retail:      body.businessType === "retail" || body.businessType === "hybrid",
+        business_type_restaurant:  body.businessType === "restaurant",
+        business_type_wholesale:   body.businessType === "wholesale" || body.businessType === "hybrid",
+        business_type_golf:        body.businessType === "golf",
+        // Legacy edition flags — keep compatible
+        groupRetailPOS:   desiredModules.has("pos_terminal"),
+        groupWholesale:   desiredModules.has("sales_orders") || desiredModules.has("purchasing"),
+        groupEnterprise:  desiredModules.has("sso") || desiredModules.has("webhooks"),
+      };
+
+      // Set module feature flags
+      for (const mod of MODULE_REGISTRY) {
+        if (!mod.core) {
+          flagUpdates[moduleFlag(mod.key)] = desiredModules.has(mod.key);
+        }
+      }
+
+      // Persist the business type via the existing business KV store
+      await service.setBusiness({ businessType: body.businessType }, t);
+      await service.setFlags(flagUpdates as Record<string, boolean>, t);
+
+      res.json({
+        ok: true,
+        businessType: body.businessType,
+        enabledModules: Array.from(desiredModules),
+      });
+    }),
+  );
 }
