@@ -243,7 +243,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS product_units_code_idx ON product_units (tenan
     const service = new CatalogService(db, events);
     // Idempotent demo seed (only runs when the table is empty for tnt_demo).
     await service.seed();
-    registerRoutes(router, service);
+    registerRoutes(router, service, db);
   },
 };
 

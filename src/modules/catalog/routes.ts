@@ -5,6 +5,8 @@ import type { CatalogService, ProductStatus, TaxClass } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
+import type { DB } from "../../shared/db.js";
+import { writeAudit } from "../../shared/audit.js";
 
 const taxClassSchema = z.enum(["standard", "exempt"]);
 const statusSchema = z.enum(["active", "draft", "archived"]);
@@ -200,17 +202,21 @@ const importSchema = z.object({
     .max(2000),
 });
 
-export function registerRoutes(router: Router, service: CatalogService): void {
+export function registerRoutes(router: Router, service: CatalogService, db: DB): void {
+  function auth(res: Response): AuthPayload { return res.locals["auth"] as AuthPayload; }
+
   // Bulk import / upsert by SKU (owner/manager only). For catalog onboarding.
   router.post(
     "/import",
     handler(async (req, res) => {
-      const role = (res.locals["auth"] as AuthPayload).role;
-      if (role !== "owner" && role !== "manager") {
+      const a = auth(res);
+      if (a.role !== "owner" && a.role !== "manager") {
         throw badRequest("catalog import requires owner or manager");
       }
       const body = parseBody(importSchema, req.body);
-      res.status(200).json(await service.bulkImport(body.items, (res.locals["auth"] as AuthPayload).tenantId));
+      const result = await service.bulkImport(body.items, a.tenantId);
+      await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "catalog.import", entityType: "catalog", entityId: a.tenantId, after: { imported: result.imported }, requestId: res.locals["requestId"] ?? null });
+      res.status(200).json(result);
     }),
   );
 
@@ -219,13 +225,15 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/bulk-update",
     requireRole("manager"),
     handler(async (req, res) => {
+      const a = auth(res);
       const body = parseBody(bulkUpdateSchema, req.body);
       const update = {
         ...body.update,
         tax_class: body.update.tax_class as TaxClass | undefined,
         status: body.update.status as ProductStatus | undefined,
       };
-      const items = await service.bulkUpdate(body.ids, update, tenantId(res));
+      const items = await service.bulkUpdate(body.ids, update, a.tenantId);
+      await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "product.bulk_update", entityType: "product", entityId: body.ids.join(","), after: { ids: body.ids, update }, requestId: res.locals["requestId"] ?? null });
       res.json({ updated: items.length, items });
     }),
   );
@@ -279,6 +287,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
   router.post(
     "/",
     handler(async (req, res) => {
+      const a = auth(res);
       const body = parseBody(createSchema, req.body);
       const product = await service.create(
         {
@@ -286,8 +295,9 @@ export function registerRoutes(router: Router, service: CatalogService): void {
           tax_class: body.tax_class as TaxClass | undefined,
           status: body.status as ProductStatus | undefined,
         },
-        tenantId(res),
+        a.tenantId,
       );
+      await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "product.create", entityType: "product", entityId: product.id, after: { sku: product.sku, name: product.name, price_cents: product.price_cents }, requestId: res.locals["requestId"] ?? null });
       res.status(201).json(product);
     }),
   );
@@ -447,8 +457,12 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id",
     requireRole("manager"),
     handler(async (req, res) => {
+      const a = auth(res);
+      const id = String(req.params.id);
       const body = parseBody(updateSchema, req.body);
-      const product = await service.update(String(req.params.id), body, tenantId(res));
+      const before = await service.get(id, a.tenantId);
+      const product = await service.update(id, body, a.tenantId);
+      await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "product.update", entityType: "product", entityId: id, before, after: product, requestId: res.locals["requestId"] ?? null });
       res.json(product);
     }),
   );
@@ -457,7 +471,10 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id",
     requireRole("manager"),
     handler(async (req, res) => {
-      const product = await service.archive(String(req.params.id), tenantId(res));
+      const a = auth(res);
+      const id = String(req.params.id);
+      const product = await service.archive(id, a.tenantId);
+      await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "product.archive", entityType: "product", entityId: id, after: { status: "archived" }, requestId: res.locals["requestId"] ?? null });
       res.json(product);
     }),
   );
@@ -475,8 +492,11 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     "/:id/compliance",
     requireRole("manager"),
     handler(async (req, res) => {
+      const a = auth(res);
+      const id = String(req.params.id);
       const body = parseBody(complianceSchema, req.body);
-      const product = await service.updateCompliance(String(req.params.id), body, tenantId(res));
+      const product = await service.updateCompliance(id, body, a.tenantId);
+      await writeAudit(db, { tenantId: a.tenantId, actorId: a.userId, action: "product.compliance_update", entityType: "product", entityId: id, after: body, requestId: res.locals["requestId"] ?? null });
       res.json(product);
     }),
   );

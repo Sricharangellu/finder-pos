@@ -411,10 +411,28 @@ export class SalesService {
     if (so.status === "cancelled") throw conflict("sales order is cancelled");
     if (so.status === "invoiced") throw conflict("sales order is already invoiced");
     if (so.status === "pending_approve") throw conflict("approve the sales order before invoicing");
+    const lines = await this.db.query<SalesLine>(
+      "SELECT * FROM sales_order_lines WHERE sales_order_id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
     await this.db.query("UPDATE sales_orders SET status = 'invoiced', updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
     await this.events.publish(
       "sales_order.invoiced",
-      { salesOrderId: id, tenantId, customerId: so.customer_id, totalCents: Number(so.total_cents) },
+      {
+        salesOrderId: id,
+        tenantId,
+        customerId: so.customer_id,
+        subtotalCents: Number(so.subtotal_cents),
+        discountCents: Number(so.discount_cents),
+        totalCents: Number(so.total_cents),
+        lines: lines.map((l) => ({
+          productId: l.product_id,
+          name: l.name,
+          quantity: l.quantity,
+          unitCents: l.unit_cents,
+          lineCents: l.line_cents,
+        })),
+      },
       id,
     );
     return { ...so, status: "invoiced" };
