@@ -1485,3 +1485,388 @@ export interface CycleCountLinesResponse {
   items: CycleCountLine[];
 }
 
+// ─── Restaurant (Phase 7) ─────────────────────────────────────────────────────
+
+export type TableStatus = "available" | "occupied" | "reserved" | "cleaning";
+
+export interface RestaurantTable {
+  id: string;
+  outlet_id: string | null;
+  table_number: string;
+  capacity: number;
+  floor_section: string | null;
+  status: TableStatus;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RestaurantTablesResponse {
+  items: RestaurantTable[];
+}
+
+export interface TableSession {
+  id: string;
+  table_id: string;
+  server_id: string | null;
+  party_size: number;
+  status: "open" | "closed";
+  opened_at: number;
+  closed_at: number | null;
+  notes: string | null;
+  created_at: number;
+}
+
+export type TabStatus = "open" | "closed";
+
+export interface BarTab {
+  id: string;
+  table_id: string | null;
+  session_id: string | null;
+  customer_name: string | null;
+  status: TabStatus;
+  opened_at: number;
+  closed_at: number | null;
+  order_ids: string[];
+}
+
+export interface BarTabsResponse {
+  items: BarTab[];
+}
+
+export type CourseType = "appetizer" | "main" | "dessert" | "drinks";
+export type CourseStatus = "pending" | "cooking" | "ready";
+
+export interface KitchenQueueLine {
+  id: string;
+  order_id: string;
+  table_number: string | null;
+  product_name: string;
+  quantity: number;
+  course: CourseType;
+  status: CourseStatus;
+  created_at: number;
+}
+
+export interface KitchenQueueResponse {
+  items: KitchenQueueLine[];
+}
+
+// ─── Hospitality ──────────────────────────────────────────────────────────────
+
+export type RoomStatus = "available" | "occupied" | "checkout" | "cleaning" | "maintenance";
+
+export interface HospitalityRoom {
+  id: string;
+  outlet_id: string | null;
+  room_number: string;
+  type: string;
+  floor: string | null;
+  rate_cents: number;
+  status: RoomStatus;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface HospitalityRoomsResponse {
+  items: HospitalityRoom[];
+}
+
+export interface RoomCharge {
+  id: string;
+  room_id: string;
+  description: string;
+  amount_cents: number;
+  order_id: string | null;
+  posted_at: number;
+  created_at: number;
+}
+
+export interface RoomFolioResponse {
+  room: HospitalityRoom;
+  charges: RoomCharge[];
+  total_cents: number;
+}
+
+// ─── Appointments ─────────────────────────────────────────────────────────────
+
+export interface ServiceCatalogItem {
+  id: string;
+  name: string;
+  duration_mins: number;
+  price_cents: number;
+  category: string | null;
+  active: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ServiceCatalogResponse {
+  items: ServiceCatalogItem[];
+}
+
+export type AppointmentStatus = "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show";
+
+export interface Appointment {
+  id: string;
+  customer_id: string | null;
+  customer_name?: string | null;
+  employee_id: string | null;
+  employee_name?: string | null;
+  service_id: string | null;
+  service_name?: string | null;
+  starts_at: number;
+  ends_at: number;
+  status: AppointmentStatus;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface AppointmentsResponse {
+  items: Appointment[];
+}
+
+// ─── Healthcare ───────────────────────────────────────────────────────────────
+
+export interface Patient {
+  id: string;
+  name: string;
+  dob: string | null;
+  gender: string | null;
+  phone: string | null;
+  email: string | null;
+  allergies: string | null;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface PatientsResponse {
+  items: Patient[];
+}
+
+export interface Prescription {
+  id: string;
+  patient_id: string;
+  drug: string;
+  dosage: string | null;
+  prescriber: string | null;
+  refills_total: number;
+  refills_remaining: number;
+  expiry_date: string | null;
+  status: "active" | "expired" | "cancelled";
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface PrescriptionsResponse {
+  items: Prescription[];
+}
+
+// ─── Manufacturing ────────────────────────────────────────────────────────────
+
+export type ProductionOrderStatus = "draft" | "in_progress" | "completed" | "cancelled";
+
+export interface BomLine {
+  id: string;
+  raw_material_id: string | null;
+  raw_material_name: string;
+  qty_required: number;
+  qty_consumed: number;
+  unit: string;
+}
+
+export interface ProductionOrder {
+  id: string;
+  product_id: string | null;
+  product_name?: string | null;
+  quantity: number;
+  status: ProductionOrderStatus;
+  notes: string | null;
+  started_at: number | null;
+  completed_at: number | null;
+  created_at: number;
+  updated_at: number;
+  bom_lines?: BomLine[];
+}
+
+export interface ProductionOrdersResponse {
+  items: ProductionOrder[];
+}
+
+// ─── Automotive ───────────────────────────────────────────────────────────────
+
+export interface Vehicle {
+  id: string;
+  customer_id: string | null;
+  customer_name?: string | null;
+  vin: string | null;
+  make: string;
+  model: string;
+  year: number | null;
+  color: string | null;
+  license_plate: string | null;
+  mileage: number;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface VehiclesResponse {
+  items: Vehicle[];
+}
+
+export type WorkOrderStatus = "open" | "in_progress" | "ready" | "closed" | "cancelled";
+
+export interface WorkOrder {
+  id: string;
+  vehicle_id: string;
+  customer_id: string | null;
+  technician_id: string | null;
+  technician_name?: string | null;
+  title: string;
+  description: string | null;
+  status: WorkOrderStatus;
+  estimate_cents: number;
+  actual_cents: number;
+  labour_cents: number;
+  mileage_in: number;
+  mileage_out: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WorkOrdersResponse {
+  items: WorkOrder[];
+}
+
+// ─── Rental ───────────────────────────────────────────────────────────────────
+
+export type RentalAssetStatus = "available" | "rented" | "maintenance" | "retired";
+
+export interface RentalAsset {
+  id: string;
+  name: string;
+  sku: string;
+  category: string | null;
+  daily_rate_cents: number;
+  deposit_cents: number;
+  status: RentalAssetStatus;
+  serial: string | null;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RentalAssetsResponse {
+  items: RentalAsset[];
+}
+
+export type RentalContractStatus = "draft" | "active" | "returned" | "cancelled";
+
+export interface RentalContract {
+  id: string;
+  customer_id: string | null;
+  customer_name?: string | null;
+  asset_id: string;
+  asset_name?: string | null;
+  starts_at: number;
+  ends_at: number;
+  actual_return_at: number | null;
+  deposit_cents: number;
+  deposit_returned: number;
+  daily_rate_cents: number;
+  status: RentalContractStatus;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RentalContractsResponse {
+  items: RentalContract[];
+}
+
+// ─── Entertainment ────────────────────────────────────────────────────────────
+
+export type EventStatus = "draft" | "active" | "cancelled" | "past";
+
+export interface EntertainmentEvent {
+  id: string;
+  name: string;
+  description: string | null;
+  venue: string | null;
+  starts_at: number;
+  ends_at: number;
+  capacity: number;
+  price_cents: number;
+  status: EventStatus;
+  tickets_sold?: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface EntertainmentEventsResponse {
+  items: EntertainmentEvent[];
+}
+
+export type TicketStatus = "valid" | "redeemed" | "cancelled";
+
+export interface EventTicket {
+  id: string;
+  event_id: string;
+  event_name?: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  qr_code: string;
+  status: TicketStatus;
+  price_cents: number;
+  redeemed_at: number | null;
+  created_at: number;
+}
+
+export interface EventTicketsResponse {
+  items: EventTicket[];
+}
+
+// ─── Education ────────────────────────────────────────────────────────────────
+
+export type StudentStatus = "active" | "inactive" | "graduated";
+
+export interface Student {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  date_of_birth: string | null;
+  course_id: string | null;
+  enrolled_at: number | null;
+  status: StudentStatus;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface StudentsResponse {
+  items: Student[];
+}
+
+export type FeeStatus = "pending" | "paid" | "overdue" | "waived";
+
+export interface FeeRecord {
+  id: string;
+  student_id: string;
+  description: string;
+  amount_cents: number;
+  due_date: string | null;
+  paid_at: number | null;
+  payment_method: string | null;
+  status: FeeStatus;
+  created_at: number;
+}
+
+export interface FeeRecordsResponse {
+  items: FeeRecord[];
+}
+

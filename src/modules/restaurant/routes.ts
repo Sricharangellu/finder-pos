@@ -3,7 +3,7 @@ import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
-import type { RestaurantService, TableStatus } from "./service.js";
+import type { RestaurantService, TableStatus, CourseType } from "./service.js";
 
 function tid(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
@@ -78,5 +78,34 @@ export function registerRoutes(router: Router, svc: RestaurantService): void {
 
   router.post("/restaurant/tabs/:id/close", handler(async (req, res) => {
     res.json(await svc.closeTab(String(req.params["id"]), tid(res)));
+  }));
+
+  // ── BE-R3: Course-based ordering ───────────────────────────────────────────
+
+  router.patch("/restaurant/order-lines/:lineId/course", handler(async (req, res) => {
+    const { orderId, course } = parseBody(z.object({
+      orderId: z.string().min(1),
+      course: z.enum(["appetizer", "main", "dessert", "drinks"]),
+    }), req.body);
+    res.json(await svc.assignCourse(tid(res), orderId, String(req.params["lineId"]), course as CourseType));
+  }));
+
+  router.get("/restaurant/kitchen/queue", handler(async (req, res) => {
+    const outletId = typeof req.query.outletId === "string" ? req.query.outletId : undefined;
+    res.json(await svc.listKitchenQueue(tid(res), outletId));
+  }));
+
+  router.patch("/restaurant/kitchen/:lineId/bump", handler(async (req, res) => {
+    res.json(await svc.bumpLine(tid(res), String(req.params["lineId"])));
+  }));
+
+  // ── BE-R5: Split check ─────────────────────────────────────────────────────
+
+  router.post("/restaurant/orders/:id/split", handler(async (req, res) => {
+    const { splitCount } = parseBody(z.object({
+      splitCount: z.number().int().min(2).max(20),
+    }), req.body);
+    const splits = await svc.splitOrder(tid(res), String(req.params["id"]), splitCount);
+    res.status(201).json({ splits });
   }));
 }

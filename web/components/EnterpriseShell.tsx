@@ -58,7 +58,21 @@ type NavKey =
   | "inventory-serials"
   | "inventory-reorder"
   | "inventory-counts"
-  | "workforce";
+  | "workforce"
+  | "restaurant-floor-plan"
+  | "restaurant-kitchen"
+  | "restaurant-tabs"
+  | "hospitality-rooms"
+  | "appointments"
+  | "healthcare-patients"
+  | "manufacturing-orders"
+  | "automotive-vehicles"
+  | "automotive-work-orders"
+  | "rental-assets"
+  | "rental-contracts"
+  | "entertainment-tickets"
+  | "education-students"
+  | "setup-modules";
 
 /** Full nav item definition — module key gates visibility. */
 interface NavItemDef {
@@ -100,7 +114,38 @@ const ALL_NAV_ITEMS: NavItemDef[] = [
   { key: "finance",     label: "Finance",      href: "/finance",      icon: "finance",     group: "Analyze", module: "billing" },
 
   // ── Restaurant ────────────────────────────────────────────────────────────
-  { key: "orders",      label: "Tables",       href: "/restaurant/floor-plan", icon: "orders", group: "Operate", module: "tables" },
+  { key: "restaurant-floor-plan", label: "Floor Plan",    href: "/restaurant/floor-plan", icon: "orders",   group: "Operate", module: "tables" },
+  { key: "restaurant-kitchen",    label: "Kitchen (KDS)", href: "/restaurant/kitchen",    icon: "operations",group: "Operate", module: "kitchen" },
+  { key: "restaurant-tabs",       label: "Bar Tabs",      href: "/restaurant/tabs",       icon: "finance",  group: "Operate", module: "bar_tabs" },
+
+  // ── Hospitality ───────────────────────────────────────────────────────────
+  { key: "hospitality-rooms",     label: "Rooms",         href: "/hospitality/rooms",     icon: "inventory",group: "Operate", module: "room_billing" },
+
+  // ── Services ──────────────────────────────────────────────────────────────
+  { key: "appointments",          label: "Appointments",  href: "/appointments",          icon: "team",     group: "Operate", module: "appointments" },
+
+  // ── Healthcare ────────────────────────────────────────────────────────────
+  { key: "healthcare-patients",   label: "Patients",      href: "/healthcare/patients",   icon: "customers",group: "Manage", module: "patient_records" },
+
+  // ── Manufacturing ─────────────────────────────────────────────────────────
+  { key: "manufacturing-orders",  label: "Production",    href: "/manufacturing/orders",  icon: "purchasing",group: "Manage", module: "production_orders" },
+
+  // ── Automotive ────────────────────────────────────────────────────────────
+  { key: "automotive-vehicles",   label: "Vehicles",      href: "/automotive/vehicles",   icon: "inventory",group: "Manage", module: "vehicle_history" },
+  { key: "automotive-work-orders",label: "Work Orders",   href: "/automotive/work-orders",icon: "operations",group: "Operate",module: "work_orders" },
+
+  // ── Rental ────────────────────────────────────────────────────────────────
+  { key: "rental-assets",         label: "Rental Assets", href: "/rental/assets",         icon: "inventory",group: "Manage", module: "asset_tracking" },
+  { key: "rental-contracts",      label: "Contracts",     href: "/rental/contracts",      icon: "sales",    group: "Operate", module: "rental_contracts" },
+
+  // ── Entertainment ─────────────────────────────────────────────────────────
+  { key: "entertainment-tickets", label: "Tickets",       href: "/entertainment/tickets", icon: "discounts",group: "Operate", module: "tickets" },
+
+  // ── Education ─────────────────────────────────────────────────────────────
+  { key: "education-students",    label: "Students",      href: "/education/students",    icon: "customers",group: "Manage", module: "student_accounts" },
+
+  // ── Setup: Module Marketplace ─────────────────────────────────────────────
+  { key: "setup-modules",         label: "Modules",       href: "/setup/modules",         icon: "settings", group: "Platform" },
 
   // ── Workforce & Operations ─────────────────────────────────────────────────
   { key: "workforce",   label: "Workforce",    href: "/workforce",    icon: "workforce",  group: "Manage",   module: "workforce" },
@@ -127,6 +172,30 @@ const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
   customers: "customers", loyalty: "customers", finance: "finance", accounting: "finance",
   ecommerce: "ecommerce", settings: "settings", team: "settings", workflows: "settings",
   integrations: "settings", "imports-exports": "settings", notifications: "settings", "audit-log": "settings",
+  // Restaurant
+  "restaurant-floor-plan": "restaurant-floor-plan",
+  "restaurant-kitchen": "restaurant-floor-plan",
+  "restaurant-tabs": "restaurant-floor-plan",
+  // Hospitality
+  "hospitality-rooms": "hospitality-rooms",
+  // Services
+  appointments: "appointments",
+  // Healthcare
+  "healthcare-patients": "healthcare-patients",
+  // Manufacturing
+  "manufacturing-orders": "manufacturing-orders",
+  // Automotive
+  "automotive-vehicles": "automotive-vehicles",
+  "automotive-work-orders": "automotive-vehicles",
+  // Rental
+  "rental-assets": "rental-assets",
+  "rental-contracts": "rental-assets",
+  // Entertainment
+  "entertainment-tickets": "entertainment-tickets",
+  // Education
+  "education-students": "education-students",
+  // Setup
+  "setup-modules": "settings",
 };
 
 interface EnterpriseShellProps {

@@ -61,9 +61,40 @@ CREATE TABLE IF NOT EXISTS bar_tab_orders (
 );
 `;
 
+// ── BE-R3: Course-based ordering ─────────────────────────────────────────────
+
+const CREATE_ORDER_COURSES = `
+CREATE TABLE IF NOT EXISTS order_courses (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  order_id    TEXT NOT NULL,
+  line_id     TEXT NOT NULL,
+  course      TEXT NOT NULL CHECK (course IN ('appetizer','main','dessert','drinks')),
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','cooking','ready')),
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ocourses_tenant_order_idx ON order_courses (tenant_id, order_id);
+CREATE INDEX IF NOT EXISTS ocourses_tenant_status_idx ON order_courses (tenant_id, status) WHERE status != 'ready';
+`;
+
+// ── BE-R5: Split check ────────────────────────────────────────────────────────
+
+const CREATE_SPLIT_ORDERS = `
+CREATE TABLE IF NOT EXISTS split_orders (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  parent_order_id  TEXT NOT NULL,
+  child_order_id   TEXT NOT NULL,
+  split_index      INTEGER NOT NULL,
+  created_at       BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS split_orders_tenant_parent_idx ON split_orders (tenant_id, parent_order_id);
+`;
+
 export const restaurantModule: PosModule = {
   name: "restaurant",
-  migrations: [CREATE_TABLES, CREATE_TABLE_SESSIONS, CREATE_BAR_TABS],
+  migrations: [CREATE_TABLES, CREATE_TABLE_SESSIONS, CREATE_BAR_TABS, CREATE_ORDER_COURSES, CREATE_SPLIT_ORDERS],
   register({ db, events, router }: ModuleContext) {
     const svc = new RestaurantService(db, events);
     registerRoutes(router, svc);

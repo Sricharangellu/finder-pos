@@ -521,8 +521,22 @@ export class CatalogService {
     return { items, total, limit, offset };
   }
 
-  async update(id: string, input: UpdateProductInput, tenantId: string): Promise<Product> {
-    const current = await this.getOrThrow(id, tenantId);
+  /**
+   * Core update logic parameterised on a DB instance so bulkUpdate can run all
+   * writes inside a single transaction without changing the public API.
+   * Returns the new product state and a diff of changed fields.
+   */
+  private async _updateRecord(
+    db: DB,
+    id: string,
+    input: UpdateProductInput,
+    tenantId: string,
+  ): Promise<{ product: Product; changed: Partial<Product> }> {
+    const current = await db.one<Product>(
+      "SELECT * FROM products WHERE id = @id AND tenant_id = @tenantId",
+      { id, tenantId },
+    );
+    if (!current) throw notFound(`product '${id}' not found`);
 
     const next: Product = { ...current };
     const changed: Partial<Product> = {};
@@ -557,7 +571,11 @@ export class CatalogService {
 
     if (input.parent_product_id) {
       if (input.parent_product_id === id) throw conflict("a product cannot be its own variant parent");
-      await this.getOrThrow(input.parent_product_id, tenantId);
+      const parent = await db.one<{ id: string }>(
+        "SELECT id FROM products WHERE id = @id AND tenant_id = @tenantId",
+        { id: input.parent_product_id, tenantId },
+      );
+      if (!parent) throw notFound(`product '${input.parent_product_id}' not found`);
     }
 
     // Boolean flag fields — convert boolean input → integer storage.
@@ -610,12 +628,12 @@ export class CatalogService {
     }
 
     if (Object.keys(changed).length === 0) {
-      return current;
+      return { product: current, changed };
     }
 
     next.updated_at = Date.now();
 
-    await this.db.query(
+    await db.query(
       `UPDATE products SET
          name = @name, price_cents = @price_cents, category = @category, tax_class = @tax_class,
          barcode = @barcode, status = @status,
@@ -643,13 +661,19 @@ export class CatalogService {
          track_inventory_by_imei = @track_inventory_by_imei,
          ecommerce = @ecommerce,
          updated_at = @updated_at
-       WHERE id = @id`,
+       WHERE id = @id AND tenant_id = @tenant_id`,
       next as unknown as Record<string, unknown>,
     );
 
-    await this.events.publish("product.updated", { id: next.id, ...changed }, next.id);
+    return { product: next, changed };
+  }
 
-    return next;
+  async update(id: string, input: UpdateProductInput, tenantId: string): Promise<Product> {
+    const { product, changed } = await this._updateRecord(this.db, id, input, tenantId);
+    if (Object.keys(changed).length > 0) {
+      await this.events.publish("product.updated", { id: product.id, ...changed }, product.id);
+    }
+    return product;
   }
 
   /** Soft delete: archive the product. */
@@ -735,13 +759,21 @@ export class CatalogService {
 
   // ---- Bulk operations (BE-7) ----
 
-  /** Apply the same field update to many products by id (manager-gated route). */
+  /** Apply the same field update to many products by id (manager-gated route). All updates are atomic — partial failures roll back every change. */
   async bulkUpdate(ids: string[], input: UpdateProductInput, tenantId: string): Promise<Product[]> {
-    const updated: Product[] = [];
-    for (const id of ids) {
-      updated.push(await this.update(id, input, tenantId));
+    const results: Array<{ product: Product; changed: Partial<Product> }> = [];
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      for (const id of ids) {
+        results.push(await this._updateRecord(tdb, id, input, tenantId));
+      }
+    });
+    // Publish events after the transaction commits so subscribers see consistent state.
+    for (const { product, changed } of results) {
+      if (Object.keys(changed).length > 0) {
+        await this.events.publish("product.updated", { id: product.id, ...changed }, product.id);
+      }
     }
-    return updated;
+    return results.map((r) => r.product);
   }
 
   /** All products for a tenant, for CSV export. Unpaginated (catalogs are small per tenant). */

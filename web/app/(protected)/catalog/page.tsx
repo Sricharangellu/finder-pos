@@ -442,24 +442,86 @@ function ProductsTab({ categories }: { categories: Category[] }) {
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async (body: Record<string, unknown>) => {
-    await apiPost("/api/v1/catalog", body);
-    await load();
+    const tempId = `__opt_${Date.now()}`;
+    const now = Date.now();
+    const placeholder = {
+      id: tempId, tenant_id: "", sku: String(body.sku ?? ""), name: String(body.name ?? ""),
+      price_cents: Number(body.price_cents ?? 0), category: String(body.category ?? ""),
+      tax_class: (body.tax_class as TaxClass) ?? "standard",
+      barcode: body.barcode as string | null ?? null, status: (body.status as ProductStatus) ?? "draft",
+      brand: body.brand as string | null ?? null, description: body.description as string | null ?? null,
+      manufacturer: null, parent_product_id: null, variant_label: null,
+      age_restricted: body.age_restricted ? 1 : 0, track_inventory: body.track_inventory !== false ? 1 : 0,
+      returnable: 1, ecommerce: 0, qty_increment: 1,
+      msrp_cents: body.msrp_cents as number | null ?? null,
+      raw_cost_price_cents: body.raw_cost_price_cents as number | null ?? null,
+      min_selling_price_cents: null, min_qty_to_sell: null, max_qty_to_sell: null, reorder_quantity: null,
+      created_at: now, updated_at: now,
+    } as unknown as Product;
+    setProducts((prev) => [placeholder, ...prev]);
+    setTotal((prev) => prev + 1);
+    try {
+      const created = await apiPost<Product>("/api/v1/catalog", body);
+      setProducts((prev) => prev.map((p) => (p.id === tempId ? created : p)));
+    } catch (ex) {
+      setProducts((prev) => prev.filter((p) => p.id !== tempId));
+      setTotal((prev) => prev - 1);
+      throw ex;
+    }
   };
 
   const handleEdit = async (body: Record<string, unknown>) => {
     if (!editTarget) return;
-    await apiPatch(`/api/v1/catalog/${editTarget.id}`, body);
-    await load();
+    const original = editTarget;
+    const optimistic: Product = {
+      ...original,
+      name: String(body.name ?? original.name),
+      sku: String(body.sku ?? original.sku),
+      price_cents: Number(body.price_cents ?? original.price_cents),
+      category: String(body.category ?? original.category),
+      tax_class: (body.tax_class as TaxClass) ?? original.tax_class,
+      barcode: body.barcode !== undefined ? (body.barcode as string | null) : original.barcode,
+      status: (body.status as ProductStatus) ?? original.status,
+      brand: body.brand !== undefined ? (body.brand as string | null) : original.brand,
+      description: body.description !== undefined ? (body.description as string | null) : original.description,
+      age_restricted: body.age_restricted !== undefined ? (body.age_restricted ? 1 : 0) : original.age_restricted,
+      track_inventory: body.track_inventory !== undefined ? (body.track_inventory ? 1 : 0) : original.track_inventory,
+      msrp_cents: body.msrp_cents !== undefined ? (body.msrp_cents as number | null) : original.msrp_cents,
+      raw_cost_price_cents: body.raw_cost_price_cents !== undefined ? (body.raw_cost_price_cents as number | null) : original.raw_cost_price_cents,
+      updated_at: Date.now(),
+    };
+    setProducts((prev) => prev.map((p) => (p.id === original.id ? optimistic : p)));
+    try {
+      const updated = await apiPatch<Product>(`/api/v1/catalog/${original.id}`, body);
+      setProducts((prev) => prev.map((p) => (p.id === original.id ? updated : p)));
+    } catch (ex) {
+      setProducts((prev) => prev.map((p) => (p.id === original.id ? original : p)));
+      throw ex;
+    }
   };
 
   const handleArchive = async () => {
     if (!archiveTarget) return;
     setArchiving(true); setActionError(null);
+    const original = archiveTarget;
+    const removedByFilter = Boolean(filterStatus && filterStatus !== "archived");
+    setArchiveTarget(null);
+    setProducts((prev) =>
+      removedByFilter
+        ? prev.filter((p) => p.id !== original.id)
+        : prev.map((p) => (p.id === original.id ? { ...p, status: "archived" as ProductStatus } : p))
+    );
+    if (removedByFilter) setTotal((prev) => prev - 1);
     try {
-      await apiDelete(`/api/v1/catalog/${archiveTarget.id}`);
-      setArchiveTarget(null);
-      await load();
+      await apiDelete(`/api/v1/catalog/${original.id}`);
     } catch (err) {
+      setProducts((prev) =>
+        removedByFilter
+          ? [original, ...prev]
+          : prev.map((p) => (p.id === original.id ? original : p))
+      );
+      if (removedByFilter) setTotal((prev) => prev + 1);
+      setArchiveTarget(original);
       setActionError(err instanceof ApiResponseError ? err.message : "Archive failed.");
     } finally {
       setArchiving(false);
@@ -828,12 +890,19 @@ function CategoriesTab() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    const name = newName.trim();
+    if (!name) return;
     setCreating(true); setCreateError(null);
+    const tempId = `__opt_${Date.now()}`;
+    const optimistic: Category = { id: tempId, name, parent_id: null, created_at: Date.now() };
+    setCategories((prev) => [...prev, optimistic]);
+    setNewName("");
     try {
-      await apiPost("/api/v1/catalog/categories", { name: newName.trim() });
-      setNewName(""); await load();
+      const created = await apiPost<Category>("/api/v1/catalog/categories", { name });
+      setCategories((prev) => prev.map((c) => (c.id === tempId ? created : c)));
     } catch (err) {
+      setCategories((prev) => prev.filter((c) => c.id !== tempId));
+      setNewName(name);
       setCreateError(err instanceof ApiResponseError ? err.message : "Create failed.");
     } finally {
       setCreating(false);
@@ -844,11 +913,18 @@ function CategoriesTab() {
 
   const handleEditSave = async () => {
     if (!editTarget || !editName.trim()) return;
+    const original = editTarget;
+    const name = editName.trim();
+    const optimistic: Category = { ...original, name };
+    setCategories((prev) => prev.map((c) => (c.id === original.id ? optimistic : c)));
+    setEditTarget(null);
     setEditSaving(true); setActionError(null);
     try {
-      await apiPatch(`/api/v1/catalog/categories/${editTarget.id}`, { name: editName.trim() });
-      setEditTarget(null); await load();
+      const updated = await apiPatch<Category>(`/api/v1/catalog/categories/${original.id}`, { name });
+      setCategories((prev) => prev.map((c) => (c.id === original.id ? updated : c)));
     } catch (err) {
+      setCategories((prev) => prev.map((c) => (c.id === original.id ? original : c)));
+      setEditTarget(original);
       setActionError(err instanceof ApiResponseError ? err.message : "Save failed.");
     } finally {
       setEditSaving(false);
@@ -857,11 +933,15 @@ function CategoriesTab() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    const original = deleteTarget;
+    setCategories((prev) => prev.filter((c) => c.id !== original.id));
+    setDeleteTarget(null);
     setDeleting(true); setActionError(null);
     try {
-      await apiDelete(`/api/v1/catalog/categories/${deleteTarget.id}`);
-      setDeleteTarget(null); await load();
+      await apiDelete(`/api/v1/catalog/categories/${original.id}`);
     } catch (err) {
+      setCategories((prev) => [...prev, original].sort((a, b) => a.created_at - b.created_at));
+      setDeleteTarget(original);
       setActionError(err instanceof ApiResponseError ? err.message : "Delete failed.");
     } finally {
       setDeleting(false);

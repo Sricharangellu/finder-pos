@@ -273,10 +273,17 @@ export function requirePlan(required: Plan): RequestHandler {
   };
 }
 
-export function tenantResolver(_req: Request, _res: Response, next: NextFunction): void {
-  // The DB layer sets `app.tenant_id` inside each transaction via the service
-  // layer helpers (`withTenant`). The middleware records the tenantId so those
-  // helpers can read it without touching the JWT again.
-  // Actual SET LOCAL happens in identity/db.ts `withTenant()` helper.
+export function tenantResolver(_req: Request, res: Response, next: NextFunction): void {
+  const auth = res.locals["auth"] as AuthPayload | undefined;
+  if (auth?.tenantId) {
+    const baseDb = res.locals["db"] as DB | undefined;
+    if (baseDb) {
+      // Compose withTenant on top of any existing request-scoped DB (e.g. withRequestId).
+      // Every subsequent query that goes through res.locals.db will set app.tenant_id
+      // inside its transaction, so the RLS policy enforces tenant isolation even if
+      // a service accidentally omits the WHERE tenant_id clause.
+      res.locals["db"] = baseDb.withTenant(auth.tenantId);
+    }
+  }
   next();
 }

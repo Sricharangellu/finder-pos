@@ -4,6 +4,8 @@ import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { SalesService, QuoteStatus, SOStatus } from "./service.js";
+import type { DB } from "../../shared/db.js";
+import { writeAudit } from "../../shared/audit.js";
 
 const repSchema = z.object({
   name: z.string().min(1),
@@ -50,12 +52,17 @@ const tierPricesSchema = z.object({
   prices: z.record(z.string(), z.number().int().nonnegative()),
 });
 
-export function registerRoutes(router: Router, service: SalesService): void {
+export function registerRoutes(router: Router, service: SalesService, db: DB): void {
   const mgr = requireRole("manager");
+  function auth(res: Response): AuthPayload { return res.locals["auth"] as AuthPayload; }
+  function reqDb(res: Response): DB { return (res.locals["db"] as DB | undefined) ?? db; }
 
   // ── Quotations ─────────────────────────────────────────────────────────
   router.post("/quotations", handler(async (req, res) => {
-    res.status(201).json(await service.createQuotation(parseBody(quoteSchema, req.body), tenantId(res)));
+    const a = auth(res);
+    const q = await service.createQuotation(parseBody(quoteSchema, req.body), a.tenantId);
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "quotation.create", entityType: "quotation", entityId: q.id, after: { quote_number: q.quote_number, customer_id: q.customer_id, total_cents: q.total_cents }, requestId: res.locals["requestId"] ?? null });
+    res.status(201).json(q);
   }));
   router.get("/quotations", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? (req.query.status as QuoteStatus) : undefined;
@@ -79,7 +86,10 @@ export function registerRoutes(router: Router, service: SalesService): void {
 
   // ── Sales orders ───────────────────────────────────────────────────────
   router.post("/sales-orders", handler(async (req, res) => {
-    res.status(201).json(await service.createSalesOrder(parseBody(soSchema, req.body), tenantId(res)));
+    const a = auth(res);
+    const so = await service.createSalesOrder(parseBody(soSchema, req.body), a.tenantId);
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.create", entityType: "sales_order", entityId: so.id, after: { so_number: so.so_number, customer_id: so.customer_id, total_cents: so.total_cents, status: so.status }, requestId: res.locals["requestId"] ?? null });
+    res.status(201).json(so);
   }));
   router.get("/sales-orders", handler(async (req, res) => {
     res.json(await service.listSalesOrders(tenantId(res), {
@@ -94,17 +104,29 @@ export function registerRoutes(router: Router, service: SalesService): void {
     res.json(await service.getSalesOrder(String(req.params.id), tenantId(res)));
   }));
   router.post("/sales-orders/:id/approve", mgr, handler(async (req, res) => {
-    res.json(await service.approveSalesOrder(String(req.params.id), tenantId(res)));
+    const a = auth(res);
+    const id = String(req.params.id);
+    const so = await service.approveSalesOrder(id, a.tenantId);
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.approve", entityType: "sales_order", entityId: id, after: { status: "approved" }, requestId: res.locals["requestId"] ?? null });
+    res.json(so);
   }));
   router.post("/sales-orders/:id/assign-picker", mgr, handler(async (req, res) => {
     const b = parseBody(assignSchema, req.body);
     res.json(await service.assignPicker(String(req.params.id), b.pickerId, tenantId(res)));
   }));
   router.post("/sales-orders/:id/invoice", mgr, handler(async (req, res) => {
-    res.json(await service.convertToInvoice(String(req.params.id), tenantId(res)));
+    const a = auth(res);
+    const id = String(req.params.id);
+    const so = await service.convertToInvoice(id, a.tenantId);
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.invoice", entityType: "sales_order", entityId: id, after: { status: "invoiced", total_cents: so.total_cents }, requestId: res.locals["requestId"] ?? null });
+    res.json(so);
   }));
   router.post("/sales-orders/:id/cancel", mgr, handler(async (req, res) => {
-    res.json(await service.cancelSalesOrder(String(req.params.id), tenantId(res)));
+    const a = auth(res);
+    const id = String(req.params.id);
+    const so = await service.cancelSalesOrder(id, a.tenantId);
+    await writeAudit(reqDb(res), { tenantId: a.tenantId, actorId: a.userId, action: "sales_order.cancel", entityType: "sales_order", entityId: id, after: { status: "cancelled" }, requestId: res.locals["requestId"] ?? null });
+    res.json(so);
   }));
 
   // ── Per-product tier prices ──────────────────────────────────────────────

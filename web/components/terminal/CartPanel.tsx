@@ -15,7 +15,7 @@ import type { CartLine, CartContextValue } from "@/lib/useCart";
 import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
 import { NumpadModal } from "./NumpadModal";
-import { DISPLAY_CHANNEL } from "@/app/(protected)/display/page";
+import { DISPLAY_CHANNEL } from "@/lib/displayChannel";
 
 interface CartPanelProps {
   cart: CartContextValue;

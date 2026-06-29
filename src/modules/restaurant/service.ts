@@ -3,6 +3,27 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { notFound, HttpError } from "../../shared/http.js";
 
+export type CourseType = "appetizer" | "main" | "dessert" | "drinks";
+export type CourseStatus = "pending" | "cooking" | "ready";
+
+export interface OrderCourse {
+  id: string;
+  tenant_id: string;
+  order_id: string;
+  line_id: string;
+  course: CourseType;
+  status: CourseStatus;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SplitStub {
+  id: string;
+  parentOrderId: string;
+  splitIndex: number;
+  shareCents: number;
+}
+
 export type TableStatus = "available" | "occupied" | "reserved" | "cleaning";
 export type TabStatus = "open" | "closed";
 
@@ -231,5 +252,109 @@ export class RestaurantService {
       { id: tabId },
     );
     return { ...tab, status: "closed", closed_at: now, order_ids: orderRows.map((o) => o.order_id) };
+  }
+
+  // ── BE-R3: Course-based ordering ───────────────────────────────────────────
+
+  async assignCourse(
+    tenantId: string,
+    orderId: string,
+    lineId: string,
+    course: CourseType,
+  ): Promise<OrderCourse> {
+    const now = Date.now();
+    const existing = await this.db.one<OrderCourse>(
+      "SELECT * FROM order_courses WHERE tenant_id = @t AND order_id = @orderId AND line_id = @lineId",
+      { t: tenantId, orderId, lineId },
+    );
+    if (existing) {
+      await this.db.query(
+        "UPDATE order_courses SET course = @course, updated_at = @now WHERE id = @id AND tenant_id = @t",
+        { course, now, id: existing.id, t: tenantId },
+      );
+      return { ...existing, course, updated_at: now };
+    }
+    const id = `oc_${uuidv7()}`;
+    const row: OrderCourse = {
+      id, tenant_id: tenantId, order_id: orderId, line_id: lineId,
+      course, status: "pending", created_at: now, updated_at: now,
+    };
+    await this.db.query(
+      `INSERT INTO order_courses (id, tenant_id, order_id, line_id, course, status, created_at, updated_at)
+       VALUES (@id, @tenant_id, @order_id, @line_id, @course, 'pending', @created_at, @updated_at)`,
+      row as unknown as Record<string, unknown>,
+    );
+    void this.events.publish("restaurant.course_assigned", { tenantId, orderId, lineId, course }, id);
+    return row;
+  }
+
+  async listKitchenQueue(tenantId: string, outletId?: string): Promise<Record<CourseType, OrderCourse[]>> {
+    const where: string[] = ["oc.tenant_id = @t", "oc.status != 'ready'"];
+    const params: Record<string, unknown> = { t: tenantId };
+    if (outletId) {
+      where.push("EXISTS (SELECT 1 FROM restaurant_tables rt WHERE rt.id = (SELECT table_id FROM table_sessions ts WHERE ts.id = (SELECT session_id FROM bar_tabs bt WHERE bt.id = oc.order_id LIMIT 1) LIMIT 1) AND rt.outlet_id = @outletId)");
+      params["outletId"] = outletId;
+    }
+    const rows = await this.db.query<OrderCourse>(
+      `SELECT oc.* FROM order_courses oc WHERE ${where.join(" AND ")} ORDER BY oc.course, oc.created_at ASC`,
+      params,
+    );
+    const grouped: Record<CourseType, OrderCourse[]> = {
+      appetizer: [], main: [], dessert: [], drinks: [],
+    };
+    for (const row of rows) {
+      grouped[row.course].push(row);
+    }
+    return grouped;
+  }
+
+  async bumpLine(tenantId: string, lineId: string): Promise<OrderCourse> {
+    const row = await this.db.one<OrderCourse>(
+      "SELECT * FROM order_courses WHERE tenant_id = @t AND line_id = @lineId",
+      { t: tenantId, lineId },
+    );
+    if (!row) throw notFound(`order_course for line '${lineId}'`);
+    const next: CourseStatus = row.status === "pending" ? "cooking" : "ready";
+    const now = Date.now();
+    await this.db.query(
+      "UPDATE order_courses SET status = @status, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { status: next, now, id: row.id, t: tenantId },
+    );
+    void this.events.publish("restaurant.line_bumped", { tenantId, lineId, status: next }, row.id);
+    return { ...row, status: next, updated_at: now };
+  }
+
+  // ── BE-R5: Split check ─────────────────────────────────────────────────────
+
+  async splitOrder(tenantId: string, orderId: string, splitCount: number): Promise<SplitStub[]> {
+    // Get the parent order total
+    const order = await this.db.one<{ id: string; total_cents?: number; subtotal_cents?: number }>(
+      "SELECT id, total_cents, subtotal_cents FROM orders WHERE id = @id AND tenant_id = @t",
+      { id: orderId, t: tenantId },
+    );
+    if (!order) throw notFound(`order '${orderId}'`);
+    const totalCents = (order.total_cents ?? order.subtotal_cents ?? 0) as number;
+    const baseShare = Math.floor(totalCents / splitCount);
+    const remainder = totalCents - baseShare * splitCount;
+
+    const now = Date.now();
+    const stubs: SplitStub[] = [];
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      for (let i = 0; i < splitCount; i++) {
+        const childId = `ord_${uuidv7()}`;
+        const splitId = `spl_${uuidv7()}`;
+        const shareCents = baseShare + (i === 0 ? remainder : 0);
+        await tdb.query(
+          `INSERT INTO split_orders (id, tenant_id, parent_order_id, child_order_id, split_index, created_at)
+           VALUES (@id, @t, @parentOrderId, @childId, @splitIndex, @now)`,
+          { id: splitId, t: tenantId, parentOrderId: orderId, childId, splitIndex: i, now },
+        );
+        stubs.push({ id: childId, parentOrderId: orderId, splitIndex: i, shareCents });
+      }
+    });
+
+    void this.events.publish("restaurant.order_split", { tenantId, orderId, splitCount }, orderId);
+    return stubs;
   }
 }

@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
+import { DISPLAY_CHANNEL } from "@/lib/displayChannel";
 
 interface CartLine {
   id: string;
@@ -34,8 +35,6 @@ interface DisplayMessage {
   storeName?: string;
   thankYouMessage?: string;
 }
-
-export const DISPLAY_CHANNEL = "finder-pos-display";
 
 const IDLE_LOGO = (
   <div className="flex flex-col items-center gap-4">
