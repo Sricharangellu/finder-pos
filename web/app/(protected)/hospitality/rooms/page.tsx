@@ -161,7 +161,7 @@ export default function HospitalityRoomsPage() {
                       </div>
                     ))}
                   </div>
-                  <Button size="sm" className="mt-3 w-full" variant="outline" onClick={() => setShowCharge(true)}>+ Post Charge</Button>
+                  <Button size="sm" className="mt-3 w-full" variant="secondary" onClick={() => setShowCharge(true)}>+ Post Charge</Button>
                 </div>
               )}
               <div className="space-y-2">

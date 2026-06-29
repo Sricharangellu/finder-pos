@@ -36,20 +36,11 @@ const ALL_STATUSES: AppointmentStatus[] = ["scheduled", "confirmed", "in_progres
 interface BookForm {
   serviceId: string;
   customerName: string;
-  customerPhone: string;
-  staffId: string;
   startAt: string;
   notes: string;
 }
 
-const EMPTY_FORM: BookForm = {
-  serviceId: "",
-  customerName: "",
-  customerPhone: "",
-  staffId: "",
-  startAt: "",
-  notes: "",
-};
+const EMPTY_FORM: BookForm = { serviceId: "", customerName: "", startAt: "", notes: "" };
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -78,7 +69,9 @@ export default function AppointmentsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const visible = statusFilter === "all" ? appointments : appointments.filter(a => a.status === statusFilter);
-  const counts = ALL_STATUSES.reduce<Record<string, number>>((a, s) => { a[s] = appointments.filter(r => r.status === s).length; return a; }, {});
+  const counts = ALL_STATUSES.reduce<Record<string, number>>((acc, s) => {
+    acc[s] = appointments.filter(r => r.status === s).length; return acc;
+  }, {});
 
   async function book() {
     if (!form.serviceId || !form.customerName.trim() || !form.startAt) return;
@@ -87,8 +80,6 @@ export default function AppointmentsPage() {
       await apiPost("/api/v1/appointments", {
         serviceId: form.serviceId,
         customerName: form.customerName.trim(),
-        customerPhone: form.customerPhone.trim() || undefined,
-        staffId: form.staffId.trim() || undefined,
         startAt: new Date(form.startAt).getTime(),
         notes: form.notes.trim() || undefined,
       });
@@ -135,7 +126,7 @@ export default function AppointmentsPage() {
           <div className="overflow-hidden rounded-lg border border-[#E8E8E8] bg-white">
             {visible.length === 0 ? (
               <div className="p-12 text-center text-sm text-[rgba(0,0,0,0.45)]">
-                No appointments found. {statusFilter === "all" && <Button size="sm" className="mt-2" onClick={() => setShowBook(true)}>+ Book First Appointment</Button>}
+                No appointments found.
               </div>
             ) : (
               <table className="w-full text-sm">
@@ -144,20 +135,15 @@ export default function AppointmentsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Customer</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Service</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Date & Time</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Duration</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visible.map(appt => (
                     <tr key={appt.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => setSelected(appt)}>
-                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">
-                        <p>{appt.customer_name}</p>
-                        {appt.customer_phone && <p className="text-xs text-[rgba(0,0,0,0.45)]">{appt.customer_phone}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{appt.service_name}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDt(appt.start_at)}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{appt.duration_min} min</td>
+                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{appt.customer_name ?? "Walk-in"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{appt.service_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDt(appt.starts_at)}</td>
                       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[appt.status]} size="sm">{STATUS_LABEL[appt.status]}</Badge></td>
                     </tr>
                   ))}
@@ -173,9 +159,9 @@ export default function AppointmentsPage() {
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">{selected.customer_name}</h3>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.service_name} · {selected.duration_min} min</p>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{formatDt(selected.start_at)}</p>
+                  <h3 className="text-lg font-bold">{selected.customer_name ?? "Walk-in"}</h3>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.service_name ?? "No service"}</p>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{formatDt(selected.starts_at)}</p>
                 </div>
                 <Badge variant={STATUS_BADGE[selected.status]}>{STATUS_LABEL[selected.status]}</Badge>
               </div>
@@ -183,13 +169,7 @@ export default function AppointmentsPage() {
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Update Status</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {activeStatuses.filter(s => s !== selected.status).map(s => (
-                    <button key={s} type="button" onClick={() => void updateStatus(selected.id, s)}
-                      className="rounded border border-[#D9D9D9] px-3 py-1.5 text-xs text-[rgba(0,0,0,0.65)] hover:bg-[#F5F5F5]">
-                      {STATUS_LABEL[s]}
-                    </button>
-                  ))}
-                  {doneStatuses.filter(s => s !== selected.status).map(s => (
+                  {[...activeStatuses, ...doneStatuses].filter(s => s !== selected.status).map(s => (
                     <button key={s} type="button" onClick={() => void updateStatus(selected.id, s)}
                       className="rounded border border-[#D9D9D9] px-3 py-1.5 text-xs text-[rgba(0,0,0,0.65)] hover:bg-[#F5F5F5]">
                       {STATUS_LABEL[s]}
@@ -213,19 +193,13 @@ export default function AppointmentsPage() {
                   <select value={form.serviceId} onChange={e => setForm(f => ({ ...f, serviceId: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus>
                     <option value="">Select a service…</option>
-                    {services.map(s => <option key={s.id} value={s.id}>{s.name} — {formatMoney(s.price_cents)} ({s.duration_min} min)</option>)}
+                    {services.map(s => <option key={s.id} value={s.id}>{s.name} — {formatMoney(s.price_cents)} ({s.duration_mins} min)</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">Customer Name *</label>
                   <input type="text" placeholder="Jane Smith…" value={form.customerName}
                     onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
-                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Phone</label>
-                  <input type="tel" placeholder="+1 555 000 0000" value={form.customerPhone}
-                    onChange={e => setForm(f => ({ ...f, customerPhone: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
                 <div>

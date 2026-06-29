@@ -8,10 +8,9 @@ import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import type { Patient, PatientsResponse, Prescription, PrescriptionsResponse } from "@/api-client/types";
-import { clsx } from "clsx";
 
-interface PatientForm { firstName: string; lastName: string; dob: string; phone: string; email: string; }
-const EMPTY_FORM: PatientForm = { firstName: "", lastName: "", dob: "", phone: "", email: "" };
+interface PatientForm { name: string; dob: string; phone: string; email: string; }
+const EMPTY_FORM: PatientForm = { name: "", dob: "", phone: "", email: "" };
 
 export default function HealthcarePatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -22,7 +21,7 @@ export default function HealthcarePatientsPage() {
   const [rxList, setRxList] = useState<Prescription[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showRx, setShowRx] = useState(false);
-  const [rxForm, setRxForm] = useState({ drug: "", doseInstructions: "", refills: "0" });
+  const [rxForm, setRxForm] = useState({ drug: "", dosage: "", refills: "0" });
   const [form, setForm] = useState<PatientForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -46,12 +45,11 @@ export default function HealthcarePatientsPage() {
   }
 
   async function createPatient() {
-    if (!form.firstName.trim() || !form.lastName.trim()) return;
+    if (!form.name.trim()) return;
     setSaving(true);
     try {
       await apiPost("/api/v1/healthcare/patients", {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
+        name: form.name.trim(),
         dob: form.dob || undefined,
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
@@ -61,15 +59,15 @@ export default function HealthcarePatientsPage() {
   }
 
   async function addPrescription() {
-    if (!selected || !rxForm.drug.trim() || !rxForm.doseInstructions.trim()) return;
+    if (!selected || !rxForm.drug.trim()) return;
     setSaving(true);
     try {
       await apiPost(`/api/v1/healthcare/patients/${selected.id}/prescriptions`, {
         drug: rxForm.drug.trim(),
-        doseInstructions: rxForm.doseInstructions.trim(),
+        dosage: rxForm.dosage.trim() || undefined,
         refillsRemaining: parseInt(rxForm.refills) || 0,
       });
-      setShowRx(false); setRxForm({ drug: "", doseInstructions: "", refills: "0" });
+      setShowRx(false); setRxForm({ drug: "", dosage: "", refills: "0" });
       await loadRx(selected);
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
   }
@@ -83,28 +81,24 @@ export default function HealthcarePatientsPage() {
   }
 
   const filtered = patients.filter(p =>
-    search === "" || `${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase())
+    search === "" || p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <EnterpriseShell active="healthcare-patients" title="Patients" subtitle="Patient records & prescription management">
       <div className="flex flex-col gap-6 p-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Card className="p-4">
             <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Total Patients</p>
             <p className="mt-1 text-2xl font-bold">{patients.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Active</p>
-            <p className="mt-1 text-2xl font-bold text-green-600">{patients.filter(p => p.status === "active").length}</p>
+            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">With Allergies</p>
+            <p className="mt-1 text-2xl font-bold text-yellow-600">{patients.filter(p => p.allergies).length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Inactive</p>
-            <p className="mt-1 text-2xl font-bold text-[rgba(0,0,0,0.45)]">{patients.filter(p => p.status === "inactive").length}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Deceased</p>
-            <p className="mt-1 text-2xl font-bold text-[rgba(0,0,0,0.25)]">{patients.filter(p => p.status === "deceased").length}</p>
+            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Active Rx</p>
+            <p className="mt-1 text-2xl font-bold text-green-600">—</p>
           </Card>
         </div>
 
@@ -129,21 +123,17 @@ export default function HealthcarePatientsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">DOB</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Phone</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Allergies</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(p => (
                     <tr key={p.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => void loadRx(p)}>
-                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{p.first_name} {p.last_name}</td>
+                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{p.name}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{p.dob ?? "—"}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{p.phone ?? "—"}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{p.email ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={p.status === "active" ? "green" : p.status === "deceased" ? "gray" : "yellow"} size="sm">
-                          {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-                        </Badge>
-                      </td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{p.allergies ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -158,16 +148,18 @@ export default function HealthcarePatientsPage() {
             <div className="w-full max-w-md rounded-xl bg-white shadow-2xl p-6 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">{selected.first_name} {selected.last_name}</h3>
+                  <h3 className="text-lg font-bold">{selected.name}</h3>
                   <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.dob ? `DOB: ${selected.dob}` : "No DOB"}{selected.phone ? ` · ${selected.phone}` : ""}</p>
                 </div>
-                <Badge variant={selected.status === "active" ? "green" : "gray"}>{selected.status}</Badge>
+                {selected.allergies && <Badge variant="yellow">Allergies</Badge>}
               </div>
+
+              {selected.notes && <p className="mb-4 text-sm text-[rgba(0,0,0,0.65)] bg-[#FAFAFA] rounded p-2">{selected.notes}</p>}
 
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-semibold">Prescriptions</h4>
-                  <Button size="sm" variant="outline" onClick={() => setShowRx(true)}>+ Add Rx</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setShowRx(true)}>+ Add Rx</Button>
                 </div>
                 {rxList.length === 0
                   ? <p className="text-xs text-[rgba(0,0,0,0.35)]">No prescriptions on record.</p>
@@ -179,7 +171,7 @@ export default function HealthcarePatientsPage() {
                             <p className="font-medium text-sm">{rx.drug}</p>
                             <Badge variant={rx.status === "active" ? "green" : "gray"} size="sm">{rx.status}</Badge>
                           </div>
-                          <p className="text-xs text-[rgba(0,0,0,0.65)] mt-1">{rx.dose_instructions}</p>
+                          {rx.dosage && <p className="text-xs text-[rgba(0,0,0,0.65)] mt-1">{rx.dosage}</p>}
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-xs text-[rgba(0,0,0,0.45)]">{rx.refills_remaining} refill{rx.refills_remaining !== 1 ? "s" : ""} remaining</span>
                             {rx.status === "active" && rx.refills_remaining > 0 && (
@@ -202,7 +194,7 @@ export default function HealthcarePatientsPage() {
         {showRx && selected && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowRx(false)}>
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-              <h3 className="text-lg font-bold mb-4">Add Prescription — {selected.first_name}</h3>
+              <h3 className="text-lg font-bold mb-4">Add Prescription — {selected.name}</h3>
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium mb-1">Drug / Medication *</label>
@@ -211,9 +203,9 @@ export default function HealthcarePatientsPage() {
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Dosage Instructions *</label>
-                  <input type="text" placeholder="Take 1 tablet twice daily…" value={rxForm.doseInstructions}
-                    onChange={e => setRxForm(f => ({ ...f, doseInstructions: e.target.value }))}
+                  <label className="block text-xs font-medium mb-1">Dosage Instructions</label>
+                  <input type="text" placeholder="Take 1 tablet twice daily…" value={rxForm.dosage}
+                    onChange={e => setRxForm(f => ({ ...f, dosage: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
                 <div>
@@ -237,19 +229,11 @@ export default function HealthcarePatientsPage() {
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
               <h3 className="text-lg font-bold mb-4">Add Patient</h3>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">First Name *</label>
-                    <input type="text" placeholder="Jane" value={form.firstName}
-                      onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
-                      className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Last Name *</label>
-                    <input type="text" placeholder="Smith" value={form.lastName}
-                      onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
-                      className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Full Name *</label>
+                  <input type="text" placeholder="Jane Smith" value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">Date of Birth</label>

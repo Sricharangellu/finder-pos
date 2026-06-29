@@ -4,14 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
-import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost } from "@/api-client/client";
 import type { Vehicle, VehiclesResponse } from "@/api-client/types";
-import { clsx } from "clsx";
 
-interface CreateVehicleForm { vin: string; make: string; model: string; year: string; color: string; licensePlate: string; ownerName: string; ownerPhone: string; }
-const EMPTY_FORM: CreateVehicleForm = { vin: "", make: "", model: "", year: new Date().getFullYear().toString(), color: "", licensePlate: "", ownerName: "", ownerPhone: "" };
+interface CreateVehicleForm { vin: string; make: string; model: string; year: string; color: string; licensePlate: string; customerName: string; }
+const EMPTY_FORM: CreateVehicleForm = { vin: "", make: "", model: "", year: new Date().getFullYear().toString(), color: "", licensePlate: "", customerName: "" };
 
 export default function AutomotiveVehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -45,8 +43,7 @@ export default function AutomotiveVehiclesPage() {
         year: parseInt(form.year) || new Date().getFullYear(),
         color: form.color.trim() || undefined,
         licensePlate: form.licensePlate.trim() || undefined,
-        ownerName: form.ownerName.trim() || undefined,
-        ownerPhone: form.ownerPhone.trim() || undefined,
+        customerName: form.customerName.trim() || undefined,
       });
       setShowCreate(false); setForm(EMPTY_FORM); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
@@ -54,7 +51,7 @@ export default function AutomotiveVehiclesPage() {
 
   const filtered = vehicles.filter(v =>
     search === "" ||
-    [v.vin, v.make, v.model, v.license_plate ?? "", v.owner_name ?? ""].some(f => f.toLowerCase().includes(search.toLowerCase()))
+    [v.vin ?? "", v.make, v.model, v.license_plate ?? "", v.customer_name ?? ""].some(f => f.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -66,12 +63,12 @@ export default function AutomotiveVehiclesPage() {
             <p className="mt-1 text-2xl font-bold">{vehicles.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">With Open Work Orders</p>
-            <p className="mt-1 text-2xl font-bold text-blue-600">—</p>
+            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">With Owner Info</p>
+            <p className="mt-1 text-2xl font-bold">{vehicles.filter(v => v.customer_name).length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">With Owner Info</p>
-            <p className="mt-1 text-2xl font-bold">{vehicles.filter(v => v.owner_name).length}</p>
+            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">With VIN</p>
+            <p className="mt-1 text-2xl font-bold">{vehicles.filter(v => v.vin).length}</p>
           </Card>
         </div>
 
@@ -103,13 +100,10 @@ export default function AutomotiveVehiclesPage() {
                   {filtered.map(v => (
                     <tr key={v.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => setSelected(v)}>
                       <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{v.year} {v.make} {v.model}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[rgba(0,0,0,0.65)]">{v.vin}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[rgba(0,0,0,0.65)]">{v.vin ?? "—"}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{v.license_plate ?? "—"}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)] capitalize">{v.color ?? "—"}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">
-                        {v.owner_name ?? "—"}
-                        {v.owner_phone && <p className="text-xs">{v.owner_phone}</p>}
-                      </td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{v.customer_name ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -123,13 +117,14 @@ export default function AutomotiveVehiclesPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSelected(null)}>
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
               <h3 className="text-lg font-bold mb-1">{selected.year} {selected.make} {selected.model}</h3>
-              <p className="text-xs text-[rgba(0,0,0,0.45)] font-mono mb-4">VIN: {selected.vin}</p>
+              <p className="text-xs text-[rgba(0,0,0,0.45)] font-mono mb-4">VIN: {selected.vin ?? "—"}</p>
               <div className="space-y-2 text-sm mb-4">
                 {selected.license_plate && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">License Plate</span><span>{selected.license_plate}</span></div>}
                 {selected.color && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Color</span><span className="capitalize">{selected.color}</span></div>}
-                {selected.owner_name && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Owner</span><span>{selected.owner_name}</span></div>}
-                {selected.owner_phone && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Phone</span><span>{selected.owner_phone}</span></div>}
+                {selected.customer_name && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Owner</span><span>{selected.customer_name}</span></div>}
+                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Mileage</span><span>{selected.mileage.toLocaleString()} mi</span></div>
               </div>
+              {selected.notes && <p className="mb-4 text-xs text-[rgba(0,0,0,0.55)] bg-[#FAFAFA] rounded p-2">{selected.notes}</p>}
               <button type="button" onClick={() => setSelected(null)} className="w-full rounded border border-[#D9D9D9] py-1.5 text-xs text-[rgba(0,0,0,0.45)] hover:bg-[#F5F5F5]">Close</button>
             </div>
           </div>
@@ -181,19 +176,11 @@ export default function AutomotiveVehiclesPage() {
                       className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Owner Name</label>
-                    <input type="text" placeholder="John Smith" value={form.ownerName}
-                      onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))}
-                      className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Owner Phone</label>
-                    <input type="tel" placeholder="+1 555 0000" value={form.ownerPhone}
-                      onChange={e => setForm(f => ({ ...f, ownerPhone: e.target.value }))}
-                      className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Owner Name</label>
+                  <input type="text" placeholder="John Smith" value={form.customerName}
+                    onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
+                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
               </div>
               <div className="mt-4 flex gap-2 justify-end">

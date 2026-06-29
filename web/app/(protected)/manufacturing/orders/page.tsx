@@ -7,8 +7,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch } from "@/api-client/client";
-import { formatMoney } from "@/lib/money";
-import type { ProductionOrderStatus, BomLine, ProductionOrder, ProductionOrdersResponse } from "@/api-client/types";
+import type { ProductionOrderStatus, ProductionOrder, ProductionOrdersResponse } from "@/api-client/types";
 import { clsx } from "clsx";
 
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
@@ -29,8 +28,8 @@ const STATUS_LABEL: Record<ProductionOrderStatus, string> = {
 
 const ALL_STATUSES: ProductionOrderStatus[] = ["draft", "in_progress", "completed", "cancelled"];
 
-interface CreateOrderForm { productName: string; qtyOrdered: string; }
-const EMPTY_FORM: CreateOrderForm = { productName: "", qtyOrdered: "1" };
+interface CreateOrderForm { productName: string; quantity: string; }
+const EMPTY_FORM: CreateOrderForm = { productName: "", quantity: "1" };
 
 export default function ManufacturingOrdersPage() {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
@@ -62,7 +61,7 @@ export default function ManufacturingOrdersPage() {
     try {
       await apiPost("/api/v1/manufacturing/orders", {
         productName: form.productName.trim(),
-        qtyOrdered: parseInt(form.qtyOrdered) || 1,
+        quantity: parseInt(form.quantity) || 1,
       });
       setShowCreate(false); setForm(EMPTY_FORM); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
@@ -79,13 +78,9 @@ export default function ManufacturingOrdersPage() {
     return new Date(ts).toLocaleDateString();
   }
 
-  const completionPct = (o: ProductionOrder) =>
-    o.qty_ordered > 0 ? Math.round((o.qty_produced / o.qty_ordered) * 100) : 0;
-
   return (
     <EnterpriseShell active="manufacturing-orders" title="Production Orders" subtitle="Manufacturing order management & BOM tracking">
       <div className="flex flex-col gap-6 p-6">
-        {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {ALL_STATUSES.map(s => (
             <Card key={s} className={clsx("p-4 cursor-pointer hover:shadow-md transition-shadow", statusFilter === s && "ring-2 ring-brand-500")}
@@ -112,9 +107,8 @@ export default function ManufacturingOrdersPage() {
                 <thead>
                   <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA]">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Product</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Qty Ordered</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Qty Produced</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Progress</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Quantity</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Started</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Created</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Status</th>
                   </tr>
@@ -122,19 +116,9 @@ export default function ManufacturingOrdersPage() {
                 <tbody>
                   {visible.map(order => (
                     <tr key={order.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => setSelected(order)}>
-                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{order.product_name}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{order.qty_ordered}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{order.qty_produced}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 rounded-full bg-[#F0F0F0] overflow-hidden">
-                            <div className={clsx("h-full rounded-full transition-all",
-                              completionPct(order) === 100 ? "bg-green-500" : "bg-brand-500")}
-                              style={{ width: `${completionPct(order)}%` }} />
-                          </div>
-                          <span className="text-xs text-[rgba(0,0,0,0.45)] w-8">{completionPct(order)}%</span>
-                        </div>
-                      </td>
+                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{order.product_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{order.quantity}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{order.started_at ? formatDate(order.started_at) : "—"}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDate(order.created_at)}</td>
                       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[order.status]} size="sm">{STATUS_LABEL[order.status]}</Badge></td>
                     </tr>
@@ -151,19 +135,13 @@ export default function ManufacturingOrdersPage() {
             <div className="w-full max-w-md rounded-xl bg-white shadow-2xl p-6 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">{selected.product_name}</h3>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.qty_produced} / {selected.qty_ordered} produced · {completionPct(selected)}%</p>
+                  <h3 className="text-lg font-bold">{selected.product_name ?? "Production Order"}</h3>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">Qty: {selected.quantity}</p>
                 </div>
                 <Badge variant={STATUS_BADGE[selected.status]}>{STATUS_LABEL[selected.status]}</Badge>
               </div>
 
-              {/* Progress bar */}
-              <div className="mb-4">
-                <div className="h-2 rounded-full bg-[#F0F0F0] overflow-hidden">
-                  <div className={clsx("h-full rounded-full transition-all", completionPct(selected) === 100 ? "bg-green-500" : "bg-brand-500")}
-                    style={{ width: `${completionPct(selected)}%` }} />
-                </div>
-              </div>
+              {selected.notes && <p className="mb-4 text-sm text-[rgba(0,0,0,0.65)] bg-[#FAFAFA] rounded p-2">{selected.notes}</p>}
 
               {/* BOM lines */}
               {selected.bom_lines && selected.bom_lines.length > 0 && (
@@ -171,9 +149,9 @@ export default function ManufacturingOrdersPage() {
                   <h4 className="text-sm font-semibold mb-2">Bill of Materials</h4>
                   <div className="space-y-1">
                     {selected.bom_lines.map((b, i) => (
-                      <div key={i} className="flex justify-between text-xs">
-                        <span className="text-[rgba(0,0,0,0.65)]">{b.material_name}</span>
-                        <span className="font-medium">× {b.qty_required}</span>
+                      <div key={i} className="flex justify-between text-xs border-b border-[#F0F0F0] py-1">
+                        <span className="text-[rgba(0,0,0,0.65)]">{b.raw_material_name}</span>
+                        <span className="font-medium">{b.qty_consumed} / {b.qty_required} {b.unit}</span>
                       </div>
                     ))}
                   </div>
@@ -210,8 +188,8 @@ export default function ManufacturingOrdersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">Quantity to Produce</label>
-                  <input type="number" min="1" value={form.qtyOrdered}
-                    onChange={e => setForm(f => ({ ...f, qtyOrdered: e.target.value }))}
+                  <input type="number" min="1" value={form.quantity}
+                    onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
               </div>

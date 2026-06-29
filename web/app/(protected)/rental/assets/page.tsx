@@ -106,7 +106,7 @@ export default function RentalAssetsPage() {
                 </div>
                 {asset.category && <p className="text-xs text-[rgba(0,0,0,0.45)] capitalize">{asset.category}</p>}
                 <p className="mt-1 text-xs font-medium">{formatMoney(asset.daily_rate_cents)}/day</p>
-                {asset.serial_number && <p className="text-xs text-[rgba(0,0,0,0.35)] font-mono mt-0.5">{asset.serial_number}</p>}
+                {asset.serial && <p className="text-xs text-[rgba(0,0,0,0.35)] font-mono mt-0.5">{asset.serial}</p>}
               </button>
             ))}
             {visible.length === 0 && (
@@ -128,7 +128,7 @@ export default function RentalAssetsPage() {
               </div>
               <div className="space-y-2 text-sm mb-4">
                 <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Daily Rate</span><span>{formatMoney(selected.daily_rate_cents)}</span></div>
-                {selected.serial_number && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Serial #</span><span className="font-mono text-xs">{selected.serial_number}</span></div>}
+                {selected.serial && <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Serial #</span><span className="font-mono text-xs">{selected.serial}</span></div>}
               </div>
               <button type="button" onClick={() => setSelected(null)} className="w-full rounded border border-[#D9D9D9] py-1.5 text-xs text-[rgba(0,0,0,0.45)] hover:bg-[#F5F5F5]">Close</button>
             </div>

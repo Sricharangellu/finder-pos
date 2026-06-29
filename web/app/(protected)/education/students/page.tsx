@@ -14,17 +14,15 @@ import { clsx } from "clsx";
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
 const STUDENT_STATUS_BADGE: Record<StudentStatus, BadgeVariant> = {
-  enrolled:   "green",
-  graduated:  "blue",
-  suspended:  "yellow",
-  withdrawn:  "gray",
+  active:    "green",
+  inactive:  "gray",
+  graduated: "blue",
 };
 
 const STUDENT_STATUS_LABEL: Record<StudentStatus, string> = {
-  enrolled:  "Enrolled",
+  active:    "Active",
+  inactive:  "Inactive",
   graduated: "Graduated",
-  suspended: "Suspended",
-  withdrawn: "Withdrawn",
 };
 
 const FEE_STATUS_BADGE: Record<FeeStatus, BadgeVariant> = {
@@ -34,8 +32,8 @@ const FEE_STATUS_BADGE: Record<FeeStatus, BadgeVariant> = {
   waived:  "gray",
 };
 
-interface EnrollForm { firstName: string; lastName: string; email: string; phone: string; program: string; }
-const EMPTY_ENROLL: EnrollForm = { firstName: "", lastName: "", email: "", phone: "", program: "" };
+interface EnrollForm { name: string; email: string; phone: string; }
+const EMPTY_ENROLL: EnrollForm = { name: "", email: "", phone: "" };
 
 export default function EducationStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -71,15 +69,13 @@ export default function EducationStudentsPage() {
   }
 
   async function enroll() {
-    if (!enrollForm.firstName.trim() || !enrollForm.lastName.trim() || !enrollForm.email.trim()) return;
+    if (!enrollForm.name.trim() || !enrollForm.email.trim()) return;
     setSaving(true);
     try {
       await apiPost("/api/v1/education/students", {
-        firstName: enrollForm.firstName.trim(),
-        lastName: enrollForm.lastName.trim(),
+        name: enrollForm.name.trim(),
         email: enrollForm.email.trim(),
         phone: enrollForm.phone.trim() || undefined,
-        program: enrollForm.program.trim() || undefined,
       });
       setShowEnroll(false); setEnrollForm(EMPTY_ENROLL); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
@@ -106,12 +102,12 @@ export default function EducationStudentsPage() {
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); }
   }
 
-  const ALL_STATUSES: StudentStatus[] = ["enrolled", "graduated", "suspended", "withdrawn"];
+  const ALL_STATUSES: StudentStatus[] = ["active", "inactive", "graduated"];
   const counts = ALL_STATUSES.reduce<Record<string, number>>((a, s) => { a[s] = students.filter(st => st.status === s).length; return a; }, {});
 
   const filtered = students.filter(s => {
     const matchStatus = statusFilter === "all" || s.status === statusFilter;
-    const matchSearch = search === "" || `${s.first_name} ${s.last_name} ${s.email}`.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = search === "" || `${s.name} ${s.email ?? ""}`.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
@@ -120,12 +116,12 @@ export default function EducationStudentsPage() {
   return (
     <EnterpriseShell active="education-students" title="Students" subtitle="Student enrollment & fee management">
       <div className="flex flex-col gap-6 p-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3">
           {ALL_STATUSES.map(s => (
             <Card key={s} className={clsx("p-4 cursor-pointer hover:shadow-md transition-shadow", statusFilter === s && "ring-2 ring-brand-500")}
               onClick={() => setStatusFilter(f => f === s ? "all" : s)}>
               <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">{STUDENT_STATUS_LABEL[s]}</p>
-              <p className={clsx("mt-1 text-2xl font-bold", s === "enrolled" && "text-green-600", statusFilter === s && "text-brand-600")}>{counts[s] ?? 0}</p>
+              <p className={clsx("mt-1 text-2xl font-bold", s === "active" && "text-green-600", statusFilter === s && "text-brand-600")}>{counts[s] ?? 0}</p>
             </Card>
           ))}
         </div>
@@ -148,8 +144,8 @@ export default function EducationStudentsPage() {
                 <thead>
                   <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA]">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Student</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Program</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Phone</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Enrolled</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Status</th>
                   </tr>
@@ -157,10 +153,10 @@ export default function EducationStudentsPage() {
                 <tbody>
                   {filtered.map(st => (
                     <tr key={st.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => void loadFees(st)}>
-                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{st.first_name} {st.last_name}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{st.program ?? "—"}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{st.email}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{new Date(st.enrolled_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{st.name}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{st.email ?? "—"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{st.phone ?? "—"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{st.enrolled_at ? new Date(st.enrolled_at).toLocaleDateString() : "—"}</td>
                       <td className="px-4 py-3"><Badge variant={STUDENT_STATUS_BADGE[st.status]} size="sm">{STUDENT_STATUS_LABEL[st.status]}</Badge></td>
                     </tr>
                   ))}
@@ -176,8 +172,8 @@ export default function EducationStudentsPage() {
             <div className="w-full max-w-md rounded-xl bg-white shadow-2xl p-6 overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">{selected.first_name} {selected.last_name}</h3>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.email}{selected.program ? ` · ${selected.program}` : ""}</p>
+                  <h3 className="text-lg font-bold">{selected.name}</h3>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.email ?? ""}</p>
                 </div>
                 <Badge variant={STUDENT_STATUS_BADGE[selected.status]}>{STUDENT_STATUS_LABEL[selected.status]}</Badge>
               </div>
@@ -185,7 +181,7 @@ export default function EducationStudentsPage() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-semibold">Fees {totalPending > 0 && <span className="text-red-600 ml-1">({formatMoney(totalPending)} due)</span>}</h4>
-                  <Button size="sm" variant="outline" onClick={() => setShowFee(true)}>+ Add Fee</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setShowFee(true)}>+ Add Fee</Button>
                 </div>
                 {fees.length === 0
                   ? <p className="text-xs text-[rgba(0,0,0,0.35)]">No fee records.</p>
@@ -218,7 +214,7 @@ export default function EducationStudentsPage() {
         {showFee && selected && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowFee(false)}>
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-              <h3 className="text-lg font-bold mb-4">Add Fee — {selected.first_name}</h3>
+              <h3 className="text-lg font-bold mb-4">Add Fee — {selected.name}</h3>
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium mb-1">Description *</label>
@@ -247,19 +243,11 @@ export default function EducationStudentsPage() {
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
               <h3 className="text-lg font-bold mb-4">Enroll Student</h3>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">First Name *</label>
-                    <input type="text" placeholder="Jane" value={enrollForm.firstName}
-                      onChange={e => setEnrollForm(f => ({ ...f, firstName: e.target.value }))}
-                      className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Last Name *</label>
-                    <input type="text" placeholder="Smith" value={enrollForm.lastName}
-                      onChange={e => setEnrollForm(f => ({ ...f, lastName: e.target.value }))}
-                      className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Full Name *</label>
+                  <input type="text" placeholder="Jane Smith" value={enrollForm.name}
+                    onChange={e => setEnrollForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">Email *</label>
@@ -271,12 +259,6 @@ export default function EducationStudentsPage() {
                   <label className="block text-xs font-medium mb-1">Phone</label>
                   <input type="tel" placeholder="+1 555 0000" value={enrollForm.phone}
                     onChange={e => setEnrollForm(f => ({ ...f, phone: e.target.value }))}
-                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Program</label>
-                  <input type="text" placeholder="Computer Science, Business…" value={enrollForm.program}
-                    onChange={e => setEnrollForm(f => ({ ...f, program: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
               </div>

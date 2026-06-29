@@ -14,23 +14,27 @@ import { clsx } from "clsx";
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
 const EVENT_STATUS_BADGE: Record<EventStatus, BadgeVariant> = {
-  upcoming:   "blue",
-  on_sale:    "green",
-  sold_out:   "yellow",
-  cancelled:  "red",
-  completed:  "gray",
+  draft:     "gray",
+  active:    "green",
+  cancelled: "red",
+  past:      "blue",
 };
 
 const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
-  upcoming:  "Upcoming",
-  on_sale:   "On Sale",
-  sold_out:  "Sold Out",
+  draft:     "Draft",
+  active:    "Active",
   cancelled: "Cancelled",
-  completed: "Completed",
+  past:      "Past",
 };
 
-interface CreateEventForm { name: string; venue: string; startsAt: string; capacityMax: string; ticketPriceCents: string; }
-const EMPTY_EVENT: CreateEventForm = { name: "", venue: "", startsAt: "", capacityMax: "100", ticketPriceCents: "2500" };
+const TICKET_STATUS_BADGE: Record<TicketStatus, BadgeVariant> = {
+  valid:     "blue",
+  redeemed:  "green",
+  cancelled: "gray",
+};
+
+interface CreateEventForm { name: string; venue: string; startsAt: string; capacity: string; priceCents: string; }
+const EMPTY_EVENT: CreateEventForm = { name: "", venue: "", startsAt: "", capacity: "100", priceCents: "25" };
 
 export default function EntertainmentTicketsPage() {
   const [events, setEvents] = useState<EntertainmentEvent[]>([]);
@@ -42,7 +46,7 @@ export default function EntertainmentTicketsPage() {
   const [showSell, setShowSell] = useState(false);
   const [showScan, setShowScan] = useState(false);
   const [eventForm, setEventForm] = useState<CreateEventForm>(EMPTY_EVENT);
-  const [sellForm, setSellForm] = useState({ buyerName: "", buyerEmail: "" });
+  const [sellForm, setSellForm] = useState({ customerName: "", customerEmail: "" });
   const [scanQr, setScanQr] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -73,22 +77,22 @@ export default function EntertainmentTicketsPage() {
         name: eventForm.name.trim(),
         venue: eventForm.venue.trim() || undefined,
         startsAt: new Date(eventForm.startsAt).getTime(),
-        capacityMax: parseInt(eventForm.capacityMax) || 100,
-        ticketPriceCents: Math.round(parseFloat(eventForm.ticketPriceCents) * 100) || 0,
+        capacity: parseInt(eventForm.capacity) || 100,
+        priceCents: Math.round(parseFloat(eventForm.priceCents) * 100) || 0,
       });
       setShowCreate(false); setEventForm(EMPTY_EVENT); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
   }
 
   async function sellTicket() {
-    if (!selectedEvent || !sellForm.buyerName.trim()) return;
+    if (!selectedEvent || !sellForm.customerName.trim()) return;
     setSaving(true);
     try {
       await apiPost(`/api/v1/entertainment/events/${selectedEvent.id}/tickets/sell`, {
-        buyerName: sellForm.buyerName.trim(),
-        buyerEmail: sellForm.buyerEmail.trim() || undefined,
+        customerName: sellForm.customerName.trim(),
+        customerEmail: sellForm.customerEmail.trim() || undefined,
       });
-      setShowSell(false); setSellForm({ buyerName: "", buyerEmail: "" });
+      setShowSell(false); setSellForm({ customerName: "", customerEmail: "" });
       await loadTickets(selectedEvent);
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
   }
@@ -118,17 +122,17 @@ export default function EntertainmentTicketsPage() {
             <p className="mt-1 text-2xl font-bold">{events.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">On Sale</p>
-            <p className="mt-1 text-2xl font-bold text-green-600">{events.filter(e => e.status === "on_sale").length}</p>
+            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Active</p>
+            <p className="mt-1 text-2xl font-bold text-green-600">{events.filter(e => e.status === "active").length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Upcoming</p>
-            <p className="mt-1 text-2xl font-bold text-blue-600">{events.filter(e => e.status === "upcoming").length}</p>
+            <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">Draft</p>
+            <p className="mt-1 text-2xl font-bold text-[rgba(0,0,0,0.45)]">{events.filter(e => e.status === "draft").length}</p>
           </Card>
         </div>
 
         <div className="flex gap-2 justify-end">
-          <Button size="sm" variant="outline" onClick={() => setShowScan(true)}>Scan QR</Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowScan(true)}>Scan QR</Button>
           <Button size="sm" onClick={() => setShowCreate(true)}>+ New Event</Button>
         </div>
 
@@ -147,11 +151,11 @@ export default function EntertainmentTicketsPage() {
                 {ev.venue && <p className="text-xs text-[rgba(0,0,0,0.45)]">{ev.venue}</p>}
                 <p className="text-xs text-[rgba(0,0,0,0.65)] mt-1">{formatDt(ev.starts_at)}</p>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs text-[rgba(0,0,0,0.45)]">{ev.tickets_sold} / {ev.capacity_max} sold</span>
-                  <span className="text-xs font-medium">{formatMoney(ev.ticket_price_cents)}</span>
+                  <span className="text-xs text-[rgba(0,0,0,0.45)]">{ev.tickets_sold ?? 0} / {ev.capacity} sold</span>
+                  <span className="text-xs font-medium">{formatMoney(ev.price_cents)}</span>
                 </div>
                 <div className="mt-1 h-1 rounded-full bg-[#F0F0F0] overflow-hidden">
-                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, (ev.tickets_sold / ev.capacity_max) * 100)}%` }} />
+                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, ((ev.tickets_sold ?? 0) / ev.capacity) * 100)}%` }} />
                 </div>
               </button>
             ))}
@@ -169,7 +173,7 @@ export default function EntertainmentTicketsPage() {
                 <div>
                   <h3 className="text-lg font-bold">{selectedEvent.name}</h3>
                   <p className="text-xs text-[rgba(0,0,0,0.45)]">{selectedEvent.venue ? `${selectedEvent.venue} · ` : ""}{formatDt(selectedEvent.starts_at)}</p>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selectedEvent.tickets_sold} / {selectedEvent.capacity_max} tickets sold</p>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selectedEvent.tickets_sold ?? 0} / {selectedEvent.capacity} tickets sold</p>
                 </div>
                 <Badge variant={EVENT_STATUS_BADGE[selectedEvent.status]}>{EVENT_STATUS_LABEL[selectedEvent.status]}</Badge>
               </div>
@@ -177,8 +181,8 @@ export default function EntertainmentTicketsPage() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-semibold">Tickets</h4>
-                  {selectedEvent.status === "on_sale" && (
-                    <Button size="sm" variant="outline" onClick={() => setShowSell(true)}>+ Sell Ticket</Button>
+                  {selectedEvent.status === "active" && (
+                    <Button size="sm" variant="secondary" onClick={() => setShowSell(true)}>+ Sell Ticket</Button>
                   )}
                 </div>
                 {tickets.length === 0
@@ -188,10 +192,10 @@ export default function EntertainmentTicketsPage() {
                       {tickets.map(t => (
                         <div key={t.id} className="flex items-center justify-between text-xs rounded border border-[#F0F0F0] px-2 py-1.5">
                           <div>
-                            <p className="font-medium">{t.buyer_name}</p>
+                            <p className="font-medium">{t.customer_name ?? "—"}</p>
                             <p className="font-mono text-[rgba(0,0,0,0.35)]">{t.qr_code}</p>
                           </div>
-                          <Badge variant={t.status === "sold" ? "blue" : t.status === "redeemed" ? "green" : "gray"} size="sm">{t.status}</Badge>
+                          <Badge variant={TICKET_STATUS_BADGE[t.status]} size="sm">{t.status}</Badge>
                         </div>
                       ))}
                     </div>
@@ -211,18 +215,18 @@ export default function EntertainmentTicketsPage() {
               <h3 className="text-lg font-bold mb-4">Sell Ticket — {selectedEvent.name}</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Buyer Name *</label>
-                  <input type="text" placeholder="Jane Smith" value={sellForm.buyerName}
-                    onChange={e => setSellForm(f => ({ ...f, buyerName: e.target.value }))}
+                  <label className="block text-xs font-medium mb-1">Customer Name *</label>
+                  <input type="text" placeholder="Jane Smith" value={sellForm.customerName}
+                    onChange={e => setSellForm(f => ({ ...f, customerName: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" autoFocus />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">Email</label>
-                  <input type="email" placeholder="jane@example.com" value={sellForm.buyerEmail}
-                    onChange={e => setSellForm(f => ({ ...f, buyerEmail: e.target.value }))}
+                  <input type="email" placeholder="jane@example.com" value={sellForm.customerEmail}
+                    onChange={e => setSellForm(f => ({ ...f, customerEmail: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
-                <p className="text-xs text-[rgba(0,0,0,0.45)]">Price: {formatMoney(selectedEvent.ticket_price_cents)}</p>
+                <p className="text-xs text-[rgba(0,0,0,0.45)]">Price: {formatMoney(selectedEvent.price_cents)}</p>
               </div>
               <div className="mt-4 flex gap-2 justify-end">
                 <Button variant="ghost" size="sm" onClick={() => setShowSell(false)}>Cancel</Button>
@@ -278,14 +282,14 @@ export default function EntertainmentTicketsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-medium mb-1">Capacity</label>
-                    <input type="number" min="1" value={eventForm.capacityMax}
-                      onChange={e => setEventForm(f => ({ ...f, capacityMax: e.target.value }))}
+                    <input type="number" min="1" value={eventForm.capacity}
+                      onChange={e => setEventForm(f => ({ ...f, capacity: e.target.value }))}
                       className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1">Ticket Price ($)</label>
-                    <input type="number" min="0" step="0.01" value={(parseInt(eventForm.ticketPriceCents) / 100).toFixed(2)}
-                      onChange={e => setEventForm(f => ({ ...f, ticketPriceCents: String(Math.round(parseFloat(e.target.value) * 100)) }))}
+                    <input type="number" min="0" step="0.01" value={eventForm.priceCents}
+                      onChange={e => setEventForm(f => ({ ...f, priceCents: e.target.value }))}
                       className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                   </div>
                 </div>

@@ -14,23 +14,23 @@ import { clsx } from "clsx";
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
 const STATUS_BADGE: Record<RentalContractStatus, BadgeVariant> = {
+  draft:     "gray",
   active:    "blue",
   returned:  "green",
-  overdue:   "red",
-  cancelled: "gray",
+  cancelled: "red",
 };
 
 const STATUS_LABEL: Record<RentalContractStatus, string> = {
+  draft:     "Draft",
   active:    "Active",
   returned:  "Returned",
-  overdue:   "Overdue",
   cancelled: "Cancelled",
 };
 
-const ALL_STATUSES: RentalContractStatus[] = ["active", "returned", "overdue", "cancelled"];
+const ALL_STATUSES: RentalContractStatus[] = ["draft", "active", "returned", "cancelled"];
 
-interface CreateContractForm { assetId: string; customerName: string; customerPhone: string; startDate: string; endDate: string; }
-const EMPTY_FORM: CreateContractForm = { assetId: "", customerName: "", customerPhone: "", startDate: "", endDate: "" };
+interface CreateContractForm { assetId: string; customerName: string; startDate: string; endDate: string; }
+const EMPTY_FORM: CreateContractForm = { assetId: "", customerName: "", startDate: "", endDate: "" };
 
 export default function RentalContractsPage() {
   const [contracts, setContracts] = useState<RentalContract[]>([]);
@@ -68,9 +68,8 @@ export default function RentalContractsPage() {
       await apiPost("/api/v1/rental/contracts", {
         assetId: form.assetId,
         customerName: form.customerName.trim(),
-        customerPhone: form.customerPhone.trim() || undefined,
-        startDate: new Date(form.startDate).getTime(),
-        endDate: new Date(form.endDate).getTime(),
+        startsAt: new Date(form.startDate).getTime(),
+        endsAt: new Date(form.endDate).getTime(),
       });
       setShowCreate(false); setForm(EMPTY_FORM); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
@@ -86,6 +85,10 @@ export default function RentalContractsPage() {
 
   function formatDate(ts: number) { return new Date(ts).toLocaleDateString(); }
 
+  function durationDays(c: RentalContract) {
+    return Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400000));
+  }
+
   const availableAssets = assets.filter(a => a.status === "available");
 
   return (
@@ -96,7 +99,7 @@ export default function RentalContractsPage() {
             <Card key={s} className={clsx("p-4 cursor-pointer hover:shadow-md transition-shadow", statusFilter === s && "ring-2 ring-brand-500")}
               onClick={() => setStatusFilter(f => f === s ? "all" : s)}>
               <p className="text-xs text-[rgba(0,0,0,0.45)] uppercase tracking-wide">{STATUS_LABEL[s]}</p>
-              <p className={clsx("mt-1 text-2xl font-bold", s === "active" && "text-blue-600", s === "overdue" && "text-red-600")}>{counts[s] ?? 0}</p>
+              <p className={clsx("mt-1 text-2xl font-bold", s === "active" && "text-blue-600")}>{counts[s] ?? 0}</p>
             </Card>
           ))}
         </div>
@@ -120,21 +123,18 @@ export default function RentalContractsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Asset</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Start</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">End</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Deposit</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visible.map(c => (
                     <tr key={c.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => setSelected(c)}>
-                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">
-                        {c.customer_name}
-                        {c.customer_phone && <p className="text-xs text-[rgba(0,0,0,0.45)]">{c.customer_phone}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{c.asset_name}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDate(c.start_date)}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDate(c.end_date)}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatMoney(c.total_cents)}</td>
+                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{c.customer_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{c.asset_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDate(c.starts_at)}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDate(c.ends_at)}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatMoney(c.deposit_cents)}</td>
                       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[c.status]} size="sm">{STATUS_LABEL[c.status]}</Badge></td>
                     </tr>
                   ))}
@@ -150,14 +150,16 @@ export default function RentalContractsPage() {
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">{selected.customer_name}</h3>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.asset_name}</p>
+                  <h3 className="text-lg font-bold">{selected.customer_name ?? "—"}</h3>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.asset_name ?? "No asset"}</p>
                 </div>
                 <Badge variant={STATUS_BADGE[selected.status]}>{STATUS_LABEL[selected.status]}</Badge>
               </div>
               <div className="space-y-2 text-sm mb-4">
-                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Period</span><span>{formatDate(selected.start_date)} – {formatDate(selected.end_date)}</span></div>
-                <div className="flex justify-between font-semibold"><span>Total</span><span>{formatMoney(selected.total_cents)}</span></div>
+                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Period</span><span>{formatDate(selected.starts_at)} – {formatDate(selected.ends_at)}</span></div>
+                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Duration</span><span>{durationDays(selected)} day{durationDays(selected) !== 1 ? "s" : ""}</span></div>
+                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Daily Rate</span><span>{formatMoney(selected.daily_rate_cents)}/day</span></div>
+                <div className="flex justify-between font-semibold border-t border-[#F0F0F0] pt-2"><span>Deposit</span><span>{formatMoney(selected.deposit_cents)}</span></div>
               </div>
               {selected.status === "active" && (
                 <Button className="w-full mb-2" onClick={() => void returnAsset(selected.id)}>Mark Returned</Button>
@@ -185,12 +187,6 @@ export default function RentalContractsPage() {
                   <label className="block text-xs font-medium mb-1">Customer Name *</label>
                   <input type="text" placeholder="Jane Smith" value={form.customerName}
                     onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
-                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Phone</label>
-                  <input type="tel" placeholder="+1 555 0000" value={form.customerPhone}
-                    onChange={e => setForm(f => ({ ...f, customerPhone: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">

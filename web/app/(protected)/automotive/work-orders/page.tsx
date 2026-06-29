@@ -16,21 +16,23 @@ type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 const STATUS_BADGE: Record<WorkOrderStatus, BadgeVariant> = {
   open:        "blue",
   in_progress: "yellow",
-  completed:   "green",
+  ready:       "green",
+  closed:      "gray",
   cancelled:   "red",
 };
 
 const STATUS_LABEL: Record<WorkOrderStatus, string> = {
   open:        "Open",
   in_progress: "In Progress",
-  completed:   "Completed",
+  ready:       "Ready",
+  closed:      "Closed",
   cancelled:   "Cancelled",
 };
 
-const ALL_STATUSES: WorkOrderStatus[] = ["open", "in_progress", "completed", "cancelled"];
+const ALL_STATUSES: WorkOrderStatus[] = ["open", "in_progress", "ready", "closed", "cancelled"];
 
-interface CreateWOForm { vehicleId: string; description: string; laborCents: string; }
-const EMPTY_FORM: CreateWOForm = { vehicleId: "", description: "", laborCents: "0" };
+interface CreateWOForm { vehicleId: string; title: string; description: string; estimateCents: string; }
+const EMPTY_FORM: CreateWOForm = { vehicleId: "", title: "", description: "", estimateCents: "0" };
 
 export default function WorkOrdersPage() {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
@@ -62,13 +64,14 @@ export default function WorkOrdersPage() {
   const counts = ALL_STATUSES.reduce<Record<string, number>>((a, s) => { a[s] = orders.filter(o => o.status === s).length; return a; }, {});
 
   async function createWorkOrder() {
-    if (!form.vehicleId || !form.description.trim()) return;
+    if (!form.vehicleId || !form.title.trim()) return;
     setSaving(true);
     try {
       await apiPost("/api/v1/automotive/work-orders", {
         vehicleId: form.vehicleId,
-        description: form.description.trim(),
-        laborCents: Math.round(parseFloat(form.laborCents) * 100) || 0,
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        estimateCents: Math.round(parseFloat(form.estimateCents) * 100) || 0,
       });
       setShowCreate(false); setForm(EMPTY_FORM); await load();
     } catch (e) { alert(e instanceof Error ? e.message : "Failed"); } finally { setSaving(false); }
@@ -83,10 +86,16 @@ export default function WorkOrdersPage() {
 
   function formatDate(ts: number) { return new Date(ts).toLocaleDateString(); }
 
+  function vehicleLabel(vehicleId: string) {
+    const v = vehicles.find(v => v.id === vehicleId);
+    if (!v) return vehicleId;
+    return `${v.year ?? ""} ${v.make} ${v.model}`.trim();
+  }
+
   return (
     <EnterpriseShell active="automotive-work-orders" title="Work Orders" subtitle="Service & repair work order tracking">
       <div className="flex flex-col gap-6 p-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {ALL_STATUSES.map(s => (
             <Card key={s} className={clsx("p-4 cursor-pointer hover:shadow-md transition-shadow", statusFilter === s && "ring-2 ring-brand-500")}
               onClick={() => setStatusFilter(f => f === s ? "all" : s)}>
@@ -112,9 +121,9 @@ export default function WorkOrdersPage() {
                 <thead>
                   <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA]">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Vehicle</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Description</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Labor</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Parts</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Title</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Labour</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Actual</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Date</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(0,0,0,0.45)] uppercase">Status</th>
                   </tr>
@@ -122,13 +131,10 @@ export default function WorkOrdersPage() {
                 <tbody>
                   {visible.map(wo => (
                     <tr key={wo.id} className="border-b border-[#F0F0F0] cursor-pointer hover:bg-[#FAFAFA]" onClick={() => setSelected(wo)}>
-                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">
-                        {wo.vehicle_year} {wo.vehicle_make} {wo.vehicle_model}
-                        {wo.vehicle_plate && <p className="text-xs text-[rgba(0,0,0,0.45)]">{wo.vehicle_plate}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)] max-w-xs truncate">{wo.description}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatMoney(wo.labor_cents)}</td>
-                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatMoney(wo.parts_cents)}</td>
+                      <td className="px-4 py-3 font-medium text-[rgba(0,0,0,0.88)]">{vehicleLabel(wo.vehicle_id)}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)] max-w-xs truncate">{wo.title}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatMoney(wo.labour_cents)}</td>
+                      <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatMoney(wo.actual_cents)}</td>
                       <td className="px-4 py-3 text-[rgba(0,0,0,0.65)]">{formatDate(wo.created_at)}</td>
                       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[wo.status]} size="sm">{STATUS_LABEL[wo.status]}</Badge></td>
                     </tr>
@@ -145,16 +151,17 @@ export default function WorkOrdersPage() {
             <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold">{selected.vehicle_year} {selected.vehicle_make} {selected.vehicle_model}</h3>
-                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{selected.description}</p>
+                  <h3 className="text-lg font-bold">{selected.title}</h3>
+                  <p className="text-xs text-[rgba(0,0,0,0.45)]">{vehicleLabel(selected.vehicle_id)}</p>
+                  {selected.description && <p className="text-xs text-[rgba(0,0,0,0.65)] mt-1">{selected.description}</p>}
                 </div>
                 <Badge variant={STATUS_BADGE[selected.status]}>{STATUS_LABEL[selected.status]}</Badge>
               </div>
               <div className="space-y-2 text-sm mb-4">
-                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Labor</span><span>{formatMoney(selected.labor_cents)}</span></div>
-                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Parts</span><span>{formatMoney(selected.parts_cents)}</span></div>
+                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Estimate</span><span>{formatMoney(selected.estimate_cents)}</span></div>
+                <div className="flex justify-between"><span className="text-[rgba(0,0,0,0.45)]">Labour</span><span>{formatMoney(selected.labour_cents)}</span></div>
                 <div className="flex justify-between font-semibold border-t border-[#F0F0F0] pt-2">
-                  <span>Total</span><span>{formatMoney(selected.labor_cents + selected.parts_cents)}</span>
+                  <span>Actual</span><span>{formatMoney(selected.actual_cents)}</span>
                 </div>
               </div>
               <div className="space-y-2 mb-4">
@@ -188,15 +195,21 @@ export default function WorkOrdersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Description *</label>
-                  <input type="text" placeholder="Oil change, brake pads…" value={form.description}
+                  <label className="block text-xs font-medium mb-1">Title *</label>
+                  <input type="text" placeholder="Oil change, brake pads…" value={form.title}
+                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                    className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Description</label>
+                  <input type="text" placeholder="Additional details…" value={form.description}
                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Labor Estimate ($)</label>
-                  <input type="number" min="0" step="0.01" value={form.laborCents}
-                    onChange={e => setForm(f => ({ ...f, laborCents: e.target.value }))}
+                  <label className="block text-xs font-medium mb-1">Estimate ($)</label>
+                  <input type="number" min="0" step="0.01" value={form.estimateCents}
+                    onChange={e => setForm(f => ({ ...f, estimateCents: e.target.value }))}
                     className="w-full rounded border border-[#D9D9D9] px-2 py-1 text-sm" />
                 </div>
               </div>
