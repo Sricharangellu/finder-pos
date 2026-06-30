@@ -1006,6 +1006,44 @@ export const mockHandlers = [
         products[idx] = { ...products[idx], ...b, updatedAt: Date.now() };
         return HttpResponse.json(products[idx]);
       }),
+
+      // ── Variants (master/child) ───────────────────────────────────────────
+      http.get(`${V1}/catalog/:id/variants`, async ({ params }) => {
+        await lat();
+        const masterId = String(params["id"]);
+        const children = products.filter((p) => p.parent_product_id === masterId);
+        return HttpResponse.json({ items: children });
+      }),
+
+      http.post(`${V1}/catalog/:id/variants/assign`, async ({ params, request }) => {
+        await lat();
+        const masterId = String(params["id"]);
+        const master = products.find((p) => p.id === masterId);
+        if (!master) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { productIds: string[]; label?: string };
+        for (const pid of body.productIds ?? []) {
+          const cidx = products.findIndex((p) => p.id === pid);
+          if (cidx !== -1) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (products[cidx] as any).parent_product_id = masterId;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (products[cidx] as any).variant_label = body.label ?? null;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (products[cidx] as any).updatedAt = Date.now();
+          }
+        }
+        const updated = products.filter((p) => p.parent_product_id === masterId);
+        return HttpResponse.json({ items: updated }, { status: 200 });
+      }),
+
+      http.delete(`${V1}/catalog/:id/variants/:childId`, async ({ params }) => {
+        await lat();
+        const cidx = products.findIndex((p) => p.id === String(params["childId"]));
+        if (cidx !== -1) {
+          products[cidx] = { ...products[cidx], parent_product_id: null, variant_label: null, updatedAt: Date.now() };
+        }
+        return HttpResponse.json({ ok: true });
+      }),
     ];
   })(),
 
