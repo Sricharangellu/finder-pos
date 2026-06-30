@@ -8,6 +8,7 @@ import { formatMoney, parseToCents } from "@/lib/money";
 import { hasRole } from "@/lib/auth";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { AgingReport, Bill, Invoice, BillingStatus, Account, Deposit } from "@/api-client/types";
+import { fmtDate } from "@/lib/date";
 
 const TYPE_STYLE: Record<string, string> = {
   asset: "bg-blue-50 text-blue-700 ring-blue-200",
@@ -36,11 +37,6 @@ const DUNNING_LABEL: Record<number, string> = {
   2: "60d",
   3: "90d+",
 };
-
-function formatDate(ms: number | null) {
-  if (ms === null) return "-";
-  return new Date(ms).toLocaleDateString();
-}
 
 export default function AccountingPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -249,7 +245,7 @@ export default function AccountingPage() {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{formatDate(inv.due_date)}</td>
+                    <td className="px-4 py-3 text-slate-500">{fmtDate(inv.due_date)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(inv.paid_cents)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(inv.total_cents - inv.paid_cents)}</td>
@@ -283,7 +279,7 @@ export default function AccountingPage() {
                   <tr key={bill.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-950">{bill.bill_number}</td>
                     <td className="px-4 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${BILLING_STYLE[bill.status]}`}>{bill.status}</span></td>
-                    <td className="px-4 py-3 text-slate-500">{formatDate(bill.due_date)}</td>
+                    <td className="px-4 py-3 text-slate-500">{fmtDate(bill.due_date)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(bill.paid_cents)}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(bill.total_cents - bill.paid_cents)}</td>

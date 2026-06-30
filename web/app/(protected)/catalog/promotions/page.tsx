@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,11 +54,6 @@ function formatValue(p: Promotion): string {
   if (p.type === "fixed_off")   return `${formatMoney(p.value)} off`;
   if (p.type === "bogo")        return "Buy 1 Get 1 Free";
   return `Bundle: ${p.value} items`;
-}
-
-function formatDate(ms: number | null): string {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function promoStatusFor(p: Promotion): PromoStatus {
@@ -400,8 +396,8 @@ export default function PromotionsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">
-                          <span>{formatDate(p.starts_at)}</span>
-                          {p.ends_at && <><br /><span className="text-gray-400">→ {formatDate(p.ends_at)}</span></>}
+                          <span>{fmtDate(p.starts_at)}</span>
+                          {p.ends_at && <><br /><span className="text-gray-400">→ {fmtDate(p.ends_at)}</span></>}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={clsx("text-sm tabular-nums", usagePct === 100 ? "font-semibold text-orange-600" : "text-gray-700")}>

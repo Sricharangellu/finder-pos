@@ -14,6 +14,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { getUser } from "@/lib/auth";
+import { fmtDate } from "@/lib/date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,12 +55,6 @@ const ALL_PERMISSIONS: Array<{ key: string; label: string; group: string }> = [
 const PERMISSION_GROUPS = Array.from(new Set(ALL_PERMISSIONS.map((p) => p.group)));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-  });
-}
 
 // ── Permission Picker ─────────────────────────────────────────────────────────
 
@@ -390,7 +385,7 @@ export default function CustomRolesPage() {
                           )}
                         </div>
                         <p className="mt-1.5 text-xs text-slate-400">
-                          Updated {formatDate(r.updatedAt)}
+                          Updated {fmtDate(r.updatedAt)}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">

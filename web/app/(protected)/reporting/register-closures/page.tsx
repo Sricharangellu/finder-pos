@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDateTime } from "@/lib/date";
 
 interface RegisterClosure {
   id: string;
@@ -27,10 +28,6 @@ interface ClosureDetail {
   session: RegisterClosure;
   cashMovements: Array<{ movement_type: string; amount: number; reason: string | null; created_by: string | null; created_at: number }>;
   paymentBreakdown: Array<{ method: string; total_cents: number; count: number }>;
-}
-
-function formatDate(ms: number) {
-  return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default function RegisterClosuresPage() {
@@ -88,7 +85,7 @@ export default function RegisterClosuresPage() {
                           </Badge>
                         </div>
                         <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                          {s.outlet_name ?? "—"} · {formatDate(s.opened_at)}
+                          {s.outlet_name ?? "—"} · {fmtDateTime(s.opened_at)}
                         </div>
                         {s.variance_cents !== null && s.variance_cents !== 0 && (
                           <div className={`mt-0.5 text-xs font-medium ${s.variance_cents < 0 ? "text-danger-500" : "text-success-600"}`}>
@@ -123,8 +120,8 @@ export default function RegisterClosuresPage() {
                       ["Register", detail.session.register_name ?? detail.session.register_id],
                       ["Outlet", detail.session.outlet_name ?? "—"],
                       ["Opened by", detail.session.opened_by],
-                      ["Opened", formatDate(detail.session.opened_at)],
-                      ["Closed", detail.session.closed_at ? formatDate(detail.session.closed_at) : "Still open"],
+                      ["Opened", fmtDateTime(detail.session.opened_at)],
+                      ["Closed", detail.session.closed_at ? fmtDateTime(detail.session.closed_at) : "Still open"],
                       ["Opening float", formatMoney(detail.session.opening_float_cents)],
                       ["Closing float", detail.session.closing_float_cents !== null ? formatMoney(detail.session.closing_float_cents) : "—"],
                       ["Counted cash", detail.session.counted_cash_cents !== null ? formatMoney(detail.session.counted_cash_cents) : "—"],

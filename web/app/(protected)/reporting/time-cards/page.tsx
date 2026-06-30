@@ -6,6 +6,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { KpiCard } from "@/components/KpiCard";
 import { apiGet } from "@/api-client/client";
+import { fmtTime, fmtDateShort } from "@/lib/date";
 
 interface TimeEntry {
   employee_id: string;
@@ -33,14 +34,6 @@ function formatDuration(minutes: number | null): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return `${h}h ${m}m`;
-}
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function TimeCardsPage() {
@@ -158,9 +151,9 @@ export default function TimeCardsPage() {
                     {entries.map((e, i) => (
                       <tr key={i} className="hover:bg-gray-50">
                         <td className="py-2 font-medium text-[var(--color-text-primary)]">{e.employee_name}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{formatDate(e.clock_in)}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{formatTime(e.clock_in)}</td>
-                        <td className="py-2 text-[var(--color-text-secondary)]">{e.clock_out ? formatTime(e.clock_out) : <span className="text-success-600 font-medium">Active</span>}</td>
+                        <td className="py-2 text-[var(--color-text-secondary)]">{fmtDateShort(e.clock_in)}</td>
+                        <td className="py-2 text-[var(--color-text-secondary)]">{fmtTime(e.clock_in)}</td>
+                        <td className="py-2 text-[var(--color-text-secondary)]">{e.clock_out ? fmtTime(e.clock_out) : <span className="text-success-600 font-medium">Active</span>}</td>
                         <td className="py-2 text-[var(--color-text-secondary)]">{e.break_minutes > 0 ? `${e.break_minutes}m` : "—"}</td>
                         <td className="py-2 text-right font-medium tabular-nums text-[var(--color-text-primary)]">
                           {formatDuration(e.worked_minutes)}

@@ -10,6 +10,7 @@ import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { AgingReport, Bill, Invoice, BillingStatus } from "@/api-client/types";
 import { usePathname, useRouter } from "next/navigation";
+import { fmtDate } from "@/lib/date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,11 +40,6 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(ms: number | null) {
-  if (ms === null) return "-";
-  return new Date(ms).toLocaleDateString();
-}
 
 function dueAmount(item: { total_cents: number; paid_cents: number; due_amount_cents?: number }) {
   return item.due_amount_cents ?? item.total_cents - item.paid_cents;
@@ -390,7 +386,7 @@ export default function FinancePage() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-700">{formatMoney(inv.total_cents)}</td>
                         <td className={`whitespace-nowrap px-4 py-3 ${isOverdue(inv) ? "font-medium text-red-600" : "text-slate-500"}`}>
-                          {formatDate(inv.due_date)}
+                          {fmtDate(inv.due_date)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">{formatMoney(dueAmount(inv))}</td>
                         {canPay && (
@@ -456,7 +452,7 @@ export default function FinancePage() {
                         </td>
                         <td className="py-2 pr-4 text-right">{formatMoney(bill.total_cents)}</td>
                         <td className={`py-2 pr-4 ${isOverdue(bill) ? "font-medium text-red-600" : "text-slate-500"}`}>
-                          {formatDate(bill.due_date)}
+                          {fmtDate(bill.due_date)}
                         </td>
                         <td className="py-2 pr-4 text-right">{formatMoney(dueAmount(bill))}</td>
                         {canPay && (

@@ -14,6 +14,7 @@ import { Button } from "@/components/Button";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { getUser } from "@/lib/auth";
+import { fmtDate } from "@/lib/date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,10 +44,6 @@ function roleBadge(role: string): "blue" | "green" | "gray" {
 
 function initials(email: string): string {
   return email.slice(0, 2).toUpperCase();
-}
-
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -217,7 +214,7 @@ export default function TeamPage() {
                           <td className="px-4 py-3">
                             <Badge variant={roleBadge(m.role)}>{m.role.charAt(0).toUpperCase() + m.role.slice(1)}</Badge>
                           </td>
-                          <td className="px-4 py-3 hidden sm:table-cell text-slate-500">{formatDate(m.created_at)}</td>
+                          <td className="px-4 py-3 hidden sm:table-cell text-slate-500">{fmtDate(m.created_at)}</td>
                           {isOwner && (
                             <td className="px-4 py-3 text-right">
                               {!isSelf && (

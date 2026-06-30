@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import type { AuditEvent, AuditLogResponse, AuditAction } from "@/api-client/types";
+import { fmtDateTime } from "@/lib/date";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -33,12 +34,6 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   settings: "Settings",
   session: "Session",
 };
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleString(undefined, {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-}
 
 const RESOURCE_TYPES = ["", "product", "order", "purchase_order", "discount", "custom_role", "report", "settings", "session"];
 const ACTIONS: Array<"" | AuditAction> = ["", "created", "updated", "deleted", "login", "logout", "exported", "refunded", "voided", "approved", "rejected"];
@@ -159,7 +154,7 @@ export default function AuditLogPage() {
                     className={`hover:bg-gray-50 cursor-pointer ${expanded === ev.id ? "bg-blue-50" : ""}`}
                     onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
                   >
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(ev.created_at)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDateTime(ev.created_at)}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900 text-xs">{ev.actor.email}</div>
                       <div className="text-gray-400 text-xs capitalize">{ev.actor.role}</div>

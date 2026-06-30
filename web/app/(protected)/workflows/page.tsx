@@ -20,6 +20,7 @@ import type {
   TriggerCondition,
   StepType,
 } from "@/api-client/types";
+import { fmtDate } from "@/lib/date";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,10 +48,6 @@ const STEP_TYPE_BADGE: Record<StepType, "blue" | "yellow" | "green" | "purple"> 
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 // ── Workflow Form Modal ───────────────────────────────────────────────────────
 
@@ -421,7 +418,7 @@ function WorkflowRow({
             {workflow.description && (
               <p className="mt-0.5 text-sm text-slate-500 truncate">{workflow.description}</p>
             )}
-            <p className="mt-0.5 text-xs text-slate-400">Updated {formatDate(workflow.updatedAt)}</p>
+            <p className="mt-0.5 text-xs text-slate-400">Updated {fmtDate(workflow.updatedAt)}</p>
           </div>
 
           {/* Actions */}
