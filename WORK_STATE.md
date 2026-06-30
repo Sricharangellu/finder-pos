@@ -58,7 +58,7 @@
 | **Entertainment** | ✅ Built | Events, tickets, QR redeem |
 | **Manufacturing** | ✅ Built | Production orders, BOM, status |
 | **Rental** | ✅ Built | Asset register, contracts, return |
-| **Golf** | ❌ Missing | Tee sheet, bookings, members, pro-shop — 0 pages |
+| **Golf** | ✅ Built | Tee sheet, bookings, members, pro-shop — 4 pages + nav wired |
 
 ---
 
@@ -98,18 +98,18 @@ Key patterns:
 
 ## Next targets (priority order for launch)
 
-1. **Golf vertical** ← IN PROGRESS (mock handlers done, pages + nav pending)
-2. **Fix `as any` in 4 production files** (TypeScript — HIGH)
-3. **Add `role="alert"` to error messages** (Accessibility — widespread)
-4. **Replace `(cents / 100).toFixed(2)` with `formatMoney()`** (Design system)
-5. **Replace `#D9D9D9` with `border-slate-200`** (Design system)
+1. **Golf vertical** ✅ DONE — 4 pages + nav wired; `module: "golf"` → `module: "tee_sheet"` fixed
+2. **Split oversized pages** — customers/[id] (1705), catalog (1498), inventory (1229), purchasing (~1202)
+3. **Fix `as any` in 4 production files** (TypeScript — HIGH)
+4. **Add `role="alert"` to error messages** (Accessibility — widespread)
+5. **Replace `(cents / 100).toFixed(2)` with `formatMoney()`** (Design system)
 
 ---
 
 ## Enterprise Guardian — Last Audit
 
-> Run: 2026-06-30 (post FE-51/FE-52)  |  Score: 93/100  |  Status: ✅ LAUNCH-READY (≥88, zero CRITICAL)
-> Prior score: 91/100 → +2 pts (settings split 1818→1003 ln, web/lib/date.ts created + 5 import sites fixed, formatMoney + border-slate-200 fixes)
+> Run: 2026-06-30 (post customers/[id] split)  |  Score: 94/100  |  Status: ✅ LAUNCH-READY (≥88, zero CRITICAL)
+> Prior score: 93/100 → +1 pt (customers/[id] split 1705→441 ln, 9 extracted _components files, zero TS errors)
 
 ### Domain Scores
 
@@ -118,9 +118,9 @@ Key patterns:
 | TypeScript strictness | 100/100 | ✅ | Zero `error TS`, zero unguarded `any` in production code |
 | Security | 98/100 | ✅ | Zero secrets, no XSS, no dangerouslySetInnerHTML |
 | API contract | 92/100 | ✅ | All FE-51/FE-52 handlers correct; `await lat()` on all |
-| Component quality | 86/100 | ✅ | settings split done (1818→1003 ln); customers/[id] still at 1705 ln |
+| Component quality | 88/100 | ✅ | customers/[id] split (1705→441 ln); catalog (1498) next |
 | Accessibility | 95/100 | ✅ | `role="alert"` on all errors; icon buttons labeled |
-| Performance | 87/100 | ✅ | settings/page.tsx split; 5 pages still >800 ln |
+| Performance | 89/100 | ✅ | 2 page splits done; catalog (1498), inventory (1229), purchasing still >800 ln |
 | Design system | 86/100 | ✅ | `web/lib/date.ts` created; 5 import sites fixed; formatMoney + border-slate-200 done |
 | Nav/routing | 97/100 | ✅ | All stubs verified valid; no bad redirects remaining |
 
@@ -139,7 +139,7 @@ _None._
 - [ ] **Design system — money in form inputs** — `(cents / 100).toFixed(2)` used to seed edit-form inputs in `catalog/page.tsx` (ln 94, 98, 99, 843–845), `customers/[id]/page.tsx` (ln 680, 699), `accounting/page.tsx` (ln 336). Correct for edit inputs (need dollar string), but comment-document why to avoid false audit flags.
 
 - [ ] **Page size — split required** — 5 pages still exceed 800-line threshold (settings: ✅ done 1818→1003):
-  - `customers/[id]/page.tsx` — 1705 ln → extract tab bodies into `customers/_components/`
+  - `customers/[id]/page.tsx` — ✅ DONE: 1705→441 ln, 9 files in `customers/[id]/_components/`
   - `catalog/page.tsx` — 1498 ln
   - `inventory/page.tsx` — 1229 ln
   - `purchasing/page.tsx` — ~1202 ln
