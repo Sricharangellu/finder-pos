@@ -3049,4 +3049,59 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── UX-3 widget stubs (restaurant tables, appointments, automotive WOs) ──────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+    const tables = [
+      { id: "tbl_1", table_number: "T1", status: "occupied",  seats: 4 },
+      { id: "tbl_2", table_number: "T2", status: "available", seats: 2 },
+      { id: "tbl_3", table_number: "T3", status: "reserved",  seats: 6 },
+      { id: "tbl_4", table_number: "T4", status: "occupied",  seats: 4 },
+      { id: "tbl_5", table_number: "T5", status: "available", seats: 8 },
+    ];
+    const appts = [
+      { id: "appt_1", service: "Haircut & Style", customer_name: "Jane Doe",  starts_at: BASE - 3600_000, status: "completed" },
+      { id: "appt_2", service: "Color Treatment", customer_name: "John Smith", starts_at: BASE + 1800_000, status: "confirmed" },
+      { id: "appt_3", service: "Beard Trim",       customer_name: "Mike Wu",   starts_at: BASE + 5400_000, status: "scheduled" },
+      { id: "appt_4", service: "Deep Conditioning",customer_name: "Sara Lee",  starts_at: BASE + 7200_000, status: "scheduled" },
+    ];
+    const workOrders = [
+      { id: "wo_1", description: "Oil change + tyre rotation",  status: "in_progress", make: "Toyota",  model: "Camry",  total_cents: 8500  },
+      { id: "wo_2", description: "Brake pad replacement",        status: "in_progress", make: "Honda",   model: "Civic",  total_cents: 22000 },
+      { id: "wo_3", description: "Transmission fluid service",   status: "pending",     make: "Ford",    model: "F-150",  total_cents: 15000 },
+      { id: "wo_4", description: "A/C recharge + inspection",    status: "in_progress", make: "BMW",     model: "3 Series", total_cents: 35000 },
+    ];
+    return [
+      http.get(`${V1}/restaurant/tables`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const items = status ? tables.filter(t => t.status === status) : tables;
+        return HttpResponse.json({ items, total: items.length });
+      }),
+      http.get(`${V1}/appointments`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const items = status ? appts.filter(a => a.status === status) : appts;
+        return HttpResponse.json({ items, total: items.length });
+      }),
+      http.post(`${V1}/appointments`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { service?: string; customer_name?: string; starts_at?: number };
+        const appt = { id: `appt_${Date.now()}`, service: body.service ?? "", customer_name: body.customer_name ?? "", starts_at: body.starts_at ?? BASE + DAY, status: "scheduled" };
+        appts.push(appt);
+        return HttpResponse.json(appt, { status: 201 });
+      }),
+      http.get(`${V1}/automotive/work-orders`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const items = status ? workOrders.filter(w => w.status === status) : workOrders;
+        return HttpResponse.json({ items, total: items.length });
+      }),
+    ];
+  })(),
 );
