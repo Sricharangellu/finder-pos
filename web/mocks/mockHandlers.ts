@@ -3098,6 +3098,499 @@ mockHandlers.push(
     ];
   })(),
 
+  // ── Automotive — vehicles + work orders ──────────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface Veh { id: string; make: string; model: string; year: number | null; license_plate: string | null; vin: string | null; color: string | null; mileage: number | null; customer_id: string | null; }
+    interface WO  { id: string; vehicle_id: string; description: string; status: string; labour_cents: number; parts_cents: number; total_cents: number; mileage_in: number | null; mileage_out: number | null; started_at: number | null; completed_at: number | null; created_at: number; }
+
+    let vehicles: Veh[] = [
+      { id: "veh_1", make: "Toyota",  model: "Camry",    year: 2019, license_plate: "ABC-1234", vin: "1HGBH41JXMN109186", color: "Silver",  mileage: 62400,  customer_id: "cust_1" },
+      { id: "veh_2", make: "Honda",   model: "Civic",    year: 2021, license_plate: "XYZ-9876", vin: "2HGFC2F62MH509234", color: "Blue",    mileage: 28100,  customer_id: "cust_2" },
+      { id: "veh_3", make: "Ford",    model: "F-150",    year: 2020, license_plate: "LMN-5678", vin: "1FTFW1E57LKF16923", color: "Black",   mileage: 81300,  customer_id: "cust_3" },
+      { id: "veh_4", make: "BMW",     model: "3 Series", year: 2022, license_plate: "QRS-2345", vin: "WBA8E9G50JNU20157", color: "White",   mileage: 15200,  customer_id: "cust_4" },
+      { id: "veh_5", make: "Subaru",  model: "Outback",  year: 2018, license_plate: "DEF-7890", vin: "4S4BSAJC8J3299741", color: "Green",   mileage: 104700, customer_id: null     },
+    ];
+
+    let wos: WO[] = [
+      { id: "wo_1", vehicle_id: "veh_1", description: "Oil change + tyre rotation",     status: "in_progress", labour_cents: 4500,  parts_cents: 4000,  total_cents: 8500,  mileage_in: 62400,  mileage_out: null,  started_at: BASE - DAY * 1, completed_at: null,             created_at: BASE - DAY * 1 },
+      { id: "wo_2", vehicle_id: "veh_2", description: "Brake pad replacement (front)",  status: "in_progress", labour_cents: 9000,  parts_cents: 13000, total_cents: 22000, mileage_in: 28100,  mileage_out: null,  started_at: BASE - DAY * 2, completed_at: null,             created_at: BASE - DAY * 2 },
+      { id: "wo_3", vehicle_id: "veh_3", description: "Transmission fluid service",     status: "open",        labour_cents: 7500,  parts_cents: 7500,  total_cents: 15000, mileage_in: 81300,  mileage_out: null,  started_at: null,           completed_at: null,             created_at: BASE - DAY * 0 },
+      { id: "wo_4", vehicle_id: "veh_4", description: "A/C recharge + full inspection", status: "in_progress", labour_cents: 18000, parts_cents: 17000, total_cents: 35000, mileage_in: 15200,  mileage_out: null,  started_at: BASE - DAY * 3, completed_at: null,             created_at: BASE - DAY * 3 },
+      { id: "wo_5", vehicle_id: "veh_1", description: "Spark plug replacement",         status: "completed",   labour_cents: 8000,  parts_cents: 6000,  total_cents: 14000, mileage_in: 58200,  mileage_out: 58200, started_at: BASE - DAY * 30,completed_at: BASE - DAY * 29, created_at: BASE - DAY * 30 },
+    ];
+
+    return [
+      http.get(`${V1}/automotive/vehicles`, async ({ request }) => {
+        await lat();
+        const q = new URL(request.url).searchParams.get("q")?.toLowerCase();
+        const filtered = q
+          ? vehicles.filter(v => `${v.make} ${v.model} ${v.license_plate ?? ""}`.toLowerCase().includes(q))
+          : vehicles;
+        return HttpResponse.json({ items: filtered });
+      }),
+
+      http.get(`${V1}/automotive/vehicles/:id`, async ({ params }) => {
+        await lat();
+        const veh = vehicles.find(v => v.id === String(params["id"]));
+        if (!veh) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const workOrders = wos.filter(w => w.vehicle_id === veh.id);
+        return HttpResponse.json({ ...veh, workOrders });
+      }),
+
+      http.post(`${V1}/automotive/vehicles`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Veh>;
+        const veh: Veh = { id: `veh_${Date.now()}`, make: body.make ?? "Unknown", model: body.model ?? "Unknown", year: body.year ?? null, license_plate: body.license_plate ?? null, vin: body.vin ?? null, color: body.color ?? null, mileage: body.mileage ?? null, customer_id: body.customer_id ?? null };
+        vehicles.push(veh);
+        return HttpResponse.json(veh, { status: 201 });
+      }),
+
+      http.post(`${V1}/automotive/work-orders`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<WO> & { vehicleId?: string };
+        const now = Date.now();
+        const wo: WO = { id: `wo_${now}`, vehicle_id: body.vehicleId ?? body.vehicle_id ?? "", description: body.description ?? "", status: "open", labour_cents: body.labour_cents ?? 0, parts_cents: body.parts_cents ?? 0, total_cents: (body.labour_cents ?? 0) + (body.parts_cents ?? 0), mileage_in: body.mileage_in ?? null, mileage_out: null, started_at: null, completed_at: null, created_at: now };
+        wos.push(wo);
+        return HttpResponse.json(wo, { status: 201 });
+      }),
+
+      http.patch(`${V1}/automotive/work-orders/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = wos.findIndex(w => w.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<WO>;
+        const now = Date.now();
+        wos[idx] = { ...wos[idx]!, ...body, completed_at: body.status === "completed" ? now : wos[idx]!.completed_at };
+        return HttpResponse.json(wos[idx]);
+      }),
+    ];
+  })(),
+
+  // ── Healthcare — patients + prescriptions ─────────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface Patient { id: string; name: string; dob: string | null; gender: string | null; phone: string | null; email: string | null; allergies: string | null; created_at: number; }
+    interface Rx { id: string; drug_name: string; dosage: string; prescriber: string | null; quantity: number; refills_remaining: number; dispensed_at: number | null; expiry_date: number | null; created_at: number; }
+
+    let patients: Patient[] = [
+      { id: "pat_1", name: "Eleanor Vance",  dob: "1962-04-15", gender: "F", phone: "555-0101", email: "e.vance@email.com", allergies: "Penicillin",      created_at: BASE - DAY * 200 },
+      { id: "pat_2", name: "Marcus Webb",    dob: "1988-09-22", gender: "M", phone: "555-0202", email: null,                allergies: null,               created_at: BASE - DAY * 120 },
+      { id: "pat_3", name: "Aiko Tanaka",    dob: "1975-01-08", gender: "F", phone: "555-0303", email: "aiko@example.com",  allergies: "Sulfa, Aspirin",   created_at: BASE - DAY * 85  },
+      { id: "pat_4", name: "Carlos Mendez",  dob: "2001-11-30", gender: "M", phone: null,       email: "c.mendez@mail.com", allergies: null,               created_at: BASE - DAY * 30  },
+    ];
+
+    const rxByPatient: Record<string, Rx[]> = {
+      pat_1: [
+        { id: "rx_1", drug_name: "Lisinopril 10mg",   dosage: "1 tablet daily",    prescriber: "Dr. Okafor",  quantity: 30, refills_remaining: 5, dispensed_at: BASE - DAY * 14, expiry_date: BASE + DAY * 365, created_at: BASE - DAY * 14 },
+        { id: "rx_2", drug_name: "Metformin 500mg",    dosage: "1 tablet twice/day",prescriber: "Dr. Okafor",  quantity: 60, refills_remaining: 2, dispensed_at: null,            expiry_date: BASE + DAY * 180, created_at: BASE - DAY * 3  },
+      ],
+      pat_2: [
+        { id: "rx_3", drug_name: "Amoxicillin 500mg",  dosage: "1 capsule 3x/day",  prescriber: "Dr. Patel",   quantity: 21, refills_remaining: 0, dispensed_at: BASE - DAY * 2,  expiry_date: BASE + DAY * 14,  created_at: BASE - DAY * 2  },
+      ],
+      pat_3: [],
+      pat_4: [
+        { id: "rx_4", drug_name: "Salbutamol inhaler", dosage: "2 puffs as needed", prescriber: "Dr. Leung",   quantity: 1,  refills_remaining: 3, dispensed_at: BASE - DAY * 7,  expiry_date: BASE + DAY * 365, created_at: BASE - DAY * 7  },
+      ],
+    };
+
+    return [
+      http.get(`${V1}/healthcare/patients`, async ({ request }) => {
+        await lat();
+        const q = new URL(request.url).searchParams.get("q")?.toLowerCase();
+        const filtered = q ? patients.filter(p => p.name.toLowerCase().includes(q) || (p.phone ?? "").includes(q)) : patients;
+        return HttpResponse.json({ items: filtered });
+      }),
+
+      http.get(`${V1}/healthcare/patients/:id`, async ({ params }) => {
+        await lat();
+        const p = patients.find(x => x.id === String(params["id"]));
+        if (!p) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({ ...p, prescriptions: rxByPatient[p.id] ?? [] });
+      }),
+
+      http.post(`${V1}/healthcare/patients`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Patient>;
+        const p: Patient = { id: `pat_${Date.now()}`, name: body.name ?? "New Patient", dob: body.dob ?? null, gender: body.gender ?? null, phone: body.phone ?? null, email: body.email ?? null, allergies: null, created_at: Date.now() };
+        patients.push(p);
+        rxByPatient[p.id] = [];
+        return HttpResponse.json(p, { status: 201 });
+      }),
+
+      http.post(`${V1}/healthcare/prescriptions/:id/dispense`, async ({ params }) => {
+        await lat();
+        for (const rxs of Object.values(rxByPatient)) {
+          const rx = rxs.find(r => r.id === String(params["id"]));
+          if (rx) { rx.dispensed_at = Date.now(); return HttpResponse.json(rx); }
+        }
+        return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+      }),
+    ];
+  })(),
+
+  // ── Hospitality — rooms, charges, settle ──────────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface Room { id: string; room_number: string; type: string; floor: string | null; rate_cents: number; status: "available" | "occupied" | "checkout" | "cleaning" | "maintenance"; notes: string | null; }
+    interface Charge { id: string; room_id: string; description: string; amount_cents: number; posted_at: number; settled_at: number | null; }
+
+    let rooms: Room[] = [
+      { id: "room_1", room_number: "101", type: "standard",  floor: "1", rate_cents: 12900, status: "occupied",    notes: null },
+      { id: "room_2", room_number: "102", type: "standard",  floor: "1", rate_cents: 12900, status: "available",   notes: null },
+      { id: "room_3", room_number: "201", type: "deluxe",    floor: "2", rate_cents: 18900, status: "checkout",    notes: "Late checkout approved" },
+      { id: "room_4", room_number: "202", type: "deluxe",    floor: "2", rate_cents: 18900, status: "cleaning",    notes: null },
+      { id: "room_5", room_number: "301", type: "suite",     floor: "3", rate_cents: 35900, status: "occupied",    notes: "VIP guest - J. Smith" },
+      { id: "room_6", room_number: "302", type: "suite",     floor: "3", rate_cents: 35900, status: "maintenance", notes: "A/C repair scheduled" },
+    ];
+
+    let charges: Charge[] = [
+      { id: "chg_1", room_id: "room_1", description: "Room service - dinner",  amount_cents: 4800, posted_at: BASE - DAY,     settled_at: null },
+      { id: "chg_2", room_id: "room_1", description: "Mini-bar",               amount_cents: 1200, posted_at: BASE - 3600_000, settled_at: null },
+      { id: "chg_3", room_id: "room_5", description: "Spa treatment",          amount_cents: 9500, posted_at: BASE - DAY * 2,  settled_at: null },
+      { id: "chg_4", room_id: "room_5", description: "Room service - champagne",amount_cents: 7800, posted_at: BASE - DAY,     settled_at: null },
+    ];
+
+    return [
+      http.get(`${V1}/hospitality/rooms`, async () => {
+        await lat();
+        return HttpResponse.json({ items: rooms });
+      }),
+
+      http.post(`${V1}/hospitality/rooms`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Room> & { roomNumber?: string; rateCents?: number; };
+        const room: Room = { id: `room_${Date.now()}`, room_number: body.roomNumber ?? body.room_number ?? "000", type: body.type ?? "standard", floor: body.floor ?? null, rate_cents: body.rateCents ?? body.rate_cents ?? 9900, status: "available", notes: null };
+        rooms.push(room);
+        return HttpResponse.json(room, { status: 201 });
+      }),
+
+      http.patch(`${V1}/hospitality/rooms/:id/status`, async ({ request, params }) => {
+        await lat();
+        const idx = rooms.findIndex(r => r.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { status: Room["status"] };
+        rooms[idx] = { ...rooms[idx]!, status: body.status };
+        return HttpResponse.json(rooms[idx]);
+      }),
+
+      http.get(`${V1}/hospitality/rooms/:id/charges`, async ({ params }) => {
+        await lat();
+        const roomId = String(params["id"]);
+        return HttpResponse.json({ items: charges.filter(c => c.room_id === roomId && !c.settled_at) });
+      }),
+
+      http.post(`${V1}/hospitality/rooms/:id/charge`, async ({ request, params }) => {
+        await lat();
+        const body = (await request.json()) as { description?: string; amountCents?: number; amount_cents?: number };
+        const charge: Charge = { id: `chg_${Date.now()}`, room_id: String(params["id"]), description: body.description ?? "Miscellaneous", amount_cents: body.amountCents ?? body.amount_cents ?? 0, posted_at: Date.now(), settled_at: null };
+        charges.push(charge);
+        return HttpResponse.json(charge, { status: 201 });
+      }),
+
+      http.post(`${V1}/hospitality/rooms/:id/settle`, async ({ params }) => {
+        await lat();
+        const roomId = String(params["id"]);
+        const now = Date.now();
+        charges.filter(c => c.room_id === roomId && !c.settled_at).forEach(c => { c.settled_at = now; });
+        return HttpResponse.json({ settled: true });
+      }),
+    ];
+  })(),
+
+  // ── Education — students, fees, fee collection ────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface Student { id: string; name: string; email: string | null; phone: string | null; course: string | null; enrolled_at: number | null; status: "active" | "inactive"; notes: string | null; outstanding?: number; fees?: Fee[]; }
+    interface Fee { id: string; description: string; amount_cents: number; due_date: number | null; paid_at: number | null; method: string | null; order_id: string | null; created_at: number; }
+
+    let students: Student[] = [
+      { id: "stu_1", name: "Lily Carter",    email: "lily@email.com",  phone: "555-3001", course: "Photography Fundamentals", enrolled_at: BASE - DAY * 60,  status: "active",   notes: null },
+      { id: "stu_2", name: "Ethan Brooks",   email: null,              phone: "555-3002", course: "Digital Marketing",        enrolled_at: BASE - DAY * 45,  status: "active",   notes: "Scholarship recipient" },
+      { id: "stu_3", name: "Naomi Singh",    email: "naomi@email.com", phone: null,       course: "Web Design Bootcamp",       enrolled_at: BASE - DAY * 90,  status: "active",   notes: null },
+      { id: "stu_4", name: "Tyler Mason",    email: "tyler@email.com", phone: "555-3004", course: "Photography Fundamentals", enrolled_at: BASE - DAY * 120, status: "inactive", notes: "On leave" },
+    ];
+
+    const feesByStudent: Record<string, Fee[]> = {
+      stu_1: [
+        { id: "fee_1", description: "Tuition — Term 2",  amount_cents: 125000, due_date: BASE + DAY * 14,  paid_at: null,            method: null,   order_id: null, created_at: BASE - DAY * 10 },
+        { id: "fee_2", description: "Materials fee",      amount_cents: 15000,  due_date: BASE - DAY * 5,   paid_at: BASE - DAY * 7,  method: "card", order_id: null, created_at: BASE - DAY * 30 },
+      ],
+      stu_2: [
+        { id: "fee_3", description: "Tuition — Term 1",  amount_cents: 98000,  due_date: BASE - DAY * 30,  paid_at: BASE - DAY * 28, method: "cash", order_id: null, created_at: BASE - DAY * 45 },
+      ],
+      stu_3: [
+        { id: "fee_4", description: "Tuition — Term 2",  amount_cents: 185000, due_date: BASE + DAY * 7,   paid_at: null,            method: null,   order_id: null, created_at: BASE - DAY * 5  },
+        { id: "fee_5", description: "Lab access fee",     amount_cents: 8500,   due_date: BASE + DAY * 7,   paid_at: null,            method: null,   order_id: null, created_at: BASE - DAY * 5  },
+      ],
+      stu_4: [],
+    };
+
+    function outstanding(id: string) { return (feesByStudent[id] ?? []).filter(f => !f.paid_at).reduce((s, f) => s + f.amount_cents, 0); }
+
+    return [
+      http.get(`${V1}/education/students`, async () => {
+        await lat();
+        return HttpResponse.json({ items: students.map(s => ({ ...s, outstanding: outstanding(s.id) })) });
+      }),
+
+      http.get(`${V1}/education/students/:id`, async ({ params }) => {
+        await lat();
+        const s = students.find(x => x.id === String(params["id"]));
+        if (!s) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({ ...s, outstanding: outstanding(s.id), fees: feesByStudent[s.id] ?? [] });
+      }),
+
+      http.post(`${V1}/education/students`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Student>;
+        const s: Student = { id: `stu_${Date.now()}`, name: body.name ?? "New Student", email: body.email ?? null, phone: body.phone ?? null, course: body.course ?? null, enrolled_at: Date.now(), status: "active", notes: body.notes ?? null };
+        students.push(s);
+        feesByStudent[s.id] = [];
+        return HttpResponse.json(s, { status: 201 });
+      }),
+
+      http.patch(`${V1}/education/students/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = students.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Student>;
+        students[idx] = { ...students[idx]!, ...body };
+        return HttpResponse.json(students[idx]);
+      }),
+
+      http.post(`${V1}/education/students/:id/fees`, async ({ request, params }) => {
+        await lat();
+        const sid = String(params["id"]);
+        const body = (await request.json()) as { description?: string; amountCents?: number; amount_cents?: number; dueDate?: string; due_date?: string; };
+        const fee: Fee = { id: `fee_${Date.now()}`, description: body.description ?? "Fee", amount_cents: body.amountCents ?? body.amount_cents ?? 0, due_date: body.dueDate || body.due_date ? new Date(body.dueDate ?? body.due_date ?? "").getTime() : null, paid_at: null, method: null, order_id: null, created_at: Date.now() };
+        if (!feesByStudent[sid]) feesByStudent[sid] = [];
+        feesByStudent[sid]!.push(fee);
+        return HttpResponse.json(fee, { status: 201 });
+      }),
+
+      http.post(`${V1}/education/fees/:id/collect`, async ({ params }) => {
+        await lat();
+        for (const fees of Object.values(feesByStudent)) {
+          const fee = fees.find(f => f.id === String(params["id"]));
+          if (fee) { fee.paid_at = Date.now(); fee.method = "cash"; return HttpResponse.json(fee); }
+        }
+        return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+      }),
+    ];
+  })(),
+
+  // ── Entertainment — events + ticket sales + QR redeem ─────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+    const HOUR = 3_600_000;
+
+    interface FEvent { id: string; name: string; venue: string | null; starts_at: number; ends_at: number; capacity: number; sold: number; available: number; price_cents: number; status: string; description: string | null; }
+
+    const issuedQR = new Set<string>();
+
+    let events: FEvent[] = [
+      { id: "evt_1", name: "Summer Jazz Night",     venue: "Rooftop Terrace",   starts_at: BASE + DAY * 3,  ends_at: BASE + DAY * 3  + HOUR * 3,  capacity: 150, sold: 112, available: 38, price_cents: 4500, status: "on_sale",  description: "Live jazz under the stars." },
+      { id: "evt_2", name: "Comedy Showcase",        venue: "Main Stage",        starts_at: BASE + DAY * 7,  ends_at: BASE + DAY * 7  + HOUR * 2,  capacity: 200, sold: 200, available: 0,  price_cents: 3000, status: "sold_out", description: null },
+      { id: "evt_3", name: "Acoustic Sessions Vol.3",venue: "Lounge Bar",        starts_at: BASE + DAY * 14, ends_at: BASE + DAY * 14 + HOUR * 2,  capacity: 80,  sold: 35,  available: 45, price_cents: 2000, status: "on_sale",  description: "Intimate acoustic evening." },
+      { id: "evt_4", name: "New Year's Eve Gala",    venue: "Grand Ballroom",    starts_at: BASE - DAY * 10, ends_at: BASE - DAY * 10 + HOUR * 5,  capacity: 500, sold: 500, available: 0,  price_cents: 12000,status: "ended",    description: null },
+    ];
+
+    return [
+      http.get(`${V1}/entertainment/events`, async () => {
+        await lat();
+        return HttpResponse.json({ items: events });
+      }),
+
+      http.post(`${V1}/entertainment/events`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { name?: string; venue?: string; startsAt?: string; starts_at?: string; endsAt?: string; ends_at?: string; capacity?: string | number; priceCents?: string | number; price_cents?: number; description?: string };
+        const starts = body.startsAt ? new Date(body.startsAt).getTime() : body.starts_at ? new Date(String(body.starts_at)).getTime() : Date.now() + DAY;
+        const ends   = body.endsAt   ? new Date(body.endsAt).getTime()   : body.ends_at   ? new Date(String(body.ends_at)).getTime()   : starts + HOUR * 2;
+        const cap    = Number(body.capacity ?? 100);
+        const price  = Number(body.priceCents ?? body.price_cents ?? 0);
+        const evt: FEvent = { id: `evt_${Date.now()}`, name: body.name ?? "New Event", venue: body.venue ?? null, starts_at: starts, ends_at: ends, capacity: cap, sold: 0, available: cap, price_cents: price, status: "on_sale", description: body.description ?? null };
+        events.push(evt);
+        return HttpResponse.json(evt, { status: 201 });
+      }),
+
+      http.post(`${V1}/entertainment/events/:id/tickets`, async ({ request, params }) => {
+        await lat();
+        const body = (await request.json()) as { quantity?: string | number };
+        const idx = events.findIndex(e => e.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const qty = Number(body.quantity ?? 1);
+        const evt = events[idx]!;
+        if (evt.available < qty) return HttpResponse.json({ error: { code: "sold_out" } }, { status: 422 });
+        events[idx] = { ...evt, sold: evt.sold + qty, available: evt.available - qty, status: evt.available - qty === 0 ? "sold_out" : evt.status };
+        const tickets = Array.from({ length: qty }, (_, i) => {
+          const qr = `QR-${evt.id}-${Date.now()}-${i}`;
+          issuedQR.add(qr);
+          return { id: `tkt_${Date.now()}_${i}`, qr_code: qr };
+        });
+        return HttpResponse.json({ tickets }, { status: 201 });
+      }),
+
+      // Sub-path before /:id
+      http.post(`${V1}/entertainment/tickets/redeem`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { qrCode?: string; qr_code?: string };
+        const code = body.qrCode ?? body.qr_code ?? "";
+        if (!code || !issuedQR.has(code)) return HttpResponse.json({ success: false, message: "Invalid or already-used ticket." });
+        issuedQR.delete(code);
+        return HttpResponse.json({ success: true, message: "Ticket accepted. Entry granted." });
+      }),
+    ];
+  })(),
+
+  // ── Manufacturing — production orders + BOM ───────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface BomLine { id: string; raw_material_id: string; qty_required: number; qty_consumed: number; unit: string; }
+    interface PO { id: string; product_id: string; quantity: number; status: string; started_at: number | null; completed_at: number | null; notes: string | null; created_at: number; bom?: BomLine[]; }
+
+    const bomByOrder: Record<string, BomLine[]> = {
+      mo_1: [
+        { id: "bom_1_1", raw_material_id: "mat_wood_oak",  qty_required: 4,  qty_consumed: 4,  unit: "sheet" },
+        { id: "bom_1_2", raw_material_id: "mat_screws_m4", qty_required: 48, qty_consumed: 48, unit: "pcs"   },
+      ],
+      mo_2: [
+        { id: "bom_2_1", raw_material_id: "mat_steel_rod", qty_required: 12, qty_consumed: 8, unit: "m"   },
+        { id: "bom_2_2", raw_material_id: "mat_grease",    qty_required: 2,  qty_consumed: 1, unit: "tube" },
+      ],
+      mo_3: [
+        { id: "bom_3_1", raw_material_id: "mat_pcb_blank", qty_required: 50, qty_consumed: 0, unit: "pcs" },
+        { id: "bom_3_2", raw_material_id: "mat_solder",    qty_required: 1,  qty_consumed: 0, unit: "roll" },
+      ],
+    };
+
+    let orders: PO[] = [
+      { id: "mo_1", product_id: "prod_bookshelf", quantity: 10, status: "completed",   started_at: BASE - DAY * 7, completed_at: BASE - DAY * 2, notes: null,             created_at: BASE - DAY * 10 },
+      { id: "mo_2", product_id: "prod_gear_asm",  quantity: 5,  status: "in_progress", started_at: BASE - DAY * 2, completed_at: null,           notes: "Rush order",     created_at: BASE - DAY * 3  },
+      { id: "mo_3", product_id: "prod_pcb_rev2",  quantity: 50, status: "draft",       started_at: null,           completed_at: null,           notes: "Awaiting parts", created_at: BASE - DAY * 0  },
+    ];
+
+    return [
+      http.get(`${V1}/manufacturing/orders`, async ({ request }) => {
+        await lat();
+        const status = new URL(request.url).searchParams.get("status");
+        const filtered = status && status !== "all" ? orders.filter(o => o.status === status) : orders;
+        return HttpResponse.json({ items: filtered });
+      }),
+
+      http.get(`${V1}/manufacturing/orders/:id`, async ({ params }) => {
+        await lat();
+        const o = orders.find(x => x.id === String(params["id"]));
+        if (!o) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({ ...o, bom: bomByOrder[o.id] ?? [] });
+      }),
+
+      http.post(`${V1}/manufacturing/orders`, async ({ request }) => {
+        await lat();
+        type BomInput = { rawMaterialId?: string; raw_material_id?: string; qtyRequired?: string | number; qty_required?: number; unit?: string };
+        const body = (await request.json()) as { product_id?: string; quantity?: number; notes?: string; bom?: BomInput[] };
+        const id = `mo_${Date.now()}`;
+        const po: PO = { id, product_id: body.product_id ?? "", quantity: Number(body.quantity ?? 1), status: "draft", started_at: null, completed_at: null, notes: body.notes ?? null, created_at: Date.now() };
+        if (body.bom) {
+          bomByOrder[id] = body.bom.map((l: BomInput, i: number) => ({ id: `bom_${id}_${i}`, raw_material_id: l.rawMaterialId ?? l.raw_material_id ?? "", qty_required: Number(l.qtyRequired ?? l.qty_required ?? 1), qty_consumed: 0, unit: l.unit ?? "unit" }));
+        }
+        orders.push(po);
+        return HttpResponse.json({ ...po, bom: bomByOrder[id] ?? [] }, { status: 201 });
+      }),
+
+      http.patch(`${V1}/manufacturing/orders/:id/status`, async ({ request, params }) => {
+        await lat();
+        const idx = orders.findIndex(o => o.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { status: string };
+        const now = Date.now();
+        orders[idx] = { ...orders[idx]!, status: body.status, started_at: body.status === "in_progress" && !orders[idx]!.started_at ? now : orders[idx]!.started_at, completed_at: body.status === "completed" ? now : orders[idx]!.completed_at };
+        return HttpResponse.json(orders[idx]);
+      }),
+    ];
+  })(),
+
+  // ── Rental — assets + contracts ───────────────────────────────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+
+    interface Asset { id: string; name: string; category: string | null; daily_rate_cents: number; deposit_cents: number; status: "available" | "rented" | "maintenance"; serial_number: string | null; }
+    interface Contract { id: string; asset_id: string; asset_name: string; daily_rate_cents: number; customer_id: string | null; starts_at: number; ends_at: number; deposit_cents: number; total_cents: number; status: "active" | "returned" | "overdue"; returned_at: number | null; }
+
+    let assets: Asset[] = [
+      { id: "ast_1", name: "Canon EOS R5 Camera Kit",  category: "Photography", daily_rate_cents: 8500,  deposit_cents: 150000, status: "rented",      serial_number: "CNR5-00412" },
+      { id: "ast_2", name: "DJI Mavic 3 Pro Drone",    category: "Photography", daily_rate_cents: 12000, deposit_cents: 200000, status: "available",   serial_number: "DJI-MVP-991" },
+      { id: "ast_3", name: "Party Tent 6×12m",         category: "Events",      daily_rate_cents: 22000, deposit_cents: 100000, status: "available",   serial_number: null },
+      { id: "ast_4", name: "Pressure Washer (3000psi)", category: "Tools",       daily_rate_cents: 4500,  deposit_cents: 30000,  status: "maintenance", serial_number: "PW-3K-0071" },
+      { id: "ast_5", name: "PA System (2×1000W)",       category: "Audio/Visual",daily_rate_cents: 15000, deposit_cents: 80000,  status: "rented",      serial_number: null },
+    ];
+
+    let contracts: Contract[] = [
+      { id: "cnt_1", asset_id: "ast_1", asset_name: "Canon EOS R5 Camera Kit", daily_rate_cents: 8500,  customer_id: "cust_1", starts_at: BASE - DAY * 3, ends_at: BASE + DAY * 1, deposit_cents: 150000, total_cents: 34000,  status: "active",  returned_at: null },
+      { id: "cnt_2", asset_id: "ast_5", asset_name: "PA System (2×1000W)",     daily_rate_cents: 15000, customer_id: "cust_3", starts_at: BASE - DAY * 1, ends_at: BASE + DAY * 2, deposit_cents: 80000,  total_cents: 45000,  status: "active",  returned_at: null },
+      { id: "cnt_3", asset_id: "ast_2", asset_name: "DJI Mavic 3 Pro Drone",   daily_rate_cents: 12000, customer_id: "cust_2", starts_at: BASE - DAY * 7, ends_at: BASE - DAY * 5, deposit_cents: 200000, total_cents: 24000,  status: "returned",returned_at: BASE - DAY * 5 },
+    ];
+
+    return [
+      http.get(`${V1}/rental/assets`, async () => {
+        await lat();
+        return HttpResponse.json({ items: assets });
+      }),
+
+      http.post(`${V1}/rental/assets`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Asset> & { dailyRateCents?: number; depositCents?: number; serialNumber?: string };
+        const asset: Asset = { id: `ast_${Date.now()}`, name: body.name ?? "New Asset", category: body.category ?? null, daily_rate_cents: body.dailyRateCents ?? body.daily_rate_cents ?? 0, deposit_cents: body.depositCents ?? body.deposit_cents ?? 0, status: "available", serial_number: body.serialNumber ?? body.serial_number ?? null };
+        assets.push(asset);
+        return HttpResponse.json(asset, { status: 201 });
+      }),
+
+      http.get(`${V1}/rental/contracts`, async ({ request }) => {
+        await lat();
+        const status = new URL(request.url).searchParams.get("status");
+        const filtered = status && status !== "all" ? contracts.filter(c => c.status === status) : contracts;
+        return HttpResponse.json({ items: filtered });
+      }),
+
+      http.post(`${V1}/rental/contracts`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { assetId?: string; asset_id?: string; startsAt?: string; starts_at?: string; endsAt?: string; ends_at?: string; customer_id?: string };
+        const assetId = body.assetId ?? body.asset_id ?? "";
+        const asset = assets.find(a => a.id === assetId);
+        if (!asset) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const starts = body.startsAt ? new Date(body.startsAt).getTime() : Date.now();
+        const ends   = body.endsAt   ? new Date(body.endsAt).getTime()   : starts + DAY;
+        const days   = Math.max(1, Math.ceil((ends - starts) / DAY));
+        const contract: Contract = { id: `cnt_${Date.now()}`, asset_id: assetId, asset_name: asset.name, daily_rate_cents: asset.daily_rate_cents, customer_id: body.customer_id ?? null, starts_at: starts, ends_at: ends, deposit_cents: asset.deposit_cents, total_cents: days * asset.daily_rate_cents, status: "active", returned_at: null };
+        asset.status = "rented";
+        contracts.push(contract);
+        return HttpResponse.json(contract, { status: 201 });
+      }),
+
+      http.post(`${V1}/rental/contracts/:id/return`, async ({ params }) => {
+        await lat();
+        const idx = contracts.findIndex(c => c.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        contracts[idx] = { ...contracts[idx]!, status: "returned", returned_at: Date.now() };
+        const asset = assets.find(a => a.id === contracts[idx]!.asset_id);
+        if (asset) asset.status = "available";
+        return HttpResponse.json(contracts[idx]);
+      }),
+    ];
+  })(),
+
   // ── Loyalty Program — tiers, members, rewards ────────────────────────────
   ...(() => {
     const BASE = Date.now();
