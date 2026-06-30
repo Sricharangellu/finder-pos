@@ -1,0 +1,107 @@
+export interface POLine {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  product_barcode?: string;
+  selling_price_cents: number;
+  last_cost_cents: number;
+  margin_pct: number;
+  quantity: number;
+  unit_cost_cents: number;
+  line_cost_cents: number;
+  received_qty: number;
+  remaining_qty: number;
+  expiry_date: number | null;
+  lot_code: string | null;
+  cases_ordered?: number;
+  units_per_case?: number;
+  landed_cost_cents?: number;
+}
+
+export interface PurchaseOrderDetail {
+  id: string;
+  po_number?: number;
+  supplier_id: string;
+  status: string;
+  receive_status: string | null;
+  total_cost_cents: number;
+  freight_cost_cents: number;
+  other_charges_cents: number;
+  created_at: number;
+  received_at: number | null;
+  notes?: string;
+  lines: POLine[];
+}
+
+export interface PriceHistoryItem {
+  product_id: string;
+  product_name: string;
+  sku: string;
+  history: Array<{ unit_cost_cents: number; received_at: number; po_id: string }>;
+}
+
+export interface PODocument {
+  id: string;
+  name: string;
+  type: string;
+  size_bytes: number;
+  uploaded_at: number;
+}
+
+export interface BillingAdj {
+  id: string;
+  po_id: string;
+  line_id: string | null;
+  reason: string;
+  amount_cents: number;
+  created_at: number;
+}
+
+export interface VendorCredit {
+  id: string;
+  supplier_id: string;
+  type: string;
+  amount_cents: number;
+  reason: string | null;
+  po_id: string | null;
+  status: string;
+  created_at: number;
+}
+
+export interface ReceiveEntry {
+  lineId: string;
+  cases: string;
+  unitsPerCase: string;
+  totalQty: number;
+  expiryDate: string;
+  lotCode: string;
+}
+
+export type DetailTab = "lines" | "receive" | "billing" | "credits";
+
+export function remaining(line: POLine): number {
+  return Math.max(0, line.quantity - (line.received_qty ?? 0));
+}
+
+export function computeTotal(cases: string, upc: string): number {
+  const c = parseInt(cases, 10), u = parseInt(upc, 10);
+  if (isNaN(c) || isNaN(u) || c <= 0 || u <= 0) return 0;
+  return c * u;
+}
+
+export function marginColor(pct: number): string {
+  if (pct < 10) return "text-red-600";
+  if (pct < 25) return "text-amber-600";
+  return "text-emerald-700";
+}
+
+export function docTypeLabel(t: string): string {
+  return ({ invoice: "Invoice", delivery_note: "Delivery Note", excel: "Excel/CSV", other: "Other" } as Record<string, string>)[t] ?? t;
+}
+
+export function fmtBytes(b: number): string {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
