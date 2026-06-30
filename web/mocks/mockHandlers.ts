@@ -3098,6 +3098,88 @@ mockHandlers.push(
     ];
   })(),
 
+  // ── Service Orders — repair tickets for services vertical ────────────────
+  ...(() => {
+    const BASE = Date.now();
+    const DAY = 86_400_000;
+    let seq = 0;
+
+    interface SO {
+      id: string; customer_id: string; customer_name: string; title: string;
+      description: string; status: "draft" | "open" | "in_progress" | "ready" | "closed";
+      assigned_to: string | null; assigned_to_name: string | null;
+      estimate_cents: number; actual_cents: number | null;
+      created_at: number; updated_at: number;
+    }
+
+    let orders: SO[] = [
+      { id: "so_1", customer_id: "cust_1", customer_name: "Maria Garcia",  title: "Trek FX3 — brake cable replacement",          description: "Front and rear brake cables frayed. Replace both cables + housing.", status: "in_progress", assigned_to: "usr_t1", assigned_to_name: "Jake T.",  estimate_cents: 8500,  actual_cents: null,  created_at: BASE - DAY * 3, updated_at: BASE - DAY * 2 },
+      { id: "so_2", customer_id: "cust_2", customer_name: "Tom Lee",       title: "Cannondale — full tune-up + tyre swap",         description: "Annual tune-up, new Continental tyres front & rear, chain lube.",   status: "ready",       assigned_to: "usr_t2", assigned_to_name: "Sara M.", estimate_cents: 12000, actual_cents: 11500, created_at: BASE - DAY * 5, updated_at: BASE - DAY * 1 },
+      { id: "so_3", customer_id: "cust_3", customer_name: "Priya Sharma",  title: "iPhone 14 — screen replacement",                description: "Cracked screen, touch still works. OEM screen needed.",             status: "open",        assigned_to: null,     assigned_to_name: null,    estimate_cents: 22000, actual_cents: null,  created_at: BASE - DAY * 1, updated_at: BASE - DAY * 1 },
+      { id: "so_4", customer_id: "cust_4", customer_name: "Carlos Ruiz",   title: "Espresso machine — pressure group service",     description: "Low extraction pressure. Inspect gaskets and group head.",         status: "draft",       assigned_to: null,     assigned_to_name: null,    estimate_cents: 15000, actual_cents: null,  created_at: BASE - DAY * 0, updated_at: BASE - DAY * 0 },
+      { id: "so_5", customer_id: "cust_5", customer_name: "Amy Chen",      title: "MacBook Pro — battery swap",                    description: "Battery health at 64%. Customer wants replacement.",               status: "closed",      assigned_to: "usr_t1", assigned_to_name: "Jake T.",  estimate_cents: 18500, actual_cents: 18500, created_at: BASE - DAY * 7, updated_at: BASE - DAY * 4 },
+      { id: "so_6", customer_id: "cust_6", customer_name: "James O'Brien", title: "Trek Domane — derailleur alignment + cable",    description: "Front derailleur rubbing on small ring. Full cable replacement.", status: "open",        assigned_to: "usr_t2", assigned_to_name: "Sara M.", estimate_cents: 6500,  actual_cents: null,  created_at: BASE - DAY * 2, updated_at: BASE - DAY * 2 },
+    ];
+
+    return [
+      http.get(`${V1}/service-orders`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const q      = url.searchParams.get("q")?.toLowerCase();
+        const limit  = Number(url.searchParams.get("limit")  ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+
+        let filtered = orders;
+        if (status) filtered = filtered.filter(o => o.status === status);
+        if (q) filtered = filtered.filter(o =>
+          o.title.toLowerCase().includes(q) || o.customer_name.toLowerCase().includes(q),
+        );
+
+        const total = filtered.length;
+        return HttpResponse.json({ items: filtered.slice(offset, offset + limit), total, limit, offset });
+      }),
+
+      http.get(`${V1}/service-orders/:id`, async ({ params }) => {
+        await lat();
+        const order = orders.find(o => o.id === String(params["id"]));
+        if (!order) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(order);
+      }),
+
+      http.post(`${V1}/service-orders`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<SO>;
+        const now = Date.now();
+        const order: SO = {
+          id: `so_${++seq}`,
+          customer_id: body.customer_id ?? `cust_${seq}`,
+          customer_name: body.customer_name ?? "Walk-in Customer",
+          title: body.title ?? "New Ticket",
+          description: body.description ?? "",
+          status: "draft",
+          assigned_to: body.assigned_to ?? null,
+          assigned_to_name: body.assigned_to_name ?? null,
+          estimate_cents: body.estimate_cents ?? 0,
+          actual_cents: null,
+          created_at: now,
+          updated_at: now,
+        };
+        orders.push(order);
+        return HttpResponse.json(order, { status: 201 });
+      }),
+
+      http.patch(`${V1}/service-orders/:id`, async ({ request, params }) => {
+        await lat();
+        const idx = orders.findIndex(o => o.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<SO>;
+        orders[idx] = { ...orders[idx]!, ...body, updated_at: Date.now() };
+        return HttpResponse.json(orders[idx]);
+      }),
+    ];
+  })(),
+
   // ── Restaurant — floor plan, sessions, bar tabs ───────────────────────────
   ...(() => {
     const BASE = Date.now();
