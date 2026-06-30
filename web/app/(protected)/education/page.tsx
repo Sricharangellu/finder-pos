@@ -368,7 +368,7 @@ export default function EducationPage() {
                 placeholder={placeholder}
                 value={studentForm[key as keyof typeof studentForm]}
                 onChange={(event) => setStudentForm((form) => ({ ...form, [key]: event.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               />
             </div>
           ))}
@@ -378,7 +378,7 @@ export default function EducationPage() {
               rows={3}
               value={studentForm.notes}
               onChange={(event) => setStudentForm((form) => ({ ...form, notes: event.target.value }))}
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               placeholder="Scholarship, payment schedule, advisor notes..."
             />
           </div>
@@ -401,7 +401,7 @@ export default function EducationPage() {
               type="text"
               value={feeForm.description}
               onChange={(event) => setFeeForm((form) => ({ ...form, description: event.target.value }))}
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               placeholder="Tuition installment"
             />
           </div>
@@ -413,7 +413,7 @@ export default function EducationPage() {
                 min={1}
                 value={feeForm.amountCents}
                 onChange={(event) => setFeeForm((form) => ({ ...form, amountCents: event.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
                 placeholder="25000"
               />
             </div>
@@ -423,7 +423,7 @@ export default function EducationPage() {
                 type="date"
                 value={feeForm.dueDate}
                 onChange={(event) => setFeeForm((form) => ({ ...form, dueDate: event.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               />
             </div>
           </div>

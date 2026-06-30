@@ -145,7 +145,7 @@ export default function AutomotivePage() {
               value={q}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Search make, model, plate, VIN…"
-              className="flex-1 rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
             />
             <Button variant="primary" size="sm" onClick={() => setVehicleModal(true)}>+ Vehicle</Button>
           </div>
@@ -277,7 +277,7 @@ export default function AutomotivePage() {
               <input type="text" placeholder={placeholder}
                 value={vForm[key as keyof typeof vForm]}
                 onChange={e => setVForm(f => ({ ...f, [key]: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               />
             </div>
           ))}
@@ -299,7 +299,7 @@ export default function AutomotivePage() {
             <textarea rows={2} value={woForm.description}
               onChange={e => setWoForm(f => ({ ...f, description: e.target.value }))}
               placeholder="e.g. Oil change + filter replacement"
-              className="w-full resize-none rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -307,14 +307,14 @@ export default function AutomotivePage() {
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Labour (cents)</label>
               <input type="number" min={0} value={woForm.labourCents}
                 onChange={e => setWoForm(f => ({ ...f, labourCents: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Parts (cents)</label>
               <input type="number" min={0} value={woForm.partsCents}
                 onChange={e => setWoForm(f => ({ ...f, partsCents: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               />
             </div>
           </div>

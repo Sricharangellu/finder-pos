@@ -48,7 +48,7 @@ export default function CashMovementPage() {
             placeholder="Filter by register ID (optional)"
             value={registerId}
             onChange={(e) => setRegisterId(e.target.value)}
-            className="h-8 w-64 rounded border border-[#D9D9D9] px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+            className="h-8 w-64 rounded border border-slate-200 px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
           />
         </div>
 

@@ -76,7 +76,7 @@ function SalesReportContent() {
             <select
               value={filters.dimension ?? "product"}
               onChange={(e) => setFilter("dimension", e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-brand-600"
+              className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-brand-600"
             >
               <option value="product">By Product</option>
               <option value="category">By Category</option>
@@ -92,7 +92,7 @@ function SalesReportContent() {
             />
 
             {/* View toggle */}
-            <div className="inline-flex rounded border border-[#D9D9D9] bg-white p-0.5">
+            <div className="inline-flex rounded border border-slate-200 bg-white p-0.5">
               {(["table", "chart"] as const).map((v) => (
                 <button
                   key={v}

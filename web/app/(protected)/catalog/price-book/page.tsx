@@ -84,7 +84,7 @@ export default function PriceBookPage() {
           <select
             value={selectedCustomer}
             onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-brand-600"
+            className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-brand-600"
           >
             <option value="">Select customer to edit prices</option>
             {customers.map((c) => (
@@ -96,7 +96,7 @@ export default function PriceBookPage() {
             placeholder="Search products…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-48 rounded border border-[#D9D9D9] px-3 text-[13px] outline-none focus:border-brand-600"
+            className="h-8 w-48 rounded border border-slate-200 px-3 text-[13px] outline-none focus:border-brand-600"
           />
           {!selectedCustomer && (
             <p className="text-xs text-[var(--color-text-secondary)]">

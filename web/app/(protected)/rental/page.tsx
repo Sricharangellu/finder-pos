@@ -231,7 +231,7 @@ export default function RentalPage() {
               <input type={key.includes("Cents") ? "number" : "text"} placeholder={placeholder}
                 value={aForm[key as keyof typeof aForm]}
                 onChange={e => setAForm(f => ({ ...f, [key]: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
           ))}
           <div className="flex gap-2">
@@ -251,13 +251,13 @@ export default function RentalPage() {
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Start date *</label>
               <input type="date" value={rForm.startsAt}
                 onChange={e => setRForm(f => ({ ...f, startsAt: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">End date *</label>
               <input type="date" value={rForm.endsAt}
                 onChange={e => setRForm(f => ({ ...f, endsAt: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
           </div>
           {estimatedTotal !== null && (

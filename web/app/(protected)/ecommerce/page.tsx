@@ -297,8 +297,8 @@ function SettingsTab() {
           "/api/v1/settings/business"
         );
         setSettings({
-          storeName: (r as any).storeName ?? "",
-          acceptOnlineOrders: (r as any).acceptOnlineOrders ?? true,
+          storeName: r.storeName ?? "",
+          acceptOnlineOrders: r.acceptOnlineOrders ?? true,
         });
       } catch {
         // Use defaults

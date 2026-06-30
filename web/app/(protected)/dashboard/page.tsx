@@ -432,7 +432,7 @@ export default function DashboardPage() {
                 aria-label="Filter by outlet"
                 value={selectedOutletId}
                 onChange={(e) => setSelectedOutletId(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+                className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
               >
                 <option value="">All Outlets</option>
                 {outlets.map((o) => (
@@ -441,7 +441,7 @@ export default function DashboardPage() {
               </select>
             )}
             {/* Day/Week/Month granularity toggle */}
-            <div role="group" aria-label="Report granularity" className="inline-flex rounded-md border border-[#D9D9D9] bg-white p-1">
+            <div role="group" aria-label="Report granularity" className="inline-flex rounded-md border border-slate-200 bg-white p-1">
               {(["day", "week", "month"] as const).map((value) => (
                 <button key={value} type="button" onClick={() => setGranularity(value)} aria-pressed={granularity === value}
                   className={`min-h-[28px] rounded px-3 text-[12px] font-medium capitalize transition-colors ${granularity === value ? "bg-brand-600 text-white" : "text-[var(--color-text-secondary)] hover:bg-gray-50"}`}>
@@ -453,7 +453,7 @@ export default function DashboardPage() {
               aria-label="Date range"
               value={dateRange.preset === "custom" ? "current_week" : dateRange.preset}
               onChange={(e) => setDateRange(dateRangeForPreset(e.target.value as FinderDateRange["preset"]))}
-              className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
+              className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-brand-600"
             >
               <option value="today">Today</option>
               <option value="current_week">This Week</option>

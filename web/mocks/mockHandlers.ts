@@ -3078,27 +3078,55 @@ mockHandlers.push(
 
   // ── Reorder Suggestions (BE-27 / FE-23) ──────────────────────────────────
   ...(() => {
+    const D = 86400000;
+    const now = Date.now();
+
     interface RS {
       product_id: string; product_name: string; sku: string | null;
       stock_qty: number; reorder_pt: number; suggested_qty: number;
       preferred_vendor_id: string | null; preferred_vendor_name: string | null;
+      last_unit_cost_cents: number | null; last_ordered_at: number | null; last_ordered_qty: number | null;
     }
 
     const suggestions: RS[] = [
-      { product_id: "prod_001", product_name: "Marlboro Red King", sku: "MRL-RED-K", stock_qty: 3, reorder_pt: 10, suggested_qty: 20, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North" },
-      { product_id: "prod_002", product_name: "Newport Menthol 100s", sku: "NWP-M100", stock_qty: 1, reorder_pt: 8, suggested_qty: 16, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North" },
-      { product_id: "prod_003", product_name: "Camel Blue Box", sku: "CAM-BLU", stock_qty: 0, reorder_pt: 6, suggested_qty: 12, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North" },
-      { product_id: "prod_004", product_name: "Swisher Sweets Original", sku: "SWI-OG", stock_qty: 4, reorder_pt: 15, suggested_qty: 30, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company" },
-      { product_id: "prod_005", product_name: "White Owl Cigarillos", sku: "WOW-CIG", stock_qty: 2, reorder_pt: 12, suggested_qty: 24, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company" },
-      { product_id: "prod_006", product_name: "Backwoods Honey Berry", sku: "BKW-HB", stock_qty: 0, reorder_pt: 10, suggested_qty: 20, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company" },
-      { product_id: "prod_007", product_name: "5-Hour Energy Berry", sku: "5HR-BRY", stock_qty: 5, reorder_pt: 24, suggested_qty: 48, preferred_vendor_id: "sup_003", preferred_vendor_name: "Eby-Brown" },
-      { product_id: "prod_008", product_name: "Monster Energy Original", sku: "MON-OG", stock_qty: 3, reorder_pt: 12, suggested_qty: 24, preferred_vendor_id: null, preferred_vendor_name: null },
+      { product_id: "prod_001", product_name: "Marlboro Red King",     sku: "MRL-RED-K", stock_qty: 3, reorder_pt: 10, suggested_qty: 20, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North", last_unit_cost_cents: 450, last_ordered_at: now - 14*D, last_ordered_qty: 20 },
+      { product_id: "prod_002", product_name: "Newport Menthol 100s",  sku: "NWP-M100",  stock_qty: 1, reorder_pt: 8,  suggested_qty: 16, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North", last_unit_cost_cents: 380, last_ordered_at: now - 14*D, last_ordered_qty: 16 },
+      { product_id: "prod_003", product_name: "Camel Blue Box",        sku: "CAM-BLU",   stock_qty: 0, reorder_pt: 6,  suggested_qty: 12, preferred_vendor_id: "sup_001", preferred_vendor_name: "Core-Mark North", last_unit_cost_cents: 410, last_ordered_at: now - 28*D, last_ordered_qty: 12 },
+      { product_id: "prod_004", product_name: "Swisher Sweets Original",sku: "SWI-OG",   stock_qty: 4, reorder_pt: 15, suggested_qty: 30, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company",  last_unit_cost_cents: 200, last_ordered_at: now - 21*D, last_ordered_qty: 30 },
+      { product_id: "prod_005", product_name: "White Owl Cigarillos",  sku: "WOW-CIG",   stock_qty: 2, reorder_pt: 12, suggested_qty: 24, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company",  last_unit_cost_cents: 175, last_ordered_at: now - 21*D, last_ordered_qty: 24 },
+      { product_id: "prod_006", product_name: "Backwoods Honey Berry", sku: "BKW-HB",    stock_qty: 0, reorder_pt: 10, suggested_qty: 20, preferred_vendor_id: "sup_002", preferred_vendor_name: "McLane Company",  last_unit_cost_cents: 180, last_ordered_at: now - 35*D, last_ordered_qty: 20 },
+      { product_id: "prod_007", product_name: "5-Hour Energy Berry",   sku: "5HR-BRY",   stock_qty: 5, reorder_pt: 24, suggested_qty: 48, preferred_vendor_id: "sup_003", preferred_vendor_name: "Eby-Brown",       last_unit_cost_cents: 320, last_ordered_at: now -  7*D, last_ordered_qty: 48 },
+      { product_id: "prod_008", product_name: "Monster Energy Original",sku: "MON-OG",   stock_qty: 3, reorder_pt: 12, suggested_qty: 24, preferred_vendor_id: null,       preferred_vendor_name: null,              last_unit_cost_cents: null, last_ordered_at: null, last_ordered_qty: null },
     ];
+
+    const vendorHistory: Record<string, { po_id: string; po_number: number; created_at: number; total_cost_cents: number; item_count: number; status: string }[]> = {
+      sup_001: [
+        { po_id: "vh_1a", po_number: 3990, created_at: now - 14*D, total_cost_cents: 17600, item_count: 3, status: "received" },
+        { po_id: "vh_1b", po_number: 3975, created_at: now - 28*D, total_cost_cents: 14820, item_count: 3, status: "received" },
+        { po_id: "vh_1c", po_number: 3960, created_at: now - 42*D, total_cost_cents: 16200, item_count: 3, status: "received" },
+      ],
+      sup_002: [
+        { po_id: "vh_2a", po_number: 3985, created_at: now - 21*D, total_cost_cents: 12900, item_count: 3, status: "received" },
+        { po_id: "vh_2b", po_number: 3968, created_at: now - 35*D, total_cost_cents: 11500, item_count: 2, status: "received" },
+      ],
+      sup_003: [
+        { po_id: "vh_3a", po_number: 3994, created_at: now -  7*D, total_cost_cents: 15360, item_count: 1, status: "received" },
+        { po_id: "vh_3b", po_number: 3980, created_at: now - 21*D, total_cost_cents: 14080, item_count: 1, status: "received" },
+      ],
+    };
 
     return [
       http.get(`${V1}/inventory/reorder-suggestions`, async () => {
         await lat();
         return HttpResponse.json({ items: suggestions });
+      }),
+
+      http.get(`${V1}/purchasing/vendor-history`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const vendorId = url.searchParams.get("vendorId");
+        if (vendorId) return HttpResponse.json({ items: vendorHistory[vendorId] ?? [] });
+        return HttpResponse.json({ history: vendorHistory });
       }),
 
       http.post(`${V1}/inventory/reorder-suggestions/create-po`, async ({ request }) => {
@@ -4582,6 +4610,245 @@ mockHandlers.push(
         wf.steps.splice(sIdx, 1);
         wf.updatedAt = Date.now();
         return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Golf ─────────────────────────────────────────────────────────────────
+  ...(() => {
+    const DAY = 86_400_000;
+    const today = new Date().toISOString().slice(0, 10);
+    const d = (offset: number) => new Date(Date.now() + offset * DAY).toISOString().slice(0, 10);
+    let slotSeq = 20;
+    let bookSeq = 20;
+    let memSeq  = 20;
+
+    type SlotStatus   = "available" | "booked" | "hold" | "closed";
+    type BookStatus   = "confirmed" | "pending" | "cancelled" | "no_show" | "completed";
+    type MemTier      = "standard" | "premium" | "vip" | "corporate";
+
+    interface Slot    { id: string; date: string; tee_time: string; holes: 9|18; max_players: number; booked_players: number; status: SlotStatus; price_cents: number; cart_fee_cents: number; notes: string|null; }
+    interface Booking { id: string; slot_id: string; date: string; tee_time: string; holes: 9|18; players: number; member_id: string|null; member_name: string|null; guest_name: string|null; guest_phone: string|null; status: BookStatus; total_cents: number; paid_cents: number; cart_included: boolean; notes: string|null; created_at: number; }
+    interface Member  { id: string; name: string; email: string; phone: string|null; tier: MemTier; handicap: number|null; membership_number: string; joined_at: number; expires_at: number|null; rounds_played: number; outstanding_cents: number; notes: string|null; }
+
+    // Tee slots — 3 days worth
+    const mkSlot = (id: string, date: string, time: string, holes: 9|18, booked: number, status: SlotStatus, price: number): Slot => ({
+      id, date, tee_time: time, holes, max_players: 4, booked_players: booked, status, price_cents: price, cart_fee_cents: 1800, notes: null,
+    });
+    let slots: Slot[] = [
+      mkSlot("slot_1",  today, "07:00", 18, 4, "booked",    9500),
+      mkSlot("slot_2",  today, "07:10", 18, 2, "available", 9500),
+      mkSlot("slot_3",  today, "07:20", 18, 0, "available", 9500),
+      mkSlot("slot_4",  today, "07:30", 18, 0, "hold",      9500),
+      mkSlot("slot_5",  today, "07:40", 18, 4, "booked",    9500),
+      mkSlot("slot_6",  today, "08:00", 9,  2, "available", 5500),
+      mkSlot("slot_7",  today, "08:20", 9,  0, "available", 5500),
+      mkSlot("slot_8",  today, "09:00", 18, 0, "closed",    9500),
+      mkSlot("slot_9",  d(1),  "07:00", 18, 0, "available", 9500),
+      mkSlot("slot_10", d(1),  "07:10", 18, 2, "available", 9500),
+      mkSlot("slot_11", d(1),  "08:00", 9,  0, "available", 5500),
+      mkSlot("slot_12", d(2),  "07:00", 18, 0, "available", 9500),
+      mkSlot("slot_13", d(2),  "08:00", 9,  4, "booked",    5500),
+    ];
+
+    // Bookings
+    let bookings: Booking[] = [
+      { id: "book_1",  slot_id: "slot_1",  date: today, tee_time: "07:00", holes: 18, players: 4, member_id: "mem_1",  member_name: "James Harrington",  guest_name: null,         guest_phone: null,         status: "confirmed",  total_cents: 46000, paid_cents: 46000, cart_included: true,  notes: null,                    created_at: Date.now() - 7 * DAY },
+      { id: "book_2",  slot_id: "slot_2",  date: today, tee_time: "07:10", holes: 18, players: 2, member_id: "mem_2",  member_name: "Sandra Liu",        guest_name: "David Kim",  guest_phone: "+15552345678", status: "confirmed",  total_cents: 27600, paid_cents: 27600, cart_included: true,  notes: "Guest is a corporate client", created_at: Date.now() - 3 * DAY },
+      { id: "book_3",  slot_id: "slot_5",  date: today, tee_time: "07:40", holes: 18, players: 4, member_id: null,     member_name: null,                guest_name: "Raj Patel",  guest_phone: "+15559876543", status: "confirmed",  total_cents: 46000, paid_cents: 23000, cart_included: true,  notes: null,                    created_at: Date.now() - 1 * DAY },
+      { id: "book_4",  slot_id: "slot_6",  date: today, tee_time: "08:00", holes: 9,  players: 2, member_id: "mem_3",  member_name: "Elena Voronova",    guest_name: null,         guest_phone: null,         status: "pending",    total_cents: 14600, paid_cents: 0,     cart_included: false, notes: null,                    created_at: Date.now() - 2 * DAY },
+      { id: "book_5",  slot_id: "slot_10", date: d(1),  tee_time: "07:10", holes: 18, players: 2, member_id: "mem_1",  member_name: "James Harrington",  guest_name: null,         guest_phone: null,         status: "confirmed",  total_cents: 22400, paid_cents: 22400, cart_included: true,  notes: null,                    created_at: Date.now() - DAY },
+    ];
+
+    // Members
+    let members: Member[] = [
+      { id: "mem_1", name: "James Harrington",  email: "james@example.com",   phone: "+15551234567", tier: "vip",       handicap: 8,    membership_number: "GC-0001", joined_at: Date.now() - 730 * DAY, expires_at: Date.now() + 180 * DAY, rounds_played: 62,  outstanding_cents: 0,    notes: "Prefers morning tee times" },
+      { id: "mem_2", name: "Sandra Liu",         email: "sandra@example.com",  phone: "+15552345678", tier: "premium",   handicap: 14,   membership_number: "GC-0002", joined_at: Date.now() - 365 * DAY, expires_at: Date.now() + 90  * DAY, rounds_played: 31,  outstanding_cents: 0,    notes: null },
+      { id: "mem_3", name: "Elena Voronova",     email: "elena@example.com",   phone: null,           tier: "standard",  handicap: 22,   membership_number: "GC-0003", joined_at: Date.now() - 120 * DAY, expires_at: Date.now() + 245 * DAY, rounds_played: 9,   outstanding_cents: 14600, notes: null },
+      { id: "mem_4", name: "Marcus Tate",        email: "marcus@example.com",  phone: "+15553456789", tier: "corporate", handicap: null, membership_number: "GC-0004", joined_at: Date.now() - 200 * DAY, expires_at: Date.now() + 165 * DAY, rounds_played: 18,  outstanding_cents: 0,    notes: "Corporate account — Tate & Sons Ltd" },
+      { id: "mem_5", name: "Priya Nair",         email: "priya@example.com",   phone: "+15554567890", tier: "standard",  handicap: 18,   membership_number: "GC-0005", joined_at: Date.now() - 45  * DAY, expires_at: null, rounds_played: 4, outstanding_cents: 0, notes: null },
+    ];
+
+    // Pro shop items
+    const proShop = [
+      { id: "ps_1", product_id: "prod_ps_1", name: "Titleist Pro V1 Balls (12-pack)", sku: "GOLF-TV1-12", category: "balls",       brand: "Titleist",      price_cents: 5499, cost_cents: 3200, stock_qty: 48, reorder_pt: 12, image_url: null },
+      { id: "ps_2", product_id: "prod_ps_2", name: "Callaway Apex Irons Set (4-PW)",  sku: "GOLF-CA-SET", category: "clubs",       brand: "Callaway",      price_cents: 89900, cost_cents: 54000, stock_qty: 3, reorder_pt: 2, image_url: null },
+      { id: "ps_3", product_id: "prod_ps_3", name: "FootJoy Tour-S Shoes (M10)",     sku: "GOLF-FJ-M10", category: "footwear",    brand: "FootJoy",       price_cents: 18999, cost_cents: 11000, stock_qty: 6, reorder_pt: 3, image_url: null },
+      { id: "ps_4", product_id: "prod_ps_4", name: "Ping G430 Driver 10.5°",         sku: "GOLF-PG-DRV", category: "clubs",       brand: "Ping",          price_cents: 59999, cost_cents: 36000, stock_qty: 2, reorder_pt: 1, image_url: null },
+      { id: "ps_5", product_id: "prod_ps_5", name: "Under Armour Polo — Navy L",     sku: "GOLF-UA-NVL", category: "apparel",     brand: "Under Armour",  price_cents: 6999,  cost_cents: 3800, stock_qty: 14, reorder_pt: 5, image_url: null },
+      { id: "ps_6", product_id: "prod_ps_6", name: "Titleist Tour Cart Bag",          sku: "GOLF-TV-BAG", category: "bags",        brand: "Titleist",      price_cents: 34999, cost_cents: 21000, stock_qty: 4, reorder_pt: 2, image_url: null },
+      { id: "ps_7", product_id: "prod_ps_7", name: "Golf Pride MCC +4 Grips (13-pk)",sku: "GOLF-GP-GRP", category: "accessories", brand: "Golf Pride",    price_cents: 4999,  cost_cents: 2800, stock_qty: 22, reorder_pt: 8, image_url: null },
+    ];
+
+    return [
+      // ── Tee Sheet ────────────────────────────────────────────────────────────
+      http.get(`${V1}/golf/tee-sheet`, async ({ request }) => {
+        await lat();
+        const url  = new URL(request.url);
+        const date = url.searchParams.get("date") ?? today;
+        const list = slots.filter(s => s.date === date);
+        return HttpResponse.json({ items: list, date });
+      }),
+
+      http.post(`${V1}/golf/tee-slots`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<Slot>;
+        const slot: Slot = {
+          id: `slot_${++slotSeq}`, date: b.date ?? today, tee_time: b.tee_time ?? "08:00",
+          holes: b.holes ?? 18, max_players: b.max_players ?? 4, booked_players: 0,
+          status: "available", price_cents: b.price_cents ?? 9500, cart_fee_cents: b.cart_fee_cents ?? 1800, notes: b.notes ?? null,
+        };
+        slots.push(slot);
+        return HttpResponse.json(slot, { status: 201 });
+      }),
+
+      http.patch(`${V1}/golf/tee-slots/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = slots.findIndex(s => s.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<Slot>;
+        slots[idx] = { ...slots[idx], ...b };
+        return HttpResponse.json(slots[idx]);
+      }),
+
+      // ── Bookings ─────────────────────────────────────────────────────────────
+      http.get(`${V1}/golf/bookings`, async ({ request }) => {
+        await lat();
+        const url    = new URL(request.url);
+        const date   = url.searchParams.get("date") ?? "";
+        const status = url.searchParams.get("status") ?? "";
+        const q      = url.searchParams.get("q") ?? "";
+        const limit  = Number(url.searchParams.get("limit") ?? 50);
+        let list = bookings;
+        if (date)   list = list.filter(b => b.date === date);
+        if (status) list = list.filter(b => b.status === status);
+        if (q) {
+          const lq = q.toLowerCase();
+          list = list.filter(b =>
+            (b.member_name ?? "").toLowerCase().includes(lq) ||
+            (b.guest_name  ?? "").toLowerCase().includes(lq) ||
+            b.id.toLowerCase().includes(lq),
+          );
+        }
+        return HttpResponse.json({ items: list.slice(0, limit), total: list.length });
+      }),
+
+      http.get(`${V1}/golf/bookings/:id`, async ({ params }) => {
+        await lat();
+        const b = bookings.find(x => x.id === String(params["id"]));
+        if (!b) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(b);
+      }),
+
+      http.post(`${V1}/golf/bookings`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as Partial<Booking>;
+        const slot = slots.find(s => s.id === body.slot_id);
+        if (!slot) return HttpResponse.json({ error: { code: "not_found", message: "Slot not found" } }, { status: 404 });
+        if (slot.status === "closed") return HttpResponse.json({ error: { code: "slot_closed" } }, { status: 409 });
+        const players = body.players ?? 1;
+        const total = (slot.price_cents + (body.cart_included ? slot.cart_fee_cents : 0)) * players;
+        const booking: Booking = {
+          id: `book_${++bookSeq}`, slot_id: slot.id, date: slot.date, tee_time: slot.tee_time, holes: slot.holes,
+          players, member_id: body.member_id ?? null, member_name: body.member_name ?? null,
+          guest_name: body.guest_name ?? null, guest_phone: body.guest_phone ?? null,
+          status: "confirmed", total_cents: total, paid_cents: 0, cart_included: body.cart_included ?? false,
+          notes: body.notes ?? null, created_at: Date.now(),
+        };
+        bookings.push(booking);
+        const slotIdx = slots.findIndex(s => s.id === slot.id);
+        slots[slotIdx].booked_players += players;
+        if (slots[slotIdx].booked_players >= slots[slotIdx].max_players) slots[slotIdx].status = "booked";
+        return HttpResponse.json(booking, { status: 201 });
+      }),
+
+      http.patch(`${V1}/golf/bookings/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = bookings.findIndex(b => b.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as Partial<Booking>;
+        if (body.status === "cancelled" && bookings[idx].status !== "cancelled") {
+          const slotIdx = slots.findIndex(s => s.id === bookings[idx].slot_id);
+          if (slotIdx !== -1) {
+            slots[slotIdx].booked_players = Math.max(0, slots[slotIdx].booked_players - bookings[idx].players);
+            if (slots[slotIdx].status === "booked") slots[slotIdx].status = "available";
+          }
+        }
+        bookings[idx] = { ...bookings[idx], ...body };
+        return HttpResponse.json(bookings[idx]);
+      }),
+
+      // ── Members ───────────────────────────────────────────────────────────────
+      http.get(`${V1}/golf/members`, async ({ request }) => {
+        await lat();
+        const url  = new URL(request.url);
+        const tier = url.searchParams.get("tier") ?? "";
+        const q    = url.searchParams.get("q") ?? "";
+        let list = members;
+        if (tier) list = list.filter(m => m.tier === tier);
+        if (q) {
+          const lq = q.toLowerCase();
+          list = list.filter(m =>
+            m.name.toLowerCase().includes(lq) ||
+            m.email.toLowerCase().includes(lq) ||
+            m.membership_number.toLowerCase().includes(lq),
+          );
+        }
+        return HttpResponse.json({ items: list, total: list.length });
+      }),
+
+      http.get(`${V1}/golf/members/:id`, async ({ params }) => {
+        await lat();
+        const m = members.find(x => x.id === String(params["id"]));
+        if (!m) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const memberBookings = bookings.filter(b => b.member_id === m.id);
+        return HttpResponse.json({ ...m, bookings: memberBookings });
+      }),
+
+      http.post(`${V1}/golf/members`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<Member>;
+        const member: Member = {
+          id: `mem_${++memSeq}`,
+          name: b.name ?? "New Member",
+          email: b.email ?? "",
+          phone: b.phone ?? null,
+          tier: b.tier ?? "standard",
+          handicap: b.handicap ?? null,
+          membership_number: `GC-${String(memSeq).padStart(4, "0")}`,
+          joined_at: Date.now(),
+          expires_at: b.expires_at ?? Date.now() + 365 * DAY,
+          rounds_played: 0,
+          outstanding_cents: 0,
+          notes: b.notes ?? null,
+        };
+        members.push(member);
+        return HttpResponse.json(member, { status: 201 });
+      }),
+
+      http.patch(`${V1}/golf/members/:id`, async ({ params, request }) => {
+        await lat();
+        const idx = members.findIndex(m => m.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as Partial<Member>;
+        members[idx] = { ...members[idx], ...b };
+        return HttpResponse.json(members[idx]);
+      }),
+
+      // ── Pro Shop ──────────────────────────────────────────────────────────────
+      http.get(`${V1}/golf/pro-shop`, async ({ request }) => {
+        await lat();
+        const url      = new URL(request.url);
+        const category = url.searchParams.get("category") ?? "";
+        const q        = url.searchParams.get("q") ?? "";
+        let list = proShop;
+        if (category) list = list.filter(p => p.category === category);
+        if (q) {
+          const lq = q.toLowerCase();
+          list = list.filter(p => p.name.toLowerCase().includes(lq) || p.sku.toLowerCase().includes(lq) || (p.brand ?? "").toLowerCase().includes(lq));
+        }
+        const lowStock = list.filter(p => p.stock_qty <= p.reorder_pt).length;
+        return HttpResponse.json({ items: list, total: list.length, low_stock_count: lowStock });
       }),
     ];
   })(),

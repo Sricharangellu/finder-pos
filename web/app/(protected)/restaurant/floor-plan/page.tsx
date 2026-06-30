@@ -214,10 +214,10 @@ export default function FloorPlanPage() {
                   <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Party size</label>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}
-                      className="h-8 w-8 rounded-lg border border-[#D9D9D9] text-lg font-bold hover:bg-gray-50">−</button>
+                      className="h-8 w-8 rounded-lg border border-slate-200 text-lg font-bold hover:bg-gray-50">−</button>
                     <span className="w-8 text-center text-lg font-bold">{partySize}</span>
                     <button type="button" onClick={() => setPartySize(Math.min(selected.capacity, partySize + 1))}
-                      className="h-8 w-8 rounded-lg border border-[#D9D9D9] text-lg font-bold hover:bg-gray-50">+</button>
+                      className="h-8 w-8 rounded-lg border border-slate-200 text-lg font-bold hover:bg-gray-50">+</button>
                   </div>
                 </div>
                 <Button variant="primary" fullWidth loading={processing} onClick={handleOpenSession}>

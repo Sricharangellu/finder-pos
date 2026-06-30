@@ -15,13 +15,12 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
+import { formatMoney } from "@/lib/money";
 import type { Product, ProductsResponse, Category, CategoriesResponse, ProductStatus, TaxClass } from "@/api-client/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function centsToDisplay(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+const centsToDisplay = formatMoney;
 
 function statusBadge(s: ProductStatus): "green" | "yellow" | "gray" {
   if (s === "active")   return "green";
@@ -277,9 +276,7 @@ function ProductFormModal({
 
 // ── Print Labels ──────────────────────────────────────────────────────────────
 
-function formatMoneyHTML(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+const formatMoneyHTML = formatMoney;
 
 function printLabels(products: Product[]) {
   const win = window.open("", "_blank");
@@ -642,7 +639,7 @@ function BulkActionBar({
           Clear selection
         </button>
       </div>
-      {error && <p className="mt-1 text-xs text-red-700">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
     </div>
   );
 }

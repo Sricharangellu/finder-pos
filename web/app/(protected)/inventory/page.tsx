@@ -1130,8 +1130,7 @@ function TabButton({
 }: {
   active: boolean;
   onClick: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  children?: any;
+  children?: React.ReactNode;
 }) {
   return (
     <button
@@ -1154,8 +1153,7 @@ function DropdownItem({
   children,
 }: {
   onClick: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  children?: any;
+  children?: React.ReactNode;
 }) {
   return (
     <button

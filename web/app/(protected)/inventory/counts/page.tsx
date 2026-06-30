@@ -77,7 +77,7 @@ function NewSessionModal({ onClose, onCreated }: NewSessionModalProps) {
           </button>
         </div>
         <form id="new-session-form" onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Note <span className="text-slate-400 font-normal">(optional)</span>
@@ -159,7 +159,7 @@ function CloseSessionModal({ session, lines, onClose, onClosed }: CloseModalProp
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           {uncounted > 0 && (
             <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
               <strong>{uncounted}</strong> SKU{uncounted !== 1 ? "s" : ""} still uncounted. Their variance will be recorded as 0.

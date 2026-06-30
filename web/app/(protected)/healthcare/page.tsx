@@ -103,7 +103,7 @@ export default function HealthcarePage() {
               value={q}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Search patients…"
-              className="flex-1 rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
             />
             <Button variant="primary" size="sm" onClick={() => setModal(true)}>+ New</Button>
           </div>
@@ -232,7 +232,7 @@ export default function HealthcarePage() {
                 placeholder={placeholder}
                 value={form[key as keyof typeof form]}
                 onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600"
               />
             </div>
           ))}

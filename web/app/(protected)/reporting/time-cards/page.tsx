@@ -74,7 +74,7 @@ export default function TimeCardsPage() {
           <select
             value={range}
             onChange={(e) => setRange(e.target.value)}
-            className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-brand-600"
+            className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-brand-600"
           >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
@@ -83,7 +83,7 @@ export default function TimeCardsPage() {
           <select
             value={selectedEmployee ?? ""}
             onChange={(e) => setSelectedEmployee(e.target.value || null)}
-            className="h-8 rounded border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-brand-600"
+            className="h-8 rounded border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-brand-600"
           >
             <option value="">All employees</option>
             {summary.map((s) => (

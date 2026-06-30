@@ -212,7 +212,7 @@ export default function ModulesMarketplacePage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search modules…"
-              className="w-56 rounded-lg border border-[#D9D9D9] py-2 pl-8 pr-3 text-sm outline-none focus:border-brand-600"
+              className="w-56 rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-brand-600"
             />
             <span className="pointer-events-none absolute left-2.5 top-2.5 text-[var(--color-text-secondary)] text-sm">⌕</span>
           </div>

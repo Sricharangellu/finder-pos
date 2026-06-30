@@ -694,7 +694,7 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
             type="button"
             onClick={() => setMode(m)}
             className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-colors ${
-              mode === m ? "bg-brand-600 text-white" : "border border-[#D9D9D9] text-[var(--color-text-secondary)] hover:bg-gray-50"
+              mode === m ? "bg-brand-600 text-white" : "border border-slate-200 text-[var(--color-text-secondary)] hover:bg-gray-50"
             }`}
           >
             {m === "add" ? "Add credit" : "Deduct"}
@@ -710,16 +710,16 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
           placeholder="Amount ($)"
           value={amount}
           onChange={(e) => { setAmount(e.target.value); setError(null); }}
-          className="w-full rounded border border-[#D9D9D9] px-3 py-1.5 text-sm outline-none focus:border-brand-600"
+          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600"
         />
         <input
           type="text"
           placeholder="Reason (required)"
           value={reason}
           onChange={(e) => { setReason(e.target.value); setError(null); }}
-          className="w-full rounded border border-[#D9D9D9] px-3 py-1.5 text-sm outline-none focus:border-brand-600"
+          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600"
         />
-        {error && <p className="text-xs text-danger-500">{error}</p>}
+        {error && <p role="alert" className="text-xs text-danger-500">{error}</p>}
         <button
           type="button"
           disabled={adjusting || !amount || !reason}

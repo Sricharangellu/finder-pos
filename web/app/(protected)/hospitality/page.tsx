@@ -263,13 +263,13 @@ export default function HospitalityPage() {
             <input type="text" value={chargeForm.description}
               onChange={e => setChargeForm(f => ({ ...f, description: e.target.value }))}
               placeholder="e.g. Restaurant dinner, Mini bar, Room service"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Amount (cents) *</label>
             <input type="number" min={1} value={chargeForm.amountCents}
               onChange={e => setChargeForm(f => ({ ...f, amountCents: e.target.value }))}
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" fullWidth onClick={() => setChargeModal(false)}>Cancel</Button>
@@ -287,13 +287,13 @@ export default function HospitalityPage() {
             <input type="text" value={roomForm.roomNumber}
               onChange={e => setRoomForm(f => ({ ...f, roomNumber: e.target.value }))}
               placeholder="101"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Type</label>
               <select value={roomForm.type} onChange={e => setRoomForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600">
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600">
                 {["standard","deluxe","suite","penthouse","dormitory"].map(t => (
                   <option key={t} value={t} className="capitalize">{t}</option>
                 ))}
@@ -304,7 +304,7 @@ export default function HospitalityPage() {
               <input type="text" value={roomForm.floor}
                 onChange={e => setRoomForm(f => ({ ...f, floor: e.target.value }))}
                 placeholder="1"
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
           </div>
           <div>
@@ -312,7 +312,7 @@ export default function HospitalityPage() {
             <input type="number" min={0} value={roomForm.rateCents}
               onChange={e => setRoomForm(f => ({ ...f, rateCents: e.target.value }))}
               placeholder="15000"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" fullWidth onClick={() => setAddModal(false)}>Cancel</Button>

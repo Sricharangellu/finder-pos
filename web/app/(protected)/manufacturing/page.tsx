@@ -243,19 +243,19 @@ export default function ManufacturingPage() {
               <input type="text" value={form.productId}
                 onChange={e => setForm(f => ({ ...f, productId: e.target.value }))}
                 placeholder="SKU or product ID"
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Quantity *</label>
               <input type="number" min={1} value={form.quantity}
                 onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Notes</label>
               <input type="text" value={form.notes}
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
           </div>
 
@@ -269,13 +269,13 @@ export default function ManufacturingPage() {
                 <div key={i} className="flex gap-2 items-center">
                   <input type="text" placeholder="Material ID" value={line.rawMaterialId}
                     onChange={e => updateBomLine(i, "rawMaterialId", e.target.value)}
-                    className="flex-1 rounded-lg border border-[#D9D9D9] px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
                   <input type="number" placeholder="Qty" value={line.qtyRequired} min={0.001} step={0.001}
                     onChange={e => updateBomLine(i, "qtyRequired", e.target.value)}
-                    className="w-20 rounded-lg border border-[#D9D9D9] px-2 py-1.5 text-sm outline-none focus:border-brand-600" />
+                    className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-600" />
                   <input type="text" placeholder="Unit" value={line.unit}
                     onChange={e => updateBomLine(i, "unit", e.target.value)}
-                    className="w-16 rounded-lg border border-[#D9D9D9] px-2 py-1.5 text-sm outline-none focus:border-brand-600" />
+                    className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-600" />
                   {form.bom.length > 1 && (
                     <button type="button" onClick={() => removeBomLine(i)}
                       className="text-red-500 hover:text-red-700 text-sm">×</button>

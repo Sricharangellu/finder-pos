@@ -174,36 +174,36 @@ export default function EntertainmentPage() {
             <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Event name *</label>
             <input type="text" value={eForm.name} onChange={e => setEForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Summer Concert 2026"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Venue</label>
             <input type="text" value={eForm.venue} onChange={e => setEForm(f => ({ ...f, venue: e.target.value }))}
               placeholder="Main Hall"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Starts *</label>
               <input type="datetime-local" value={eForm.startsAt} onChange={e => setEForm(f => ({ ...f, startsAt: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Ends *</label>
               <input type="datetime-local" value={eForm.endsAt} onChange={e => setEForm(f => ({ ...f, endsAt: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Capacity</label>
               <input type="number" min={1} value={eForm.capacity} onChange={e => setEForm(f => ({ ...f, capacity: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Price (cents)</label>
               <input type="number" min={0} value={eForm.priceCents} onChange={e => setEForm(f => ({ ...f, priceCents: e.target.value }))}
-                className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
             </div>
           </div>
           <div className="flex gap-2">
@@ -223,7 +223,7 @@ export default function EntertainmentPage() {
                 <label className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]">Quantity</label>
                 <input type="number" min={1} max={selected?.available ?? 1} value={sForm.quantity}
                   onChange={e => setSForm({ quantity: e.target.value })}
-                  className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm outline-none focus:border-brand-600" />
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600" />
                 {selected && (
                   <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                     Total: {formatMoney(Number(sForm.quantity) * selected.price_cents)} · {selected.available} remaining
@@ -265,7 +265,7 @@ export default function EntertainmentPage() {
               onKeyDown={e => e.key === "Enter" && handleRedeem()}
               placeholder="Scan or type ticket code"
               autoFocus
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm font-mono outline-none focus:border-brand-600" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono outline-none focus:border-brand-600" />
           </div>
           {redeemResult && (
             <div className={`rounded-lg px-4 py-3 text-sm ${redeemResult.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
