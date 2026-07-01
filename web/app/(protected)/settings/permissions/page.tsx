@@ -2,56 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/api-client/client";
 import { FEATURE_GROUPS, ALL_FEATURES } from "@/lib/features";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type BuiltInRoleId =
-  | "owner" | "admin" | "manager" | "sales" | "cashier"
-  | "accountant" | "receiver" | "shipper" | "driver" | "warehouse";
-
-interface CustomRole {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-}
-
-interface RoleEntry {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  immutable?: boolean;
-  custom?: boolean;
-}
-
-// ── Built-in role metadata ────────────────────────────────────────────────────
-
-const BUILT_IN: Record<BuiltInRoleId, Omit<RoleEntry, "id">> = {
-  owner:      { name: "Owner",       description: "Business owner — full unrestricted access", color: "bg-violet-600", immutable: true },
-  admin:      { name: "Admin",       description: "System administrator — full access",         color: "bg-[#5D5FEF]",  immutable: true },
-  manager:    { name: "Manager",     description: "Operations and team management",             color: "bg-blue-500"   },
-  sales:      { name: "Sales",       description: "Customer sales and quote management",        color: "bg-emerald-500" },
-  cashier:    { name: "Cashier",     description: "POS checkout and payment processing",        color: "bg-cyan-500"   },
-  accountant: { name: "Accountant",  description: "Finance, billing, and compliance",           color: "bg-amber-500"  },
-  receiver:   { name: "Receiver",    description: "Inbound goods and purchase order receiving", color: "bg-orange-500" },
-  shipper:    { name: "Shipper",     description: "Outbound order fulfilment and shipping",     color: "bg-sky-500"    },
-  driver:     { name: "Driver",      description: "Delivery route and manifest access",         color: "bg-teal-500"   },
-  warehouse:  { name: "Warehouse",   description: "General warehouse and stock management",     color: "bg-slate-500"  },
-};
-
-const BUILT_IN_ORDER: BuiltInRoleId[] = [
-  "owner", "admin", "manager", "sales", "cashier",
-  "accountant", "receiver", "shipper", "driver", "warehouse",
-];
-
-const COLOR_OPTIONS = [
-  "bg-rose-500", "bg-pink-500", "bg-fuchsia-500", "bg-purple-600",
-  "bg-blue-600", "bg-cyan-600", "bg-teal-600", "bg-green-600",
-  "bg-lime-600", "bg-amber-600", "bg-orange-500", "bg-slate-600",
-];
+import type { CustomRole, RoleEntry } from "./_components/permissionsTypes";
+import { BUILT_IN, BUILT_IN_ORDER } from "./_components/permissionsTypes";
+import { NewRoleModal } from "./_components/NewRoleModal";
+import { EditRoleModal } from "./_components/EditRoleModal";
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
@@ -84,181 +40,6 @@ function Toggle({
         }`}
       />
     </button>
-  );
-}
-
-// ── New Role Modal ────────────────────────────────────────────────────────────
-
-function NewRoleModal({
-  allRoles,
-  permissions,
-  onClose,
-  onCreate,
-}: {
-  allRoles: RoleEntry[];
-  permissions: Record<string, Set<string>>;
-  onClose: () => void;
-  onCreate: (role: CustomRole, features: string[]) => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [color, setColor] = useState(COLOR_OPTIONS[4]!);
-  const [copyFrom, setCopyFrom] = useState<string>("cashier");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleCreate = async () => {
-    if (!name.trim()) { setError("Role name is required."); return; }
-    setSaving(true); setError(null);
-    const features = copyFrom
-      ? [...(permissions[copyFrom] ?? new Set())]
-      : [];
-    try {
-      const res = await apiPost<{ id: string }>("/api/v1/settings/custom-roles", {
-        name: name.trim(), description: description.trim(), color, features,
-      });
-      onCreate({ id: res.id, name: name.trim(), description: description.trim(), color }, features);
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiResponseError ? e.message : "Failed to create role.");
-    } finally { setSaving(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-[#111]">Create Custom Role</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-
-        <div className="space-y-4 px-5 py-4">
-          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Role Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Floor Supervisor"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Description</label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does this role do?"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Color</label>
-            <div className="flex flex-wrap gap-2">
-              {COLOR_OPTIONS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full ${c} transition-transform ${color === c ? "ring-2 ring-offset-2 ring-[#5D5FEF] scale-110" : "hover:scale-105"}`}
-                  aria-label={c}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Copy permissions from</label>
-            <select
-              value={copyFrom}
-              onChange={(e) => setCopyFrom(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
-            >
-              <option value="">— Start empty —</option>
-              {allRoles.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-400">You can fine-tune permissions after creating the role.</p>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            Cancel
-          </button>
-          <button type="button" onClick={() => void handleCreate()} disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
-            {saving ? "Creating…" : "Create Role"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Edit Role Modal ───────────────────────────────────────────────────────────
-
-function EditRoleModal({
-  role,
-  onClose,
-  onSave,
-}: {
-  role: RoleEntry;
-  onClose: () => void;
-  onSave: (patch: Pick<CustomRole, "name" | "description" | "color">) => void;
-}) {
-  const [name, setName] = useState(role.name);
-  const [description, setDescription] = useState(role.description);
-  const [color, setColor] = useState(role.color);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-[#111]">Edit Role</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div className="space-y-4 px-5 py-4">
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Description</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Color</label>
-            <div className="flex flex-wrap gap-2">
-              {COLOR_OPTIONS.map((c) => (
-                <button key={c} type="button" onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full ${c} ${color === c ? "ring-2 ring-offset-2 ring-[#5D5FEF] scale-110" : "hover:scale-105"}`}
-                  aria-label={c} />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-          <button type="button" onClick={() => { onSave({ name, description, color }); onClose(); }}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0]">
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -338,7 +119,6 @@ export default function PermissionsPage() {
   const [editingRole, setEditingRole] = useState<RoleEntry | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  // Load initial permissions from API
   useEffect(() => {
     apiGet<{
       roles: Array<{ role: string; features: string[] }>;
@@ -349,22 +129,20 @@ export default function PermissionsPage() {
         for (const r of data.roles) {
           perms[r.role] = new Set(r.features);
         }
-        // Seed any built-in roles not returned by API with all features
         for (const id of BUILT_IN_ORDER) {
           if (!perms[id]) {
-            perms[id] = id === "owner" || id === "admin"
-              ? new Set(ALL_FEATURES)
-              : new Set();
+            perms[id] = id === "owner" || id === "admin" ? new Set(ALL_FEATURES) : new Set();
           }
         }
         for (const cr of data.customRoles ?? []) {
           perms[cr.id] = new Set(cr.features);
         }
         setPermissions(perms);
-        setCustomRoles(data.customRoles?.map((cr) => ({ id: cr.id, name: cr.name, description: cr.description, color: cr.color })) ?? []);
+        setCustomRoles(
+          data.customRoles?.map((cr) => ({ id: cr.id, name: cr.name, description: cr.description, color: cr.color })) ?? []
+        );
       })
       .catch(() => {
-        // Fallback: initialize from built-in defaults
         const perms: Record<string, Set<string>> = {};
         for (const id of BUILT_IN_ORDER) {
           perms[id] = id === "owner" || id === "admin" ? new Set(ALL_FEATURES) : new Set();
@@ -374,7 +152,6 @@ export default function PermissionsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Build unified role list
   const allRoles: RoleEntry[] = [
     ...BUILT_IN_ORDER.map((id) => ({ id, ...BUILT_IN[id] })),
     ...customRoles.map((cr) => ({ ...cr, custom: true })),
@@ -399,33 +176,20 @@ export default function PermissionsPage() {
     setSaving(true);
     try {
       await apiPatch<{ ok: boolean }>("/api/v1/settings/permissions", {
-        roles: allRoles.map((r) => ({
-          role: r.id,
-          features: [...(permissions[r.id] ?? new Set())],
-        })),
+        roles: allRoles.map((r) => ({ role: r.id, features: [...(permissions[r.id] ?? new Set())] })),
       });
       setSavedAt(Date.now());
       setUnsaved(false);
-    } catch {
-      /* user can retry */
-    } finally {
-      setSaving(false);
-    }
+    } catch { /* user can retry */ } finally { setSaving(false); }
   };
 
   const handleDuplicate = (sourceId: string) => {
     const source = allRoles.find((r) => r.id === sourceId);
     if (!source) return;
     const newId = `crl_${Date.now()}`;
-    const newRole: CustomRole = {
-      id: newId,
-      name: `${source.name} (copy)`,
-      description: source.description,
-      color: source.color,
-    };
+    const newRole: CustomRole = { id: newId, name: `${source.name} (copy)`, description: source.description, color: source.color };
     void apiPost<{ id: string }>("/api/v1/settings/custom-roles", {
-      name: newRole.name, description: newRole.description,
-      color: newRole.color,
+      name: newRole.name, description: newRole.description, color: newRole.color,
       features: [...(permissions[sourceId] ?? new Set())],
     }).then((r) => {
       newRole.id = r.id;
@@ -439,17 +203,9 @@ export default function PermissionsPage() {
     try {
       await apiDelete(`/api/v1/settings/custom-roles/${id}`);
       setCustomRoles((prev) => prev.filter((r) => r.id !== id));
-      setPermissions((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
+      setPermissions((prev) => { const next = { ...prev }; delete next[id]; return next; });
       if (activeRoleId === id) setActiveRoleId("manager");
-    } catch {
-      /* ignore */
-    } finally {
-      setDeleteConfirm(null);
-    }
+    } catch { /* ignore */ } finally { setDeleteConfirm(null); }
   };
 
   const handleRoleCreated = (role: CustomRole, features: string[]) => {
@@ -497,7 +253,6 @@ export default function PermissionsPage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto py-1.5">
-            {/* Built-in roles */}
             <div className="px-3 pb-1 pt-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-300">Built-in</p>
             </div>
@@ -526,21 +281,14 @@ export default function PermissionsPage() {
                     )}
                   </button>
                   {!def.immutable && (
-                    <div className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <RoleMenu
-                        roleId={roleId}
-                        isCustom={false}
-                        onDuplicate={handleDuplicate}
-                        onEdit={() => {}}
-                        onDelete={() => {}}
-                      />
+                    <div className="mr-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <RoleMenu roleId={roleId} isCustom={false} onDuplicate={handleDuplicate} onEdit={() => {}} onDelete={() => {}} />
                     </div>
                   )}
                 </div>
               );
             })}
 
-            {/* Custom roles */}
             {customRoles.length > 0 && (
               <>
                 <div className="px-3 pb-1 pt-3">
@@ -565,7 +313,7 @@ export default function PermissionsPage() {
                           <p className="truncate text-[11px] text-slate-400">{featureCount} permissions</p>
                         </div>
                       </button>
-                      <div className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="mr-2 opacity-0 transition-opacity group-hover:opacity-100">
                         <RoleMenu
                           roleId={cr.id}
                           isCustom={true}
@@ -584,8 +332,6 @@ export default function PermissionsPage() {
 
         {/* ── Right: feature toggles ────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-
-          {/* Role header */}
           {activeRole && (
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
               <div className="flex items-center gap-3">
@@ -627,23 +373,16 @@ export default function PermissionsPage() {
             </div>
           )}
 
-          {/* Feature group toggles */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-4">
               {FEATURE_GROUPS.map((group) => {
-                const enabledInGroup = group.features.filter(
-                  (f) => isImmutable || currentFeatures.has(f.id),
-                ).length;
+                const enabledInGroup = group.features.filter((f) => isImmutable || currentFeatures.has(f.id)).length;
                 return (
                   <div key={group.label} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2.5">
-                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                        {group.label}
-                      </h2>
+                      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</h2>
                       <div className="flex items-center gap-3">
-                        <span className="text-[11px] text-slate-400">
-                          {enabledInGroup} / {group.features.length}
-                        </span>
+                        <span className="text-[11px] text-slate-400">{enabledInGroup} / {group.features.length}</span>
                         {!isImmutable && (
                           <button
                             type="button"
@@ -662,21 +401,12 @@ export default function PermissionsPage() {
                       {group.features.map((feature) => {
                         const enabled = isImmutable || currentFeatures.has(feature.id);
                         return (
-                          <div
-                            key={feature.id}
-                            className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[#FAFAFA]"
-                          >
+                          <div key={feature.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[#FAFAFA]">
                             <div className="mr-4">
-                              <p className={`text-sm font-medium ${enabled ? "text-[#111]" : "text-slate-400"}`}>
-                                {feature.label}
-                              </p>
+                              <p className={`text-sm font-medium ${enabled ? "text-[#111]" : "text-slate-400"}`}>{feature.label}</p>
                               <p className="text-xs text-slate-400">{feature.description}</p>
                             </div>
-                            <Toggle
-                              enabled={enabled}
-                              onChange={(v) => toggleFeature(feature.id, v)}
-                              disabled={isImmutable}
-                            />
+                            <Toggle enabled={enabled} onChange={(v) => toggleFeature(feature.id, v)} disabled={isImmutable} />
                           </div>
                         );
                       })}
@@ -690,7 +420,6 @@ export default function PermissionsPage() {
         </div>
       </div>
 
-      {/* ── Modals ────────────────────────────────────────────────────────────── */}
       {showNewRole && (
         <NewRoleModal
           allRoles={allRoles}
@@ -728,7 +457,6 @@ export default function PermissionsPage() {
           </div>
         </div>
       )}
-
     </EnterpriseShell>
   );
 }
