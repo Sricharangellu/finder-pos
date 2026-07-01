@@ -13,6 +13,7 @@ import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtTime } from "@/lib/date";
 
 interface BarTab {
   id: string;
@@ -139,7 +140,7 @@ export default function BarTabsPage() {
 
                 {tab.status === "closed" && tab.closed_at && (
                   <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-                    Closed {new Date(tab.closed_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                    Closed {fmtTime(tab.closed_at)}
                   </p>
                 )}
               </div>

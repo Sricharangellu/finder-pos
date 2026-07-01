@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
+import { fmtDate } from "@/lib/date";
 
 interface ExpiringLot {
   id: string;
@@ -165,7 +166,7 @@ export default function ExpiryReportPage() {
                         <td className="whitespace-nowrap px-5 py-3 font-medium text-gray-900">{lot.name}</td>
                         <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-gray-500">{lot.lot_code ?? "—"}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right text-gray-700">{lot.quantity}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">{new Date(lot.expiry_date).toLocaleDateString()}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">{fmtDate(lot.expiry_date)}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right">
                           <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">{lot.days_overdue}d</span>
                         </td>
@@ -203,7 +204,7 @@ export default function ExpiryReportPage() {
                         <td className="whitespace-nowrap px-5 py-3 font-medium text-gray-900">{lot.name}</td>
                         <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-gray-500">{lot.lot_code ?? "—"}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right text-gray-700">{lot.quantity}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">{new Date(lot.expiry_date).toLocaleDateString()}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">{fmtDate(lot.expiry_date)}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right">
                           <ExpiryBadge days={lot.days_to_expiry} />
                         </td>

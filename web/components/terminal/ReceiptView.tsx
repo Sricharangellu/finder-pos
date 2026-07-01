@@ -20,6 +20,7 @@ import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/Button";
 import type { Role } from "@/api-client/types";
 import { ThermalReceipt } from "@/components/ThermalReceipt";
+import { fmtTime, fmtDateTime } from "@/lib/date";
 
 interface ReceiptViewProps {
   order: Order;
@@ -173,7 +174,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
           {/* Order info */}
           <div className="flex justify-between text-sm text-gray-500 mb-4">
             <span>Order #{currentOrder.orderNumber}</span>
-            <span>{new Date(currentOrder.createdAt).toLocaleTimeString()}</span>
+            <span>{fmtTime(currentOrder.createdAt)}</span>
           </div>
 
           {/* Line items */}
@@ -247,7 +248,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
             <ThermalReceipt
               storeName="FinderPOS Demo Store"
               receiptNumber={currentOrder.orderNumber}
-              dateTime={new Date(currentOrder.createdAt).toLocaleString()}
+              dateTime={fmtDateTime(currentOrder.createdAt)}
               lineItems={currentOrder.lines.map((l) => ({
                 name: l.name,
                 quantity: l.quantity,

@@ -13,6 +13,7 @@ import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDateTime } from "@/lib/date";
 
 interface FEvent {
   id: string;
@@ -139,7 +140,7 @@ export default function EntertainmentPage() {
                     </div>
                     <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
                       {ev.venue && `${ev.venue} · `}
-                      {new Date(ev.starts_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                      {fmtDateTime(ev.starts_at)}
                     </p>
                     <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
                       {formatMoney(ev.price_cents)}/ticket

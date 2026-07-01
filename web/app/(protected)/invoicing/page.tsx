@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/money";
 import type {
   CustomerInvoice, CustomerInvoiceLine, InvoiceStatus, CustomerInvoiceResponse,
 } from "@/api-client/types";
+import { fmtDate } from "@/lib/date";
 
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
@@ -270,7 +271,7 @@ function InvoiceDetailModal({ invoice, onClose, onStatusChange }: {
               ["Customer", invoice.customer_name],
               ["Email", invoice.customer_email ?? "—"],
               ["Phone", invoice.customer_phone ?? "—"],
-              ["Due", invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "—"],
+              ["Due", invoice.due_date ? fmtDate(invoice.due_date) : "—"],
               ["Billing Address", invoice.billing_address ?? "—"],
               ["Notes", invoice.notes ?? "—"],
             ].map(([k, v]) => (
@@ -477,9 +478,9 @@ export default function InvoicingPage() {
                         {balance > 0 ? formatMoney(balance) : "—"}
                       </td>
                       <td className="px-5 py-3 text-slate-500 text-xs">
-                        {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "—"}
+                        {inv.due_date ? fmtDate(inv.due_date) : "—"}
                       </td>
-                      <td className="px-5 py-3 text-slate-400 text-xs">{new Date(inv.created_at).toLocaleDateString()}</td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">{fmtDate(inv.created_at)}</td>
                     </tr>
                   );
                 })}

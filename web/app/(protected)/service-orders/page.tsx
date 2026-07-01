@@ -8,6 +8,7 @@ import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { ServiceOrder, ServiceOrderStatus, ServiceOrderResponse } from "@/api-client/types";
+import { fmtDate, fmtDateTime } from "@/lib/date";
 
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
@@ -235,7 +236,7 @@ export default function ServiceOrdersPage() {
                         {order.actual_cents != null ? formatMoney(order.actual_cents) : "—"}
                       </td>
                       <td className="px-5 py-3 text-slate-500 text-xs">
-                        {new Date(order.created_at).toLocaleDateString()}
+                        {fmtDate(order.created_at)}
                       </td>
                       <td className="px-5 py-3 text-right">
                         {next && (
@@ -302,8 +303,8 @@ export default function ServiceOrdersPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
-                <div>Created {new Date(selected.created_at).toLocaleString()}</div>
-                <div>Updated {new Date(selected.updated_at).toLocaleString()}</div>
+                <div>Created {fmtDateTime(selected.created_at)}</div>
+                <div>Updated {fmtDateTime(selected.updated_at)}</div>
               </div>
             </div>
             {STATUS_TRANSITIONS[selected.status] && (

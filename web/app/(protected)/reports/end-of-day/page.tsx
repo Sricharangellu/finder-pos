@@ -10,6 +10,7 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
 import { apiGet } from "@/api-client/client";
+import { fmtTime } from "@/lib/date";
 
 interface EndOfDayReport {
   date: string;
@@ -138,11 +139,7 @@ export default function EndOfDayPage() {
               <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                 <span className="font-semibold">Shift closed</span> at{" "}
                 {report.closedAt
-                  ? new Date(report.closedAt).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    })
+                  ? fmtTime(report.closedAt)
                   : "—"}
               </div>
             )}

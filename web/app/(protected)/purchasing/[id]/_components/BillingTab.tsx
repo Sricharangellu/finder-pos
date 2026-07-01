@@ -171,7 +171,7 @@ export function BillingTab({
                 </svg>
                 <div>
                   <p className="text-xs font-medium text-slate-800">{doc.name}</p>
-                  <p className="text-xs text-slate-400">{fmtBytes(doc.size_bytes)} · {new Date(doc.uploaded_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-400">{fmtBytes(doc.size_bytes)} · {fmtDate(doc.uploaded_at)}</p>
                 </div>
               </div>
             ))}

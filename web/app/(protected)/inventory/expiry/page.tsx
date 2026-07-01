@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { ProductBatch, ExpirySummary, ExpiryStatus } from "@/api-client/types";
+import { fmtDate } from "@/lib/date";
 
 type BadgeVariant = "gray" | "blue" | "yellow" | "green" | "red" | "purple";
 
@@ -319,7 +320,7 @@ export default function ExpiryTrackingPage() {
                       <td className="px-4 py-3">
                         {batch.expiry_date ? (
                           <div>
-                            <p className="text-slate-700 text-xs">{new Date(batch.expiry_date).toLocaleDateString()}</p>
+                            <p className="text-slate-700 text-xs">{fmtDate(batch.expiry_date)}</p>
                             <p className={`text-xs font-medium ${isUrgent ? "text-red-600" : days != null && days <= 30 ? "text-amber-600" : "text-slate-400"}`}>
                               {daysLabel(days)}
                             </p>
@@ -376,8 +377,8 @@ export default function ExpiryTrackingPage() {
                   ["Supplier", selectedBatch.supplier_name ?? "—"],
                   ["Quantity", String(selectedBatch.qty)],
                   ["Unit Cost", formatMoney(selectedBatch.cost_cents)],
-                  ["Received", new Date(selectedBatch.received_at).toLocaleDateString()],
-                  ["Expiry", selectedBatch.expiry_date ? new Date(selectedBatch.expiry_date).toLocaleDateString() : "—"],
+                  ["Received", fmtDate(selectedBatch.received_at)],
+                  ["Expiry", selectedBatch.expiry_date ? fmtDate(selectedBatch.expiry_date) : "—"],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <p className="text-xs text-slate-400">{k}</p>

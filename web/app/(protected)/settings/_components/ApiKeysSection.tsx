@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
+import { fmtDate } from "@/lib/date";
 
 interface ApiKey {
   id: string;
@@ -219,7 +220,7 @@ export function ApiKeysSection({ canManage, addToast }: { canManage: boolean; ad
                     {key.last_used_at ? relativeTime(key.last_used_at) : "Never"}
                   </td>
                   <td className="px-4 py-3 text-slate-500">
-                    {key.expires_at ? new Date(key.expires_at).toLocaleDateString() : "Never"}
+                    {key.expires_at ? fmtDate(new Date(key.expires_at).getTime()) : "Never"}
                   </td>
                   {canManage && (
                     <td className="px-4 py-3 text-right">

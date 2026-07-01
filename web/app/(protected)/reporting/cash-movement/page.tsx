@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { KpiCard } from "@/components/KpiCard";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDateTime } from "@/lib/date";
 
 interface CashMovement {
   movement_type: string;
@@ -87,7 +88,7 @@ export default function CashMovementPage() {
                     <td className="py-2 text-[var(--color-text-secondary)]">{m.reason ?? "—"}</td>
                     <td className="py-2 text-[var(--color-text-secondary)]">{m.created_by ?? "—"}</td>
                     <td className="py-2 text-[var(--color-text-secondary)]">
-                      {new Date(m.created_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                      {fmtDateTime(m.created_at)}
                     </td>
                     <td className={`py-2 text-right font-medium tabular-nums ${m.movement_type === "cash_out" ? "text-danger-500" : "text-success-600"}`}>
                       {m.movement_type === "cash_out" ? "-" : "+"}{formatMoney(m.amount)}

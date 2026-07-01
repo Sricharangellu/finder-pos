@@ -12,6 +12,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { formatMoney } from "@/lib/money";
 import { apiGet } from "@/api-client/client";
+import { fmtDate, fmtDateTime } from "@/lib/date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ export default function SalesHistoryPage() {
   });
 
   function fmt(ts: number) {
-    return new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    return fmtDateTime(ts);
   }
 
   return (
@@ -388,7 +389,7 @@ function SaleDetailPanel({ sale }: { sale: SaleRecord }) {
             </div>
             {payments.map((p, i) => (
               <div key={i} className="flex justify-between text-white/50 text-xs">
-                <span>{p.method} · {new Date(p.date).toLocaleDateString()}</span>
+                <span>{p.method} · {fmtDate(new Date(p.date).getTime())}</span>
                 <span>{formatMoney(p.amount_cents)}</span>
               </div>
             ))}

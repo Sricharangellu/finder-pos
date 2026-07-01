@@ -13,6 +13,7 @@ import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 
 interface RentalAsset {
   id: string;
@@ -197,7 +198,7 @@ export default function RentalPage() {
                   <div>
                     <p className="font-semibold text-[var(--color-text-primary)]">{c.asset_name}</p>
                     <p className="text-xs text-[var(--color-text-secondary)]">
-                      {new Date(c.starts_at).toLocaleDateString()} → {new Date(c.ends_at).toLocaleDateString()}
+                      {fmtDate(c.starts_at)} → {fmtDate(c.ends_at)}
                       {" · "}{daysBetween(c.starts_at, c.ends_at)} days
                     </p>
                     <p className="text-xs text-[var(--color-text-secondary)]">

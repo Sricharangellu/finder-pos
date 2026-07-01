@@ -5,6 +5,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { apiGet, apiPost } from "@/api-client/client";
 import type { useToast } from "@/components/Toast";
+import { fmtDate } from "@/lib/date";
 
 interface CustomerNote {
   id: string;
@@ -124,7 +125,7 @@ export function NotesPanel({
                   </span>
                   <p className="flex-1 text-sm text-slate-700">{note.content}</p>
                   <span className="shrink-0 text-xs text-slate-400">
-                    {new Date(note.created_at).toLocaleDateString()}
+                    {fmtDate(new Date(note.created_at).getTime())}
                   </span>
                 </li>
               ))}

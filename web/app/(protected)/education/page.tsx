@@ -13,6 +13,7 @@ import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPatch, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 
 interface FeeRecord {
   id: string;
@@ -273,7 +274,7 @@ export default function EducationPage() {
                         <h3 className="text-base font-bold text-[var(--color-text-primary)]">{selected.name}</h3>
                         <p className="text-sm text-[var(--color-text-secondary)]">
                           {selected.course ?? "No course assigned"}
-                          {selected.enrolled_at ? ` · Enrolled ${new Date(selected.enrolled_at).toLocaleDateString()}` : ""}
+                          {selected.enrolled_at ? ` · Enrolled ${fmtDate(selected.enrolled_at)}` : ""}
                         </p>
                         <p className="text-sm text-[var(--color-text-secondary)]">
                           {selected.email ?? "No email"}{selected.phone ? ` · ${selected.phone}` : ""}
@@ -328,7 +329,7 @@ export default function EducationPage() {
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{fee.description}</p>
                             <p className="text-xs text-[var(--color-text-secondary)]">
-                              {fee.due_date ? `Due ${new Date(fee.due_date).toLocaleDateString()}` : "No due date"}
+                              {fee.due_date ? `Due ${fmtDate(fee.due_date)}` : "No due date"}
                               {fee.method ? ` · Paid via ${fee.method}` : ""}
                             </p>
                           </div>

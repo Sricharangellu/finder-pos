@@ -18,6 +18,7 @@ import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { getUser } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
+import { fmtDate } from "@/lib/date";
 
 interface GiftCard {
   id: string;
@@ -227,7 +228,7 @@ export default function GiftCardsPage() {
                     <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{formatMoney(card.balance_cents)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-slate-500 hidden sm:table-cell">{formatMoney(card.initial_cents)}</td>
                     <td className="px-4 py-3"><Badge variant={STATUS_BADGE[card.status] ?? "gray"}>{card.status}</Badge></td>
-                    <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{new Date(card.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{fmtDate(card.created_at)}</td>
                     {canManage && (
                       <td className="px-4 py-3 text-right">
                         {card.status === "active" && (

@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { GolfMember, MembershipTier } from "@/api-client/types";
+import { fmtDate } from "@/lib/date";
 
 type BadgeVariant = "green" | "yellow" | "red" | "gray" | "blue" | "purple";
 
@@ -312,10 +313,10 @@ export default function GolfMembersPage() {
                           <span className="text-xs font-medium text-red-600">Expired</span>
                         ) : expiringSoon ? (
                           <span className="text-xs font-medium text-amber-600">
-                            {new Date(m.expires_at).toLocaleDateString()}
+                            {fmtDate(m.expires_at)}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-500">{new Date(m.expires_at).toLocaleDateString()}</span>
+                          <span className="text-xs text-slate-500">{fmtDate(m.expires_at)}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">

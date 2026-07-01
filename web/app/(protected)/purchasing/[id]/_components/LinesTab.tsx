@@ -97,7 +97,7 @@ export function LinesTab({
                 <div className="space-y-1">
                   {ph.history.map((h, i) => (
                     <div key={i} className="flex justify-between text-xs">
-                      <span className={i === 0 ? "font-semibold text-slate-900" : "text-slate-400"}>{new Date(h.received_at).toLocaleDateString()}</span>
+                      <span className={i === 0 ? "font-semibold text-slate-900" : "text-slate-400"}>{fmtDate(h.received_at)}</span>
                       <span className={i === 0 ? "font-bold tabular-nums text-slate-900" : "tabular-nums text-slate-400"}>{formatMoney(h.unit_cost_cents)}</span>
                     </div>
                   ))}

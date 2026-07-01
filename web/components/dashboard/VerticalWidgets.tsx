@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useModuleFlags } from "@/hooks/useModuleFlags";
 import { apiGet, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate, fmtTime } from "@/lib/date";
 
 // ── Generic mini-widget shell ────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ function AppointmentsWidget() {
             <div key={a.id} className="flex items-center justify-between rounded-lg bg-brand-50 px-2 py-1.5 mt-1">
               <p className="text-xs font-medium text-brand-800 truncate">{a.service}</p>
               <p className="text-xs text-brand-600 shrink-0 ml-2">
-                {new Date(a.starts_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                {fmtTime(a.starts_at)}
               </p>
             </div>
           ))}
@@ -228,7 +229,7 @@ function RentalWidget() {
             <WidgetRow key={c.id}
               label={c.asset_name}
               value={formatMoney(c.total_cents)}
-              sub={`Due ${new Date(c.ends_at).toLocaleDateString()}`}
+              sub={`Due ${fmtDate(c.ends_at)}`}
               color={c.ends_at < Date.now() ? "text-red-600" : undefined}
             />
           ))}

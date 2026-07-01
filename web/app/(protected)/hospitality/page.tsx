@@ -13,6 +13,7 @@ import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDateTime } from "@/lib/date";
 
 interface Room {
   id: string;
@@ -236,7 +237,7 @@ export default function HospitalityPage() {
                         <div>
                           <p className="text-sm font-medium text-[var(--color-text-primary)]">{c.description}</p>
                           <p className="text-xs text-[var(--color-text-secondary)]">
-                            {new Date(c.posted_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                            {fmtDateTime(c.posted_at)}
                           </p>
                         </div>
                         <div className="text-right">

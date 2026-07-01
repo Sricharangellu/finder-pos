@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, ApiResponseError } from "@/api-client/client";
 import type { StockMovement } from "./shared";
+import { fmtDateTime } from "@/lib/date";
 
 const MOVEMENT_TYPE_BADGE: Record<StockMovement["type"], { label: string; color: string }> = {
   sale:       { label: "Sale",       color: "bg-blue-50 text-blue-700 ring-blue-200" },
@@ -13,11 +14,7 @@ const MOVEMENT_TYPE_BADGE: Record<StockMovement["type"], { label: string; color:
   return:     { label: "Return",     color: "bg-slate-100 text-slate-600 ring-slate-200" },
 };
 
-function fmt(ts: number) {
-  return new Date(ts).toLocaleString("en-US", {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-}
+
 
 export function MovementsDrawer({
   product,
@@ -89,7 +86,7 @@ export function MovementsDrawer({
                   const badge = MOVEMENT_TYPE_BADGE[m.type as StockMovement["type"]];
                   return (
                     <tr key={m.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fmt(m.created_at)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fmtDateTime(m.created_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`inline-flex rounded px-2 py-1 text-xs font-semibold ring-1 ring-inset ${badge.color}`}>
                           {badge.label}

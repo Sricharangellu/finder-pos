@@ -13,6 +13,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { fmtDate } from "@/lib/date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -524,7 +525,7 @@ export default function ReceiveStockPage() {
                       <Badge variant={receiveStatusBadge(po.receive_status)}>{po.receive_status ?? "pending"}</Badge>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(po.total_cost_cents)}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{new Date(po.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(po.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

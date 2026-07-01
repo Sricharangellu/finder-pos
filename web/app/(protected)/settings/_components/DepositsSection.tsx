@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { useToast } from "@/components/Toast";
 import { formatMoney } from "@/lib/money";
 import type { Deposit } from "@/api-client/types";
+import { fmtDate } from "@/lib/date";
 
 export function DepositsSection({ canManage }: { canManage: boolean }) {
   const { addToast } = useToast();
@@ -86,7 +87,7 @@ export function DepositsSection({ canManage }: { canManage: boolean }) {
               <td className="px-4 py-3 font-medium">{d.batch_number}</td>
               <td className={`px-4 py-3 capitalize font-medium ${statusColor(d.status)}`}>{d.status.replace(/_/g, " ")}</td>
               <td className="px-4 py-3">{formatMoney(d.total_cents)}</td>
-              <td className="px-4 py-3 text-slate-500">{new Date(d.created_at).toLocaleDateString()}</td>
+              <td className="px-4 py-3 text-slate-500">{fmtDate(d.created_at)}</td>
               <td className="px-4 py-3 text-slate-500">{d.description ?? "—"}</td>
             </tr>
           ))}

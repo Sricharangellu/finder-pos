@@ -10,6 +10,7 @@ import { useFlag } from "@/flags/useFlag";
 import { NewQuoteModal } from "./NewQuoteModal";
 import type { QuoteLine, VendorQuote, VQ_STATUS_BADGE } from "./shared";
 import { VQ_STATUS_BADGE as VQ_BADGE } from "./shared";
+import { fmtDate, fmtDateTime } from "@/lib/date";
 
 export function VendorQuotesTab() {
   const enabled = useFlag("vendor_quotations");
@@ -140,7 +141,7 @@ export function VendorQuotesTab() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">{formatMoney(q.total_cents)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{new Date(q.expires_at).toLocaleDateString()}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{fmtDate(q.expires_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <Badge variant={VQ_BADGE[q.status]}>
                           {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
@@ -180,7 +181,7 @@ export function VendorQuotesTab() {
                               ))}
                             </tbody>
                           </table>
-                          <p className="mt-2 text-xs text-slate-400">Created {new Date(q.created_at).toLocaleString()}</p>
+                          <p className="mt-2 text-xs text-slate-400">Created {fmtDateTime(q.created_at)}</p>
                         </td>
                       </tr>
                     )}

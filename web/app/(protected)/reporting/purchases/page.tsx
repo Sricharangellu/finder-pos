@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDate } from "@/lib/date";
 
 interface PurchaseRow {
   po_id: string;
@@ -116,7 +117,7 @@ export default function PurchasesPage() {
                       {formatMoney(r.due_cents)}
                     </td>
                     <td className="py-2 text-xs text-[var(--color-text-secondary)]">
-                      {new Date(r.created_at).toLocaleDateString()}
+                      {fmtDate(r.created_at)}
                     </td>
                   </tr>
                 ))}

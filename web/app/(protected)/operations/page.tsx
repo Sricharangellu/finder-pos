@@ -11,6 +11,7 @@ import { apiGet, apiPost, apiPatch } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { FulfillmentLocation, PickList, Register, Outlet } from "@/api-client/types";
 import { useToast } from "@/components/Toast";
+import { fmtDate } from "@/lib/date";
 
 interface StockItem {
   product_id: string;
@@ -127,7 +128,7 @@ export default function OperationsPage() {
     { key: "num", header: "Pick #", render: (r: PickList) => <span className="font-medium text-gray-900">{r.pick_number}</span> },
     { key: "status", header: "Status", render: (r: PickList) => <Badge variant={statusBadge(r.status)}>{r.status}</Badge> },
     { key: "assigned", header: "Assigned To", render: (r: PickList) => <span className="text-gray-500">{r.assigned_to ?? "Unassigned"}</span> },
-    { key: "created", header: "Created", render: (r: PickList) => <span className="text-gray-500 text-xs">{new Date(r.created_at).toLocaleDateString()}</span> },
+    { key: "created", header: "Created", render: (r: PickList) => <span className="text-gray-500 text-xs">{fmtDate(r.created_at)}</span> },
   ];
 
   const registerCols = [
