@@ -20,7 +20,11 @@ const nextConfig = {
   // Proxy all backend routes to BACKEND_URL (set per-env). Covers identity
   // (/api/identity/*), versioned business routes (/api/v1/*) and health probes.
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3001";
+    const backendUrl =
+      process.env.BACKEND_URL ??
+      (process.env.VERCEL_ENV
+        ? "https://finder-pos-backend.vercel.app"
+        : "http://localhost:3001");
     return [
       { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },
       { source: "/healthz", destination: `${backendUrl}/healthz` },

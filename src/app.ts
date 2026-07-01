@@ -48,8 +48,6 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     const REQUIRED_VARS = [
       ["JWT_SECRET", "JWT signing key — every authenticated request will fail without it"],
       ["DATABASE_URL", "Postgres connection string — the server cannot start without a database"],
-      ["APP_URL", "Public URL of this service — used in email links and CORS checks"],
-      ["BACKEND_URL", "Internal backend origin — used by the Next.js frontend to reach this API"],
     ];
     const missing = REQUIRED_VARS.filter(([name]) => !process.env[name]);
     if (missing.length > 0) {
@@ -58,6 +56,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
 
     const WARNED_VARS: [string, string][] = [
+      ["APP_URL", "public URL of this service — email reset links will fall back to finder-pos.vercel.app"],
       ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
