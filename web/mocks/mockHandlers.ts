@@ -5296,20 +5296,28 @@ mockHandlers.push(
   // ── Settings: Role Permissions ───────────────────────────────────────────────
   ...(() => {
     const ALL_FEATURES = [
-      "register", "sales", "orders", "quotes", "returns", "payments", "service-orders",
+      "register", "sales", "orders", "quotes", "returns", "payments",
+      "price-override", "void-transaction", "service-orders",
       "catalog", "discounts", "gift-cards", "loyalty",
-      "inventory", "purchasing", "vendors", "shipping", "operations",
+      "inventory", "purchasing", "vendors", "operations", "delivery", "shipping",
       "customers", "appointments",
       "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing",
       "team", "settings", "workflows", "integrations", "imports-exports", "audit-log",
     ];
 
+    const IMMUTABLE = new Set(["owner", "admin"]);
+
     let rolePerms: Record<string, string[]> = {
-      admin:     ALL_FEATURES,
-      manager:   ["register", "sales", "orders", "quotes", "returns", "payments", "service-orders", "catalog", "discounts", "gift-cards", "loyalty", "inventory", "purchasing", "vendors", "shipping", "operations", "customers", "appointments", "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing", "workflows"],
-      cashier:   ["register", "sales", "orders", "returns", "payments", "customers", "gift-cards"],
-      warehouse: ["inventory", "purchasing", "vendors", "shipping", "operations", "catalog"],
-      readonly:  ["reports", "insights", "sales", "customers", "inventory"],
+      owner:      ALL_FEATURES,
+      admin:      ALL_FEATURES,
+      manager:    ["register", "sales", "orders", "quotes", "returns", "payments", "price-override", "void-transaction", "service-orders", "catalog", "discounts", "gift-cards", "loyalty", "inventory", "purchasing", "vendors", "operations", "shipping", "customers", "appointments", "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing", "team", "workflows"],
+      sales:      ["register", "sales", "orders", "quotes", "returns", "payments", "price-override", "catalog", "discounts", "gift-cards", "loyalty", "customers", "appointments", "reports"],
+      cashier:    ["register", "sales", "orders", "returns", "payments", "gift-cards", "customers"],
+      accountant: ["payments", "invoicing", "purchasing", "vendors", "reports", "insights", "tax-compliance", "finance", "accounting"],
+      receiver:   ["inventory", "purchasing", "vendors", "operations", "catalog"],
+      shipper:    ["orders", "returns", "inventory", "shipping"],
+      driver:     ["orders", "delivery"],
+      warehouse:  ["inventory", "purchasing", "vendors", "operations", "shipping", "catalog"],
     };
 
     return [
@@ -5324,7 +5332,7 @@ mockHandlers.push(
         await lat();
         const body = (await request.json()) as { roles: { role: string; features: string[] }[] };
         for (const { role, features } of body.roles) {
-          if (role !== "admin") rolePerms[role] = features;
+          if (!IMMUTABLE.has(role)) rolePerms[role] = features;
         }
         return HttpResponse.json({ ok: true });
       }),
