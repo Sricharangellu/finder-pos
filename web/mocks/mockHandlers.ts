@@ -5292,4 +5292,82 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Settings: Role Permissions ───────────────────────────────────────────────
+  ...(() => {
+    const ALL_FEATURES = [
+      "register", "sales", "orders", "quotes", "returns", "payments", "service-orders",
+      "catalog", "discounts", "gift-cards", "loyalty",
+      "inventory", "purchasing", "vendors", "shipping", "operations",
+      "customers", "appointments",
+      "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing",
+      "team", "settings", "workflows", "integrations", "imports-exports", "audit-log",
+    ];
+
+    let rolePerms: Record<string, string[]> = {
+      admin:     ALL_FEATURES,
+      manager:   ["register", "sales", "orders", "quotes", "returns", "payments", "service-orders", "catalog", "discounts", "gift-cards", "loyalty", "inventory", "purchasing", "vendors", "shipping", "operations", "customers", "appointments", "reports", "insights", "tax-compliance", "finance", "accounting", "invoicing", "workflows"],
+      cashier:   ["register", "sales", "orders", "returns", "payments", "customers", "gift-cards"],
+      warehouse: ["inventory", "purchasing", "vendors", "shipping", "operations", "catalog"],
+      readonly:  ["reports", "insights", "sales", "customers", "inventory"],
+    };
+
+    return [
+      http.get(`${V1}/settings/permissions`, async () => {
+        await lat();
+        return HttpResponse.json({
+          roles: Object.entries(rolePerms).map(([role, features]) => ({ role, features })),
+        });
+      }),
+
+      http.patch(`${V1}/settings/permissions`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { roles: { role: string; features: string[] }[] };
+        for (const { role, features } of body.roles) {
+          if (role !== "admin") rolePerms[role] = features;
+        }
+        return HttpResponse.json({ ok: true });
+      }),
+
+      // B2B portal config
+      http.get(`${V1}/settings/b2b`, async () => {
+        await lat();
+        return HttpResponse.json({
+          enabled: false,
+          approval: "manual",
+          paymentTerm: "net30",
+          showPricesToGuests: false,
+          creditLimitEnforced: true,
+          groups: [
+            { id: "gold",   name: "Gold",   discountPct: 20, minOrderCents: 50000 },
+            { id: "silver", name: "Silver", discountPct: 12, minOrderCents: 25000 },
+            { id: "bronze", name: "Bronze", discountPct: 5,  minOrderCents: 10000 },
+          ],
+        });
+      }),
+
+      http.patch(`${V1}/settings/b2b`, async ({ request }) => {
+        await lat();
+        const _body = await request.json();
+        return HttpResponse.json({ ok: true });
+      }),
+
+      // Kiosk config
+      http.get(`${V1}/settings/kiosk`, async () => {
+        await lat();
+        return HttpResponse.json({
+          enabled: false,
+          idleTimeoutSecs: 120,
+          showPrices: true,
+          allowedPaymentMethods: ["card", "cash"],
+        });
+      }),
+
+      http.patch(`${V1}/settings/kiosk`, async ({ request }) => {
+        await lat();
+        const _body = await request.json();
+        return HttpResponse.json({ ok: true });
+      }),
+    ];
+  })(),
 );
