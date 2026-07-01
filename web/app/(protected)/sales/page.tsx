@@ -8,7 +8,7 @@
  *   Expandable table rows → inline sale detail with actions
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { formatMoney } from "@/lib/money";
 import { apiGet } from "@/api-client/client";
@@ -245,9 +245,8 @@ export default function SalesHistoryPage() {
                 </tr>
               )}
               {visible.map(sale => (
-                <>
+                <Fragment key={sale.id}>
                   <tr
-                    key={sale.id}
                     className="border-b border-[#F5F5F5] hover:bg-[#FAFAFA] cursor-pointer"
                     onClick={() => setExpandedId(expandedId === sale.id ? null : sale.id)}
                   >
@@ -311,13 +310,13 @@ export default function SalesHistoryPage() {
 
                   {/* ── Expanded detail row ───────────────────────────────── */}
                   {expandedId === sale.id && (
-                    <tr key={`${sale.id}-detail`}>
+                    <tr>
                       <td colSpan={7} className="p-0">
                         <SaleDetailPanel sale={sale} />
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

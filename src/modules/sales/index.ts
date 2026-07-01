@@ -108,7 +108,7 @@ export const salesModule: PosModule = {
   name: "sales",
   migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES, CREATE_SALES_REPS],
   register({ db, events, router }) {
-    registerRoutes(router, new SalesService(db, events));
+    registerRoutes(router, new SalesService(db, events), db);
   },
 };
 

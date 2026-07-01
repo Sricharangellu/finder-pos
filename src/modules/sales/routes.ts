@@ -4,6 +4,7 @@ import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { SalesService, QuoteStatus, SOStatus } from "./service.js";
+import type { DB } from "../../shared/db.js";
 
 const repSchema = z.object({
   name: z.string().min(1),
@@ -50,8 +51,49 @@ const tierPricesSchema = z.object({
   prices: z.record(z.string(), z.number().int().nonnegative()),
 });
 
-export function registerRoutes(router: Router, service: SalesService): void {
+export function registerRoutes(router: Router, service: SalesService, db?: DB): void {
   const mgr = requireRole("manager");
+
+  // ── POS sales history (retail receipt list) ────────────────────────────
+  // GET /history?status=&q= — maps POS orders → SaleRecord shape for the
+  // Sales History page (filter bar + expandable receipt rows).
+  if (db) {
+    router.get("/history", handler(async (req, res) => {
+      const tid    = tenantId(res);
+      const status = typeof req.query.status === "string" && req.query.status ? req.query.status : null;
+      const q      = typeof req.query.q === "string" ? req.query.q.toLowerCase() : "";
+
+      const rows = await db.query<{
+        id: string; order_number: string; status: string;
+        subtotal_cents: number; discount_cents: number; tax_cents: number; total_cents: number;
+        customer_id: string | null; created_at: number;
+      }>(
+        `SELECT id, order_number, status, subtotal_cents, discount_cents, tax_cents, total_cents,
+                customer_id, created_at
+           FROM orders
+          WHERE tenant_id = @tid ${status ? "AND status = @status" : ""}
+          ORDER BY created_at DESC
+          LIMIT 200`,
+        { tid, status },
+      );
+
+      const items = rows
+        .filter(r => !q || r.order_number.toLowerCase().includes(q) || (r.customer_id ?? "").toLowerCase().includes(q))
+        .map(r => ({
+          id:             r.id,
+          receipt_number: r.order_number,
+          created_at:     r.created_at,
+          customer_name:  r.customer_id ?? null,
+          sold_by:        "Staff",
+          outlet:         "Main Outlet",
+          note:           null as string | null,
+          total_cents:    r.total_cents,
+          status:         r.status as "completed" | "open" | "voided" | "returned",
+        }));
+
+      res.json({ items });
+    }));
+  }
 
   // ── Quotations ─────────────────────────────────────────────────────────
   router.post("/quotations", handler(async (req, res) => {
