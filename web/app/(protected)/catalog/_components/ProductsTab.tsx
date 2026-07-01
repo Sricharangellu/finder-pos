@@ -268,113 +268,106 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   return (
     <>
       <Card className="overflow-hidden p-0">
-        {/* Metrics */}
-        <div className="grid gap-2 border-b border-slate-200 bg-slate-100 p-3 sm:grid-cols-4">
-          <CatalogMetric label="Visible products" value={visibleProducts.length} helper={`${total} total`} tone={hasFilters ? "neutral" : "muted"} active={hasFilters} />
-          <CatalogMetric label="Active"           value={activeCount}            helper={`${draftCount} draft`} tone="success" active={filterStatus === "active"} />
-          <CatalogMetric label="Archived"         value={archivedCount}          helper="Hidden from sale"       tone="muted"   active={filterStatus === "archived"} />
-          <CatalogMetric label="Age restricted"   value={restrictedCount}        helper="ID check needed"        tone="restricted" active={restrictedCount > 0} />
+        {/* ── Spec: header row — Import + Add product ─────────────────────────── */}
+        <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-3">
+          <span className="text-sm font-semibold text-[#111]">Products</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setShowImport(true)}
+              className="flex items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] hover:bg-gray-50 transition-colors">
+              ↑ Import
+            </button>
+            <button type="button" onClick={() => { setShowCreate(true); setActionError(null); }}
+              className="rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+              + Add product
+            </button>
+          </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto_auto_auto]">
-          <div className="min-w-0">
-            <label htmlFor="catalog-search" className="sr-only">Search products</label>
-            <input id="catalog-search" type="search" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name, SKU, barcode…"
-              className="min-h-[40px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600" />
-          </div>
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-500 sm:min-w-[140px]">
-            Status
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              className="min-h-[40px] rounded-md border border-slate-200 px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600">
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="draft">Draft</option>
-              <option value="archived">Archived</option>
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-500 sm:min-w-[160px]">
-            Category
-            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-              className="min-h-[40px] rounded-md border border-slate-200 px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600">
-              <option value="">All categories</option>
-              {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-          </label>
-          <button type="button" onClick={() => setShowMoreFilters(v => !v)}
-            className={clsx("min-h-[40px] self-end rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-              showMoreFilters ? "border-brand-300 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-700 hover:bg-slate-50")}>
-            {showMoreFilters ? "▲ Filters" : "▼ Filters"}
-            {(filterTaxClass || filterBrand || filterAgeRestricted || priceMin || priceMax) && (
-              <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[10px] text-white">
-                {[filterTaxClass, filterBrand, filterAgeRestricted, priceMin || priceMax].filter(Boolean).length}
-              </span>
-            )}
-          </button>
-          <div className="relative self-end">
-            <button type="button" onClick={() => setShowActionsMenu(v => !v)}
-              className="min-h-[40px] rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              aria-label="More actions">⋯</button>
-            {showActionsMenu && (
+        {/* ── Spec: standard filter bar ────────────────────────────────────── */}
+        <div className="border-b border-[#E8E8E8] bg-white px-5 py-3">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Name / SKU */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="catalog-search" className="text-xs font-medium text-[#555]">Name or SKU</label>
+              <input id="catalog-search" type="search" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search…"
+                className="h-8 w-44 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]" />
+            </div>
+            {/* Category */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#555]">Category</label>
+              <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                <option value="">All categories</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            {/* Brand */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#555]">Brand</label>
+              <input type="text" value={filterBrand} onChange={e => setFilterBrand(e.target.value)} placeholder="Brand…"
+                className="h-8 w-28 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+            </div>
+            {/* Channel (ecommerce status) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#555]">Channel</label>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                <option value="">All</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            {/* More filters */}
+            {showMoreFilters && (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowActionsMenu(false)} />
-                <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                  <button type="button" onClick={() => { handleExportCSV(); setShowActionsMenu(false); }}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">↓ Export CSV</button>
-                  <button type="button" onClick={() => { setShowImport(true); setShowActionsMenu(false); }}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">↑ Import CSV</button>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[#555]">Tax class</label>
+                  <select value={filterTaxClass} onChange={e => setFilterTaxClass(e.target.value)}
+                    className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                    <option value="">All</option>
+                    <option value="standard">Standard</option>
+                    <option value="exempt">Exempt</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-[#555]">Age restricted</label>
+                  <select value={filterAgeRestricted ? "1" : "0"} onChange={e => setFilterAgeRestricted(e.target.value === "1")}
+                    className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                    <option value="0">All</option>
+                    <option value="1">18+ only</option>
+                  </select>
                 </div>
               </>
             )}
+            {/* Actions */}
+            <div className="flex items-center gap-2 ml-auto">
+              <button type="button" onClick={clearFilters} className="text-sm text-[#5D5FEF] hover:underline">Clear filters</button>
+              <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="text-sm text-[#5D5FEF] hover:underline">
+                {showMoreFilters ? "Fewer filters" : "More filters"}
+              </button>
+              <button type="button" onClick={() => void load()}
+                className="h-8 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+                Search
+              </button>
+            </div>
           </div>
-          <button type="button" onClick={() => setShowPrintLabels(true)}
-            className="min-h-[40px] self-end rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Labels{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
-          </button>
-          <button type="button" onClick={() => { setShowCreate(true); setActionError(null); }}
-            className="min-h-[40px] self-end rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-            + New product
-          </button>
+          {/* Results count */}
+          <div className="mt-2 flex items-center justify-between text-xs text-[#666]">
+            <span>Showing <strong>{visibleProducts.length}</strong> of {total} products
+              {someSelected && <span className="ml-2 text-[#5D5FEF]">· {selectedIds.size} selected</span>}
+            </span>
+            <div className="flex items-center gap-3">
+              {someSelected && (
+                <button type="button" onClick={() => setShowPrintLabels(true)}
+                  className="text-[#5D5FEF] hover:underline">Labels ({selectedIds.size})</button>
+              )}
+              <button type="button" onClick={handleExportCSV} className="text-[#5D5FEF] hover:underline">Export CSV</button>
+            </div>
+          </div>
         </div>
 
-        {/* Expanded filter panel */}
-        {showMoreFilters && (
-          <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-              Tax class
-              <select value={filterTaxClass} onChange={e => setFilterTaxClass(e.target.value)}
-                className="min-h-[36px] rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600">
-                <option value="">All tax classes</option>
-                <option value="standard">Standard</option>
-                <option value="exempt">Tax exempt</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-              Brand
-              <input type="text" value={filterBrand} onChange={e => setFilterBrand(e.target.value)} placeholder="e.g. Acme"
-                className="min-h-[36px] rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600" />
-            </label>
-            <div className="flex flex-col gap-1 text-xs font-medium text-slate-500">
-              Price range ($)
-              <div className="flex items-center gap-1.5">
-                <input type="number" min="0" step="0.01" value={priceMin} onChange={e => setPriceMin(e.target.value)} placeholder="Min"
-                  className="min-h-[36px] w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600" />
-                <span className="shrink-0 text-slate-400">–</span>
-                <input type="number" min="0" step="0.01" value={priceMax} onChange={e => setPriceMax(e.target.value)} placeholder="Max"
-                  className="min-h-[36px] w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600" />
-              </div>
-            </div>
-            <div className="flex flex-col justify-end gap-1 text-xs font-medium text-slate-500">
-              Age restriction
-              <label className="flex min-h-[36px] cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm">
-                <input type="checkbox" checked={filterAgeRestricted} onChange={e => setFilterAgeRestricted(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-600" />
-                <span className="text-slate-700">Age restricted only</span>
-              </label>
-            </div>
-          </div>
-        )}
 
         {someSelected && (
           <BulkActionBar count={selectedIds.size} categories={categories} onApply={handleBulkUpdate}
@@ -387,15 +380,6 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
           </div>
         )}
 
-        {hasFilters && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-brand-50 px-4 py-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-brand-700">Filtered</span>
-            {filterSummary.map(label => (
-              <span key={label} className="rounded-full border border-brand-200 bg-white px-2.5 py-1 text-xs font-medium text-brand-700">{label}</span>
-            ))}
-            <button type="button" onClick={clearFilters} className="ml-auto text-xs font-medium text-brand-700 hover:underline">Clear all</button>
-          </div>
-        )}
 
         {loading ? (
           <TableSkeleton headers={["", "Product", "SKU", "Category", "Price", "Status", ""]} rows={8} />
@@ -409,30 +393,43 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
         ) : (
           <>
             <div className="hidden overflow-x-auto md:block">
+              {/* ── Spec: checkbox | thumbnail+Name | Brand | Supplier | Available | Retail price | Channels | Created | ✎ */}
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wider text-[#888]">
                     <th className="px-4 py-3">
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded border-slate-300" />
                     </th>
-                    <SortTh col="name"        label="Product"  cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <SortTh col="sku"         label="SKU"      cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <SortTh col="category"    label="Category" cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <SortTh col="price_cents" label="Price"    cur={sortCol} dir={sortDir} onSort={handleSort} right />
-                    <SortTh col="status"      label="Status"   cur={sortCol} dir={sortDir} onSort={handleSort} />
-                    <th className="px-4 py-3" />
+                    <SortTh col="name"        label="Name"          cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <SortTh col="brand"       label="Brand"         cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3">Supplier</th>
+                    <th className="px-4 py-3">Available</th>
+                    <SortTh col="price_cents" label="Retail price"  cur={sortCol} dir={sortDir} onSort={handleSort} right />
+                    <th className="px-4 py-3">Channels</th>
+                    <SortTh col="created_at"  label="Created"       cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <th className="w-10 px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[#F5F5F5]">
                   {visibleProducts.map(p => {
-                    const style = productStatusStyle(p.status);
                     const isSelected = selectedIds.has(p.id);
+                    const isAvailable = p.status === "active";
+                    const createdDate = p.created_at
+                      ? new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })
+                      : "—";
                     return (
-                      <tr key={p.id} className={clsx("border-l-4 transition-colors", style.row, isSelected && "ring-1 ring-inset ring-brand-200")}>
-                        <td className="px-4 py-3">
+                      <tr key={p.id}
+                        className={clsx("hover:bg-[#FAFAFA] transition-colors", isSelected && "bg-blue-50")}
+                        onClick={() => { setEditTarget(p); setActionError(null); }}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {/* Checkbox */}
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)}
                             aria-label={`Select ${p.name}`} className="h-4 w-4 rounded border-slate-300" />
                         </td>
+
+                        {/* thumbnail + Name + SKU */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             {p.image_url ? (
@@ -440,49 +437,72 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                               <img src={p.image_url} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" aria-hidden="true" />
                             ) : (
                               <span className={clsx("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white",
-                                p.status === "active" ? "bg-brand-600" : p.status === "draft" ? "bg-warning-500" : "bg-slate-400")}
+                                p.status === "active" ? "bg-[#5D5FEF]" : p.status === "draft" ? "bg-amber-400" : "bg-slate-300")}
                                 aria-hidden="true">
                                 {p.name.charAt(0).toUpperCase()}
                               </span>
                             )}
                             <div className="min-w-0">
-                              <p className={clsx("font-medium leading-snug", p.status === "archived" ? "text-slate-600" : "text-slate-950")}>{p.name}</p>
-                              <p className="text-xs text-slate-400">
-                                {p.brand ?? ""}
-                                {p.raw_cost_price_cents != null && (
-                                  <span className={p.brand ? "ml-1.5" : ""}>cost {formatMoney(p.raw_cost_price_cents)}</span>
-                                )}
-                              </p>
+                              <p className={clsx("font-medium text-[#111] leading-snug", p.status === "archived" && "text-[#888] line-through")}>{p.name}</p>
+                              <p className="text-[11px] text-[#888] font-mono">{p.sku}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.sku}</td>
-                        <td className="px-4 py-3 text-slate-600">{p.category}</td>
-                        <td className="px-4 py-3 text-right font-medium text-slate-900">{formatMoney(p.price_cents)}</td>
+
+                        {/* Brand */}
+                        <td className="px-4 py-3 text-[#555]">{p.brand ?? <span className="text-[#ccc]">—</span>}</td>
+
+                        {/* Supplier */}
+                        <td className="px-4 py-3 text-[#555]">
+                          {p.preferred_vendor_name ?? <span className="text-[#ccc]">—</span>}
+                        </td>
+
+                        {/* Available indicator */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
-                            <Badge variant={statusBadge(p.status)}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</Badge>
+                            <span className={clsx("h-2 w-2 rounded-full shrink-0",
+                              isAvailable ? "bg-emerald-500" : p.status === "draft" ? "bg-amber-400" : "bg-slate-300"
+                            )} aria-hidden="true" />
+                            <span className={clsx("text-xs font-medium capitalize",
+                              isAvailable ? "text-emerald-700" : p.status === "draft" ? "text-amber-700" : "text-[#888]"
+                            )}>
+                              {p.status}
+                            </span>
                             {p.age_restricted === 1 && (
-                              <span className="rounded-md bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200">18+</span>
+                              <span className="rounded bg-orange-100 px-1 py-0.5 text-[10px] font-semibold text-orange-700">18+</span>
                             )}
                           </div>
                         </td>
+
+                        {/* Retail price */}
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#111]">
+                          {formatMoney(p.price_cents)}
+                        </td>
+
+                        {/* Channels */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button type="button" onClick={() => router.push(`/catalog/${p.id}`)}
-                              className="min-h-[32px] rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">View</button>
-                            <button type="button" onClick={() => { setEditTarget(p); setActionError(null); }}
-                              className="min-h-[32px] rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100">Edit</button>
-                            <button type="button" onClick={() => void handleDuplicate(p.id)} disabled={duplicating === p.id}
-                              title="Duplicate product (creates a Draft copy)"
-                              className="min-h-[32px] rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40">
-                              {duplicating === p.id ? "…" : "Copy"}
-                            </button>
-                            {p.status !== "archived" && (
-                              <button type="button" onClick={() => { setArchiveTarget(p); setActionError(null); }}
-                                className="min-h-[32px] rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100">Archive</button>
+                          <div className="flex flex-wrap gap-1">
+                            <span className="rounded-full bg-[#F0F0F0] px-2 py-0.5 text-[11px] font-medium text-[#555]">In-store</span>
+                            {p.ecommerce === 1 && (
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">Online</span>
                             )}
                           </div>
+                        </td>
+
+                        {/* Created */}
+                        <td className="px-4 py-3 text-xs text-[#888] tabular-nums">{createdDate}</td>
+
+                        {/* Edit icon */}
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          <button type="button"
+                            onClick={() => { setEditTarget(p); setActionError(null); }}
+                            aria-label={`Edit ${p.name}`}
+                            className="text-[#aaa] hover:text-[#5D5FEF] transition-colors">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -496,15 +516,6 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                   onEdit={() => { setEditTarget(p); setActionError(null); }}
                   onArchive={() => { setArchiveTarget(p); setActionError(null); }} />
               ))}
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-              <span>
-                Showing {visibleProducts.length} of {total} products
-                {someSelected && <span className="ml-2 font-medium text-brand-600">· {selectedIds.size} selected</span>}
-              </span>
-              {hasFilters && (
-                <button type="button" onClick={clearFilters} className="font-medium text-brand-600 hover:underline">Clear filters</button>
-              )}
             </div>
           </>
         )}

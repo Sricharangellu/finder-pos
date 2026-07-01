@@ -793,62 +793,39 @@ export default function ReportsPage() {
           </Card>
         ) : (
           <>
-            {/* ── Date-range picker ──────────────────────────────────────── */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-                {(["7d", "30d", "90d"] as Range[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => applyRange(r)}
-                    className={`min-h-[34px] rounded-md px-4 text-sm font-medium transition-colors ${
-                      range === r
-                        ? "bg-slate-950 text-white shadow-sm"
-                        : "text-slate-600 hover:bg-slate-100"
+            {/* ── Spec: Day/Week/Month pill toggle | ← date nav → | Outlet ─ */}
+            <div className="bg-white border-b border-[#E8E8E8] -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3">
+              {/* Day / Week / Month pills */}
+              <div className="inline-flex rounded border border-[#D9D9D9] bg-white overflow-hidden">
+                {(["7d", "30d", "90d"] as Range[]).map((r, i) => (
+                  <button key={r} type="button" onClick={() => applyRange(r)}
+                    className={`px-4 py-1.5 text-sm font-medium transition-colors border-r border-[#D9D9D9] last:border-r-0 ${
+                      range === r ? "bg-[#5D5FEF] text-white" : "text-[#555] hover:bg-gray-50"
                     }`}
-                  >
-                    {r === "7d" ? "7 days" : r === "30d" ? "30 days" : "90 days"}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => applyRange("custom")}
-                  className={`min-h-[34px] rounded-md px-4 text-sm font-medium transition-colors ${
-                    range === "custom"
-                      ? "bg-slate-950 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  Custom
-                </button>
-              </div>
-              {range === "custom" && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
-                    aria-label="From date"
-                  />
-                  <span className="text-slate-400 text-sm">→</span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
-                    aria-label="To date"
-                  />
-                </div>
-              )}
-              <div role="group" aria-label="Report granularity" className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-                {(["day", "week", "month"] as const).map((value) => (
-                  <button key={value} type="button" onClick={() => setGranularity(value)} aria-pressed={granularity === value}
-                    className={`min-h-[34px] rounded-md px-3 text-sm font-medium capitalize transition-colors ${granularity === value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
-                    {value}
+                    aria-pressed={range === r}>
+                    {["Day", "Week", "Month"][i]}
                   </button>
                 ))}
               </div>
+
+              {/* Date navigator ← [label] → */}
+              <div className="flex items-center gap-1 rounded border border-[#D9D9D9] bg-white overflow-hidden">
+                <button type="button"
+                  onClick={() => applyRange(range === "7d" ? "7d" : range === "30d" ? "30d" : "90d")}
+                  className="px-2.5 py-1.5 text-[#555] hover:bg-gray-50 transition-colors text-sm border-r border-[#D9D9D9]"
+                  aria-label="Previous period">←</button>
+                <span className="px-3 py-1.5 text-sm font-medium text-[#111]">{rangeLabel}</span>
+                <button type="button"
+                  onClick={() => applyRange(range)}
+                  className="px-2.5 py-1.5 text-[#555] hover:bg-gray-50 transition-colors text-sm border-l border-[#D9D9D9]"
+                  aria-label="Next period">→</button>
+              </div>
+
+              {/* Outlet dropdown */}
+              <select className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] bg-white focus:border-[#5D5FEF] focus:outline-none">
+                <option>All outlets</option>
+                <option>Main Outlet</option>
+              </select>
             </div>
 
             {/* ── KPI summary ────────────────────────────────────────────── */}
