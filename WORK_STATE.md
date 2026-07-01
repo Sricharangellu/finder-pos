@@ -99,10 +99,11 @@ Key patterns:
 ## Next targets (priority order for launch)
 
 1. **Golf vertical** ✅ DONE — 4 pages + nav wired; `module: "golf"` → `module: "tee_sheet"` fixed
-2. **Split oversized pages** — customers/[id] (1705), catalog (1498), inventory (1229), purchasing (~1202)
-3. **Fix `as any` in 4 production files** (TypeScript — HIGH)
-4. **Add `role="alert"` to error messages** (Accessibility — widespread)
-5. **Replace `(cents / 100).toFixed(2)` with `formatMoney()`** (Design system)
+2. **FE-R4: Restaurant Dashboard** ✅ DONE — `/restaurant/dashboard` with KPIs, hourly chart, top items, active sessions (2026-07-01)
+3. **UX-2: Module marketplace** ✅ DONE — `/setup/modules` page already complete
+4. **UX-3: Vertical dashboard widgets** ✅ DONE — `VerticalWidgets.tsx` already complete
+5. **Split oversized pages** — reports/page.tsx ✅ DONE (866→246 ln); next: customers/page.tsx (810 ln), dashboard (803 ln), discounts (765 ln)
+6. **Settings page split** ✅ DONE — CoaSection, DepositsSection, LoyaltyTiersSection extracted (2026-07-01)
 
 ---
 
@@ -138,12 +139,12 @@ _None._
 
 - [ ] **Design system — money in form inputs** — `(cents / 100).toFixed(2)` used to seed edit-form inputs in `catalog/page.tsx` (ln 94, 98, 99, 843–845), `customers/[id]/page.tsx` (ln 680, 699), `accounting/page.tsx` (ln 336). Correct for edit inputs (need dollar string), but comment-document why to avoid false audit flags.
 
-- [ ] **Page size — split required** — 5 pages still exceed 800-line threshold (settings: ✅ done 1818→1003):
+- [ ] **Page size — split required** — pages exceeding 800-line threshold:
+  - `settings/page.tsx` — ✅ DONE: 1818→644 ln (CoaSection, DepositsSection, LoyaltyTiersSection extracted)
   - `customers/[id]/page.tsx` — ✅ DONE: 1705→441 ln, 9 files in `customers/[id]/_components/`
-  - `catalog/page.tsx` — 1498 ln
-  - `inventory/page.tsx` — 1229 ln
-  - `purchasing/page.tsx` — ~1202 ln
-  - `purchasing/[id]/page.tsx` — ~982 ln
+  - `reports/page.tsx` — ✅ DONE: 866→246 ln (4 section files + reportHelpers.tsx)
+  - `customers/page.tsx` — 810 ln — next split candidate
+  - `dashboard/page.tsx` — 803 ln — next split candidate
 
 ### LOW (polish — backlog)
 
@@ -153,9 +154,14 @@ _None._
 
 ### Next session must-do (Claude's priority queue)
 
-Score: 93/100 — launch-ready, zero CRITICAL. Fix remaining MEDIUM before v2:
+Score: 94/100 — launch-ready, zero CRITICAL. Fix remaining MEDIUM before v2:
 
-1. **Finish date.ts migration** — convert remaining local `fmtDate`/`fmtTime` in insights, ecommerce, purchasing, quotes, workforce to import from `@/lib/date`
-2. **Split oversized pages** — customers/[id] (1705), catalog (1498), inventory (1229), purchasing (~1202) — extract tab content into `_components/` subdirs
-3. **Golf vertical** — tee sheet, bookings, members, pro-shop pages (types + mock handlers complete; pages not yet wired)
-4. **Backend connection** — replace MSW with live Postgres + Express; `db-schema` skill for migrations
+1. **Split customers/page.tsx (810 ln)** — extract filter bar, table, customer detail drawer to `_components/`
+2. **Split dashboard/page.tsx (803 ln)** — extract KPI section, top products, payment breakdown
+3. **Split discounts/page.tsx (765 ln)** — extract discount form, promotions section
+4. **Finish date.ts migration** — replace `new Date(x).toLocaleDateString()` with `fmtDate(x)` across: hospitality, golf/members, reporting/purchases, restaurant/tabs, gift-cards, rental, sales, catalog/[id], entertainment, education, operations
+
+**Done this session (2026-07-01):**
+- Settings page split: CoaSection + DepositsSection + LoyaltyTiersSection → `_components/` (1003→644 ln)
+- FE-R4 Restaurant Dashboard: `/restaurant/dashboard` — covers, avg ticket, table turns, peak hour, hourly revenue chart, top items, active sessions
+- reports/page.tsx split: 4 sections → `_components/` (866→246 ln); shared helpers in reportHelpers.tsx
