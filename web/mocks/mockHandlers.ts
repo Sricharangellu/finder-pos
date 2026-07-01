@@ -747,45 +747,156 @@ export const mockHandlers = [
     return HttpResponse.json({ code: card.code, redeemedCents: amountCents, balanceCents: card.balance_cents, status: card.status });
   }),
 
-  // ── Team (Settings → Users) ───────────────────────────────────────────────
   // ── Team ─────────────────────────────────────────────────────────────────
   ...(() => {
-    let teamSeq = 10;
-    let teamMembers = [
-      { id: "usr_demo_owner",   email: "owner@finder-pos.dev",   role: "owner",   custom_role_id: null,       created_at: Date.now() - 90 * 86_400_000 },
-      { id: "usr_demo_manager", email: "manager@finder-pos.dev", role: "manager", custom_role_id: null,       created_at: Date.now() - 60 * 86_400_000 },
-      { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier", custom_role_id: "crl_demo_1", created_at: Date.now() - 30 * 86_400_000 },
+    const NOW = Date.now();
+    const D = (days: number) => NOW - days * 86_400_000;
+    const H = (hrs: number) => NOW - hrs * 3_600_000;
+
+    type Emp = {
+      id: string; name: string; email: string; phone: string | null;
+      role: string; department: string | null; employment_type: string;
+      hourly_rate_cents: number | null; status: string; suspend_reason: string | null;
+      pin: string | null; hire_date: number;
+      clocked_in: boolean; clocked_in_at: number | null; today_minutes: number;
+    };
+    type Entry = { id: string; employee_id: string; clock_in: number; clock_out: number | null; duration_mins: number | null; notes: string | null };
+
+    let empSeq = 20;
+    let entrySeq = 100;
+
+    let employees: Emp[] = [
+      { id: "emp_1",  name: "Sarah Johnson",   email: "sarah@demo.dev",   phone: "555-1001", role: "manager",    department: "Operations",   employment_type: "full_time",  hourly_rate_cents: 2500, status: "active",     suspend_reason: null, pin: "1234", hire_date: D(540), clocked_in: true,  clocked_in_at: H(6),   today_minutes: 0    },
+      { id: "emp_2",  name: "Mike Chen",       email: "mike@demo.dev",    phone: "555-1002", role: "cashier",    department: "Front End",    employment_type: "full_time",  hourly_rate_cents: 1600, status: "active",     suspend_reason: null, pin: "2345", hire_date: D(270), clocked_in: false, clocked_in_at: null,   today_minutes: 420  },
+      { id: "emp_3",  name: "Ashley Williams", email: "ashley@demo.dev",  phone: "555-1003", role: "sales",      department: "Sales",        employment_type: "full_time",  hourly_rate_cents: 2000, status: "active",     suspend_reason: null, pin: "3456", hire_date: D(180), clocked_in: true,  clocked_in_at: H(3),   today_minutes: 0    },
+      { id: "emp_4",  name: "David Rodriguez", email: "david@demo.dev",   phone: "555-1004", role: "accountant", department: "Finance",      employment_type: "full_time",  hourly_rate_cents: 3200, status: "active",     suspend_reason: null, pin: "4567", hire_date: D(730), clocked_in: false, clocked_in_at: null,   today_minutes: 0    },
+      { id: "emp_5",  name: "Emma Thompson",   email: "emma@demo.dev",    phone: "555-1005", role: "receiver",   department: "Warehouse",    employment_type: "part_time",  hourly_rate_cents: 1500, status: "active",     suspend_reason: null, pin: "5678", hire_date: D(120), clocked_in: true,  clocked_in_at: H(2),   today_minutes: 0    },
+      { id: "emp_6",  name: "James O'Brien",   email: "james@demo.dev",   phone: "555-1006", role: "shipper",    department: "Warehouse",    employment_type: "full_time",  hourly_rate_cents: 1800, status: "active",     suspend_reason: null, pin: "6789", hire_date: D(90),  clocked_in: false, clocked_in_at: null,   today_minutes: 240  },
+      { id: "emp_7",  name: "Priya Patel",     email: "priya@demo.dev",   phone: "555-1007", role: "cashier",    department: "Front End",    employment_type: "part_time",  hourly_rate_cents: 1500, status: "suspended",  suspend_reason: "Attendance policy violation", pin: "7890", hire_date: D(200), clocked_in: false, clocked_in_at: null, today_minutes: 0 },
+      { id: "emp_8",  name: "Carlos Ruiz",     email: "carlos@demo.dev",  phone: "555-1008", role: "warehouse",  department: "Warehouse",    employment_type: "full_time",  hourly_rate_cents: 1700, status: "active",     suspend_reason: null, pin: "8901", hire_date: D(150), clocked_in: true,  clocked_in_at: H(1),   today_minutes: 0    },
+      { id: "emp_9",  name: "Alex Kim",        email: "alex@demo.dev",    phone: "555-1009", role: "driver",     department: "Delivery",     employment_type: "full_time",  hourly_rate_cents: 1900, status: "active",     suspend_reason: null, pin: "9012", hire_date: D(60),  clocked_in: true,  clocked_in_at: H(5),   today_minutes: 0    },
+      { id: "emp_10", name: "Jordan Lee",      email: "jordan@demo.dev",  phone: "555-1010", role: "cashier",    department: "Front End",    employment_type: "full_time",  hourly_rate_cents: 1600, status: "active",     suspend_reason: null, pin: "0123", hire_date: D(45),  clocked_in: false, clocked_in_at: null,   today_minutes: 480  },
+      { id: "emp_11", name: "Demo Owner",      email: "owner@finder-pos.dev", phone: null,   role: "owner",      department: "Management",   employment_type: "full_time",  hourly_rate_cents: null, status: "active",     suspend_reason: null, pin: null,   hire_date: D(900), clocked_in: false, clocked_in_at: null,   today_minutes: 0    },
     ];
+
+    // Seed today's time entries for active demo employees
+    let timeEntries: Entry[] = [
+      // Sarah: clocked in 6h ago (no clock-out yet)
+      { id: "ent_1", employee_id: "emp_1", clock_in: H(6), clock_out: null, duration_mins: null, notes: null },
+      // Mike: 7h complete shift
+      { id: "ent_2", employee_id: "emp_2", clock_in: H(8), clock_out: H(1), duration_mins: 420, notes: null },
+      // Ashley: clocked in 3h ago
+      { id: "ent_3", employee_id: "emp_3", clock_in: H(3), clock_out: null, duration_mins: null, notes: null },
+      // James: 4h complete
+      { id: "ent_4", employee_id: "emp_6", clock_in: H(5), clock_out: H(1), duration_mins: 240, notes: null },
+      // Jordan: 8h complete
+      { id: "ent_5", employee_id: "emp_10", clock_in: H(9), clock_out: H(1), duration_mins: 480, notes: null },
+      // Emma: clocked in 2h ago
+      { id: "ent_6", employee_id: "emp_5", clock_in: H(2), clock_out: null, duration_mins: null, notes: null },
+      // Carlos: clocked in 1h ago
+      { id: "ent_7", employee_id: "emp_8", clock_in: H(1), clock_out: null, duration_mins: null, notes: null },
+      // Alex: clocked in 5h ago
+      { id: "ent_8", employee_id: "emp_9", clock_in: H(5), clock_out: null, duration_mins: null, notes: null },
+    ];
+
     return [
+      // GET /team
       http.get(`${V1}/team`, async () => {
         await lat();
-        return HttpResponse.json({ items: teamMembers });
+        return HttpResponse.json({ items: employees });
       }),
+
+      // POST /team (create)
+      http.post(`${V1}/team`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<Emp>;
+        if (!b.name || !b.email) return HttpResponse.json({ error: { code: "validation", message: "name and email required" } }, { status: 400 });
+        if (employees.find((e) => e.email === b.email)) return HttpResponse.json({ error: { code: "conflict", message: "Email already exists." } }, { status: 409 });
+        const emp: Emp = {
+          id: `emp_${++empSeq}`, name: b.name, email: b.email,
+          phone: b.phone ?? null, role: b.role ?? "cashier",
+          department: b.department ?? null, employment_type: b.employment_type ?? "full_time",
+          hourly_rate_cents: b.hourly_rate_cents ?? null, status: "active",
+          suspend_reason: null, pin: b.pin ?? null, hire_date: b.hire_date ?? Date.now(),
+          clocked_in: false, clocked_in_at: null, today_minutes: 0,
+        };
+        employees.push(emp);
+        return HttpResponse.json(emp, { status: 201 });
+      }),
+
+      // Legacy invite alias
       http.post(`${V1}/team/invite`, async ({ request }) => {
         await lat();
-        const b = (await request.json()) as { email: string; role: string };
+        const b = (await request.json()) as { email: string; role?: string; name?: string };
         if (!b.email) return HttpResponse.json({ error: { code: "validation", message: "email required" } }, { status: 400 });
-        const existing = teamMembers.find(m => m.email === b.email);
-        if (existing) return HttpResponse.json({ error: { code: "conflict", message: "Member already exists." } }, { status: 409 });
-        const member = { id: `usr_${++teamSeq}`, email: b.email, role: b.role ?? "cashier", custom_role_id: null, created_at: Date.now() };
-        teamMembers.push(member);
-        return HttpResponse.json(member, { status: 201 });
+        const emp: Emp = {
+          id: `emp_${++empSeq}`, name: b.name ?? b.email.split("@")[0] ?? b.email,
+          email: b.email, phone: null, role: b.role ?? "cashier",
+          department: null, employment_type: "full_time", hourly_rate_cents: null,
+          status: "active", suspend_reason: null, pin: null, hire_date: Date.now(),
+          clocked_in: false, clocked_in_at: null, today_minutes: 0,
+        };
+        employees.push(emp);
+        return HttpResponse.json(emp, { status: 201 });
       }),
+
+      // POST /team/:id/clock-in  — must come before PATCH /:id
+      http.post(`${V1}/team/:id/clock-in`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const emp = employees.find((e) => e.id === id);
+        if (!emp) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        if (emp.clocked_in) return HttpResponse.json({ error: { code: "already_in", message: "Already clocked in." } }, { status: 409 });
+        emp.clocked_in = true;
+        emp.clocked_in_at = Date.now();
+        const entry: Entry = { id: `ent_${++entrySeq}`, employee_id: id, clock_in: Date.now(), clock_out: null, duration_mins: null, notes: null };
+        timeEntries.push(entry);
+        return HttpResponse.json({ ok: true, clocked_in_at: emp.clocked_in_at });
+      }),
+
+      // POST /team/:id/clock-out — must come before PATCH /:id
+      http.post(`${V1}/team/:id/clock-out`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const emp = employees.find((e) => e.id === id);
+        if (!emp) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        if (!emp.clocked_in) return HttpResponse.json({ error: { code: "not_in", message: "Not clocked in." } }, { status: 409 });
+        const elapsed = Math.floor((Date.now() - (emp.clocked_in_at ?? Date.now())) / 60_000);
+        emp.today_minutes += elapsed;
+        emp.clocked_in = false;
+        emp.clocked_in_at = null;
+        const entry = [...timeEntries].reverse().find((e) => e.employee_id === id && !e.clock_out);
+        if (entry) { entry.clock_out = Date.now(); entry.duration_mins = elapsed; }
+        return HttpResponse.json({ ok: true, today_minutes: emp.today_minutes });
+      }),
+
+      // GET /team/:id/time-entries
+      http.get(`${V1}/team/:id/time-entries`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const items = timeEntries.filter((e) => e.employee_id === id && e.clock_in >= todayStart.getTime());
+        return HttpResponse.json({ items });
+      }),
+
+      // PATCH /team/:id
       http.patch(`${V1}/team/:id`, async ({ params, request }) => {
         await lat();
         const id = String(params["id"]);
-        const b = (await request.json()) as { role?: string; custom_role_id?: string | null };
-        const idx = teamMembers.findIndex(m => m.id === id);
+        const idx = employees.findIndex((e) => e.id === id);
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        teamMembers[idx] = { ...teamMembers[idx], ...b };
-        return HttpResponse.json(teamMembers[idx]);
+        const b = (await request.json()) as Partial<Emp>;
+        employees[idx] = { ...employees[idx]!, ...b, id };
+        return HttpResponse.json(employees[idx]);
       }),
+
+      // DELETE /team/:id
       http.delete(`${V1}/team/:id`, async ({ params }) => {
         await lat();
         const id = String(params["id"]);
-        const idx = teamMembers.findIndex(m => m.id === id);
+        const idx = employees.findIndex((e) => e.id === id);
         if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
-        teamMembers.splice(idx, 1);
+        employees.splice(idx, 1);
         return new HttpResponse(null, { status: 204 });
       }),
     ];
