@@ -84,21 +84,44 @@ export default function ProductDetailPage() {
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          {/* Left: back + status badges */}
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => router.back()}
-              className="text-gray-400 transition-colors hover:text-gray-600"
-              aria-label="Back to catalog"
+              onClick={() => router.push("/catalog")}
+              className="flex items-center gap-1 text-sm text-slate-500 transition-colors hover:text-[#111]"
+              aria-label="Back to Catalog"
             >
-              ←
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13L5 8l5-5"/></svg>
+              Products
             </button>
+            <span className="text-slate-300">|</span>
             <Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>
             <Badge variant="gray">{product.tax_class === "exempt" ? "Tax exempt" : "Standard tax"}</Badge>
           </div>
-          <Button size="sm" variant="secondary" loading={duplicating} onClick={() => void handleDuplicate()}>
-            Duplicate
-          </Button>
+
+          {/* Right: actions */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Need help?
+            </button>
+            <Button size="sm" variant="secondary" loading={duplicating} onClick={() => void handleDuplicate()}>
+              Duplicate
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => router.push("/catalog")}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => {
+              // Trigger the active tab's save by dispatching a custom event
+              window.dispatchEvent(new CustomEvent("finder:save-product"));
+            }}>
+              Save
+            </Button>
+          </div>
         </div>
 
         {/* ── Tab nav ─────────────────────────────────────────────────────── */}
