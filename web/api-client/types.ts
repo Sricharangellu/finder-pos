@@ -656,6 +656,127 @@ export interface CatalogBarcodesResponse {
   items: CatalogBarcode[];
 }
 
+// ── Product sub-resources (Expiry / Sales / Returns / Credits / Invoices) ────
+
+export interface ProductExpiryBatch {
+  id: string;
+  product_id: string;
+  batch_number: string;
+  lot_code: string | null;
+  quantity: number;
+  unit_cost_cents: number;
+  expiry_date: number | null;        // unix ms
+  received_at: number;               // unix ms
+  supplier_name: string | null;
+  location_name: string | null;
+  notes: string | null;
+  expiry_status: "ok" | "warning" | "critical" | "expired";
+  days_until_expiry: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ProductExpiryResponse {
+  items: ProductExpiryBatch[];
+  total: number;
+}
+
+export interface ProductSaleRecord {
+  id: string;
+  product_id: string;
+  sale_id: string;
+  sale_number: string;
+  date: number;                       // unix ms
+  quantity: number;
+  unit_price_cents: number;
+  discount_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  customer_name: string | null;
+  cashier_name: string;
+  outlet_name: string;
+  payment_method: string;
+}
+
+export interface ProductSalesResponse {
+  items: ProductSaleRecord[];
+  total: number;
+  total_units_sold: number;
+  total_revenue_cents: number;
+}
+
+export type ReturnReason =
+  | "defective" | "wrong_item" | "customer_changed_mind"
+  | "expired" | "damaged" | "other";
+
+export interface ProductReturn {
+  id: string;
+  product_id: string;
+  return_id: string;
+  return_number: string;
+  original_sale_id: string | null;
+  original_sale_number: string | null;
+  date: number;
+  quantity: number;
+  unit_price_cents: number;
+  refund_cents: number;
+  reason: ReturnReason;
+  notes: string | null;
+  customer_name: string | null;
+  cashier_name: string;
+  status: "pending" | "approved" | "rejected" | "restocked";
+}
+
+export interface ProductReturnsResponse {
+  items: ProductReturn[];
+  total: number;
+  total_units_returned: number;
+  total_refunded_cents: number;
+}
+
+export interface ProductCredit {
+  id: string;
+  product_id: string;
+  credit_note_id: string;
+  credit_number: string;
+  date: number;
+  amount_cents: number;
+  reason: string;
+  notes: string | null;
+  customer_name: string | null;
+  status: "issued" | "applied" | "expired" | "voided";
+  expires_at: number | null;
+}
+
+export interface ProductCreditsResponse {
+  items: ProductCredit[];
+  total: number;
+  total_credits_cents: number;
+}
+
+export interface ProductInvoice {
+  id: string;
+  product_id: string;
+  po_id: string;
+  po_number: string;
+  invoice_number: string | null;
+  date: number;
+  quantity: number;
+  unit_cost_cents: number;
+  total_cost_cents: number;
+  supplier_name: string;
+  status: "pending" | "partial" | "received" | "invoiced" | "cancelled";
+  expiry_date: number | null;
+  lot_code: string | null;
+}
+
+export interface ProductInvoicesResponse {
+  items: ProductInvoice[];
+  total: number;
+  total_units_ordered: number;
+  total_cost_cents: number;
+}
+
 // ─── Accounting ───────────────────────────────────────────────────────────────
 
 export type AccountType = "asset" | "liability" | "income" | "expense";

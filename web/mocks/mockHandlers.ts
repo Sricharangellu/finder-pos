@@ -1274,6 +1274,331 @@ export const mockHandlers = [
         }
         return HttpResponse.json({ ok: true });
       }),
+
+      // ── Batches/lots per product (used by ExpiryTab) ─────────────────────
+      ...(() => {
+        let bSeq = 100;
+        const D = 86_400_000;
+        const N = Date.now();
+
+        function mkBatch(id: string, productId: string, batchNum: string, qty: number, costCents: number | null,
+          expiryOffset: number | null, supplier: string | null): {
+          id: string; product_id: string; batch_number: string; supplier_name: string | null;
+          received_at: number; expiry_date: number; qty_on_hand: number; cost_cents: number | null;
+          status: "fresh" | "expiring" | "expired";
+        } {
+          const exp = expiryOffset !== null ? N + expiryOffset * D : N + 90 * D;
+          const daysLeft = Math.ceil((exp - N) / D);
+          const status: "fresh" | "expiring" | "expired" =
+            daysLeft < 0 ? "expired" : daysLeft <= 30 ? "expiring" : "fresh";
+          return { id, product_id: productId, batch_number: batchNum, supplier_name: supplier,
+            received_at: N - 20 * D, expiry_date: exp, qty_on_hand: qty, cost_cents: costCents, status };
+        }
+
+        let batches = [
+          mkBatch("b_p1_a","prod_1","LOT-2024-001",48,80,-3,"CoreDist"),
+          mkBatch("b_p1_b","prod_1","LOT-2024-002",120,78,15,"CoreDist"),
+          mkBatch("b_p1_c","prod_1","LOT-2024-003",60,82,45,"CoreDist"),
+          mkBatch("b_p2_a","prod_2","LOT-2024-010",24,130,4,"KeHE"),
+          mkBatch("b_p2_b","prod_2","LOT-2024-011",36,128,60,"KeHE"),
+          mkBatch("b_p3_a","prod_3","LOT-2024-020",72,100,null,"Sysco"),
+          mkBatch("b_p4_a","prod_4","LOT-2024-030",18,240,22,"NatFoods"),
+          mkBatch("b_p5_a","prod_5","LOT-2024-040",100,820,null,null),
+        ];
+
+        return [
+          http.get(`${V1}/catalog/:id/batches`, async ({ params }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const items = batches.filter((b) => b.product_id === pid);
+            return HttpResponse.json({ items });
+          }),
+          http.post(`${V1}/catalog/:id/batches`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const body = (await request.json()) as Record<string, unknown>;
+            const exp = body.expiry_date ? Number(body.expiry_date) : Date.now() + 90 * D;
+            const dLeft = Math.ceil((exp - Date.now()) / D);
+            const status: "fresh" | "expiring" | "expired" = dLeft < 0 ? "expired" : dLeft <= 30 ? "expiring" : "fresh";
+            const b = {
+              id: `b_${++bSeq}`, product_id: pid,
+              batch_number: String(body.batch_number ?? "LOT-NEW"),
+              supplier_name: (body.supplier_name as string | null) ?? null,
+              received_at: body.received_at ? Number(body.received_at) : Date.now(),
+              expiry_date: exp,
+              qty_on_hand: Number(body.qty_on_hand ?? 0),
+              cost_cents: body.cost_cents ? Number(body.cost_cents) : null,
+              status,
+            };
+            batches.push(b);
+            return HttpResponse.json(b, { status: 201 });
+          }),
+          http.patch(`${V1}/catalog/:id/batches/:bid`, async ({ params, request }) => {
+            await lat();
+            const bid = String(params["bid"]);
+            const body = (await request.json()) as Record<string, unknown>;
+            const idx = batches.findIndex((b) => b.id === bid);
+            if (idx === -1) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+            batches[idx] = { ...batches[idx], ...body } as typeof batches[0];
+            return HttpResponse.json(batches[idx]);
+          }),
+          http.delete(`${V1}/catalog/:id/batches/:bid`, async ({ params }) => {
+            await lat();
+            const bid = String(params["bid"]);
+            const before = batches.length;
+            batches = batches.filter((b) => b.id !== bid);
+            if (batches.length === before) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+            return new HttpResponse(null, { status: 204 });
+          }),
+        ];
+      })(),
+
+      // ── Expiry batches per product ────────────────────────────────────────
+      ...(() => {
+        let batchSeq = 10;
+        const DAY = 86_400_000;
+        const BASE = Date.now();
+
+        function makeExpiry(id: string, productId: string, batchNum: string, qty: number,
+          costCents: number, expiryOffset: number | null, supplier: string | null,
+          lotCode: string | null = null, notes: string | null = null) {
+          const expiryDate = expiryOffset !== null ? BASE + expiryOffset * DAY : null;
+          const daysUntil = expiryDate !== null ? Math.round((expiryDate - BASE) / DAY) : null;
+          let expiry_status: "ok" | "warning" | "critical" | "expired" = "ok";
+          if (daysUntil !== null) {
+            if (daysUntil < 0) expiry_status = "expired";
+            else if (daysUntil < 7) expiry_status = "critical";
+            else if (daysUntil < 30) expiry_status = "warning";
+          }
+          return {
+            id, product_id: productId, batch_number: batchNum,
+            lot_code: lotCode, quantity: qty, unit_cost_cents: costCents,
+            expiry_date: expiryDate, received_at: BASE - 20 * DAY,
+            supplier_name: supplier, location_name: "Main Floor",
+            notes, expiry_status, days_until_expiry: daysUntil,
+            created_at: BASE - 20 * DAY, updated_at: BASE - 5 * DAY,
+          };
+        }
+
+        let expiryBatches = [
+          makeExpiry("batch_p1_1","prod_1","LOT-2024-001",48,80,-3,"CoreDist","L-001"),
+          makeExpiry("batch_p1_2","prod_1","LOT-2024-002",120,78,15,"CoreDist","L-002"),
+          makeExpiry("batch_p1_3","prod_1","LOT-2024-003",60,82,45,"CoreDist","L-003"),
+          makeExpiry("batch_p2_1","prod_2","LOT-2024-010",24,130,4,"KeHE","L-010","Check dates"),
+          makeExpiry("batch_p2_2","prod_2","LOT-2024-011",36,128,60,"KeHE","L-011"),
+          makeExpiry("batch_p3_1","prod_3","LOT-2024-020",72,100,null,"Sysco",null),
+          makeExpiry("batch_p4_1","prod_4","LOT-2024-030",18,240,22,"NatFoods","L-030"),
+          makeExpiry("batch_p5_1","prod_5","LOT-2024-040",100,820,null,null,null,"Tobacco — no expiry"),
+        ];
+
+        return [
+          http.get(`${V1}/catalog/:id/expiry`, async ({ params }) => {
+            await lat();
+            const productId = String(params["id"]);
+            const items = expiryBatches.filter((b) => b.product_id === productId);
+            return HttpResponse.json({ items, total: items.length });
+          }),
+
+          http.post(`${V1}/catalog/:id/expiry`, async ({ params, request }) => {
+            await lat();
+            const productId = String(params["id"]);
+            const b = (await request.json()) as Record<string, unknown>;
+            const expiryDate = b.expiry_date ? Number(b.expiry_date) : null;
+            const daysUntil = expiryDate ? Math.round((expiryDate - Date.now()) / DAY) : null;
+            let expiry_status: "ok" | "warning" | "critical" | "expired" = "ok";
+            if (daysUntil !== null) {
+              if (daysUntil < 0) expiry_status = "expired";
+              else if (daysUntil < 7) expiry_status = "critical";
+              else if (daysUntil < 30) expiry_status = "warning";
+            }
+            const batch = {
+              id: `batch_${++batchSeq}`, product_id: productId,
+              batch_number: String(b.batch_number ?? `LOT-${Date.now()}`),
+              lot_code: (b.lot_code as string | null) ?? null,
+              quantity: Number(b.quantity ?? 0),
+              unit_cost_cents: Number(b.unit_cost_cents ?? 0),
+              expiry_date: expiryDate, received_at: Date.now(),
+              supplier_name: (b.supplier_name as string | null) ?? null,
+              location_name: (b.location_name as string | null) ?? "Main Floor",
+              notes: (b.notes as string | null) ?? null,
+              expiry_status, days_until_expiry: daysUntil,
+              created_at: Date.now(), updated_at: Date.now(),
+            };
+            expiryBatches.push(batch);
+            return HttpResponse.json(batch, { status: 201 });
+          }),
+
+          http.patch(`${V1}/catalog/:id/expiry/:batchId`, async ({ params, request }) => {
+            await lat();
+            const batchId = String(params["batchId"]);
+            const b = (await request.json()) as Record<string, unknown>;
+            const idx = expiryBatches.findIndex((x) => x.id === batchId);
+            if (idx === -1) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+            expiryBatches[idx] = { ...expiryBatches[idx], ...b, updated_at: Date.now() };
+            return HttpResponse.json(expiryBatches[idx]);
+          }),
+
+          http.delete(`${V1}/catalog/:id/expiry/:batchId`, async ({ params }) => {
+            await lat();
+            const batchId = String(params["batchId"]);
+            const before = expiryBatches.length;
+            expiryBatches = expiryBatches.filter((x) => x.id !== batchId);
+            if (expiryBatches.length === before) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+            return new HttpResponse(null, { status: 204 });
+          }),
+        ];
+      })(),
+
+      // ── Sales history per product ──────────────────────────────────────────
+      ...(() => {
+        const BASE = Date.now();
+        const DAY = 86_400_000;
+        const cashiers = ["Alex T.","Maria S.","John D.","Sara K."];
+        const methods = ["cash","card","gift_card","split"];
+
+        function makeSale(id: string, productId: string, saleId: string, saleNum: string,
+          daysAgo: number, qty: number, unitCents: number, taxCents: number,
+          customer: string | null, cashierIdx: number) {
+          const discountCents = 0;
+          return {
+            id, product_id: productId, sale_id: saleId, sale_number: saleNum,
+            date: BASE - daysAgo * DAY, quantity: qty,
+            unit_price_cents: unitCents, discount_cents: discountCents,
+            tax_cents: taxCents, total_cents: qty * unitCents - discountCents + taxCents,
+            customer_name: customer, cashier_name: cashiers[cashierIdx % cashiers.length],
+            outlet_name: "Main Outlet", payment_method: methods[Math.floor(Math.random() * methods.length)],
+          };
+        }
+
+        const salesData = [
+          makeSale("sl_p1_1","prod_1","sale_001","SALE-0001",1,3,199,5,"Jane Doe",0),
+          makeSale("sl_p1_2","prod_1","sale_002","SALE-0002",3,1,199,2,null,1),
+          makeSale("sl_p1_3","prod_1","sale_003","SALE-0003",5,5,199,8,"Bob Smith",2),
+          makeSale("sl_p1_4","prod_1","sale_004","SALE-0004",8,2,199,3,"Alice J.",3),
+          makeSale("sl_p1_5","prod_1","sale_005","SALE-0005",12,4,199,7,null,0),
+          makeSale("sl_p1_6","prod_1","sale_006","SALE-0006",15,1,199,2,"Tom K.",1),
+          makeSale("sl_p1_7","prod_1","sale_007","SALE-0007",20,6,199,10,null,2),
+          makeSale("sl_p2_1","prod_2","sale_008","SALE-0008",2,2,349,6,"Jane Doe",0),
+          makeSale("sl_p2_2","prod_2","sale_009","SALE-0009",4,1,349,3,null,1),
+          makeSale("sl_p3_1","prod_3","sale_010","SALE-0010",1,4,299,10,"Bob Smith",2),
+          makeSale("sl_p3_2","prod_3","sale_011","SALE-0011",6,2,299,5,null,3),
+          makeSale("sl_p4_1","prod_4","sale_012","SALE-0012",3,1,599,10,"Alice J.",0),
+          makeSale("sl_p5_1","prod_5","sale_013","SALE-0013",2,3,1299,0,null,1),
+          makeSale("sl_p5_2","prod_5","sale_014","SALE-0014",7,5,1299,0,"Tom K.",2),
+          makeSale("sl_p7_1","prod_7","sale_015","SALE-0015",1,2,1499,0,null,0),
+        ];
+
+        return [
+          http.get(`${V1}/catalog/:id/sales`, async ({ params, request }) => {
+            await lat();
+            const productId = String(params["id"]);
+            const url = new URL(request.url);
+            const limit = Number(url.searchParams.get("limit") ?? 50);
+            const offset = Number(url.searchParams.get("offset") ?? 0);
+            const all = salesData.filter((s) => s.product_id === productId)
+              .sort((a, b) => b.date - a.date);
+            const items = all.slice(offset, offset + limit);
+            const totalRevenue = all.reduce((s, r) => s + r.total_cents, 0);
+            const totalUnits = all.reduce((s, r) => s + r.quantity, 0);
+            return HttpResponse.json({ items, total: all.length, total_units_sold: totalUnits, total_revenue_cents: totalRevenue });
+          }),
+        ];
+      })(),
+
+      // ── Returns per product ────────────────────────────────────────────────
+      ...(() => {
+        const BASE = Date.now();
+        const DAY = 86_400_000;
+        const reasons = ["defective","customer_changed_mind","wrong_item","expired","damaged","other"] as const;
+
+        const returnsData = [
+          { id:"ret_p1_1", product_id:"prod_1", return_id:"rtn_001", return_number:"RTN-0001", original_sale_id:"sale_001", original_sale_number:"SALE-0001", date:BASE-1*DAY, quantity:1, unit_price_cents:199, refund_cents:199, reason:"defective" as const, notes:"Leaking bottle", customer_name:"Jane Doe", cashier_name:"Alex T.", status:"approved" as const },
+          { id:"ret_p1_2", product_id:"prod_1", return_id:"rtn_002", return_number:"RTN-0002", original_sale_id:"sale_003", original_sale_number:"SALE-0003", date:BASE-5*DAY, quantity:2, unit_price_cents:199, refund_cents:398, reason:"wrong_item" as const, notes:null, customer_name:"Bob Smith", cashier_name:"Maria S.", status:"restocked" as const },
+          { id:"ret_p2_1", product_id:"prod_2", return_id:"rtn_003", return_number:"RTN-0003", original_sale_id:"sale_008", original_sale_number:"SALE-0008", date:BASE-2*DAY, quantity:1, unit_price_cents:349, refund_cents:349, reason:"customer_changed_mind" as const, notes:null, customer_name:"Jane Doe", cashier_name:"John D.", status:"approved" as const },
+          { id:"ret_p3_1", product_id:"prod_3", return_id:"rtn_004", return_number:"RTN-0004", original_sale_id:null, original_sale_number:null, date:BASE-10*DAY, quantity:1, unit_price_cents:299, refund_cents:299, reason:"expired" as const, notes:"Past best-by date", customer_name:null, cashier_name:"Sara K.", status:"pending" as const },
+          { id:"ret_p5_1", product_id:"prod_5", return_id:"rtn_005", return_number:"RTN-0005", original_sale_id:"sale_013", original_sale_number:"SALE-0013", date:BASE-3*DAY, quantity:1, unit_price_cents:1299, refund_cents:1299, reason:"damaged" as const, notes:"Packaging damaged", customer_name:null, cashier_name:"Alex T.", status:"rejected" as const },
+        ];
+
+        return [
+          http.get(`${V1}/catalog/:id/returns`, async ({ params, request }) => {
+            await lat();
+            const productId = String(params["id"]);
+            const url = new URL(request.url);
+            const limit = Number(url.searchParams.get("limit") ?? 50);
+            const offset = Number(url.searchParams.get("offset") ?? 0);
+            const all = returnsData.filter((r) => r.product_id === productId)
+              .sort((a, b) => b.date - a.date);
+            const items = all.slice(offset, offset + limit);
+            const totalUnits = all.reduce((s, r) => s + r.quantity, 0);
+            const totalRefunded = all.reduce((s, r) => s + r.refund_cents, 0);
+            return HttpResponse.json({ items, total: all.length, total_units_returned: totalUnits, total_refunded_cents: totalRefunded });
+          }),
+        ];
+      })(),
+
+      // ── Credits per product ───────────────────────────────────────────────
+      ...(() => {
+        const BASE = Date.now();
+        const DAY = 86_400_000;
+
+        const creditsData = [
+          { id:"crd_p1_1", product_id:"prod_1", credit_note_id:"cn_001", credit_number:"CN-2024-001", date:BASE-2*DAY, amount_cents:199, reason:"Product defect refund", notes:"Leaking bottle batch LOT-001", customer_name:"Jane Doe", status:"applied" as const, expires_at:BASE+60*DAY },
+          { id:"crd_p1_2", product_id:"prod_1", credit_note_id:"cn_002", credit_number:"CN-2024-002", date:BASE-10*DAY, amount_cents:398, reason:"Wrong item shipped", notes:null, customer_name:"Bob Smith", status:"issued" as const, expires_at:BASE+90*DAY },
+          { id:"crd_p2_1", product_id:"prod_2", credit_note_id:"cn_003", credit_number:"CN-2024-003", date:BASE-15*DAY, amount_cents:349, reason:"Goodwill credit", notes:"Customer complaint resolution", customer_name:"Jane Doe", status:"applied" as const, expires_at:null },
+          { id:"crd_p3_1", product_id:"prod_3", credit_note_id:"cn_004", credit_number:"CN-2024-004", date:BASE-30*DAY, amount_cents:149, reason:"Expired stock credit", notes:null, customer_name:null, status:"expired" as const, expires_at:BASE-1*DAY },
+          { id:"crd_p5_1", product_id:"prod_5", credit_note_id:"cn_005", credit_number:"CN-2024-005", date:BASE-5*DAY, amount_cents:1299, reason:"Damaged in transit", notes:"Supplier credit applied", customer_name:null, status:"issued" as const, expires_at:BASE+120*DAY },
+        ];
+
+        return [
+          http.get(`${V1}/catalog/:id/credits`, async ({ params, request }) => {
+            await lat();
+            const productId = String(params["id"]);
+            const url = new URL(request.url);
+            const limit = Number(url.searchParams.get("limit") ?? 50);
+            const offset = Number(url.searchParams.get("offset") ?? 0);
+            const all = creditsData.filter((c) => c.product_id === productId)
+              .sort((a, b) => b.date - a.date);
+            const items = all.slice(offset, offset + limit);
+            const totalCredits = all.filter((c) => (c.status as string) !== "expired" && (c.status as string) !== "voided")
+              .reduce((s, c) => s + c.amount_cents, 0);
+            return HttpResponse.json({ items, total: all.length, total_credits_cents: totalCredits });
+          }),
+        ];
+      })(),
+
+      // ── Invoices / PO history per product ────────────────────────────────
+      ...(() => {
+        const BASE = Date.now();
+        const DAY = 86_400_000;
+
+        const invoicesData = [
+          { id:"inv_p1_1", product_id:"prod_1", po_id:"po_001", po_number:"PO-2024-001", invoice_number:"INV-2024-001", date:BASE-60*DAY, quantity:200, unit_cost_cents:80, total_cost_cents:16000, supplier_name:"CoreDist", status:"received" as const, expiry_date:BASE+15*DAY, lot_code:"L-001" },
+          { id:"inv_p1_2", product_id:"prod_1", po_id:"po_002", po_number:"PO-2024-015", invoice_number:"INV-2024-015", date:BASE-30*DAY, quantity:180, unit_cost_cents:82, total_cost_cents:14760, supplier_name:"CoreDist", status:"invoiced" as const, expiry_date:BASE+45*DAY, lot_code:"L-002" },
+          { id:"inv_p1_3", product_id:"prod_1", po_id:"po_003", po_number:"PO-2024-030", invoice_number:null, date:BASE-5*DAY, quantity:120, unit_cost_cents:80, total_cost_cents:9600, supplier_name:"CoreDist", status:"partial" as const, expiry_date:null, lot_code:null },
+          { id:"inv_p2_1", product_id:"prod_2", po_id:"po_004", po_number:"PO-2024-005", invoice_number:"INV-2024-005", date:BASE-45*DAY, quantity:96, unit_cost_cents:130, total_cost_cents:12480, supplier_name:"KeHE", status:"received" as const, expiry_date:BASE+4*DAY, lot_code:"L-010" },
+          { id:"inv_p2_2", product_id:"prod_2", po_id:"po_005", po_number:"PO-2024-025", invoice_number:"INV-2024-025", date:BASE-10*DAY, quantity:60, unit_cost_cents:128, total_cost_cents:7680, supplier_name:"KeHE", status:"invoiced" as const, expiry_date:BASE+60*DAY, lot_code:"L-011" },
+          { id:"inv_p3_1", product_id:"prod_3", po_id:"po_006", po_number:"PO-2024-010", invoice_number:"INV-2024-010", date:BASE-20*DAY, quantity:144, unit_cost_cents:100, total_cost_cents:14400, supplier_name:"Sysco", status:"received" as const, expiry_date:null, lot_code:null },
+          { id:"inv_p4_1", product_id:"prod_4", po_id:"po_007", po_number:"PO-2024-012", invoice_number:null, date:BASE-7*DAY, quantity:48, unit_cost_cents:240, total_cost_cents:11520, supplier_name:"NatFoods", status:"pending" as const, expiry_date:BASE+22*DAY, lot_code:"L-030" },
+          { id:"inv_p5_1", product_id:"prod_5", po_id:"po_008", po_number:"PO-2024-020", invoice_number:"INV-2024-020", date:BASE-90*DAY, quantity:500, unit_cost_cents:820, total_cost_cents:410000, supplier_name:"TobaccoNet", status:"invoiced" as const, expiry_date:null, lot_code:null },
+          { id:"inv_p7_1", product_id:"prod_7", po_id:"po_009", po_number:"PO-2024-028", invoice_number:"INV-2024-028", date:BASE-14*DAY, quantity:200, unit_cost_cents:600, total_cost_cents:120000, supplier_name:"VapeWholesale", status:"received" as const, expiry_date:null, lot_code:null },
+        ];
+
+        return [
+          http.get(`${V1}/catalog/:id/invoices`, async ({ params, request }) => {
+            await lat();
+            const productId = String(params["id"]);
+            const url = new URL(request.url);
+            const limit = Number(url.searchParams.get("limit") ?? 50);
+            const offset = Number(url.searchParams.get("offset") ?? 0);
+            const all = invoicesData.filter((i) => i.product_id === productId)
+              .sort((a, b) => b.date - a.date);
+            const items = all.slice(offset, offset + limit);
+            const totalUnits = all.reduce((s, i) => s + i.quantity, 0);
+            const totalCost = all.reduce((s, i) => s + i.total_cost_cents, 0);
+            return HttpResponse.json({ items, total: all.length, total_units_ordered: totalUnits, total_cost_cents: totalCost });
+          }),
+        ];
+      })(),
     ];
   })(),
 
