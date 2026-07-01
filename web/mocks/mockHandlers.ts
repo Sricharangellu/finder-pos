@@ -59,8 +59,42 @@ let shippingMethods: any[] = [];
 let paymentTerms: any[] = [];
 let paymentModes: any[] = [];
 let taxRates: any[] = [];
-let featureFlags: Record<string, boolean> = { quotations: true, achBatchPayout: false, imeiTracking: false, msaReporting: false, compositeProducts: false, customerPortal: false, ecommerce: true, commissionTracking: false, pickerFulfillment: true, batchDeposits: true, room_billing: true, production_orders: true, rental_contracts: true, tickets: true, student_accounts: true };
+// ── Business-type bundles ─────────────────────────────────────────────────────
+// Each bundle lists the module keys that are auto-activated when a business
+// type is selected during signup or changed by support later.
+const BT_BUNDLES: Record<string, string[]> = {
+  retail:        ["pos_terminal", "discounts", "loyalty", "gift_cards", "ecommerce", "customer_display", "compliance"],
+  wholesale:     ["sales_orders", "purchasing", "billing", "accounting", "price_book", "quotes", "invoicing"],
+  restaurant:    ["tables", "kitchen", "bar_tabs", "reservations", "menu_modifiers", "pos_terminal"],
+  golf:          ["tee_sheet", "golf_bookings", "golf_members", "pro_shop", "pos_terminal"],
+  hospitality:   ["room_billing", "guest_accounts", "spa_services", "event_mgmt", "pos_terminal"],
+  services:      ["appointments", "service_orders", "memberships", "staff_commission", "pos_terminal"],
+  healthcare:    ["prescriptions", "patient_records", "insurance", "expiry_tracking"],
+  manufacturing: ["production_orders", "raw_materials", "batch_mgmt", "quality_control"],
+  ecommerce:     ["online_store", "order_fulfillment", "marketplace", "shipping_mgmt"],
+  automotive:    ["vehicle_history", "parts_inventory", "work_orders", "inspection"],
+  rental:        ["rental_contracts", "deposits", "asset_tracking", "damage_mgmt"],
+  entertainment: ["tickets", "access_control", "concessions", "season_passes"],
+  education:     ["fee_collection", "student_accounts", "course_enrollment", "attendance"],
+};
+
+// Non-nav system flags that always persist regardless of business type.
+const SYSTEM_FLAGS: Record<string, boolean> = {
+  achBatchPayout: false, imaiTracking: false, msaReporting: false,
+  compositeProducts: false, customerPortal: false, commissionTracking: false,
+  pickerFulfillment: true, batchDeposits: true,
+};
+
+function buildFeatureFlags(type: string, extraEnabled: Set<string>): Record<string, boolean> {
+  const bundle = new Set([...(BT_BUNDLES[type] ?? []), ...extraEnabled]);
+  const result: Record<string, boolean> = { ...SYSTEM_FLAGS };
+  for (const key of bundle) result[`module:${key}`] = true;
+  return result;
+}
+
+let featureFlags: Record<string, boolean> = buildFeatureFlags("retail", new Set());
 let businessProfile: Record<string, unknown> = {};
+let _btLocked = false; // locked after first setup — only support can change
 // ── UX-2: Module marketplace state ─────────────────────────────────────────
 type _BPMod = { key: string; name: string; description: string; group: string; core?: boolean; route?: string };
 const _BP_CATALOG: _BPMod[] = [
@@ -139,7 +173,7 @@ const _BP_CATALOG: _BPMod[] = [
 ];
 const _BP_CORE_KEYS = new Set(_BP_CATALOG.filter(m => m.core).map(m => m.key));
 let _bpType = "retail";
-let _bpEnabled = new Set<string>(["pos_terminal","discounts","loyalty","gift_cards","customer_display"]);
+let _bpEnabled = new Set<string>(BT_BUNDLES["retail"]);
 // Shipping dev stores
 let shipments: any[] = [];
 const shipLines = new Map<string, any[]>();
@@ -1451,6 +1485,7 @@ mockHandlers.push(
     await lat();
     return HttpResponse.json({
       businessType: _bpType,
+      locked: _btLocked,
       coreModules: [..._BP_CORE_KEYS],
       modules: _BP_CATALOG.map(m => ({
         ...m,
@@ -1461,17 +1496,49 @@ mockHandlers.push(
   }),
   http.post(`${V1}/settings/business-profile`, async ({ request }) => {
     await lat();
-    const body = (await request.json()) as { businessType?: string; moduleFlags?: Record<string, boolean>; enabledModules?: string[] };
-    if (body.businessType) _bpType = body.businessType;
+    const body = (await request.json()) as { businessType?: string; moduleFlags?: Record<string, boolean>; enabledModules?: string[]; lock?: boolean };
+
+    if (body.businessType && body.businessType !== _bpType) {
+      // Apply the bundle for the new business type — this wires the nav immediately.
+      _bpType = body.businessType;
+      _bpEnabled = new Set(BT_BUNDLES[_bpType] ?? []);
+      featureFlags = buildFeatureFlags(_bpType, new Set());
+    }
+
+    // Fine-grained module toggles (within the current type's bundle).
     if (body.moduleFlags) {
       for (const [fk, on] of Object.entries(body.moduleFlags)) {
         const key = fk.startsWith("module:") ? fk.slice(7) : fk;
-        if (on) _bpEnabled.add(key); else _bpEnabled.delete(key);
+        if (on) { _bpEnabled.add(key); featureFlags[`module:${key}`] = true; }
+        else    { _bpEnabled.delete(key); delete featureFlags[`module:${key}`]; }
       }
     } else if (body.enabledModules) {
-      _bpEnabled = new Set(body.enabledModules.filter(k => !_BP_CORE_KEYS.has(k)));
+      const extra = new Set(body.enabledModules.filter(k => !_BP_CORE_KEYS.has(k)));
+      _bpEnabled = extra;
+      featureFlags = buildFeatureFlags(_bpType, extra);
     }
-    return HttpResponse.json({ ok: true, businessType: _bpType });
+
+    if (body.lock) _btLocked = true;
+
+    return HttpResponse.json({ ok: true, businessType: _bpType, locked: _btLocked });
+  }),
+
+  // ── Support-only: change business type after account setup ─────────────────
+  // Requires header X-Finder-Support-Key: finder-support-2026
+  http.patch(`${V1}/admin/business-type`, async ({ request }) => {
+    await lat();
+    if (request.headers.get("X-Finder-Support-Key") !== "finder-support-2026") {
+      return HttpResponse.json({ error: { code: "forbidden", message: "Support credentials required." } }, { status: 403 });
+    }
+    const body = (await request.json()) as { businessType: string };
+    if (!BT_BUNDLES[body.businessType]) {
+      return HttpResponse.json({ error: { code: "invalid", message: "Unknown business type." } }, { status: 400 });
+    }
+    _bpType = body.businessType;
+    _bpEnabled = new Set(BT_BUNDLES[_bpType]);
+    featureFlags = buildFeatureFlags(_bpType, new Set());
+    _btLocked = true;
+    return HttpResponse.json({ ok: true, businessType: _bpType, locked: true });
   }),
   http.get(`${V1}/settings/shipping-methods`, async () => { await lat(); return HttpResponse.json({ items: shippingMethods }); }),
   http.post(`${V1}/settings/shipping-methods`, async ({ request }) => { await lat(); const b = (await request.json()) as any; const r = { id: `shm_${++smSeq}`, tenant_id: "tnt_demo", name: b.name, amount_cents: b.amountCents, free_limit_cents: b.freeLimitCents ?? null, ecommerce: b.ecommerce ? 1 : 0, sequence: b.sequence ?? 0, credit_account_id: b.creditAccountId ?? null, debit_account_id: b.debitAccountId ?? null, active: 1 }; shippingMethods.push(r); return HttpResponse.json(r, { status: 201 }); }),
@@ -4924,6 +4991,147 @@ mockHandlers.push(
         promos = promos.filter(p => p.id !== String(params["id"]));
         if (promos.length === before) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
         return new HttpResponse(null, { status: 204 });
+      }),
+    ];
+  })(),
+
+  // ── Sales History ──────────────────────────────────────────────────────────
+  ...(() => {
+    const NOW  = Date.now();
+    const DAY  = 86_400_000;
+    const HOUR = 3_600_000;
+
+    interface SaleLine  { qty: number; name: string; unit_price_cents: number; tax_cents: number; total_cents: number; }
+    interface SalePayment { method: string; amount_cents: number; date: number; }
+    interface SaleRecord {
+      id: string; receipt_number: string; created_at: number;
+      customer_name: string | null; sold_by: string; outlet: string;
+      note: string | null; total_cents: number;
+      status: "completed" | "open" | "voided" | "returned";
+      lines: SaleLine[]; payments: SalePayment[];
+    }
+
+    const STAFF = ["Alex Johnson", "Maria Chen", "Sam Rivera", "Jamie Taylor", "Casey Morgan"];
+
+    function makeSale(id: string, receipt: string, offsetMs: number, opts: Partial<SaleRecord>): SaleRecord {
+      const ts = NOW - offsetMs;
+      return {
+        id,
+        receipt_number: receipt,
+        created_at: ts,
+        customer_name: opts.customer_name ?? null,
+        sold_by: opts.sold_by ?? STAFF[Math.floor(Math.random() * STAFF.length)]!,
+        outlet: "Main Outlet",
+        note: opts.note ?? null,
+        total_cents: opts.total_cents ?? 0,
+        status: opts.status ?? "completed",
+        lines: opts.lines ?? [],
+        payments: opts.payments ?? [],
+      };
+    }
+
+    const sales: SaleRecord[] = [
+      makeSale("sale_001", "R-10042", 2 * HOUR, {
+        customer_name: "Emily Carter",
+        sold_by: "Alex Johnson",
+        total_cents: 4597,
+        note: "Regular customer",
+        status: "completed",
+        lines: [
+          { qty: 2, name: "Coffee Blend 500g", unit_price_cents: 1499, tax_cents: 135, total_cents: 2998 },
+          { qty: 1, name: "Reusable Travel Mug", unit_price_cents: 1599, tax_cents: 0,   total_cents: 1599 },
+        ],
+        payments: [{ method: "Card", amount_cents: 4597, date: NOW - 2 * HOUR }],
+      }),
+      makeSale("sale_002", "R-10041", 4 * HOUR, {
+        sold_by: "Maria Chen",
+        total_cents: 12499,
+        status: "completed",
+        lines: [
+          { qty: 1, name: "Wireless Keyboard", unit_price_cents: 9999, tax_cents: 900, total_cents: 9999 },
+          { qty: 1, name: "USB Hub 7-Port",    unit_price_cents: 2500, tax_cents: 225, total_cents: 2500 },
+        ],
+        payments: [{ method: "Cash", amount_cents: 12499, date: NOW - 4 * HOUR }],
+      }),
+      makeSale("sale_003", "R-10040", 6 * HOUR, {
+        customer_name: "David Park",
+        sold_by: "Sam Rivera",
+        total_cents: 2199,
+        note: "Exchange - different size",
+        status: "returned",
+        lines: [{ qty: 1, name: "Notebook A5", unit_price_cents: 2199, tax_cents: 0, total_cents: 2199 }],
+        payments: [{ method: "Card", amount_cents: 2199, date: NOW - 6 * HOUR }],
+      }),
+      makeSale("sale_004", "R-10039", 1 * DAY, {
+        customer_name: "Sophia Williams",
+        sold_by: "Jamie Taylor",
+        total_cents: 7850,
+        status: "completed",
+        lines: [
+          { qty: 3, name: "Protein Bar 12-Pack", unit_price_cents: 1999, tax_cents: 0,   total_cents: 5997 },
+          { qty: 1, name: "Shaker Bottle",        unit_price_cents: 1853, tax_cents: 0,   total_cents: 1853 },
+        ],
+        payments: [{ method: "Card", amount_cents: 7850, date: NOW - 1 * DAY }],
+      }),
+      makeSale("sale_005", "R-10038", 1 * DAY + 3 * HOUR, {
+        sold_by: "Casey Morgan",
+        total_cents: 999,
+        status: "voided",
+        note: "Wrong register",
+        lines: [{ qty: 1, name: "Candy Bar", unit_price_cents: 999, tax_cents: 0, total_cents: 999 }],
+        payments: [],
+      }),
+      makeSale("sale_006", "R-10037", 2 * DAY, {
+        customer_name: "Liam O'Brien",
+        sold_by: "Alex Johnson",
+        total_cents: 34500,
+        status: "completed",
+        lines: [
+          { qty: 1, name: "Standing Desk 120cm", unit_price_cents: 29999, tax_cents: 2700, total_cents: 29999 },
+          { qty: 2, name: "Cable Manager",       unit_price_cents: 2251, tax_cents: 203,  total_cents: 4501  },
+        ],
+        payments: [
+          { method: "Card",  amount_cents: 20000, date: NOW - 2 * DAY },
+          { method: "Store credit", amount_cents: 14500, date: NOW - 2 * DAY },
+        ],
+      }),
+      makeSale("sale_007", "R-10036", 3 * DAY, {
+        customer_name: "Ava Thompson",
+        sold_by: "Maria Chen",
+        total_cents: 5598,
+        status: "completed",
+        lines: [
+          { qty: 2, name: "Scented Candle",  unit_price_cents: 1999, tax_cents: 0, total_cents: 3998 },
+          { qty: 1, name: "Gift Wrap Service", unit_price_cents: 1600, tax_cents: 0, total_cents: 1600 },
+        ],
+        payments: [{ method: "Cash", amount_cents: 5598, date: NOW - 3 * DAY }],
+      }),
+      makeSale("sale_008", "R-10035", 4 * DAY, {
+        sold_by: "Sam Rivera",
+        total_cents: 8999,
+        status: "completed",
+        lines: [{ qty: 1, name: "Bluetooth Speaker", unit_price_cents: 8999, tax_cents: 810, total_cents: 8999 }],
+        payments: [{ method: "Card", amount_cents: 8999, date: NOW - 4 * DAY }],
+      }),
+    ];
+
+    return [
+      http.get(`${V1}/sales/history`, async ({ request }) => {
+        await lat();
+        const url    = new URL(request.url);
+        const status = url.searchParams.get("status") ?? "";
+        const q      = url.searchParams.get("q") ?? "";
+        let list     = [...sales];
+        if (status && status !== "all") list = list.filter(s => s.status === status);
+        if (q) {
+          const ql = q.toLowerCase();
+          list = list.filter(s =>
+            s.receipt_number.toLowerCase().includes(ql) ||
+            (s.customer_name ?? "").toLowerCase().includes(ql) ||
+            (s.note ?? "").toLowerCase().includes(ql)
+          );
+        }
+        return HttpResponse.json({ items: list });
       }),
     ];
   })(),

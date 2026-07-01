@@ -4,17 +4,23 @@
 
 /* ── Design System Tokens ────────────────────────────────────────────────── */
 :root {
-  --color-primary:        #0137FC;
-  --color-sidebar-bg:     #030B25;
-  --color-sidebar-active: #0137FC;
-  --color-header-bg:      #F7F7F7;
-  --color-header-border:  rgb(229, 220, 220);
-  --color-page-bg:        #F9F9F9;
+  /* Primary brand — reference spec #5D5FEF */
+  --color-primary:        #5D5FEF;
+  /* Shell — always dark per reference spec */
+  --color-topbar-bg:      #1a1a1a;
+  --color-sidebar-bg:     #1a1a1a;
+  --color-sidebar-flyout: #2a2a2a;
+  --color-sidebar-active: rgba(255,255,255,0.15);
+  --color-sidebar-hover:  rgba(255,255,255,0.08);
+  /* Content area */
+  --color-header-bg:      #ffffff;
+  --color-header-border:  #E8E8E8;
+  --color-page-bg:        #F5F5F5;
   --color-table-header:   #FAFAFA;
   --color-table-border:   #F0F0F0;
-  --color-text-primary:   rgba(0, 0, 0, 0.88);
-  --color-text-secondary: rgba(0, 0, 0, 0.45);
-  --color-link:           #0137FC;
+  --color-text-primary:   #111111;
+  --color-text-secondary: #666666;
+  --color-link:           #5D5FEF;
   --color-billed:         #1890FF;
   --color-not-billed:     #FA8C16;
   --color-danger:         #FF4D4F;

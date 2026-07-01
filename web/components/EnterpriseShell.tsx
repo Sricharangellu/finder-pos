@@ -1,181 +1,81 @@
 "use client";
 
 /**
- * EnterpriseShell — shared retail operations frame.
+ * EnterpriseShell — retail operations frame.
  *
- * Register-first workflow, persistent module navigation, store/register
- * context, user context, and device connectivity status.
+ * Layout per reference spec:
+ *   - Fixed top bar 48px  dark #1a1a1a  (☰ Menu | Search ⌘/ | Help · Bell · User)
+ *   - Fixed left rail 52px dark #1a1a1a  (9 icon sections, icon-only)
+ *   - "Sell" rail icon → fly-out panel with register context + sub-items
+ *   - Content area: top-12 ml-[52px], bg #F5F5F5
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { clsx } from "clsx";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { NotificationBell } from "@/components/NotificationBell";
-import { apiGet } from "@/api-client/client";
-import type { OutletsResponse } from "@/api-client/types";
 import { useAuth } from "@/lib/useAuth";
 import { useOffline } from "@/lib/useOffline";
 import { useFinderContext } from "@/lib/useFinderContext";
 import { useModuleFlags } from "@/hooks/useModuleFlags";
 
-type NavKey =
-  | "dashboard"
-  | "register"
-  | "inventory"
-  | "purchasing"
-  | "customers"
-  | "orders"
-  | "sales"
-  | "accounting"
-  | "shipping"
-  | "discounts"
-  | "ecommerce"
-  | "reports"
-  | "settings"
-  | "operations"
-  | "team"
-  | "insights"
-  | "finance"
-  | "catalog"
-  | "gift-cards"
-  | "vendors"
-  | "payments"
-  | "returns"
-  | "tax-compliance"
-  | "integrations"
-  | "imports-exports"
-  | "workflows"
-  | "quotes"
-  | "loyalty"
-  | "notifications"
-  | "audit-log"
-  | "service-orders"
-  | "inventory-locations"
-  | "inventory-expiry"
-  | "invoicing"
-  | "inventory-serials"
-  | "inventory-reorder"
-  | "inventory-counts"
-  | "workforce"
-  | "appointments"
-  | "healthcare"
-  | "automotive"
-  | "hospitality"
-  | "manufacturing"
-  | "rental"
-  | "entertainment"
-  | "education"
-  | "module-marketplace"
-  | "kitchen"
-  | "bar-tabs"
-  | "golf"
-  | "golf-bookings"
-  | "golf-members"
-  | "golf-pro-shop";
+// ── NavKey type (kept for backward compat — all pages pass active="...") ──────
 
-/** Full nav item definition — module key gates visibility. */
-interface NavItemDef {
-  key: NavKey;
-  label: string;
-  href: string;
-  icon: NavKey;
-  group: "Operate" | "Manage" | "Analyze" | "Platform";
-  /** Module key that must be enabled to show this item. Omit = always visible. */
-  module?: string;
-}
+export type NavKey =
+  | "dashboard" | "register" | "inventory" | "purchasing" | "customers"
+  | "orders" | "sales" | "accounting" | "shipping" | "discounts" | "ecommerce"
+  | "reports" | "settings" | "operations" | "team" | "insights" | "finance"
+  | "catalog" | "gift-cards" | "vendors" | "payments" | "returns"
+  | "tax-compliance" | "integrations" | "imports-exports" | "workflows"
+  | "quotes" | "loyalty" | "notifications" | "audit-log" | "service-orders"
+  | "inventory-locations" | "inventory-expiry" | "invoicing" | "inventory-serials"
+  | "inventory-reorder" | "inventory-counts" | "workforce" | "appointments"
+  | "healthcare" | "automotive" | "hospitality" | "manufacturing" | "rental"
+  | "entertainment" | "education" | "module-marketplace" | "kitchen" | "bar-tabs"
+  | "golf" | "golf-bookings" | "golf-members" | "golf-pro-shop";
 
-/** All possible nav items across all verticals.
- *  Filtered at render time by useModuleFlags(). */
-const ALL_NAV_ITEMS: NavItemDef[] = [
-  // ── Always visible ───────────────────────────────────────────────────────
-  { key: "dashboard",  label: "Dashboard",     href: "/dashboard",    icon: "dashboard",  group: "Operate" },
-  { key: "settings",   label: "Setup",         href: "/setup",        icon: "settings",   group: "Platform" },
+// ── Section mapping: NavKey → which rail icon is highlighted ──────────────────
 
-  // ── Retail / POS ─────────────────────────────────────────────────────────
-  { key: "register",   label: "Sell",          href: "/sell",         icon: "register",   group: "Operate",  module: "pos_terminal" },
-  { key: "discounts",  label: "Discounts",     href: "/discounts",    icon: "discounts",  group: "Manage",   module: "discounts" },
-  { key: "loyalty",    label: "Loyalty",       href: "/loyalty",      icon: "loyalty",    group: "Manage",   module: "loyalty" },
-  { key: "gift-cards", label: "Gift Cards",    href: "/gift-cards",   icon: "gift-cards", group: "Manage",   module: "gift_cards" },
-  { key: "ecommerce",  label: "Ecommerce",     href: "/ecommerce",    icon: "ecommerce",  group: "Platform", module: "ecommerce" },
+type RailSection =
+  | "home" | "sell" | "online" | "reporting" | "catalog"
+  | "inventory" | "customers" | "finance" | "setup";
 
-  // ── Core always-on modules ────────────────────────────────────────────────
-  { key: "catalog",    label: "Catalog",       href: "/catalog",      icon: "catalog",    group: "Manage" },
-  { key: "inventory",  label: "Inventory",     href: "/inventory",    icon: "inventory",  group: "Manage" },
-  { key: "customers",  label: "Customers",     href: "/customers",    icon: "customers",  group: "Manage" },
-  { key: "reports",    label: "Reporting",     href: "/reporting",    icon: "reports",    group: "Analyze" },
+const SECTION_MAP: Record<NavKey, RailSection> = {
+  dashboard: "home",
+  register: "sell", sales: "sell", orders: "sell", quotes: "sell",
+  returns: "sell", payments: "sell", "service-orders": "sell",
+  ecommerce: "online",
+  reports: "reporting", insights: "reporting", "tax-compliance": "reporting",
+  catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
+  loyalty: "catalog", promotions: "catalog",
+  inventory: "inventory", operations: "inventory", purchasing: "inventory",
+  vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
+  "inventory-expiry": "inventory", "inventory-serials": "inventory",
+  "inventory-reorder": "inventory", "inventory-counts": "inventory", workforce: "inventory",
+  customers: "customers", appointments: "customers", healthcare: "customers",
+  finance: "finance", accounting: "finance", invoicing: "finance",
+  settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
+  notifications: "setup", "audit-log": "setup", "imports-exports": "setup",
+  "module-marketplace": "setup",
+  automotive: "setup", hospitality: "setup", manufacturing: "setup",
+  rental: "setup", entertainment: "setup", education: "setup",
+  kitchen: "sell", "bar-tabs": "sell",
+  golf: "sell", "golf-bookings": "sell", "golf-members": "sell", "golf-pro-shop": "sell",
+} as Record<NavKey, RailSection>;
 
-  // ── B2B / Wholesale ───────────────────────────────────────────────────────
-  { key: "quotes",      label: "Quotes",       href: "/quotes",       icon: "quotes",      group: "Operate", module: "quotes" },
-  { key: "sales",       label: "Sales Orders", href: "/sales",        icon: "sales",       group: "Operate", module: "sales_orders" },
-  { key: "purchasing",  label: "Purchasing",   href: "/purchasing",   icon: "purchasing",  group: "Manage",  module: "purchasing" },
-  { key: "vendors",     label: "Vendors",      href: "/vendors",      icon: "vendors",     group: "Manage",  module: "purchasing" },
-  { key: "accounting",  label: "Accounting",   href: "/accounting",   icon: "accounting",  group: "Analyze", module: "accounting" },
-  { key: "finance",     label: "Finance",      href: "/finance",      icon: "finance",     group: "Analyze", module: "billing" },
-  { key: "invoicing",   label: "Invoicing",    href: "/invoicing",    icon: "invoicing",   group: "Analyze", module: "invoicing" },
-
-  // ── Restaurant ────────────────────────────────────────────────────────────
-  { key: "orders",        label: "Tables",        href: "/restaurant/floor-plan", icon: "orders",        group: "Operate",  module: "tables" },
-  { key: "kitchen",       label: "Kitchen",       href: "/restaurant/kitchen",    icon: "kitchen",       group: "Operate",  module: "kitchen" },
-  { key: "bar-tabs",      label: "Bar Tabs",      href: "/restaurant/tabs",       icon: "bar-tabs",      group: "Operate",  module: "bar_tabs" },
-
-  // ── Services ─────────────────────────────────────────────────────────────
-  { key: "service-orders", label: "Service Orders", href: "/service-orders",       icon: "service-orders", group: "Operate",  module: "service_orders" },
-  { key: "appointments",  label: "Appointments",  href: "/appointments",          icon: "appointments",  group: "Operate",  module: "appointments" },
-
-  // ── Healthcare ────────────────────────────────────────────────────────────
-  { key: "healthcare",    label: "Patients",      href: "/healthcare",            icon: "healthcare",    group: "Operate",  module: "healthcare" },
-
-  // ── Automotive ────────────────────────────────────────────────────────────
-  { key: "automotive",    label: "Vehicles",      href: "/automotive",            icon: "automotive",    group: "Operate",  module: "automotive" },
-
-  // ── Golf ─────────────────────────────────────────────────────────────────────
-  { key: "golf",          label: "Tee Sheet",     href: "/golf",          icon: "golf",          group: "Operate",  module: "tee_sheet" },
-  { key: "golf-bookings", label: "Bookings",      href: "/golf/bookings", icon: "golf",          group: "Operate",  module: "golf_bookings" },
-  { key: "golf-members",  label: "Members",       href: "/golf/members",  icon: "golf",          group: "Operate",  module: "golf_members" },
-  { key: "golf-pro-shop", label: "Pro Shop",      href: "/golf/pro-shop", icon: "golf",          group: "Operate",  module: "pro_shop" },
-
-  // ── Vertical expansion ────────────────────────────────────────────────────
-  { key: "hospitality",   label: "Hospitality",   href: "/hospitality",          icon: "orders",       group: "Operate",  module: "room_billing" },
-  { key: "manufacturing", label: "Manufacturing", href: "/manufacturing",        icon: "operations",   group: "Manage",   module: "production_orders" },
-  { key: "rental",        label: "Rental",        href: "/rental",               icon: "shipping",     group: "Manage",   module: "rental_contracts" },
-  { key: "entertainment", label: "Entertainment", href: "/entertainment",        icon: "sales",        group: "Operate",  module: "tickets" },
-  { key: "education",     label: "Education",     href: "/education",            icon: "customers",    group: "Manage",   module: "student_accounts" },
-
-  // ── Workforce & Operations ─────────────────────────────────────────────────
-  { key: "workforce",   label: "Workforce",    href: "/workforce",    icon: "workforce",  group: "Manage",   module: "workforce" },
-  { key: "operations",  label: "Operations",   href: "/operations",   icon: "operations", group: "Manage",   module: "wms" },
-  { key: "shipping",    label: "Shipping",     href: "/shipping",     icon: "shipping",   group: "Manage",   module: "shipping_mgmt" },
-
-  // ── Platform ──────────────────────────────────────────────────────────────
-  { key: "team",             label: "Team",         href: "/team",              icon: "team",             group: "Platform" },
-  { key: "workflows",        label: "Workflows",    href: "/workflows",         icon: "workflows",        group: "Platform" },
-  { key: "integrations",     label: "Integrations", href: "/integrations",      icon: "integrations",     group: "Platform", module: "webhooks" },
-  { key: "notifications",    label: "Notifications",href: "/notifications",     icon: "notifications",    group: "Platform" },
-  { key: "audit-log",        label: "Audit Log",    href: "/audit-log",         icon: "audit-log",        group: "Platform" },
-  { key: "imports-exports",  label: "Import/Export",href: "/imports-exports",   icon: "imports-exports",  group: "Platform" },
-  { key: "module-marketplace", label: "Modules",    href: "/setup/modules",     icon: "module-marketplace", group: "Platform" },
+// Sell section fly-out sub-items
+const SELL_SUBMENU = [
+  { label: "Sell",             href: "/sell" },
+  { label: "Open / Close",     href: "/sell#open-close" },
+  { label: "Sales history",    href: "/sales" },
+  { label: "Cash management",  href: "/sell#cash" },
+  { label: "Status",           href: "/operations" },
+  { label: "Settings",         href: "/setup" },
+  { label: "Quotes",           href: "/quotes" },
 ];
 
-const MODULE_BY_ACTIVE: Record<NavKey, NavKey> = {
-  dashboard: "dashboard", register: "register", sales: "register", orders: "orders",
-  quotes: "register", returns: "register", "service-orders": "service-orders", invoicing: "invoicing",
-  payments: "finance", reports: "reports", insights: "reports", "tax-compliance": "reports",
-  catalog: "catalog", discounts: "catalog", "gift-cards": "catalog", vendors: "catalog",
-  inventory: "inventory", operations: "inventory", purchasing: "inventory", shipping: "inventory",
-  "inventory-locations": "inventory", "inventory-expiry": "inventory", "inventory-serials": "inventory",
-  "inventory-reorder": "inventory", "inventory-counts": "inventory", workforce: "settings",
-  customers: "customers", loyalty: "customers", finance: "finance", accounting: "finance",
-  ecommerce: "ecommerce", settings: "settings", team: "settings", workflows: "settings",
-  integrations: "settings", "imports-exports": "settings", notifications: "settings", "audit-log": "settings",
-  appointments: "appointments", healthcare: "healthcare", automotive: "automotive",
-  hospitality: "hospitality", manufacturing: "manufacturing", rental: "rental",
-  entertainment: "entertainment", education: "education",
-  kitchen: "kitchen", "bar-tabs": "bar-tabs",
-  golf: "golf", "golf-bookings": "golf", "golf-members": "golf", "golf-pro-shop": "golf",
-  "module-marketplace": "module-marketplace",
-};
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 interface EnterpriseShellProps {
   active: NavKey;
@@ -186,23 +86,18 @@ interface EnterpriseShellProps {
   contentClassName?: string;
 }
 
+// ── Shell ─────────────────────────────────────────────────────────────────────
+
 export function EnterpriseShell({
   active,
-  title,
-  subtitle,
   children,
   banner,
   contentClassName,
 }: EnterpriseShellProps) {
-  const { user, logout } = useAuth();
-  const { enabled: enabledModules } = useModuleFlags();
-  const { isOffline } = useOffline();
-  const pathname = usePathname();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // ⌘K / Ctrl+K global shortcut
   const handleGlobalKey = useCallback((e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "/")) {
       e.preventDefault();
       setPaletteOpen((o) => !o);
     }
@@ -214,842 +109,397 @@ export function EnterpriseShell({
   }, [handleGlobalKey]);
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: "var(--color-page-bg)" }}>
-      <EnterpriseRail active={active} pathname={pathname} />
+    <div className="flex min-h-screen flex-col bg-[#F5F5F5]">
+      {/* Skip link */}
+      <a href="#main-content" className="skip-link">Skip to content</a>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
-        {banner}
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <TopBar onSearchClick={() => setPaletteOpen(true)} />
 
-        {/* ── Top header (SalesGent spec: #F7F7F7 bg, 77px total) ──────── */}
-        <header
-          className="z-10 sticky top-0"
-          style={{
-            backgroundColor: "var(--color-header-bg)",
-            borderBottom: "1px solid var(--color-header-border)",
-          }}
-        >
-          {/* Row 1 — app switcher + search + store + utilities */}
-          <div
-            className="flex items-center justify-between gap-3 px-4 py-2"
-            style={{ borderBottom: "1px solid var(--color-header-border)" }}
-          >
-            {/* Global search */}
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              className="hidden max-w-xl flex-1 items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 h-8 text-[13px] text-[rgba(0,0,0,0.45)] transition-colors hover:border-brand-600 sm:flex"
-              aria-label="Open search (⌘K)"
-            >
-              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <span className="flex-1 text-left">Search in All</span>
-              <kbd className="rounded border border-[#D9D9D9] bg-[#F7F7F7] px-1.5 py-0.5 text-[11px] text-[rgba(0,0,0,0.45)]">⌘K</kbd>
-            </button>
+      {/* ── Body: sidebar + content ───────────────────────────────────────── */}
+      <div className="flex flex-1 pt-12">
+        <LeftRail active={active} />
 
-            {/* Right: store + notifications + user */}
-            <div className="flex items-center gap-2">
-              <StoreSwitcher />
-              <NotificationBell />
-              <DeviceStatus isOffline={isOffline} />
-              {user && <UserContext name={user.name} role={user.role} onLogout={() => void logout()} />}
-            </div>
-          </div>
-
-          {/* Row 2 — breadcrumb + page title */}
-          <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-            <div className="flex min-w-0 items-center gap-2">
-              {/* Mobile logo */}
-              <div
-                aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-xs font-bold text-white md:hidden"
-                style={{ backgroundColor: "var(--color-primary)" }}
-              >
-                F
-              </div>
-              {/* Breadcrumb: 🏠 > Parent > Current */}
-              <nav className="flex items-center gap-1 text-[13px]" aria-label="Breadcrumb">
-                <Link href="/dashboard" className="text-[rgba(0,0,0,0.45)] hover:text-brand-600 transition-colors" aria-label="Home">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                </Link>
-                <ChevronRight />
-                <Link
-                  href={ALL_NAV_ITEMS.find((i) => i.key === MODULE_BY_ACTIVE[active])?.href ?? "/"}
-                  className="transition-colors hover:text-brand-600"
-                  style={{ color: "var(--color-link)" }}
-                >
-                  {activeLabel(active)}
-                </Link>
-                <ChevronRight />
-                <span className="font-medium text-[rgba(0,0,0,0.88)] truncate max-w-[200px]">{title}</span>
-              </nav>
-            </div>
-            <span className="hidden text-[12px] text-[rgba(0,0,0,0.45)] sm:block">{subtitle}</span>
-          </div>
-        </header>
-
+        {/* Content area — sits right of the 52px rail */}
         <main
-          id="terminal-content"
-          className={clsx("flex-1 overflow-hidden", contentClassName)}
-          style={{ backgroundColor: "var(--color-page-bg)" }}
-          aria-label={title}
+          id="main-content"
+          className={[
+            "flex flex-1 flex-col min-w-0 ml-[52px]",
+            contentClassName ?? "overflow-y-auto",
+          ].join(" ")}
         >
+          {banner}
           {children}
         </main>
       </div>
-
-      <MobileNav active={active} />
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }
 
-function EnterpriseRail({
-  active,
-  pathname,
-}: {
-  active: NavKey;
-  pathname: string;
-}) {
-  const { enabled: enabledModules } = useModuleFlags();
-  const selectedModule = MODULE_BY_ACTIVE[active];
+// ── Top bar ───────────────────────────────────────────────────────────────────
 
-  return (
-    <aside
-      className="hidden w-20 shrink-0 flex-col md:flex xl:w-64"
-      style={{ backgroundColor: "var(--color-sidebar-bg)", borderRight: "1px solid rgba(255,255,255,0.08)" }}
-    >
-      {/* Logo area */}
-      <div
-        className="flex h-[65px] items-center gap-3 px-4"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
-      >
-        <div
-          aria-hidden="true"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-base font-bold text-white"
-          style={{ backgroundColor: "var(--color-sidebar-active)" }}
-        >
-          F
-        </div>
-        <div className="hidden min-w-0 xl:block">
-          <p className="truncate text-sm font-semibold text-white">Finder POS</p>
-          <p className="truncate text-xs text-white/50">Enterprise retail suite</p>
-        </div>
-      </div>
-
-      <nav aria-label="Primary" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-        <div className="space-y-0.5">
-          <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30 xl:block">
-            Modules
-          </p>
-          {ALL_NAV_ITEMS.filter(item => !item.module || enabledModules.has(item.module) || enabledModules.has("*")).map((item) => {
-            const selected = selectedModule === item.key || pathname === item.href;
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                aria-current={selected ? "page" : undefined}
-                className={clsx(
-                  "flex min-h-[40px] items-center justify-center gap-3 rounded-md px-3 text-[13px] font-medium transition-colors xl:justify-start",
-                  selected ? "text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
-                )}
-                style={selected ? { backgroundColor: "var(--color-sidebar-active)" } : undefined}
-              >
-                <NavIcon name={item.icon} />
-                <span className="hidden xl:inline">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Footer — register health indicator */}
-      <div className="p-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="rounded-md p-3" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
-          <p className="hidden text-[11px] font-semibold text-white/50 xl:block">Register health</p>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-            <span className="hidden xl:inline">Ready for sales</span>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function MobileNav({ active }: { active: NavKey }) {
-  const { enabled: enabledModules } = useModuleFlags();
-  const selectedModule = MODULE_BY_ACTIVE[active];
-  return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-white/10 md:hidden"
-      style={{ backgroundColor: "var(--color-sidebar-bg)", boxShadow: "0 -4px 16px rgba(0,0,0,0.3)" }}
-    >
-      {ALL_NAV_ITEMS.filter(item => !item.module || enabledModules.has(item.module) || enabledModules.has("*")).map((item) => (
-        <Link
-          key={item.key}
-          href={item.href}
-          aria-current={selectedModule === item.key ? "page" : undefined}
-          className={clsx(
-            "flex min-h-[56px] min-w-[72px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
-            selectedModule === item.key ? "text-white" : "text-white/50 hover:text-white"
-          )}
-        >
-          <NavIcon name={item.icon} />
-          <span>{item.label}</span>
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
-function StoreSwitcher() {
-  const { outletId, registerId, setLocation } = useFinderContext();
-  const fallbackOptions = useMemo(
-    () => [{ value: "demo-store:register-01", label: "Demo Store / Register 01" }],
-    []
-  );
-  const [options, setOptions] = useState(fallbackOptions);
-  const [loading, setLoading] = useState(false);
-  const selected = `${outletId}:${registerId}`;
+function TopBar({ onSearchClick }: { onSearchClick: () => void }) {
+  const { user, logout } = useAuth();
+  const { isOffline } = useOffline();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    apiGet<OutletsResponse>("/api/v1/outlets", { signal: controller.signal })
-      .then((data) => {
-        const nextOptions = data.items.flatMap((outlet) => {
-          if (outlet.registers.length === 0) {
-            return [{ value: `${outlet.id}:none`, label: `${outlet.name} / No register` }];
-          }
-          return outlet.registers.map((register) => ({
-            value: `${outlet.id}:${register.id}`,
-            label: `${outlet.name} / ${register.name}${register.status === "closed" ? " (closed)" : ""}`,
-          }));
-        });
-        const normalized = nextOptions.length > 0 ? nextOptions : fallbackOptions;
-        setOptions(normalized);
-        if (!normalized.some((option) => option.value === selected)) {
-          const [nextOutlet, nextRegister] = normalized[0]!.value.split(":");
-          setLocation(nextOutlet!, nextRegister!);
-        }
-      })
-      .catch(() => {
-        setOptions(fallbackOptions);
-        if (selected !== fallbackOptions[0]!.value) {
-          setLocation("demo-store", "register-01");
-        }
-      })
-      .finally(() => setLoading(false));
-
-    return () => {
-      controller.abort();
-    };
-  }, [fallbackOptions, selected, setLocation]);
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   return (
-    <label
-      className="hidden items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 h-8 text-[13px] md:flex"
-      aria-busy={loading}
+    <header
+      className="fixed top-0 left-0 right-0 z-50 flex h-12 items-center gap-3 px-3"
+      style={{ backgroundColor: "var(--color-topbar-bg)" }}
     >
-      <StoreIcon />
-      <span className="sr-only">Current store</span>
-      <select
-        className="bg-transparent text-[13px] font-medium text-[rgba(0,0,0,0.88)] outline-none"
-        value={selected}
-        onChange={(event) => {
-          const [nextOutlet, nextRegister] = event.target.value.split(":");
-          setLocation(nextOutlet!, nextRegister!);
-        }}
-        aria-label="Current store and register"
+      {/* Left: hamburger + Menu label */}
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors shrink-0"
+        aria-label="Toggle menu"
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        <HamburgerIcon />
+        <span className="text-sm font-medium hidden sm:block">Menu</span>
+      </button>
+
+      {/* Center: search */}
+      <button
+        type="button"
+        onClick={onSearchClick}
+        className="flex flex-1 max-w-2xl items-center gap-2 rounded border border-white/20 bg-white/10 px-3 h-8 text-[13px] text-white/50 hover:bg-white/15 hover:text-white/70 transition-colors mx-auto"
+        aria-label="Open search (⌘/)"
+      >
+        <SearchIcon />
+        <span className="flex-1 text-left">Search…</span>
+        <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-[11px] text-white/40">⌘/</kbd>
+      </button>
+
+      {/* Right: offline pill + Help + Bell + User */}
+      <div className="flex items-center gap-3 shrink-0">
+        {isOffline && (
+          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+            Offline
+          </span>
+        )}
+        <a href="/help" className="hidden sm:block text-sm text-white/60 hover:text-white transition-colors">
+          Help
+        </a>
+        <NotificationBell />
+        {/* User menu */}
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5D5FEF] text-[11px] font-bold text-white">
+              {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
+            </div>
+            <span className="hidden sm:block max-w-[120px] truncate">{user?.name ?? "User"}</span>
+            <ChevronDown />
+          </button>
+          {userMenuOpen && (
+            <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+              <div className="border-b border-slate-100 px-3 py-2">
+                <p className="text-xs font-semibold text-slate-900 truncate">{user?.name}</p>
+                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+              </div>
+              <Link href="/setup" className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Account settings</Link>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
   );
 }
 
-function DeviceStatus({ isOffline }: { isOffline: boolean }) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={clsx(
-        "inline-flex h-8 items-center gap-2 rounded border px-3 text-[13px] font-medium",
-        isOffline
-          ? "border-orange-200 bg-orange-50 text-orange-700"
-          : "border-emerald-200 bg-emerald-50 text-emerald-700"
-      )}
-    >
-      {isOffline ? <OfflineIcon /> : <OnlineIcon />}
-      <span className="hidden sm:inline">{isOffline ? "Offline" : "Online"}</span>
-    </div>
-  );
-}
+// ── Left rail ─────────────────────────────────────────────────────────────────
 
-function UserContext({
-  name,
-  role,
-  onLogout,
-}: {
-  name: string;
-  role: string;
-  onLogout?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onLogout}
-      title={onLogout ? "Sign out" : "Current user"}
-      className="hidden h-8 items-center gap-2 rounded border border-[#D9D9D9] bg-white px-3 text-left transition-colors hover:border-brand-600 hover:bg-gray-50 sm:flex"
-    >
-      <UserIcon />
-      <span className="min-w-0">
-        <span className="block max-w-[9rem] truncate text-[13px] font-medium text-[rgba(0,0,0,0.88)]">
-          {name}
-        </span>
-        <span className="block text-[11px] capitalize text-[rgba(0,0,0,0.45)]">{role}</span>
-      </span>
-    </button>
-  );
-}
+function LeftRail({ active }: { active: NavKey }) {
+  const pathname = usePathname();
+  const { enabled: enabledModules } = useModuleFlags();
+  const activeSection = SECTION_MAP[active] ?? "home";
+  const [flyout, setFlyout] = useState<RailSection | null>(null);
+  const railRef = useRef<HTMLElement>(null);
 
-function NavIcon({ name }: { name: NavKey }) {
-  switch (name) {
-    case "dashboard":
-      return <DashboardIcon />;
-    case "register":
-      return <RegisterIcon />;
-    case "sales":
-      return <SalesIcon />;
-    case "orders":
-      return <OrdersIcon />;
-    case "inventory":
-      return <InventoryIcon />;
-    case "operations":
-      return <OperationsIcon />;
-    case "purchasing":
-      return <PurchasingIcon />;
-    case "shipping":
-      return <ShippingIcon />;
-    case "customers":
-      return <CustomersIcon />;
-    case "discounts":
-      return <DiscountsIcon />;
-    case "accounting":
-      return <AccountingIcon />;
-    case "ecommerce":
-      return <EcommerceIcon />;
-    case "reports":
-      return <ReportsIcon />;
-    case "settings":
-      return <SettingsIcon />;
-    case "team":
-      return <TeamIcon />;
-    case "insights":
-      return <InsightsIcon />;
-    case "finance":
-      return <FinanceIcon />;
-    case "catalog":
-      return <CatalogIcon />;
-    case "workflows":
-      return <WorkflowsIcon />;
-    case "loyalty":
-      return <LoyaltyIcon />;
-    case "gift-cards":
-      return <GiftCardIcon />;
-    case "quotes":
-      return <QuotesIcon />;
-    case "vendors":
-      return <PurchasingIcon />;
-    case "payments":
-      return <FinanceIcon />;
-    case "returns":
-      return <RegisterIcon />;
-    case "tax-compliance":
-      return <AccountingIcon />;
-    case "integrations":
-      return <OperationsIcon />;
-    case "imports-exports":
-      return <ReportsIcon />;
-    case "notifications":
-      return <NotificationsIcon />;
-    case "audit-log":
-      return <AuditLogIcon />;
-    case "service-orders":
-      return <ServiceOrdersIcon />;
-    case "invoicing":
-      return <InvoicingIcon />;
-    case "inventory-locations":
-      return <StoreMapIcon />;
-    case "inventory-expiry":
-      return <ExpiryIcon />;
-    case "inventory-serials":
-      return <SerialsIcon />;
-    case "inventory-reorder":
-      return <ReorderIcon />;
-    case "inventory-counts":
-      return <CycleCountIcon />;
-    case "workforce":
-      return <WorkforceIcon />;
-    case "module-marketplace":
-      return <ModuleMarketplaceIcon />;
-    case "kitchen":
-      return <KitchenIcon />;
-    case "bar-tabs":
-      return <BarTabsIcon />;
-    case "golf":
-    case "golf-bookings":
-    case "golf-members":
-    case "golf-pro-shop":
-      return <GolfIcon />;
-    default:
-      return <ReportsIcon />;
+  // Close fly-out when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (railRef.current && !railRef.current.contains(e.target as Node)) {
+        setFlyout(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const { registerId } = useFinderContext();
+
+  // Rail items — show/hide based on enabled modules
+  const railItems: { section: RailSection; label: string; href?: string; icon: React.ReactNode }[] = [
+    { section: "home",      label: "Home",      href: "/dashboard",  icon: <HomeIcon /> },
+    { section: "sell",      label: "Sell",                           icon: <SellIcon /> },
+    ...(enabledModules.has("ecommerce") || enabledModules.has("*")
+      ? [{ section: "online" as RailSection, label: "Online", href: "/ecommerce", icon: <OnlineIcon /> }]
+      : []),
+    { section: "reporting", label: "Reporting", href: "/reporting",  icon: <ReportingIcon /> },
+    { section: "catalog",   label: "Catalog",   href: "/catalog",    icon: <CatalogIcon /> },
+    { section: "inventory", label: "Inventory", href: "/inventory",  icon: <InventoryIcon /> },
+    { section: "customers", label: "Customers", href: "/customers",  icon: <CustomersIcon /> },
+    { section: "finance",   label: "Finance",   href: "/finance",    icon: <FinanceIcon /> },
+    { section: "setup",     label: "Setup",     href: "/setup",      icon: <SetupIcon /> },
+  ];
+
+  function handleRailClick(section: RailSection, href?: string) {
+    if (section === "sell") {
+      setFlyout((prev) => (prev === "sell" ? null : "sell"));
+    } else {
+      setFlyout(null);
+      if (href) window.location.href = href;
+    }
   }
-}
 
-function activeLabel(active: NavKey) {
-  return ALL_NAV_ITEMS.find((item) => item.key === MODULE_BY_ACTIVE[active])?.label ?? "Workspace";
-}
-
-function ChevronRight() {
   return (
-    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[rgba(0,0,0,0.25)]">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
+    <>
+      <nav
+        ref={railRef}
+        aria-label="Primary navigation"
+        className="fixed left-0 top-12 bottom-0 z-40 flex w-[52px] flex-col items-center py-2 gap-0.5"
+        style={{ backgroundColor: "var(--color-sidebar-bg)" }}
+      >
+        {railItems.map((item) => {
+          const isActive = activeSection === item.section;
+          const isFlyoutOpen = flyout === item.section;
+          return (
+            <button
+              key={item.section}
+              type="button"
+              title={item.label}
+              aria-label={item.label}
+              aria-current={isActive ? "true" : undefined}
+              onClick={() => handleRailClick(item.section, item.href)}
+              className="group relative flex w-10 h-10 items-center justify-center rounded-lg transition-colors"
+              style={{
+                backgroundColor: isActive || isFlyoutOpen
+                  ? "var(--color-sidebar-active)"
+                  : "transparent",
+                color: isActive || isFlyoutOpen ? "#fff" : "rgba(255,255,255,0.5)",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive && !isFlyoutOpen) {
+                  (e.currentTarget as HTMLElement).style.backgroundColor = "var(--color-sidebar-hover)";
+                  (e.currentTarget as HTMLElement).style.color = "#fff";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive && !isFlyoutOpen) {
+                  (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.5)";
+                }
+              }}
+            >
+              {item.icon}
+              {/* Tooltip */}
+              <span className="pointer-events-none absolute left-[52px] rounded bg-[#333] px-2 py-1 text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+
+        {/* Spacer + expand (bottom) */}
+        <div className="flex-1" />
+        <button
+          type="button"
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-white/40 hover:text-white transition-colors"
+        >
+          <ExpandIcon />
+        </button>
+      </nav>
+
+      {/* ── Sell fly-out panel ──────────────────────────────────────────── */}
+      {flyout === "sell" && (
+        <div
+          className="fixed left-[52px] top-12 bottom-0 z-30 w-56 flex flex-col shadow-2xl"
+          style={{ backgroundColor: "var(--color-sidebar-flyout)" }}
+        >
+          {/* Register context header */}
+          <div className="border-b border-white/10 px-4 py-3">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-white/40">
+              {registerId ?? "Main Register"}
+            </p>
+            <div className="mt-0.5 flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Main Outlet</p>
+              <button
+                type="button"
+                className="rounded border border-white/20 px-2 py-0.5 text-[11px] text-white/60 hover:text-white transition-colors"
+              >
+                Switch
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-items */}
+          <nav aria-label="Sell section" className="flex flex-col py-1">
+            {SELL_SUBMENU.map((item) => {
+              const isCurrentPage = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setFlyout(null)}
+                  className="flex items-center px-4 py-2.5 text-sm transition-colors"
+                  style={{
+                    backgroundColor: isCurrentPage ? "rgba(93,95,239,0.25)" : "transparent",
+                    color: isCurrentPage ? "#fff" : "rgba(255,255,255,0.65)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isCurrentPage) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)";
+                    (e.currentTarget as HTMLElement).style.color = "#fff";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isCurrentPage) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                    (e.currentTarget as HTMLElement).style.color = isCurrentPage ? "#fff" : "rgba(255,255,255,0.65)";
+                  }}
+                >
+                  {isCurrentPage && (
+                    <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#5D5FEF]" />
+                  )}
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      )}
+
+      {/* Click-away overlay when fly-out is open */}
+      {flyout && (
+        <div
+          className="fixed inset-0 z-20"
+          onClick={() => setFlyout(null)}
+        />
+      )}
+    </>
   );
 }
 
-function GiftCardIcon() {
+// ── Rail icons (24×24 SVG) ────────────────────────────────────────────────────
+
+function HomeIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="7" width="20" height="14" rx="2" />
-      <path d="M16 3c0 2-4 4-4 4S8 5 8 3a4 4 0 0 1 8 0z" />
-      <line x1="12" y1="7" x2="12" y2="21" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   );
 }
-
-function QuotesIcon() {
+function SellIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <path d="M12 18v-4" />
-      <path d="M9.5 15.5 12 18l2.5-2.5" />
-      <path d="M9 12h6" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
     </svg>
   );
 }
-
-function FinanceIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2" />
-      <path d="M2 10h20" />
-      <path d="M7 15h.01" />
-      <path d="M11 15h2" />
-    </svg>
-  );
-}
-
-function TeamIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function InsightsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 20h20" />
-      <path d="M6 20V10" />
-      <path d="M10 20V4" />
-      <path d="M14 20V14" />
-      <path d="M18 20V8" />
-    </svg>
-  );
-}
-
-function DashboardIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  );
-}
-
-function OfflineIcon() {
-  return (
-    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 1l22 22" />
-      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
-      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-      <path d="M12 20h.01" />
-    </svg>
-  );
-}
-
 function OnlineIcon() {
   return (
-    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6 9 17l-5-5" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />
     </svg>
   );
 }
-
-function StoreIcon() {
+function ReportingIcon() {
   return (
-    <svg aria-hidden="true" className="text-gray-500" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9h18l-2-5H5L3 9Z" />
-      <path d="M5 9v11h14V9" />
-      <path d="M9 20v-6h6v6" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" />
     </svg>
   );
 }
-
-function UserIcon() {
-  return (
-    <svg aria-hidden="true" className="text-gray-500" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21a8 8 0 0 1 16 0" />
-    </svg>
-  );
-}
-
-function RegisterIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="3" width="16" height="18" rx="2" />
-      <path d="M8 7h8" />
-      <path d="M8 11h8" />
-      <path d="M8 15h2" />
-      <path d="M14 15h2" />
-    </svg>
-  );
-}
-
-function InventoryIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 8a2 2 0 0 0-1-1.73L13 2.27a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-      <path d="m3.3 7 8.7 5 8.7-5" />
-      <path d="M12 22V12" />
-    </svg>
-  );
-}
-
-function OperationsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4" />
-      <path d="M9 14v7" />
-    </svg>
-  );
-}
-
-function CustomersIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function SalesIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18" />
-      <path d="M3 12h18" />
-      <path d="M3 18h18" />
-      <path d="M7 6v12" />
-      <path d="M17 6v12" />
-    </svg>
-  );
-}
-
-function OrdersIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-      <rect x="9" y="3" width="6" height="4" rx="1" />
-      <path d="M9 12h6" />
-      <path d="M9 16h4" />
-    </svg>
-  );
-}
-
-function PurchasingIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-      <path d="M3 6h18" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
-    </svg>
-  );
-}
-
-function ShippingIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 17h4V5H2v12h3" />
-      <path d="M14 17h1V9h4l3 4v4h-2" />
-      <circle cx="7.5" cy="17.5" r="2.5" />
-      <circle cx="17.5" cy="17.5" r="2.5" />
-    </svg>
-  );
-}
-
-function DiscountsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 5 5 19" />
-      <circle cx="7" cy="7" r="2" />
-      <circle cx="17" cy="17" r="2" />
-    </svg>
-  );
-}
-
-function AccountingIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="3" width="16" height="18" rx="2" />
-      <path d="M8 7h8" />
-      <path d="M8 11h2" />
-      <path d="M14 11h2" />
-      <path d="M8 15h2" />
-      <path d="M14 15h2" />
-    </svg>
-  );
-}
-
-function EcommerceIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="21" r="1" />
-      <circle cx="20" cy="21" r="1" />
-      <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-    </svg>
-  );
-}
-
-function ReportsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19V5" />
-      <path d="M4 19h16" />
-      <path d="M8 16v-5" />
-      <path d="M12 16V8" />
-      <path d="M16 16v-3" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.21.39.6.6 1 .6H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.4Z" />
-    </svg>
-  );
-}
-
 function CatalogIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 5h18" />
-      <path d="M3 9h18" />
-      <rect x="3" y="13" width="7" height="7" rx="1" />
-      <path d="M14 13h7" />
-      <path d="M14 17h7" />
-      <path d="M14 20h4" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
     </svg>
   );
 }
-
-function WorkflowsIcon() {
+function InventoryIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="5"  cy="6"  r="2" />
-      <circle cx="19" cy="6"  r="2" />
-      <circle cx="5"  cy="18" r="2" />
-      <circle cx="19" cy="18" r="2" />
-      <path d="M7 6h10" />
-      <path d="M7 18h10" />
-      <path d="M5 8v8" />
-      <path d="M19 8v8" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   );
 }
-
-function LoyaltyIcon() {
+function CustomersIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
-
-function NotificationsIcon() {
+function FinanceIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
-
-function AuditLogIcon() {
+function SetupIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
-
-function ModuleMarketplaceIcon() {
+function HamburgerIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
     </svg>
   );
 }
-
-function ServiceOrdersIcon() {
+function SearchIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
-
-function InvoicingIcon() {
+function ChevronDown() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="6 9 12 15 18 9" />
     </svg>
   );
 }
-
-function StoreMapIcon() {
+function ExpandIcon() {
   return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-      <line x1="9" y1="3" x2="9" y2="18" />
-      <line x1="15" y1="6" x2="15" y2="21" />
-    </svg>
-  );
-}
-
-function ExpiryIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
-function SerialsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="6" width="20" height="12" rx="2" />
-      <path d="M6 10v4" />
-      <path d="M9 10v4" />
-      <path d="M12 10v4" />
-      <path d="M15 10v4" />
-      <path d="M18 10v4" />
-    </svg>
-  );
-}
-
-function ReorderIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12h18" />
-      <path d="M3 6h18" />
-      <path d="M9 18h12" />
-      <path d="M3 18l3-3 3 3" />
-    </svg>
-  );
-}
-
-function CycleCountIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-    </svg>
-  );
-}
-
-function WorkforceIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function KitchenIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
-      <path d="M7 2v20" />
-      <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
-    </svg>
-  );
-}
-
-function BarTabsIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 22H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6" />
-      <path d="M18 14v4h4" />
-      <circle cx="18" cy="18" r="4" />
-    </svg>
-  );
-}
-
-function GolfIcon() {
-  return (
-    <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="18" r="3" />
-      <path d="M12 15V3" />
-      <path d="M12 3l6 4-6 2" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" />
     </svg>
   );
 }

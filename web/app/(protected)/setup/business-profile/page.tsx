@@ -38,6 +38,7 @@ interface BundleDef {
 
 interface BusinessProfileResponse {
   businessType: string;
+  locked?: boolean;
   bundles: Record<string, BundleDef>;
   modules: ModuleDef[];
   coreModules: string[];
