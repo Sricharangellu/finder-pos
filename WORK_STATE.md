@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-01  |  Last commit: `b7e3278`
+> Last updated: 2026-07-01  |  Last commit: `299425c`
 
 ---
 
@@ -33,7 +33,7 @@
 | **Operations** | ✅ Built | Outlet management, register sessions, transfer orders |
 | **Shipping** | ✅ Built | Shipment tracking, carrier config |
 | **Tax Compliance** | ✅ Built | MSA/PACT reporting, state flavor ban tracking |
-| **Team / Roles** | ✅ Built | Staff list, custom roles, permissions |
+| **Team / Roles** | ✅ Built | Employee directory, clock in/out, 10 roles, account status, time entries, 3-tab detail modal |
 | **Workflows** | ✅ Built | Automation rules, condition/action builder, step editor |
 | **Settings** | ✅ Built | Mega-page: store profile, tax rates, payment modes, loyalty tiers, shipping, security, COA, receipt templates, API keys, currencies |
 | **Settings → Permissions** | ✅ Built | Role-based feature toggles (Admin/Manager/Cashier/Warehouse/Read-only) with RBAC PATCH endpoint |
