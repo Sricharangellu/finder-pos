@@ -2,22 +2,24 @@
 
 /**
  * FE-R4: Restaurant Dashboard — F&B KPI overlay.
- * Module-gated by module:tables. Shows covers, avg ticket, table turns,
- * peak hour, revenue, top items, hourly bar chart, and active sessions.
+ * Covers today, avg ticket, table turns, peak hour, revenue.
+ * Hourly revenue bar chart, top menu items, active table sessions.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import { Card } from "@/components/Card";
+import { KpiCard } from "@/components/KpiCard";
+import { BarChart } from "@/components/charts/BarChart";
+import { useQuery } from "@/lib/useQuery";
 import { apiGet } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
-import { fmtTime } from "@/lib/date";
-import { useModuleFlags } from "@/hooks/useModuleFlags";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface RestaurantKpis {
+type Range = "today" | "yesterday" | "week";
+
+interface DashboardKpis {
   covers_today: number;
   avg_ticket_cents: number;
   table_turns_today: number;
@@ -46,8 +48,8 @@ interface ActiveSession {
   elapsed_mins: number;
 }
 
-interface DashboardData {
-  kpis: RestaurantKpis;
+interface DashboardResponse {
+  kpis: DashboardKpis;
   top_items: TopItem[];
   hourly_revenue: HourlyBucket[];
   active_sessions: ActiveSession[];
@@ -55,347 +57,287 @@ interface DashboardData {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function elapsedLabel(mins: number): string {
+function elapsed(mins: number): string {
   if (mins < 60) return `${mins}m`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
 function sessionTone(mins: number): string {
   if (mins > 90) return "text-red-600";
   if (mins > 60) return "text-amber-600";
-  return "text-emerald-700";
+  return "text-emerald-600";
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function KpiCard({
-  label,
-  value,
-  sub,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "neutral" | "green" | "blue" | "purple";
-}) {
-  const accent =
-    tone === "green"  ? "bg-emerald-50 text-emerald-700" :
-    tone === "blue"   ? "bg-blue-50 text-blue-700" :
-    tone === "purple" ? "bg-violet-50 text-violet-700" :
-                        "bg-slate-100 text-slate-600";
-
+function RangeButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
-      <span className="text-2xl font-bold text-slate-950">{value}</span>
-      {sub && (
-        <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${accent}`}>
-          {sub}
-        </span>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+        active
+          ? "bg-[#5D5FEF] text-white"
+          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
-function HourlyBarChart({ data }: { data: HourlyBucket[] }) {
-  const max = Math.max(...data.map(d => d.revenue_cents), 1);
+function QuickLink({ href, label, sub }: { href: string; label: string; sub: string }) {
   return (
-    <div className="flex items-end gap-1 h-24">
-      {data.map(d => {
-        const pct = (d.revenue_cents / max) * 100;
-        return (
-          <div key={d.hour} className="group relative flex flex-1 flex-col items-center">
-            <div
-              className="w-full min-h-[2px] rounded-t bg-[#5D5FEF]"
-              style={{ height: `${Math.max(pct, 2)}%` }}
-            />
-            {/* Tooltip on hover */}
-            <div className="pointer-events-none absolute bottom-full mb-1 hidden group-hover:flex whitespace-nowrap rounded bg-[#1a1a1a] px-2 py-1 text-[11px] text-white shadow-lg z-10">
-              {d.label}: {formatMoney(d.revenue_cents)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function HourlyLabels({ data }: { data: HourlyBucket[] }) {
-  return (
-    <div className="flex gap-1 mt-1">
-      {data.map((d, i) => (
-        <div key={d.hour} className="flex-1 text-center text-[9px] text-slate-400">
-          {i % 3 === 0 ? d.label : ""}
-        </div>
-      ))}
-    </div>
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-[#5D5FEF]/40 hover:bg-[#5D5FEF]/5"
+    >
+      <div>
+        <p className="text-sm font-semibold text-[#111]">{label}</p>
+        <p className="text-xs text-slate-500">{sub}</p>
+      </div>
+      <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </Link>
   );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RestaurantDashboardPage() {
-  const { enabled: enabledModules } = useModuleFlags();
-  const tablesEnabled = enabledModules.has("tables") || enabledModules.has("*");
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastRefreshed, setLastRefreshed] = useState<number>(Date.now());
+  const [range, setRange] = useState<Range>("today");
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const result = await apiGet<DashboardData>("/api/v1/restaurant/dashboard");
-      setData(result);
-      setLastRefreshed(Date.now());
-    } catch {
-      setError("Failed to load dashboard");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  // Auto-refresh every 60 s
-  useEffect(() => {
-    const id = setInterval(() => void load(), 60_000);
-    return () => clearInterval(id);
-  }, [load]);
-
-  if (!tablesEnabled) {
-    return (
-      <EnterpriseShell active="restaurant-dashboard" title="Restaurant Dashboard" subtitle="" contentClassName="overflow-y-auto">
-        <div className="flex flex-col items-center justify-center h-64 gap-3 text-center px-4">
-          <p className="text-slate-500 text-sm">The Table Management module is not enabled.</p>
-          <Link href="/setup/modules" className="text-sm font-medium text-[#5D5FEF] hover:underline">
-            Enable it in Module Marketplace →
-          </Link>
-        </div>
-      </EnterpriseShell>
-    );
-  }
+  const { data, loading } = useQuery(
+    `restaurant:dashboard:${range}`,
+    () => apiGet<DashboardResponse>(`/api/v1/restaurant/dashboard?range=${range}`),
+  );
 
   const kpis = data?.kpis;
   const topItems = data?.top_items ?? [];
-  const hourly = data?.hourly_revenue ?? [];
+  const hourly = (data?.hourly_revenue ?? []).map((h) => ({
+    label: h.label,
+    value: h.revenue_cents / 100,
+  }));
   const sessions = data?.active_sessions ?? [];
+
+  const peakBucket = data?.hourly_revenue.reduce(
+    (best, h) => (h.revenue_cents > best.revenue_cents ? h : best),
+    data?.hourly_revenue[0] ?? { label: "—", revenue_cents: 0 },
+  );
+
+  const maxQty = topItems[0]?.qty_sold ?? 1;
 
   return (
     <EnterpriseShell
       active="restaurant-dashboard"
       title="Restaurant Dashboard"
-      subtitle="Live F&B metrics — refreshes every 60 seconds"
+      subtitle="F&B performance overview"
       contentClassName="overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-5 sm:px-6">
 
-        {/* Header row */}
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-slate-950">Today's Overview</h1>
-            {!loading && (
-              <span className="text-xs text-slate-400">Updated {fmtTime(lastRefreshed)}</span>
-            )}
+          <div>
+            <h1 className="text-lg font-semibold text-[#111]">Restaurant Dashboard</h1>
+            <p className="text-sm text-slate-500">
+              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/restaurant/floor-plan"
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm">
-              Floor Plan
-            </Link>
-            <Link href="/restaurant/kitchen"
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm">
-              Kitchen
-            </Link>
-            <Link href="/restaurant/tabs"
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm">
-              Bar Tabs
-            </Link>
-            <button
-              type="button"
-              onClick={() => void load()}
-              disabled={loading}
-              className="rounded-md bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4a4cd4] disabled:opacity-50 shadow-sm"
-            >
-              {loading ? "Loading…" : "Refresh"}
-            </button>
+          <div className="flex gap-2">
+            <RangeButton label="Today"     active={range === "today"}     onClick={() => setRange("today")} />
+            <RangeButton label="Yesterday" active={range === "yesterday"} onClick={() => setRange("yesterday")} />
+            <RangeButton label="This Week" active={range === "week"}      onClick={() => setRange("week")} />
           </div>
         </div>
 
-        {error && (
-          <p role="alert" className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </p>
+        {/* ── KPI Tiles ───────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <KpiCard
+            title="Covers today"
+            value={loading ? "—" : String(kpis?.covers_today ?? 0)}
+            tone="blue"
+            trend={{ value: 12, label: "vs yesterday" }}
+            loading={loading}
+          />
+          <KpiCard
+            title="Avg ticket"
+            value={loading ? "—" : formatMoney(kpis?.avg_ticket_cents ?? 0)}
+            tone="green"
+            trend={{ value: -3, label: "vs yesterday" }}
+            loading={loading}
+          />
+          <KpiCard
+            title="Table turns"
+            value={loading ? "—" : `${kpis?.table_turns_today?.toFixed(1) ?? "0.0"}×`}
+            tone="amber"
+            loading={loading}
+          />
+          <KpiCard
+            title="Peak hour"
+            value={loading ? "—" : (kpis?.peak_hour ?? peakBucket?.label ?? "—")}
+            tone="neutral"
+            loading={loading}
+          />
+          <KpiCard
+            title="Revenue today"
+            value={loading ? "—" : formatMoney(kpis?.revenue_today_cents ?? 0)}
+            tone="green"
+            trend={{ value: 8, label: "vs yesterday" }}
+            loading={loading}
+          />
+        </div>
+
+        {/* ── Table occupancy bar ──────────────────────────────────────────── */}
+        {!loading && kpis && (
+          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium text-[#111]">Table Occupancy</span>
+              <span className="text-xs text-slate-500">
+                {kpis.open_tables} of {kpis.total_tables} tables occupied
+              </span>
+            </div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-[#5D5FEF] transition-all duration-500"
+                style={{
+                  width: `${kpis.total_tables > 0 ? (kpis.open_tables / kpis.total_tables) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <div className="mt-1.5 flex justify-between text-[11px] text-slate-400">
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
+          </div>
         )}
 
-        {/* KPI cards */}
-        {loading && !data ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {[...Array(7)].map((_, i) => (
-              <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            <KpiCard
-              label="Revenue Today"
-              value={formatMoney(kpis?.revenue_today_cents ?? 0)}
-              tone="green"
-            />
-            <KpiCard
-              label="Covers Today"
-              value={String(kpis?.covers_today ?? 0)}
-              sub={`${kpis?.open_tables ?? 0} / ${kpis?.total_tables ?? 0} tables open`}
-              tone="blue"
-            />
-            <KpiCard
-              label="Avg Ticket"
-              value={formatMoney(kpis?.avg_ticket_cents ?? 0)}
-              tone="purple"
-            />
-            <KpiCard
-              label="Table Turns"
-              value={`${kpis?.table_turns_today?.toFixed(1) ?? "—"}×`}
-              sub="turns today"
-              tone="neutral"
-            />
-            <KpiCard
-              label="Peak Hour"
-              value={kpis?.peak_hour ?? "—"}
-              tone="neutral"
-            />
-          </div>
-        )}
+        {/* ── Main content row ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
 
-        {/* Charts + tables row */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-
-          {/* Hourly revenue */}
-          <Card className="lg:col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-950">Revenue by Hour</h2>
-              {hourly.length > 0 && (
+          {/* Hourly revenue chart — 3 cols */}
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:col-span-3">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h2 className="text-sm font-semibold text-[#111]">Hourly Revenue</h2>
+              {!loading && peakBucket && (
                 <span className="text-xs text-slate-400">
-                  Peak: {hourly.reduce((m, d) => d.revenue_cents > m.revenue_cents ? d : m, hourly[0]!).label}
+                  Peak: {peakBucket.label} · {formatMoney(peakBucket.revenue_cents)}
                 </span>
               )}
             </div>
-            {loading && !data ? (
-              <div className="h-24 animate-pulse rounded bg-slate-100" />
-            ) : hourly.length === 0 ? (
-              <p className="text-sm text-slate-400">No data yet today.</p>
-            ) : (
-              <>
-                <HourlyBarChart data={hourly} />
-                <HourlyLabels data={hourly} />
-              </>
-            )}
-          </Card>
-
-          {/* Active sessions */}
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-950">Active Tables</h2>
-              <Link href="/restaurant/floor-plan" className="text-xs text-[#5D5FEF] hover:underline">
-                View all →
-              </Link>
+            <div className="px-4 py-4">
+              <BarChart
+                data={hourly}
+                height={180}
+                color="#5D5FEF"
+                formatValue={(v) => `$${v.toFixed(0)}`}
+                loading={loading}
+                showEveryNthLabel={2}
+              />
             </div>
-            {loading && !data ? (
-              <div className="divide-y divide-slate-100">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-3">
-                    <div className="h-8 w-8 animate-pulse rounded-md bg-slate-100" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
-                      <div className="h-2.5 w-24 animate-pulse rounded bg-slate-100" />
+          </div>
+
+          {/* Top menu items — 2 cols */}
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:col-span-2">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h2 className="text-sm font-semibold text-[#111]">Top Menu Items</h2>
+              <span className="text-xs text-slate-400">by qty sold</span>
+            </div>
+            <div>
+              {loading ? (
+                <div className="space-y-3 px-4 py-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-5 animate-pulse rounded bg-slate-100" />
+                  ))}
+                </div>
+              ) : topItems.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-500">No sales data yet.</p>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {topItems.map((item, i) => (
+                    <div key={item.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
+                      <span className="w-5 shrink-0 text-right text-[11px] font-semibold text-slate-400">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-[#111]">{item.name}</p>
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-[#5D5FEF]/70"
+                            style={{ width: `${(item.qty_sold / maxQty) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold text-[#111]">{item.qty_sold}</p>
+                        <p className="text-[11px] text-slate-400">{formatMoney(item.revenue_cents)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : sessions.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-slate-400">No active tables</p>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {sessions.map(s => (
-                  <div key={s.table_number} className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#5D5FEF]/10 text-xs font-bold text-[#5D5FEF]">
-                      {s.table_number}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">
-                        {s.floor_section ?? "Main"} · {s.party_size} {s.party_size === 1 ? "cover" : "covers"}
-                      </p>
-                      <p className={`text-xs font-medium ${sessionTone(s.elapsed_mins)}`}>
-                        {elapsedLabel(s.elapsed_mins)} at table
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Top items */}
-        <Card className="overflow-hidden p-0">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-950">Top Selling Items Today</h2>
+        {/* ── Active table sessions ────────────────────────────────────────── */}
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <h2 className="text-sm font-semibold text-[#111]">
+              Active Sessions
+              {!loading && sessions.length > 0 && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-[#5D5FEF]/10 px-1.5 py-0.5 text-[11px] font-semibold text-[#5D5FEF]">
+                  {sessions.length}
+                </span>
+              )}
+            </h2>
+            <Link href="/restaurant/floor-plan" className="text-xs text-[#5D5FEF] hover:underline">
+              View floor plan →
+            </Link>
           </div>
-          {loading && !data ? (
-            <div className="divide-y divide-slate-100">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 px-4 py-3">
-                  <div className="h-3 w-4 animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 flex-1 animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 w-12 animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
-                </div>
+
+          {loading ? (
+            <div className="space-y-3 px-4 py-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-8 animate-pulse rounded bg-slate-100" />
               ))}
             </div>
+          ) : sessions.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-500">No active table sessions right now.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-[#FAFAFA] text-left text-xs font-semibold uppercase tracking-wider text-[#888]">
-                  <th className="px-4 py-3 w-8">#</th>
-                  <th className="px-4 py-3">Item</th>
-                  <th className="px-4 py-3 text-right">Qty Sold</th>
-                  <th className="px-4 py-3 text-right">Revenue</th>
-                  <th className="px-4 py-3">Share</th>
+              <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-4 py-2.5 text-left">Table</th>
+                  <th className="px-4 py-2.5 text-left">Section</th>
+                  <th className="px-4 py-2.5 text-right">Covers</th>
+                  <th className="px-4 py-2.5 text-right">Elapsed</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F5F5F5]">
-                {topItems.map((item, i) => {
-                  const totalRev = topItems.reduce((s, x) => s + x.revenue_cents, 0);
-                  const pct = totalRev > 0 ? (item.revenue_cents / totalRev) * 100 : 0;
-                  return (
-                    <tr key={item.name} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-400 font-medium">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900">{item.name}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{item.qty_sold}</td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-900">
-                        {formatMoney(item.revenue_cents)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-[#5D5FEF]"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-slate-500">{pct.toFixed(0)}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-slate-100">
+                {sessions.map((s, i) => (
+                  <tr key={i} className="hover:bg-[#FAFAFA]">
+                    <td className="px-4 py-2.5 font-semibold text-[#111]">{s.table_number}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{s.floor_section ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-right text-[#111]">{s.party_size}</td>
+                    <td className={`px-4 py-2.5 text-right font-semibold ${sessionTone(s.elapsed_mins)}`}>
+                      {elapsed(s.elapsed_mins)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
-        </Card>
+        </div>
+
+        {/* ── Quick links ───────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <QuickLink href="/restaurant/floor-plan" label="Floor Plan" sub="Table status and session management" />
+          <QuickLink href="/restaurant/kitchen"    label="Kitchen Display" sub="Course queue and bump interface" />
+          <QuickLink href="/restaurant/tabs"       label="Bar Tabs" sub="Open tabs and multi-round orders" />
+        </div>
 
       </div>
     </EnterpriseShell>
