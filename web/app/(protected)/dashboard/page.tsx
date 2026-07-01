@@ -21,6 +21,8 @@ import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 import { useModuleFlags } from "@/hooks/useModuleFlags";
 import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
+import { DashboardTopLists } from "./_components/DashboardTopLists";
+import { DashboardOperational } from "./_components/DashboardOperational";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -587,141 +589,13 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        {/* ── Top Products & Top Customers ───────────────────────────────── */}
-        <section
-          aria-label="Top products and customers"
-          className="grid grid-cols-1 gap-5 md:grid-cols-2"
-        >
-          {/* Top Products */}
-          <Card title="Top Products" noPadding>
-            {loading ? (
-              <div className="space-y-3 px-5 py-4">
-                {[...Array(5)].map((_, i) => (
-                  <SkeletonBox key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : topProducts.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-slate-500">No data for this period.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-5 py-3 font-medium text-slate-600">Product</th>
-                    <th className="px-3 py-3 font-medium text-slate-600 text-right">Qty</th>
-                    <th className="px-5 py-3 font-medium text-slate-600 text-right">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {topProducts.map((p) => (
-                    <tr
-                      key={p.id}
-                      className="transition-colors hover:bg-slate-50"
-                    >
-                      <td className="px-5 py-3">
-                        <Link
-                          href={`/inventory/products/${p.id}`}
-                          className="font-medium text-slate-900 hover:text-brand-700 hover:underline"
-                        >
-                          {p.name}
-                        </Link>
-                        {p.category && (
-                          <span className="ml-2 text-xs text-slate-400">
-                            {p.category}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">
-                        {p.qty}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                        {formatMoney(p.revenue)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-
-          {/* Top Customers */}
-          <Card title="Top Customers" noPadding>
-            {loading ? (
-              <div className="space-y-3 px-5 py-4">
-                {[...Array(5)].map((_, i) => (
-                  <SkeletonBox key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : topCustomers.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-slate-500">No data for this period.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-5 py-3 font-medium text-slate-600">Customer</th>
-                    <th className="px-3 py-3 font-medium text-slate-600 text-right">Orders</th>
-                    <th className="px-5 py-3 font-medium text-slate-600 text-right">Total Spent</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {topCustomers.map((c) => (
-                    <tr
-                      key={c.customer_id}
-                      className="transition-colors hover:bg-slate-50"
-                    >
-                      <td className="px-5 py-3">
-                        <Link
-                          href={`/customers/${c.customer_id}`}
-                          className="font-medium text-slate-900 hover:text-brand-700 hover:underline"
-                        >
-                          {c.name}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">
-                        {c.orderCount}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                        {formatMoney(c.totalCents)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-        </section>
-
-        {/* ── Sales by Category ─────────────────────────────────────────── */}
-        {(loadingCategory || categoryItems.length > 0) && (
-          <section aria-label="Sales by category">
-            <Card title="Sales by Category" noPadding>
-              {loadingCategory ? (
-                <div className="space-y-2 px-5 py-4">
-                  {[...Array(4)].map((_, i) => <SkeletonBox key={i} className="h-7 w-full" />)}
-                </div>
-              ) : (
-                <div className="px-5 py-3 space-y-2">
-                  {(() => {
-                    const maxRev = Math.max(...categoryItems.map(c => c.revenueCents), 1);
-                    return categoryItems.map((c) => {
-                      const pct = Math.round((c.revenueCents / maxRev) * 100);
-                      return (
-                        <div key={c.key}>
-                          <div className="flex items-center justify-between mb-1 text-sm">
-                            <span className="font-medium text-slate-700">{c.name}</span>
-                            <span className="tabular-nums text-slate-500">{formatMoney(c.revenueCents)}</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-2 rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-            </Card>
-          </section>
-        )}
+        <DashboardTopLists
+          topProducts={topProducts}
+          topCustomers={topCustomers}
+          categoryItems={categoryItems}
+          loading={loading}
+          loadingCategory={loadingCategory}
+        />
 
         {/* ── Quick-access action grid ───────────────────────────────────── */}
         <section aria-label="Quick actions">
@@ -740,62 +614,7 @@ export default function DashboardPage() {
         {/* ── Vertical-specific widgets (UX-3) ──────────────────────────── */}
         <VerticalWidgets />
 
-        {/* ── Operational widgets ────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-          {/* Low stock alerts */}
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-slate-900">Low Stock Alerts</h2>
-              <Link href="/inventory" className="text-xs text-blue-600 hover:underline">View all →</Link>
-            </div>
-            {lowStock.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">All stock levels are healthy.</p>
-            ) : (
-              <ul className="space-y-2">
-                {lowStock.map(item => (
-                  <li key={item.id} className="flex items-center justify-between rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{item.name}</p>
-                      <p className="text-xs text-slate-500 font-mono">{item.sku} · {item.category}</p>
-                    </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <p className="text-sm font-semibold text-amber-700">{item.onHand} left</p>
-                      <p className="text-xs text-slate-400">reorder at {item.reorderPoint}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {/* Recent notifications */}
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-slate-900">Recent Alerts</h2>
-              <Link href="/notifications" className="text-xs text-blue-600 hover:underline">View all →</Link>
-            </div>
-            {recentNotifs.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">No recent alerts.</p>
-            ) : (
-              <ul className="space-y-2">
-                {recentNotifs.map(n => {
-                  const sevColor = n.severity === "critical" ? "bg-red-50 border-red-100" : n.severity === "warning" ? "bg-amber-50 border-amber-100" : "bg-blue-50 border-blue-100";
-                  const dotColor = n.severity === "critical" ? "bg-red-500" : n.severity === "warning" ? "bg-amber-400" : "bg-blue-400";
-                  return (
-                    <li key={n.id} className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${sevColor}`}>
-                      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} aria-hidden="true" />
-                      <div className="min-w-0">
-                        <p className={`text-sm font-medium ${n.read ? "text-slate-600" : "text-slate-900"}`}>{n.title}</p>
-                        <p className="text-xs text-slate-500 truncate">{n.body}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
-        </div>
+        <DashboardOperational lowStock={lowStock} recentNotifs={recentNotifs} />
 
       </div>
     </EnterpriseShell>

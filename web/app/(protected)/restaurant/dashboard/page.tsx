@@ -142,7 +142,7 @@ export default function RestaurantDashboardPage() {
           <div>
             <h1 className="text-lg font-semibold text-[#111]">Restaurant Dashboard</h1>
             <p className="text-sm text-slate-500">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              {new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date())}
             </p>
           </div>
           <div className="flex gap-2">

@@ -415,7 +415,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                     const isSelected = selectedIds.has(p.id);
                     const isAvailable = p.status === "active";
                     const createdDate = p.created_at
-                      ? new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })
+                      ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "2-digit" }).format(new Date(p.created_at))
                       : "—";
                     return (
                       <tr key={p.id}

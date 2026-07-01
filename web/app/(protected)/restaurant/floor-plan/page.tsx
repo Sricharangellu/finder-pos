@@ -112,7 +112,7 @@ export default function FloorPlanPage() {
   };
 
   return (
-    <EnterpriseShell active="orders" title="Floor Plan" subtitle="Table status and session management">
+    <EnterpriseShell active="restaurant-floor-plan" title="Floor Plan" subtitle="Table status and session management">
       <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-5 sm:px-6">
 
         {/* Stats + section filter */}

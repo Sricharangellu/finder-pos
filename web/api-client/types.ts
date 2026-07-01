@@ -612,6 +612,12 @@ export interface CatalogProduct {
   msrp_cents?: number | null;
   raw_cost_price_cents?: number | null;
   wholesale_price_cents?: number | null;
+  // Commerce flags
+  ecommerce?: number;
+  track_inventory?: number;
+  // Metadata
+  tags?: string | null;
+  preferred_vendor_name?: string;
   // Compliance
   tobacco_type?: string | null;
   flavored?: number;

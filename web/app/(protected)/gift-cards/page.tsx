@@ -106,7 +106,7 @@ export default function GiftCardsPage() {
   };
 
   return (
-    <EnterpriseShell active="settings" title="Gift Cards" subtitle="Issue, check balance, and manage gift cards">
+    <EnterpriseShell active="gift-cards" title="Gift Cards" subtitle="Issue, check balance, and manage gift cards">
       <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
