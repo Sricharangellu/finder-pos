@@ -2019,6 +2019,71 @@ export const mockHandlers = [
         ];
       })(),
 
+      // ── Catalog: Sales by Customer ────────────────────────────────────────
+      http.get(`${V1}/catalog/:id/sales-by-customer`, async ({ params, request }) => {
+        await lat();
+        const url    = new URL(request.url);
+        const limit  = Number(url.searchParams.get("limit")  ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        const BASE   = Date.now();
+        const all = [
+          { id: "sbc_1", customer_id: "cust_1", customer_name: "Emma Johnson",    customer_type: "retail",    order_id: "ord_201", order_number: "ORD-2026-201", order_date: BASE - 864e5 * 2,  outlet: "Main Store",   qty_bought: 2,  unit_price_cents: 2499, discount_cents: 0,   tax_cents: 399,  total_cents: 5397,  margin_pct: 44.0, returned_qty: 0, last_purchase_date: BASE - 864e5 * 2  },
+          { id: "sbc_2", customer_id: "cust_2", customer_name: "Marcus Rodriguez", customer_type: "wholesale", order_id: "ord_189", order_number: "ORD-2026-189", order_date: BASE - 864e5 * 5,  outlet: "Warehouse",    qty_bought: 12, unit_price_cents: 1799, discount_cents: 1000, tax_cents: 0,    total_cents: 20588, margin_pct: 22.2, returned_qty: 0, last_purchase_date: BASE - 864e5 * 5  },
+          { id: "sbc_3", customer_id: "cust_3", customer_name: "Priya Patel",      customer_type: "retail",    order_id: "ord_177", order_number: "ORD-2026-177", order_date: BASE - 864e5 * 9,  outlet: "Main Store",   qty_bought: 1,  unit_price_cents: 2499, discount_cents: 250, tax_cents: 180,  total_cents: 2429,  margin_pct: 40.1, returned_qty: 1, last_purchase_date: BASE - 864e5 * 9  },
+          { id: "sbc_4", customer_id: "cust_4", customer_name: "James Liu",        customer_type: "retail",    order_id: "ord_165", order_number: "ORD-2026-165", order_date: BASE - 864e5 * 14, outlet: "South Branch", qty_bought: 3,  unit_price_cents: 2499, discount_cents: 0,   tax_cents: 599,  total_cents: 8096,  margin_pct: 44.0, returned_qty: 0, last_purchase_date: BASE - 864e5 * 14 },
+          { id: "sbc_5", customer_id: "cust_2", customer_name: "Marcus Rodriguez", customer_type: "wholesale", order_id: "ord_142", order_number: "ORD-2026-142", order_date: BASE - 864e5 * 21, outlet: "Warehouse",    qty_bought: 24, unit_price_cents: 1799, discount_cents: 2400, tax_cents: 0,    total_cents: 40776, margin_pct: 20.8, returned_qty: 0, last_purchase_date: BASE - 864e5 * 5  },
+          { id: "sbc_6", customer_id: "cust_5", customer_name: "Olivia Chen",      customer_type: "retail",    order_id: "ord_130", order_number: "ORD-2026-130", order_date: BASE - 864e5 * 28, outlet: "Main Store",   qty_bought: 2,  unit_price_cents: 2499, discount_cents: 0,   tax_cents: 399,  total_cents: 5397,  margin_pct: 44.0, returned_qty: 0, last_purchase_date: BASE - 864e5 * 28 },
+        ];
+        const totalRevenue = all.reduce((s, r) => s + r.total_cents, 0);
+        const totalQty     = all.reduce((s, r) => s + r.qty_bought, 0);
+        const totalReturns = all.reduce((s, r) => s + r.returned_qty, 0);
+        return HttpResponse.json({ items: all.slice(offset, offset + limit), total: all.length, summary: { total_revenue_cents: totalRevenue, total_qty: totalQty, total_returns: totalReturns, unique_customers: new Set(all.map((r) => r.customer_id)).size } });
+      }),
+
+      // ── Catalog: Reorder Suggestions ─────────────────────────────────────
+      http.get(`${V1}/catalog/:id/reorder-suggestions`, async () => {
+        await lat();
+        const BASE = Date.now();
+        return HttpResponse.json({
+          current_stock: 18,
+          reserved_stock: 4,
+          available_stock: 14,
+          incoming_stock: 0,
+          reorder_point: 20,
+          safety_stock: 10,
+          avg_daily_sales: 3.2,
+          days_until_stockout: 4,
+          suggested_qty: 48,
+          preferred_supplier_id: "ven_1",
+          preferred_supplier_name: "Acme Distributors",
+          preferred_supplier_lead_days: 3,
+          preferred_supplier_cost_cents: 1400,
+          best_price_supplier_id: "ven_2",
+          best_price_supplier_name: "Global Supply Co",
+          best_price_supplier_cost_cents: 1320,
+          savings_per_unit_cents: 80,
+          reason: "Stock below reorder point (18 < 20). At current sales velocity, stockout in ~4 days.",
+          last_reorder_date: BASE - 864e5 * 60,
+          open_po_qty: 0,
+          status: "suggested",
+        });
+      }),
+
+      // ── Catalog: Supplier Price Comparison ───────────────────────────────
+      http.get(`${V1}/catalog/:id/supplier-price-comparison`, async () => {
+        await lat();
+        const BASE = Date.now();
+        return HttpResponse.json({
+          items: [
+            { supplier_id: "ven_1", supplier_name: "Acme Distributors",  is_preferred: true,  vendor_sku: "ACM-0042", last_purchase_date: BASE - 864e5 * 12, last_cost_cents: 1400, landed_cost_cents: 1480, moq: 6,  lead_time_days: 3,  price_30d_trend: "stable",   price_history: [{ date: BASE - 864e5 * 90, cost: 1420 }, { date: BASE - 864e5 * 60, cost: 1400 }, { date: BASE - 864e5 * 30, cost: 1400 }, { date: BASE, cost: 1400 }] },
+            { supplier_id: "ven_2", supplier_name: "Global Supply Co",   is_preferred: false, vendor_sku: "GS-11209", last_purchase_date: BASE - 864e5 * 5,  last_cost_cents: 1320, landed_cost_cents: 1420, moq: 12, lead_time_days: 7,  price_30d_trend: "down",     price_history: [{ date: BASE - 864e5 * 90, cost: 1550 }, { date: BASE - 864e5 * 60, cost: 1480 }, { date: BASE - 864e5 * 30, cost: 1350 }, { date: BASE, cost: 1320 }] },
+            { supplier_id: "ven_3", supplier_name: "Pacific Wholesale",  is_preferred: false, vendor_sku: "PW-8801",  last_purchase_date: BASE - 864e5 * 45, last_cost_cents: 1500, landed_cost_cents: 1560, moq: 24, lead_time_days: 10, price_30d_trend: "up",       price_history: [{ date: BASE - 864e5 * 90, cost: 1450 }, { date: BASE - 864e5 * 60, cost: 1480 }, { date: BASE - 864e5 * 30, cost: 1510 }, { date: BASE, cost: 1500 }] },
+          ],
+          best_price_supplier_id: "ven_2",
+          current_retail_price_cents: 2499,
+        });
+      }),
+
     ];
   })(),
 
@@ -6361,6 +6426,253 @@ mockHandlers.push(
         await lat();
         const _body = await request.json();
         return HttpResponse.json({ ok: true });
+      }),
+    ];
+  })(),
+
+  // ── Permission Requests ───────────────────────────────────────────────────
+  ...(() => {
+    const NOW = Date.now();
+    const D = (days: number) => NOW - days * 86_400_000;
+
+    type PRStatus = "draft" | "submitted" | "pending_review" | "approved" | "rejected" | "expired" | "revoked";
+    type AccessType = "temporary" | "permanent";
+    type Urgency = "low" | "normal" | "high" | "urgent";
+
+    interface PR {
+      id: string;
+      requested_for_user_id: string;
+      requested_for_name: string;
+      requested_by_user_id: string;
+      requested_by_name: string;
+      permission_code: string;
+      reason: string;
+      business_justification: string | null;
+      access_type: AccessType;
+      start_at: number | null;
+      end_at: number | null;
+      urgency: Urgency;
+      status: PRStatus;
+      reviewed_by_user_id: string | null;
+      reviewed_by_name: string | null;
+      review_notes: string | null;
+      reviewed_at: number | null;
+      created_at: number;
+    }
+
+    interface Override {
+      id: string;
+      user_id: string;
+      permission_code: string;
+      granted_by_user_id: string;
+      granted_by_name: string;
+      source_request_id: string | null;
+      starts_at: number | null;
+      expires_at: number | null;
+      status: "active" | "expired" | "revoked";
+      created_at: number;
+    }
+
+    let prSeq = 20;
+    let ovSeq = 10;
+
+    let permissionRequests: PR[] = [
+      {
+        id: "pr_1", requested_for_user_id: "emp_2", requested_for_name: "Mike Chen",
+        requested_by_user_id: "emp_2", requested_by_name: "Mike Chen",
+        permission_code: "reports", reason: "Need to pull end-of-day sales summary for store manager.",
+        business_justification: "Manager is out and I need to run EOD report.", access_type: "temporary",
+        start_at: NOW, end_at: NOW + 7 * 86_400_000, urgency: "high",
+        status: "pending_review", reviewed_by_user_id: null, reviewed_by_name: null,
+        review_notes: null, reviewed_at: null, created_at: D(1),
+      },
+      {
+        id: "pr_2", requested_for_user_id: "emp_3", requested_for_name: "Ashley Williams",
+        requested_by_user_id: "emp_3", requested_by_name: "Ashley Williams",
+        permission_code: "discounts", reason: "Need to apply promotional discounts for new client onboarding.",
+        business_justification: "New B2B account — sales team approved in CRM.", access_type: "permanent",
+        start_at: null, end_at: null, urgency: "normal",
+        status: "submitted", reviewed_by_user_id: null, reviewed_by_name: null,
+        review_notes: null, reviewed_at: null, created_at: D(2),
+      },
+      {
+        id: "pr_3", requested_for_user_id: "emp_5", requested_for_name: "Emma Thompson",
+        requested_by_user_id: "emp_1", requested_by_name: "Sarah Johnson",
+        permission_code: "purchasing", reason: "Emma needs to raise urgent POs for restocking shortage items.",
+        business_justification: "Receiver responsible for this warehouse during lead's leave.", access_type: "temporary",
+        start_at: NOW, end_at: NOW + 14 * 86_400_000, urgency: "urgent",
+        status: "approved", reviewed_by_user_id: "emp_11", reviewed_by_name: "Demo Owner",
+        review_notes: "Approved for 2 weeks while lead is on leave.", reviewed_at: D(0),
+        created_at: D(3),
+      },
+      {
+        id: "pr_4", requested_for_user_id: "emp_6", requested_for_name: "James O'Brien",
+        requested_by_user_id: "emp_6", requested_by_name: "James O'Brien",
+        permission_code: "shipping", reason: "Shipper role doesn't have access to shipping label printer.",
+        business_justification: null, access_type: "permanent",
+        start_at: null, end_at: null, urgency: "low",
+        status: "rejected", reviewed_by_user_id: "emp_1", reviewed_by_name: "Sarah Johnson",
+        review_notes: "Shipping access is already included in your role — check with IT.", reviewed_at: D(1),
+        created_at: D(5),
+      },
+      {
+        id: "pr_5", requested_for_user_id: "emp_10", requested_for_name: "Jordan Lee",
+        requested_by_user_id: "emp_10", requested_by_name: "Jordan Lee",
+        permission_code: "price-override", reason: "Need to match competitor pricing on high-value items.",
+        business_justification: "Customer retention for key account.", access_type: "temporary",
+        start_at: NOW, end_at: NOW + 30 * 86_400_000, urgency: "normal",
+        status: "pending_review", reviewed_by_user_id: null, reviewed_by_name: null,
+        review_notes: null, reviewed_at: null, created_at: D(0),
+      },
+    ];
+
+    let permissionOverrides: Override[] = [
+      {
+        id: "ov_1", user_id: "emp_5", permission_code: "purchasing",
+        granted_by_user_id: "emp_11", granted_by_name: "Demo Owner",
+        source_request_id: "pr_3",
+        starts_at: NOW, expires_at: NOW + 14 * 86_400_000,
+        status: "active", created_at: D(0),
+      },
+    ];
+
+    const HIGH_RISK = new Set(["payments", "void-transaction", "settings", "team", "accounting", "finance", "tax-compliance", "audit-log"]);
+    const MEDIUM_RISK = new Set(["reports", "insights", "inventory", "purchasing", "price-override", "discounts", "ecommerce", "invoicing"]);
+
+    function riskLevel(code: string): "low" | "medium" | "high" {
+      if (HIGH_RISK.has(code)) return "high";
+      if (MEDIUM_RISK.has(code)) return "medium";
+      return "low";
+    }
+
+    return [
+      // GET /permission-requests — all (admin view, filter by status)
+      http.get(`${V1}/permission-requests`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const items = status
+          ? permissionRequests.filter((r) => r.status === status)
+          : permissionRequests;
+        return HttpResponse.json({
+          items: items.map((r) => ({ ...r, risk_level: riskLevel(r.permission_code) })),
+          pending_count: permissionRequests.filter((r) => r.status === "pending_review" || r.status === "submitted").length,
+        });
+      }),
+
+      // POST /permission-requests — submit new request
+      http.post(`${V1}/permission-requests`, async ({ request }) => {
+        await lat();
+        const b = (await request.json()) as Partial<PR>;
+        if (!b.permission_code || !b.reason || !b.requested_for_user_id) {
+          return HttpResponse.json({ error: { code: "validation", message: "permission_code, reason, and requested_for_user_id required" } }, { status: 400 });
+        }
+        const pr: PR = {
+          id: `pr_${++prSeq}`,
+          requested_for_user_id: b.requested_for_user_id,
+          requested_for_name: b.requested_for_name ?? "Unknown",
+          requested_by_user_id: b.requested_by_user_id ?? b.requested_for_user_id,
+          requested_by_name: b.requested_by_name ?? "Unknown",
+          permission_code: b.permission_code,
+          reason: b.reason,
+          business_justification: b.business_justification ?? null,
+          access_type: b.access_type ?? "temporary",
+          start_at: b.start_at ?? null,
+          end_at: b.end_at ?? null,
+          urgency: b.urgency ?? "normal",
+          status: "submitted",
+          reviewed_by_user_id: null, reviewed_by_name: null,
+          review_notes: null, reviewed_at: null,
+          created_at: Date.now(),
+        };
+        permissionRequests.unshift(pr);
+        return HttpResponse.json({ ...pr, risk_level: riskLevel(pr.permission_code) }, { status: 201 });
+      }),
+
+      // GET /permission-requests/:id
+      http.get(`${V1}/permission-requests/:id`, async ({ params }) => {
+        await lat();
+        const pr = permissionRequests.find((r) => r.id === String(params["id"]));
+        if (!pr) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({ ...pr, risk_level: riskLevel(pr.permission_code) });
+      }),
+
+      // POST /permission-requests/:id/approve
+      http.post(`${V1}/permission-requests/:id/approve`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const pr = permissionRequests.find((r) => r.id === id);
+        if (!pr) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as { review_notes?: string; expires_at?: number };
+        pr.status = "approved";
+        pr.reviewed_by_user_id = "emp_11";
+        pr.reviewed_by_name = "Demo Owner";
+        pr.review_notes = b.review_notes ?? null;
+        pr.reviewed_at = Date.now();
+        // Create an override
+        const ov: Override = {
+          id: `ov_${++ovSeq}`,
+          user_id: pr.requested_for_user_id,
+          permission_code: pr.permission_code,
+          granted_by_user_id: "emp_11",
+          granted_by_name: "Demo Owner",
+          source_request_id: pr.id,
+          starts_at: pr.start_at ?? Date.now(),
+          expires_at: b.expires_at ?? pr.end_at ?? null,
+          status: "active",
+          created_at: Date.now(),
+        };
+        permissionOverrides.push(ov);
+        return HttpResponse.json({ ...pr, risk_level: riskLevel(pr.permission_code), override: ov });
+      }),
+
+      // POST /permission-requests/:id/reject
+      http.post(`${V1}/permission-requests/:id/reject`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const pr = permissionRequests.find((r) => r.id === id);
+        if (!pr) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as { review_notes?: string };
+        pr.status = "rejected";
+        pr.reviewed_by_user_id = "emp_11";
+        pr.reviewed_by_name = "Demo Owner";
+        pr.review_notes = b.review_notes ?? null;
+        pr.reviewed_at = Date.now();
+        return HttpResponse.json({ ...pr, risk_level: riskLevel(pr.permission_code) });
+      }),
+
+      // POST /permission-requests/:id/revoke
+      http.post(`${V1}/permission-requests/:id/revoke`, async ({ params, request }) => {
+        await lat();
+        const id = String(params["id"]);
+        const pr = permissionRequests.find((r) => r.id === id);
+        if (!pr) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const b = (await request.json()) as { review_notes?: string };
+        pr.status = "revoked";
+        pr.review_notes = b.review_notes ?? null;
+        pr.reviewed_at = Date.now();
+        // Revoke the override too
+        const ov = permissionOverrides.find((o) => o.source_request_id === id);
+        if (ov) ov.status = "revoked";
+        return HttpResponse.json({ ok: true });
+      }),
+
+      // GET /team/:id/permission-requests — requests for one employee
+      http.get(`${V1}/team/:id/permission-requests`, async ({ params }) => {
+        await lat();
+        const userId = String(params["id"]);
+        const items = permissionRequests
+          .filter((r) => r.requested_for_user_id === userId)
+          .map((r) => ({ ...r, risk_level: riskLevel(r.permission_code) }));
+        return HttpResponse.json({ items });
+      }),
+
+      // GET /team/:id/permission-overrides — active overrides for one employee
+      http.get(`${V1}/team/:id/permission-overrides`, async ({ params }) => {
+        await lat();
+        const userId = String(params["id"]);
+        const items = permissionOverrides.filter((o) => o.user_id === userId);
+        return HttpResponse.json({ items });
       }),
     ];
   })(),
