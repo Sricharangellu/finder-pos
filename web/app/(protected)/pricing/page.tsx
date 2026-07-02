@@ -160,13 +160,15 @@ function TableShell({ cols, children, empty }: { cols: string[]; children: React
 function PriceBooksTab() {
   const [books, setBooks]   = useState<PriceBook[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<{ items: PriceBook[] }>("/api/v1/pricing/price-books").then(r => {
       setBooks(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -217,13 +219,15 @@ function PriceBooksTab() {
 function TierPricingTab() {
   const [rules, setRules]   = useState<TierRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<{ items: TierRule[] }>("/api/v1/pricing/tier-rules").then(r => {
       setRules(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -289,12 +293,13 @@ function TierPricingTab() {
 function ContractPricesTab() {
   const [contracts, setContracts] = useState<ContractPrice[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [search, setSearch]       = useState("");
 
   useEffect(() => {
     void apiGet<{ items: ContractPrice[] }>("/api/v1/pricing/contracts").then(r => {
       setContracts(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
   const filtered = useMemo(() => {
@@ -302,6 +307,7 @@ function ContractPricesTab() {
     return contracts.filter(c => !q || c.customerName.toLowerCase().includes(q) || c.productName.toLowerCase().includes(q) || c.contractNumber.toLowerCase().includes(q));
   }, [contracts, search]);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -359,18 +365,20 @@ function ContractPricesTab() {
 function ScheduledTab() {
   const [schedules, setSchedules] = useState<ScheduledPrice[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [filter, setFilter]       = useState<ScheduledPrice["status"] | "all">("all");
 
   useEffect(() => {
     void apiGet<{ items: ScheduledPrice[] }>("/api/v1/pricing/scheduled").then(r => {
       setSchedules(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
   const filtered = useMemo(() =>
     filter === "all" ? schedules : schedules.filter(s => s.status === filter),
   [schedules, filter]);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -442,11 +450,12 @@ function ScheduledTab() {
 function MarginRulesTab() {
   const [rules, setRules]   = useState<MarginRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<{ items: MarginRule[] }>("/api/v1/pricing/margin-rules").then(r => {
       setRules(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
   const ACTION_CLS: Record<MarginRule["action"], string> = {
@@ -455,6 +464,7 @@ function MarginRulesTab() {
     approve: "bg-blue-100 text-blue-700",
   };
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -525,14 +535,21 @@ function SimulatorTab() {
   const [customerId, setCustomerId] = useState("");
   const [result, setResult]         = useState<SimulatorResult | null>(null);
   const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
 
   const runSim = async () => {
     setLoading(true);
-    const r = await apiGet<SimulatorResult>(
-      `/api/v1/pricing/simulate?sku=${productSku}&qty=${qty}&customerId=${customerId}`
-    );
-    setResult(r);
-    setLoading(false);
+    setError(null);
+    try {
+      const r = await apiGet<SimulatorResult>(
+        `/api/v1/pricing/simulate?sku=${productSku}&qty=${qty}&customerId=${customerId}`
+      );
+      setResult(r);
+    } catch (err: unknown) {
+      setError((err as Error).message ?? "Simulation failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -574,6 +591,7 @@ function SimulatorTab() {
         >
           {loading ? "Resolving…" : "Resolve Price"}
         </button>
+        {error && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
       </div>
 
       {result && (

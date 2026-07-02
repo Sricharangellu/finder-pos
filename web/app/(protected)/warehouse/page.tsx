@@ -144,13 +144,15 @@ function ProgressBar({ value, max, color = "bg-[#5D5FEF]" }: { value: number; ma
 function DashboardTab() {
   const [data, setData] = useState<WmsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<WmsDashboard>("/api/v1/warehouse/dashboard").then((d) => {
       setData(d); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}</div>;
   if (!data) return null;
 
@@ -195,13 +197,14 @@ function DashboardTab() {
 function LocationsTab() {
   const [locations, setLocations] = useState<WmsLocation[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch]         = useState("");
 
   useEffect(() => {
     void apiGet<{ items: WmsLocation[] }>("/api/v1/warehouse/locations").then((r) => {
       setLocations(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
   const TYPE_COLOR: Record<WmsLocation["type"], string> = {
@@ -218,6 +221,7 @@ function LocationsTab() {
     return locations.filter(l => !q || l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q));
   }, [locations, search]);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -290,14 +294,16 @@ function LocationsTab() {
 function ReceivingTab() {
   const [items, setItems]     = useState<ReceivingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<{ items: ReceivingItem[] }>("/api/v1/warehouse/receiving").then((r) => {
       setItems(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>;
 
   return (
@@ -384,13 +390,15 @@ function ReceivingTab() {
 function PutawayTab() {
   const [tasks, setTasks]     = useState<PutawayTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<{ items: PutawayTask[] }>("/api/v1/warehouse/putaway").then((r) => {
       setTasks(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -462,18 +470,20 @@ function PutawayTab() {
 function PicksTab() {
   const [picks, setPicks]     = useState<PickList[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
   const [filter, setFilter]   = useState<PickList["status"] | "all">("all");
 
   useEffect(() => {
     void apiGet<{ items: PickList[] }>("/api/v1/warehouse/picks").then((r) => {
       setPicks(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
   const filtered = useMemo(() =>
     filter === "all" ? picks : picks.filter(p => p.status === filter),
   [picks, filter]);
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (
@@ -566,11 +576,12 @@ function PicksTab() {
 function CycleCountsTab() {
   const [counts, setCounts]   = useState<CycleCount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     void apiGet<{ items: CycleCount[] }>("/api/v1/warehouse/cycle-counts").then((r) => {
       setCounts(r.items ?? []); setLoading(false);
-    });
+    }).catch((err: unknown) => { setError((err as Error).message ?? "Failed to load"); setLoading(false); });
   }, []);
 
   const ABC_CLS: Record<CycleCount["abcClass"], string> = {
@@ -579,6 +590,7 @@ function CycleCountsTab() {
     C: "bg-slate-100 text-slate-600",
   };
 
+  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-600">{error}</p>;
   if (loading) return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
 
   return (

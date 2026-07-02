@@ -142,7 +142,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
 
   app.use((req, res, next) => {
     const origin = req.headers.origin ?? "";
-    const isDev = process.env["NODE_ENV"] !== "production";
+    const isDev = process.env["NODE_ENV"] === "development";
     const allowed = isDev || allowedOrigins.has(origin);
 
     if (allowed && origin) {

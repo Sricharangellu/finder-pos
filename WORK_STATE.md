@@ -352,3 +352,254 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 - FE-R4 Restaurant Dashboard: `/restaurant/dashboard` — covers, avg ticket, table turns, peak hour, hourly revenue chart, top items, active sessions
 - reports/page.tsx split: 4 sections → `_components/` (866→246 ln); shared helpers in reportHelpers.tsx
 - catalog/[id]/page.tsx restructured: 3-tab editor (General | Inventory | Marketing) — 763→136 ln; GeneralTab (price table w/ markup/margin), InventoryTab (supplier, replenish, variants), MarketingTab (loyalty, compliance)
+
+---
+
+## Full-Stack Audit — 2026-07-02
+
+> Audited by: Claude Sonnet 4.6 | Commit at audit time: `efefd76`
+> Scope: 129 pages · 465 API handlers · auth · security headers · offline · notifications · RBAC · error handling
+
+---
+
+### SECURITY
+
+#### ✅ PASSING
+
+| Area | Detail |
+|---|---|
+| **Auth guard (frontend)** | `middleware.ts` checks `finder_session_hint` cookie on every protected route; redirects to `/login?next=<path>` if absent |
+| **Auth guard (React)** | `(protected)/layout.tsx` reads `useAuth().status`; renders null + redirects on `"unauthenticated"` — double layer |
+| **JWT verification (backend)** | `gateway/auth.ts` — `jsonwebtoken.verify()` on every request; rejects missing or invalid Bearer tokens with HTTP 401 |
+| **httpOnly refresh token** | `finder_refresh` cookie is httpOnly (JS-unreadable); `finder_session_hint` is non-httpOnly hint only — actual auth secret never exposed to JS |
+| **Token refresh race protection** | `_refreshPromise` singleton in `api-client/client.ts` prevents concurrent refreshes (lines 40, 90–95) |
+| **Rate limiting** | `src/gateway/rateLimit.ts` — IP-based token-bucket (60 req burst / 20 RPS sustained); Redis-backed in prod (Lua atomic script prevents TOCTOU); per-tenant tiered limiter (standard/premium/enterprise) |
+| **CORS** | Allowlist-based; defaults to `finder-pos.vercel.app` + `finder-pos-web.vercel.app` in prod; configurable via `ALLOWED_ORIGINS` env var; dev-only wildcard |
+| **Security headers (frontend)** | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera/mic/geo disabled) |
+| **CSP** | Restrictive in prod: `script-src 'self' 'unsafe-inline'`; `connect-src` limited to self + `NEXT_PUBLIC_API_BASE_URL`; `frame-ancestors 'none'` |
+| **SQL injection** | All queries use `@named` / `?` placeholder compilation (`src/shared/db.ts` `compile()`); no raw string interpolation found in service layer |
+| **Tenant isolation** | `db.withTenant(tenantId)` sets Postgres `app.tenant_id` config per transaction; RLS policies enforce at DB layer; every query in `custom_roles/service.ts` scopes to `tenant_id` |
+| **Parameterized secrets check** | No hardcoded API keys, tokens, or passwords found in `web/app/` source code |
+| **Helmet (backend)** | `helmet` imported and applied in `src/app.ts` — adds baseline HTTP security headers on backend |
+| **No XSS via React** | Zero `dangerouslySetInnerHTML` in any page component; React escapes all interpolated values |
+| **Offline outbox** | IndexedDB (not localStorage); carries idempotency key on every queued checkout for safe replay |
+| **SSE notifications** | `useNotifications()` uses `EventSource` (not polling); per-tenant broker in `src/shared/sse.ts`; 25s heartbeat keeps proxies alive; cleanup on `close`/`error` |
+| **gitignore** | `.env`, `node_modules/`, `dist/`, `.vercel`, `*.db` all ignored |
+| **No competitor brand names** | Zero references found in source tree |
+
+---
+
+#### 🔴 CRITICAL — Must Fix Before Production
+
+| ID | File | Issue | Risk |
+|---|---|---|---|
+| **SEC-1** | `.env` (repo root) | A `VERCEL_TOKEN` is stored in `.env` which IS in `.gitignore` but the file EXISTS on disk. If the repo is ever archived, zipped, or deployed via `git archive`, this token leaks. **Rotate this token immediately via the Vercel dashboard.** | Token compromise → unauthorized deploys |
+| **SEC-2** | `web/middleware.ts:54` | CSP uses `'unsafe-eval'` in development. If the dev build is ever accidentally deployed to staging/prod (e.g., via `NODE_ENV` misconfiguration), eval-based XSS becomes possible. Should be `NODE_ENV === "production"` guard verified at deploy time, not runtime. | XSS if wrong build deployed |
+| **SEC-3** | `web/middleware.ts` | **Missing `Strict-Transport-Security` (HSTS) header.** The middleware sets `X-Frame-Options`, `CSP`, etc., but no HSTS. Without it, browsers may downgrade to HTTP on first load before the cookie is set. Add: `Strict-Transport-Security: max-age=31536000; includeSubDomains` | HTTPS downgrade on first visit |
+
+---
+
+#### 🟠 HIGH — Fix Before Launch
+
+| ID | File | Issue | Risk |
+|---|---|---|---|
+| **SEC-4** | `web/app/(protected)/catalog/_components/PrintLabelsModal.tsx:9` | Uses `win.document.write()` to inject product `name`, `sku`, `barcode` values into a popup window without escaping. If any product field contains `</script>` or `<img onerror=…>`, it executes in the popup context. Mitigation: use `textContent` assignment or sanitize all fields before injection. | Stored XSS via product data |
+| **SEC-5** | `web/middleware.ts` | `middleware.ts` allows `/api` path prefix through without auth check (line: `"/api"` in `PUBLIC_PATH_PREFIXES`). This is correct for MSW in dev, but means all Next.js API routes (`/api/*`) are publicly accessible. If any server-side API routes are added under `web/app/api/`, they must implement their own auth. Currently no real API routes exist there, but this is a silent footgun. | Future API routes exposed |
+| **SEC-6** | `src/app.ts` | CORS uses `isDev = process.env.NODE_ENV !== "production"` — any non-production NODE_ENV value (e.g., `"staging"`, `"test"`) opens CORS to all origins. Should be `isDev = process.env.NODE_ENV === "development"` for safety. | CORS bypass in staging |
+
+---
+
+#### 🟡 MEDIUM — Tech Debt
+
+| ID | Issue |
+|---|---|
+| **SEC-7** | No `SameSite=Strict` or `SameSite=Lax` attribute documented for `finder_refresh` cookie. CSRF risk if backend ever adds state-mutating GET endpoints. |
+| **SEC-8** | `imports-exports/page.tsx:116` attaches `Authorization: Bearer <token>` via a direct `fetch()` call outside `apiFetch` — bypasses the 401-refresh retry logic. If token expires mid-upload, the request fails silently with no refresh. |
+| **SEC-9** | Rate limiter uses `Math.floor(Date.now() / windowMs)` for Redis fixed-window. This means all clients reset simultaneously at window boundaries — a "thundering herd" burst is possible. Upgrade to sliding window for sensitive endpoints (login, password reset). |
+| **SEC-10** | Password reset and signup pages have no client-side rate limiting UI feedback. Backend rate limits, but UX shows no "too many attempts" state — users retry excessively. |
+
+---
+
+### BUGS
+
+#### 🔴 CONFIRMED BUGS
+
+| ID | File | Bug | Impact |
+|---|---|---|---|
+| **BUG-1** | `web/mocks/mockHandlers.ts:4244 + 5517` | **Duplicate `customer-invoices` handlers** — `GET /customer-invoices`, `GET /customer-invoices/:id`, `POST /customer-invoices`, `PATCH /customer-invoices/:id/status`, `GET /customer-invoices/lookup-upc` all registered **twice** (10 duplicate registrations total). MSW matches the FIRST handler; the second block (lines 5517–5587) is dead code. The second block may have different seed data — silently wrong data if someone edits it thinking it's live. | Wrong/stale mock data; confusing to maintain |
+| **BUG-2** | `web/app/(protected)/warehouse/page.tsx` | All 6 tab data-fetch calls (`apiGet(...).then(...)`) have **no `.catch()`**. If any endpoint returns an error, the `loading` state stays `true` forever — the tab shows infinite skeleton. Pages freeze with no user-visible error. | Infinite loading on API failure |
+| **BUG-3** | `web/app/(protected)/pricing/page.tsx` | Same as BUG-2 — all 5 tab fetches (`PriceBooksTab`, `TierPricingTab`, etc.) use `.then()` with no `.catch()`. Error state `setError` is defined in some tabs (`ContractPricesTab`) but not all. `PriceBooksTab` and `TierPricingTab` have no error state at all — failures silently set `loading=false` with empty data. | Silent empty UI on error |
+| **BUG-4** | `web/app/(protected)/inventory/transfers/page.tsx` | **1-line stub** — `export { default } from "../../operations/page"`. The `/inventory/transfers` route renders the full Operations page, not a transfers page. Users navigating to "Transfers" from inventory sub-nav land on the wrong page. | Confusing UX — wrong page shown |
+| **BUG-5** | `web/mocks/mockHandlers.ts` | `GET /orders` handler filters by status but the seed orders (`ord_s_1`–`ord_s_6`) are defined inside the IIFE that also creates `termOrders`. If the orders page filter is used before the IIFE runs (race), 0 orders return. In practice no race, but the handler at line 3851 filters `termOrders` which may not include the 6 seed orders if they were added to a different array. Needs cross-check. | Potential empty orders list |
+| **BUG-6** | Multiple stub pages (see list below) | **36 pages are 1-line re-exports** pointing to other modules. Some are intentional (setup/* → settings), but others (finance/bills, finance/payment-made, ecommerce/customers, ecommerce/orders, etc.) render the wrong parent page. Users who bookmark or navigate directly to these URLs see unexpected content. | Confusing UX; SEO/link confusion |
+
+**Stub pages that render wrong content (not intentional aliases):**
+`/inventory/count` → operations, `/finance/bills` → finance, `/finance/payment-made` → finance, `/finance/settings` → finance, `/ecommerce/customers` → ecommerce, `/ecommerce/products` → ecommerce, `/ecommerce/shipping` → ecommerce, `/ecommerce/promotions` → ecommerce, `/ecommerce/orders` → ecommerce, `/ecommerce/categories` → ecommerce, `/catalog/gift-cards` → gift-cards, `/catalog/products` → catalog, `/catalog/suppliers` → vendors
+
+---
+
+#### 🟡 MEDIUM BUGS
+
+| ID | File | Bug |
+|---|---|---|
+| **BUG-7** | `web/app/(protected)/customers/[id]/_components/OrdersTab.tsx:42` | Fetches `GET /orders?limit=200` and client-filters by `customerId`. If a customer has >200 orders, earlier ones are silently dropped. No pagination or "showing N of M" indicator. |
+| **BUG-8** | `web/app/(protected)/pricing/page.tsx` (SimulatorTab) | `SimulatorTab` `runSim()` is not wrapped in try/catch. If the API call fails, `loading` stays `true` and the button shows "Resolving…" indefinitely. |
+| **BUG-9** | `web/lib/offlineOutbox.ts` | IDB sort uses `(req.result as T[]).sort((a: any, b: any) => ...)` — `any` cast bypasses type safety. If IDB returns non-array (corrupt store), this throws uncaught runtime error. |
+| **BUG-10** | `web/lib/offlineOutbox.ts:176` | `(registration as any).sync.register("checkout-replay")` — Background Sync API is typed `as any`, so TypeScript won't catch breaking changes. Also: no fallback check whether Background Sync is actually supported before calling. |
+
+---
+
+### API ENDPOINT COVERAGE
+
+#### Summary
+- **Total mock handlers:** 465 routes across `mockHandlers.ts` (7,475 lines)
+- **All routes use `await lat()`** — simulated latency on every handler ✅
+- **`/api` prefix passthrough** — all real API calls go to `NEXT_PUBLIC_API_BASE_URL`; MSW intercepts `*/api/v1/*` in dev/test ✅
+
+#### Endpoints by domain
+
+| Domain | Count | Notes |
+|---|---|---|
+| Catalog / Products | ~45 | Full CRUD + variants, batches, expiry, pricing, suppliers, images, analytics, audit |
+| Orders | ~12 | Create, list, get, refund, void, email-receipt, timeline, split, kitchen-course |
+| Payments | 3 | Create payment, register open/close sessions |
+| Customers | ~15 | CRUD, loyalty tier, product prices, adjustments |
+| Customer Invoices | 5 (×2 duplicate — BUG-1) | lookup-upc, list, get, create, status patch |
+| Purchasing / POs | ~10 | PO CRUD, receive, billing, credits |
+| Vendors | ~10 | List, detail, products, POs, invoices, credits, receiving |
+| Inventory | ~20 | Serials, reorder, counts, count lines, batches, store-locations, product-locations |
+| Inventory Pipeline | 9 | Overview, pending, receiving, reorder, issues (patch), history |
+| WMS (Warehouse) | 6 | Dashboard, locations, receiving, putaway, picks, cycle-counts |
+| Pricing Engine | 6 | Price books, tier rules, contracts, scheduled, margin rules, simulate |
+| EDI Imports | 7 | Queue, upload, validate, process, history, errors, partner config |
+| Fulfillment | 7 | Locations, assign, pick-lists CRUD, pack |
+| Sales (quotes/orders) | ~12 | Quotations CRUD + workflow, sales orders CRUD + approve/assign/invoice/cancel |
+| Accounting | ~10 | Accounts, COA tree, journal entries, reconciliation |
+| Team / Roles | ~10 | CRUD, clock-in/out, time entries, custom roles, assign |
+| Workforce | ~8 | Employees, shifts, time-off |
+| Loyalty | ~10 | Tiers, members, rewards CRUD, adjustments |
+| Notifications | 4 | List, mark-read, mark-all-read, create |
+| Audit Log | 1 | List with filters |
+| Workflows | 7 | CRUD + steps CRUD |
+| Golf | ~12 | Tee sheet, bookings, members, pro-shop |
+| Restaurant | ~10 | Dashboard, tables, tabs, kitchen queue |
+| Automotive | 5 | Work orders, vehicles CRUD |
+| Healthcare | 5 | Patients CRUD, dispense |
+| Hospitality | 6 | Rooms, charges, settle |
+| Education | 6 | Students CRUD, fees, collect |
+| Entertainment | 5 | Events, tickets, redeem |
+| Manufacturing | 4 | Orders CRUD + status |
+| Rental | 5 | Assets, contracts, return |
+| Appointments | 2 | List, create |
+| Shipping / Ecommerce | 3 | Webhooks CRUD |
+| Sync | 3 | Status, queue, push |
+| Service Orders | ~5 | CRUD + status patch |
+| Promotions | ~5 | CRUD |
+| Reports / Insights | ~5 | Sales reps + performance, scheduled reports |
+| SSE Stream | 1 | `/api/v1/stream` — MSW mock returns empty stream |
+
+#### Missing mock handlers (FE calls with no handler → 404 in dev)
+| Route | Used by |
+|---|---|
+| `GET /api/v1/customers/:id/orders` | `OrdersTab.tsx` workarounds with `GET /orders?limit=200` — no dedicated endpoint |
+| `GET /api/v1/pricing/simulate` | Added by this session ✅ |
+| `GET /api/v1/warehouse/*` | Added by this session ✅ |
+| `GET /api/v1/catalog/:id/comms` | No communications/comms tab yet |
+| `GET /api/v1/customers/:id/comms` | Customer 360 Comms tab not built |
+
+---
+
+### FIREWALLS & NETWORK SECURITY
+
+| Layer | Status | Detail |
+|---|---|---|
+| **Frontend middleware** | ✅ | Next.js middleware guards all non-`/api` routes; redirects unauthenticated → `/login` |
+| **Backend JWT gate** | ✅ | `makeAuthMiddleware()` runs before every route in `src/app.ts`; 401 on invalid/missing token |
+| **IP rate limiter** | ✅ | 60 burst / 20 RPS per IP; Redis-backed in prod (atomic Lua); in-memory fallback in dev |
+| **Tenant rate limiter** | ✅ | Per-tenant tiered limits (standard/premium/enterprise); runs after auth so tenantId is known |
+| **CORS allowlist** | ✅ | Hardcoded Vercel origins in prod; `ALLOWED_ORIGINS` env override; dev-only wildcard |
+| **CSP** | ⚠️ | `unsafe-inline` for scripts/styles (required by Next.js without nonce); `unsafe-eval` in dev (SEC-2) |
+| **HSTS** | 🔴 | **Missing** — no `Strict-Transport-Security` header in frontend middleware (SEC-3) |
+| **XFF IP spoofing** | ✅ | `extractClientIp()` uses rightmost-N strategy based on `TRUST_PROXY_DEPTH`; prevents spoofed `X-Forwarded-For` bypassing rate limits |
+| **Helmet** | ✅ | Applied in backend Express app — `X-Powered-By` removed, HSTS set for HTTPS responses |
+| **Clickjacking** | ✅ | `X-Frame-Options: DENY` + `frame-ancestors 'none'` in CSP |
+| **MIME sniffing** | ✅ | `X-Content-Type-Options: nosniff` |
+| **Permissions policy** | ✅ | Camera, microphone, geolocation disabled; payment limited to self |
+
+---
+
+### FALLBACKS & SAFEGUARDS
+
+| Area | Status | Detail |
+|---|---|---|
+| **Offline checkout** | ✅ | `offlineOutbox.ts` — IndexedDB queue, idempotency keys, Background Sync replay, manual retry fallback |
+| **Token refresh** | ✅ | `apiFetch` retries once after 401 via `silentRefresh()`; clears session + redirects on failure |
+| **Loading skeletons** | ✅ | All major pages show skeleton loaders (`animate-pulse`) during fetch |
+| **Error state display** | ⚠️ | `/warehouse` and `/pricing` tab components have no `.catch()` — freeze on error (BUG-2, BUG-3) |
+| **Empty states** | ✅ | All tables have explicit empty-state messages |
+| **Confirmation modals** | ✅ | Void, refund, delete, archive all require confirm modal with explicit warning copy |
+| **`safeLoad()` wrapper** | ✅ | `api-client/client.ts` — catches unhandled rejections; used in settings, catalog, customers |
+| **Environment variable fail-fast** | ✅ | `buildApp()` throws on missing `JWT_SECRET` / `DATABASE_URL` in production before serving |
+| **Redis fail-open** | ✅ | Rate limiter Redis path catches errors and calls `next()` — Redis outage doesn't block traffic |
+| **SSE reconnect** | ⚠️ | `useNotifications.ts` uses `EventSource` which auto-reconnects; however, there is no max-retry or exponential backoff — on network partition it retries indefinitely at browser default interval (~3s), potentially flooding the server |
+| **DB connection pooling** | ✅ | `pg.Pool` with `poolStats()` health check; transactions scoped with `withTenant()` and `withRequestId()` |
+| **BIGINT parse** | ✅ | `types.setTypeParser(20, ...)` prevents silent precision loss on int8 values |
+| **Order immutability** | ✅ | Orders use status transitions + `order_events` timeline; no in-place edits |
+| **Inventory ledger** | ✅ | Every stock change must create an `inventory_movements` record (enforced in architecture spec) |
+| **Audit log** | ✅ | `/audit-log` page wired; `audit_logs` table in schema |
+
+---
+
+### NOTIFICATIONS
+
+| Feature | Status | Detail |
+|---|---|---|
+| **Delivery mechanism** | ✅ SSE | `useNotifications()` opens `EventSource('/api/v1/stream')`; real-time push from backend |
+| **Backend broker** | ✅ | `SseBroker` in `src/shared/sse.ts`; per-tenant fan-out; 25s heartbeat; cleanup on disconnect |
+| **Redis pub/sub** | ✅ | Cross-instance fan-out via `finder:events` Redis channel (multi-replica safe) |
+| **Notification bell** | ✅ | `NotificationBell.tsx`; unread count badge; mark-all-read; dismiss per item |
+| **Notification page** | ✅ | `/notifications` — full list, filter (all/unread), severity badges (info/warning/critical) |
+| **Event types handled** | ✅ | `order_created`, `payment_captured`, `low_stock`, `tier_upgraded` |
+| **Missing event types** | ⚠️ | No handlers for: `sync_error`, `purchase_order_received`, `new_order`, `order_fulfilled`, `payment_failed` — these exist in `NotificationType` enum but `buildNotification()` returns `null` (drops them silently) |
+| **In-app toast** | ⚠️ | No toast/snackbar system — notifications only appear in the bell dropdown; high-priority alerts (payment failed, low stock critical) have no immediate visual pop |
+| **Email/SMS** | ⚠️ | Architecture specifies email/SMS/push channels; only in-app is wired; `SENDGRID_API_KEY` warned-but-optional in `buildApp()` |
+| **Notification preferences** | ✅ | `/notifications` page has channel preference UI (per-type toggles) |
+| **SSE reconnect gap** | ⚠️ | If SSE connection drops, notifications between disconnect and reconnect are lost (no catch-up query on reconnect) — should `GET /notifications?since=<lastTs>` on reconnect |
+
+---
+
+### DOMAIN ROADMAP STATUS (updated)
+
+| Priority | Domain | Path | Status |
+|---|---|---|---|
+| 1 | Sales & Order Management | `/orders`, `/orders/[id]` | ✅ Built (order list + detail + timeline) |
+| 2 | Customer 360 | `/customers/[id]` | ✅ Built (8 tabs incl. Orders tab) |
+| 3 | Supplier 360 | `/vendors/[id]` | ✅ Built (6 tabs) |
+| 4 | Warehouse Management (WMS) | `/warehouse` | ✅ Built (6 tabs: Dashboard, Locations, Receiving, Putaway, Picks, Cycle Counts) |
+| 5 | Pricing Engine | `/pricing` | ✅ Built (6 tabs: Price Books, Tier, Contracts, Scheduled, Margin Rules, Simulator) |
+| 6 | Promotion Engine | `/promotions`, `/discounts` | 🔶 Basic page — needs upgrade |
+| 7 | Enterprise Workflow Engine | `/workflows` | 🔶 Basic page — needs approval chain |
+| 8 | Notification Center | `/notifications` | 🔶 In-app only — missing toast, email/SMS, catch-up on reconnect |
+| 9 | Document Center | `/documents` | 🔲 Not started |
+| 10 | Business Intelligence | `/analytics` | 🔶 Basic dashboards |
+| 11 | Automation Engine | `/automations` | 🔶 Basic page |
+| 12 | Integration Hub | `/integrations` | 🔶 Basic page |
+| 13 | Analytics & AI | `/ai-insights` | 🔶 Basic page |
+
+---
+
+### NEXT PRIORITY QUEUE (post-audit)
+
+#### Immediate fixes (before any new features)
+
+1. **SEC-3** — Add HSTS header to `web/middleware.ts` (1 line)
+2. **BUG-1** — Remove duplicate `customer-invoices` handlers from `mockHandlers.ts` (lines 5517–5627)
+3. **BUG-2 / BUG-3** — Add `.catch(setError)` to all tab fetches in `/warehouse` and `/pricing`
+4. **SEC-4** — Sanitize product fields before `document.write()` in `PrintLabelsModal.tsx`
+5. **SEC-1** — Rotate the Vercel token in `.env` immediately
+
+#### Next domain build
+
+6. **Domain 6: Promotion Engine** — `/promotions` full upgrade (coupon types, stacking rules, campaign builder)
+7. **Domain 7: Workflow Engine** — configurable approval chain for price changes, refunds, inventory adjustments
+8. **Notification gaps** — add toast system, add `sync_error`/`payment_failed` event handlers, SSE catch-up on reconnect

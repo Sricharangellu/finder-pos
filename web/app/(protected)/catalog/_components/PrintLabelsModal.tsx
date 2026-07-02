@@ -3,6 +3,10 @@
 import { formatMoney } from "@/lib/money";
 import type { Product } from "@/api-client/types";
 
+function esc(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function printLabels(products: Product[]) {
   const win = window.open("", "_blank");
   if (!win) return;
@@ -17,9 +21,9 @@ function printLabels(products: Product[]) {
     @media print { @page { margin: 0.25in; } }
   </style></head><body><div class="sheet">${products.map(p => `
     <div class="label">
-      <div class="name">${p.name}</div>
-      <div class="sku">${p.sku}</div>
-      <div class="barcode-box">${p.barcode ?? p.sku}</div>
+      <div class="name">${esc(p.name)}</div>
+      <div class="sku">${esc(p.sku)}</div>
+      <div class="barcode-box">${esc(p.barcode ?? p.sku)}</div>
       <div class="price">${formatMoney(p.price_cents)}</div>
     </div>`).join("")}</div><script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
   win.document.close();

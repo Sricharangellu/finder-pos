@@ -35,6 +35,8 @@ export function middleware(request: NextRequest): NextResponse {
 
   const response = NextResponse.next();
 
+  // Force HTTPS for 1 year; apply to all subdomains
+  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   // Prevent embedding in iframes (clickjacking protection)
   response.headers.set("X-Frame-Options", "DENY");
   // Prevent MIME-type sniffing
