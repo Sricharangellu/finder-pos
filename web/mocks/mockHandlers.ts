@@ -7165,4 +7165,193 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── EDI Imports ───────────────────────────────────────────────────────────
+  ...(() => {
+    const D = 86_400_000;
+    const now = () => Date.now();
+
+    type EdiStatus = "queued" | "validating" | "valid" | "invalid" | "processed" | "failed";
+    type EdiFormat = "x12_850" | "x12_855" | "x12_856" | "x12_810" | "edifact_orders" | "csv_po" | "json_po" | "xml_po";
+
+    interface EdiImport {
+      id: string;
+      filename: string;
+      format: EdiFormat;
+      supplier_name: string;
+      supplier_id: string;
+      file_size_bytes: number;
+      record_count: number;
+      status: EdiStatus;
+      uploaded_at: number;
+      processed_at: number | null;
+      po_count: number;
+      line_count: number;
+      error_count: number;
+      warnings: string[];
+      errors: string[];
+      created_po_ids: string[];
+    }
+
+    const FORMAT_LABELS: Record<EdiFormat, string> = {
+      x12_850: "X12 850 (Purchase Order)",
+      x12_855: "X12 855 (PO Acknowledgment)",
+      x12_856: "X12 856 (Ship Notice/ASN)",
+      x12_810: "X12 810 (Invoice)",
+      edifact_orders: "EDIFACT ORDERS",
+      csv_po: "CSV Purchase Order",
+      json_po: "JSON Purchase Order",
+      xml_po: "XML Purchase Order",
+    };
+
+    let imports: EdiImport[] = [
+      {
+        id: "edi_1", filename: "PO_20260628_ACME.edi", format: "x12_850",
+        supplier_name: "Acme Coffee Co", supplier_id: "sup_1",
+        file_size_bytes: 14_820, record_count: 3, status: "processed",
+        uploaded_at: now() - 4 * D, processed_at: now() - 4 * D + 45_000,
+        po_count: 3, line_count: 18, error_count: 0,
+        warnings: ["Line 7: Unit cost rounded to 2 decimal places"],
+        errors: [], created_po_ids: ["PO-4010", "PO-4011", "PO-4012"],
+      },
+      {
+        id: "edi_2", filename: "invoice_Q2_teatraders.x12", format: "x12_810",
+        supplier_name: "Tea Traders", supplier_id: "sup_2",
+        file_size_bytes: 8_450, record_count: 2, status: "valid",
+        uploaded_at: now() - 1 * D, processed_at: null,
+        po_count: 2, line_count: 11, error_count: 0,
+        warnings: [],
+        errors: [], created_po_ids: [],
+      },
+      {
+        id: "edi_3", filename: "snackworld_orders_export.csv", format: "csv_po",
+        supplier_name: "Snack World", supplier_id: "sup_3",
+        file_size_bytes: 3_210, record_count: 5, status: "invalid",
+        uploaded_at: now() - 2 * D, processed_at: null,
+        po_count: 0, line_count: 5, error_count: 3,
+        warnings: [],
+        errors: [
+          "Row 3: SKU 'CHIP-XL-BULK' not found in catalog",
+          "Row 4: qty_ordered is not a number ('TBD')",
+          "Row 5: Missing required field: unit_cost",
+        ], created_po_ids: [],
+      },
+      {
+        id: "edi_4", filename: "ASN_20260701_ACME.edi", format: "x12_856",
+        supplier_name: "Acme Coffee Co", supplier_id: "sup_1",
+        file_size_bytes: 6_740, record_count: 1, status: "queued",
+        uploaded_at: now() - 30 * 60_000, processed_at: null,
+        po_count: 0, line_count: 0, error_count: 0,
+        warnings: [], errors: [], created_po_ids: [],
+      },
+    ];
+
+    return [
+      // GET /purchasing/edi-imports — list all imports
+      http.get(`${V1}/purchasing/edi-imports`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const status = url.searchParams.get("status");
+        const supplier = url.searchParams.get("supplier_id");
+        let filtered = imports;
+        if (status && status !== "all") filtered = filtered.filter((i) => i.status === status);
+        if (supplier) filtered = filtered.filter((i) => i.supplier_id === supplier);
+        return HttpResponse.json({ items: filtered, total: filtered.length });
+      }),
+
+      // GET /purchasing/edi-imports/:id — detail + preview
+      http.get(`${V1}/purchasing/edi-imports/:id`, async ({ params }) => {
+        await lat();
+        const item = imports.find((i) => i.id === String(params["id"]));
+        if (!item) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({
+          ...item,
+          format_label: FORMAT_LABELS[item.format],
+          preview_lines: item.status === "invalid" || item.status === "valid"
+            ? [
+                { line: 1, raw: "ISA*00*          *00*          *01*084748771      *01*123456789      *260628*1045*^*00501*000000001*0*P*>~", parsed: "ISA — Interchange Control Header" },
+                { line: 2, raw: "GS*PO*084748771*123456789*20260628*1045*1*X*005010~", parsed: "GS — Functional Group Header (PO)" },
+                { line: 3, raw: "ST*850*0001~", parsed: "ST — Transaction Set Header (850 PO)" },
+                { line: 4, raw: "BEG*00*SA*PO-4010**20260628~", parsed: "BEG — Beginning Segment (SA=standing order, PO-4010)" },
+                { line: 5, raw: "PO1*1*200*EA*0.80**VP*BEV-001~", parsed: "PO1 — Line 1: 200 EA @ $0.80, Vendor Part BEV-001" },
+              ]
+            : [],
+        });
+      }),
+
+      // POST /purchasing/edi-imports — upload (simulated)
+      http.post(`${V1}/purchasing/edi-imports`, async ({ request }) => {
+        await lat();
+        const body = (await request.json()) as { filename: string; format: EdiFormat; supplier_id: string; supplier_name: string; file_size_bytes: number };
+        const newImport: EdiImport = {
+          id: `edi_${rid()}`,
+          filename: body.filename,
+          format: body.format,
+          supplier_name: body.supplier_name,
+          supplier_id: body.supplier_id,
+          file_size_bytes: body.file_size_bytes ?? 4096,
+          record_count: 0,
+          status: "queued",
+          uploaded_at: now(),
+          processed_at: null,
+          po_count: 0, line_count: 0, error_count: 0,
+          warnings: [], errors: [], created_po_ids: [],
+        };
+        imports.unshift(newImport);
+        return HttpResponse.json(newImport, { status: 201 });
+      }),
+
+      // POST /purchasing/edi-imports/:id/validate — run validation
+      http.post(`${V1}/purchasing/edi-imports/:id/validate`, async ({ params }) => {
+        await lat();
+        const idx = imports.findIndex((i) => i.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        imports[idx] = {
+          ...imports[idx],
+          status: "valid",
+          record_count: 2,
+          po_count: 2,
+          line_count: 9,
+          error_count: 0,
+          warnings: ["1 SKU matched by name — verify vendor part number"],
+        };
+        return HttpResponse.json(imports[idx]);
+      }),
+
+      // POST /purchasing/edi-imports/:id/process — create POs from validated import
+      http.post(`${V1}/purchasing/edi-imports/:id/process`, async ({ params }) => {
+        await lat();
+        const idx = imports.findIndex((i) => i.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        if (imports[idx].status !== "valid") {
+          return HttpResponse.json({ error: { code: "not_valid", message: "Import must be validated before processing" } }, { status: 422 });
+        }
+        const poIds = Array.from({ length: imports[idx].po_count || 1 }, (_, i) => `PO-${4020 + i}`);
+        imports[idx] = {
+          ...imports[idx],
+          status: "processed",
+          processed_at: now(),
+          created_po_ids: poIds,
+        };
+        return HttpResponse.json({ import: imports[idx], created_po_ids: poIds });
+      }),
+
+      // DELETE /purchasing/edi-imports/:id — discard queued/invalid import
+      http.delete(`${V1}/purchasing/edi-imports/:id`, async ({ params }) => {
+        await lat();
+        const idx = imports.findIndex((i) => i.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        imports.splice(idx, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+
+      // GET /purchasing/edi-imports/formats — list supported formats
+      http.get(`${V1}/purchasing/edi-imports/formats`, async () => {
+        await lat();
+        return HttpResponse.json({
+          formats: Object.entries(FORMAT_LABELS).map(([key, label]) => ({ key, label })),
+        });
+      }),
+    ];
+  })(),
 );
