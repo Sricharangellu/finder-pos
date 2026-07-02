@@ -1275,6 +1275,52 @@ export const mockHandlers = [
         return HttpResponse.json({ ok: true });
       }),
 
+      // ── Matrix generation — creates child products for each combination ───
+      http.post(`${V1}/catalog/:id/variants/generate`, async ({ params, request }) => {
+        await lat();
+        const masterId = String(params["id"]);
+        const master = products.find((p) => p.id === masterId);
+        if (!master) return HttpResponse.json({ error: "not_found" }, { status: 404 });
+        const body = (await request.json()) as { attributes: { name: string; values: string[] }[] };
+        const attrs = body.attributes ?? [];
+
+        // Cartesian product of all attribute value arrays
+        const combos: string[][] = attrs.reduce<string[][]>(
+          (acc, attr) => acc.flatMap((combo) => attr.values.map((v) => [...combo, v])),
+          [[]],
+        );
+
+        let added = 0;
+        for (const combo of combos) {
+          const variantLabel = combo.join(" / ");
+          // Skip if already exists as a child with same label
+          const already = products.some(
+            (p) => p.parent_product_id === masterId && (p as any).variant_label === variantLabel,
+          );
+          if (already) continue;
+
+          const newId = `var_${Math.random().toString(36).slice(2, 10)}`;
+          const skuSuffix = combo.map((v) => v.replace(/\s+/g, "").toUpperCase().slice(0, 4)).join("-");
+          // Name = "Master Name — Variant Label" for invoice/scan display
+          const variantName = `${master.name} — ${variantLabel}`;
+          const newProduct = {
+            ...master,
+            id: newId,
+            sku: `${master.sku}-${skuSuffix}`,
+            name: variantName,
+            parent_product_id: masterId,
+            variant_label: variantLabel,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          products.push(newProduct as typeof products[0]);
+          added++;
+        }
+
+        const children = products.filter((p) => p.parent_product_id === masterId);
+        return HttpResponse.json({ items: children, added });
+      }),
+
       // ── Batches/lots per product (used by ExpiryTab) ─────────────────────
       ...(() => {
         let bSeq = 100;

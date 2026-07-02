@@ -16,17 +16,19 @@ import { SalesTab }      from "./_components/SalesTab";
 import { ReturnsTab }    from "./_components/ReturnsTab";
 import { CreditsTab }    from "./_components/CreditsTab";
 import { InvoicesTab }   from "./_components/InvoicesTab";
+import { VariantsTab }   from "./_components/VariantsTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
   | "general" | "categories" | "inventory" | "expiry"
-  | "sales" | "returns" | "credits" | "invoices" | "marketing";
+  | "sales" | "returns" | "credits" | "invoices" | "marketing" | "variants";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "general",    label: "General" },
+  { key: "variants",   label: "Variants" },
   { key: "categories", label: "Categories" },
   { key: "inventory",  label: "Inventory" },
   { key: "expiry",     label: "Expiry" },
@@ -120,7 +122,19 @@ export default function ProductDetailPage() {
               <Badge variant={STATUS_BADGE[product.status]}>{product.status}</Badge>
               <Badge variant="gray">{product.sku}</Badge>
               {product.tax_class === "exempt" && <Badge variant="yellow">Tax exempt</Badge>}
+              {product.variant_label && (
+                <Badge variant="gray">Variant: {product.variant_label}</Badge>
+              )}
             </div>
+            {product.parent_product_id && (
+              <button
+                type="button"
+                onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
+                className="flex items-center gap-1 text-xs font-medium text-[#5D5FEF] hover:underline"
+              >
+                ↑ Part of master product
+              </button>
+            )}
           </div>
 
           {/* Right: actions */}
@@ -230,6 +244,9 @@ export default function ProductDetailPage() {
         {/* ── Tab content ─────────────────────────────────────────────────── */}
         {activeTab === "general" && (
           <GeneralTab product={product} onSaved={setProduct} />
+        )}
+        {activeTab === "variants" && (
+          <VariantsTab product={product} />
         )}
         {activeTab === "categories" && (
           <CategoriesTab
