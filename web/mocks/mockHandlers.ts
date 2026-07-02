@@ -7039,6 +7039,124 @@ mockHandlers.push(
     ];
   })(),
 
+  // ── Pricing Engine ──────────────────────────────────────────────────────────
+  ...(() => {
+    const now = Date.now();
+    const d = (days: number) => now - days * 86_400_000;
+    const f = (days: number) => now + days * 86_400_000;
+
+    const priceBooks = [
+      { id: "pb_1", name: "Standard Retail",      type: "retail",         currency: "USD", productCount: 412, active: true,  description: "Default retail pricing for all outlets" },
+      { id: "pb_2", name: "Wholesale B2B",         type: "wholesale",      currency: "USD", productCount: 380, active: true,  description: "Wholesale prices for approved B2B customers" },
+      { id: "pb_3", name: "South Branch",          type: "location",       currency: "USD", productCount: 210, active: true,  description: "Location-specific overrides for South Branch" },
+      { id: "pb_4", name: "Amazon Marketplace",    type: "marketplace",    currency: "USD", productCount: 155, active: true,  description: "Marketplace pricing including FBA fees" },
+      { id: "pb_5", name: "Gold Member Pricing",   type: "customer-group", currency: "USD", productCount: 98,  active: true,  description: "10% discount for Gold loyalty members" },
+      { id: "pb_6", name: "Legacy Wholesale",      type: "wholesale",      currency: "USD", productCount: 200, active: false, description: "Deprecated — migrated to Wholesale B2B" },
+    ];
+
+    const tierRules = [
+      {
+        id: "tr_1", name: "Cigarette Carton Breaks", scope: "category", categoryName: "Cigarettes",
+        productId: undefined, productName: undefined, customerGroup: undefined, active: true,
+        tiers: [{ minQty: 10, discountPct: 3 }, { minQty: 25, discountPct: 6 }, { minQty: 50, discountPct: 10 }],
+      },
+      {
+        id: "tr_2", name: "Beverage Case Discount", scope: "category", categoryName: "Beverages",
+        productId: undefined, productName: undefined, customerGroup: "Wholesale", active: true,
+        tiers: [{ minQty: 24, discountPct: 5 }, { minQty: 96, discountPct: 9 }, { minQty: 240, discountPct: 14 }],
+      },
+      {
+        id: "tr_3", name: "Snack Bulk Buy", scope: "all",
+        productId: undefined, productName: undefined, categoryName: undefined, customerGroup: undefined, active: true,
+        tiers: [{ minQty: 5, discountPct: 2 }, { minQty: 20, discountPct: 5 }],
+      },
+      {
+        id: "tr_4", name: "Energy Drink Pallet", scope: "product", productName: "Monster Ultra White",
+        categoryName: undefined, productId: "prod_4", customerGroup: undefined, active: false,
+        tiers: [{ minQty: 48, discountPct: 8 }, { minQty: 144, discountPct: 12 }],
+      },
+    ];
+
+    const contracts = [
+      { id: "cp_1", contractNumber: "CTR-0041", customerId: "cust_1", customerName: "Emma Johnson",     productId: "prod_1", productName: "Marlboro Red 20pk",   sku: "SKU-001", retailCents: 1299, contractCents: 1049, effectiveDate: d(30), expiryDate: f(335), status: "active",  approvedBy: "Store Manager" },
+      { id: "cp_2", contractNumber: "CTR-0040", customerId: "cust_2", customerName: "Marcus Rodriguez", productId: "prod_3", productName: "Celsius Energy Berry", sku: "SKU-010", retailCents:  449, contractCents:  389, effectiveDate: d(15), expiryDate: f(350), status: "active",  approvedBy: "Store Manager" },
+      { id: "cp_3", contractNumber: "CTR-0039", customerId: "cust_3", customerName: "Sarah Chen",       productId: "prod_2", productName: "Newport Menthol 20pk", sku: "SKU-002", retailCents: 1349, contractCents: 1099, effectiveDate: f(5),  expiryDate: f(370), status: "pending", approvedBy: undefined },
+      { id: "cp_4", contractNumber: "CTR-0035", customerId: "cust_4", customerName: "Linda Park",       productId: "prod_4", productName: "Monster Ultra White",  sku: "SKU-011", retailCents:  299, contractCents:  249, effectiveDate: d(180),expiryDate: d(2),   status: "expired", approvedBy: "Owner" },
+    ];
+
+    const scheduled = [
+      { id: "sp_1", name: "4th of July Sale", productId: "prod_3", productName: "Celsius Energy Berry", sku: "SKU-010", originalCents: 449, scheduledCents: 349, startAt: f(2),  endAt: f(5),   status: "upcoming", approvalRequired: false, approvedBy: "Auto" },
+      { id: "sp_2", name: "Weekend Markdown",  productId: "prod_4", productName: "Monster Ultra White",  sku: "SKU-011", originalCents: 299, scheduledCents: 249, startAt: d(1),  endAt: f(1),   status: "active",   approvalRequired: false, approvedBy: "Auto" },
+      { id: "sp_3", name: "Memorial Day Sale", productId: "prod_1", productName: "Marlboro Red 20pk",    sku: "SKU-001", originalCents: 1299,scheduledCents: 1199,startAt: d(45), endAt: d(42),  status: "ended",    approvalRequired: true,  approvedBy: "Store Manager" },
+      { id: "sp_4", name: "Price Increase Q3", productId: "prod_2", productName: "Newport Menthol 20pk", sku: "SKU-002", originalCents: 1349,scheduledCents: 1399,startAt: f(30), endAt: f(10000),status:"upcoming",  approvalRequired: true,  approvedBy: undefined },
+    ];
+
+    const marginRules = [
+      { id: "mr_1", name: "Global Minimum",        scope: "global",    categoryName: undefined, productName: undefined, minMarginPct: 5,  action: "block",   active: true },
+      { id: "mr_2", name: "Tobacco Floor",          scope: "category",  categoryName: "Tobacco", productName: undefined, minMarginPct: 12, action: "warn",    active: true },
+      { id: "mr_3", name: "Beverage Margin",        scope: "category",  categoryName: "Beverages",productName: undefined,minMarginPct: 20, action: "approve", active: true },
+      { id: "mr_4", name: "Marlboro Hard Floor",    scope: "product",   categoryName: undefined, productName: "Marlboro Red 20pk", minMarginPct: 8, action: "block", active: true },
+      { id: "mr_5", name: "Premium Snacks",         scope: "category",  categoryName: "Snacks",  productName: undefined, minMarginPct: 25, action: "warn",    active: false },
+    ];
+
+    return [
+      http.get(`${V1}/pricing/price-books`, async () => {
+        await lat();
+        return HttpResponse.json({ items: priceBooks });
+      }),
+
+      http.get(`${V1}/pricing/tier-rules`, async () => {
+        await lat();
+        return HttpResponse.json({ items: tierRules });
+      }),
+
+      http.get(`${V1}/pricing/contracts`, async () => {
+        await lat();
+        return HttpResponse.json({ items: contracts });
+      }),
+
+      http.get(`${V1}/pricing/scheduled`, async () => {
+        await lat();
+        return HttpResponse.json({ items: scheduled });
+      }),
+
+      http.get(`${V1}/pricing/margin-rules`, async () => {
+        await lat();
+        return HttpResponse.json({ items: marginRules });
+      }),
+
+      http.get(`${V1}/pricing/simulate`, async ({ request }) => {
+        await lat();
+        const url = new URL(request.url);
+        const sku = url.searchParams.get("sku") ?? "SKU-001";
+        const qty = Number(url.searchParams.get("qty") ?? 1);
+        const customerId = url.searchParams.get("customerId") ?? "";
+
+        const retailCents = sku === "SKU-002" ? 1349 : sku === "SKU-010" ? 449 : sku === "SKU-011" ? 299 : 1299;
+        const contractMatch = customerId ? contracts.find(c => c.customerId === customerId && c.sku === sku && c.status === "active") : null;
+        const tierMatch = tierRules.find(t => t.active && t.tiers.some(tier => qty >= tier.minQty));
+        const activeSched = scheduled.find(s => s.sku === sku && s.status === "active");
+
+        const steps = [
+          { priority: 1, rule: "Contract price", price: contractMatch ? contractMatch.contractCents : retailCents, applied: !!contractMatch },
+          { priority: 2, rule: "Customer group price", price: Math.round(retailCents * 0.9), applied: false },
+          { priority: 3, rule: "Tier price", price: tierMatch ? Math.round(retailCents * (1 - tierMatch.tiers[0].discountPct / 100)) : retailCents, applied: !contractMatch && !!tierMatch },
+          { priority: 4, rule: "Price book price", price: retailCents, applied: false },
+          { priority: 5, rule: "Promotional price", price: Math.round(retailCents * 0.85), applied: false },
+          { priority: 6, rule: "Scheduled markdown", price: activeSched ? activeSched.scheduledCents : retailCents, applied: !contractMatch && !tierMatch && !!activeSched },
+          { priority: 7, rule: "Retail base price", price: retailCents, applied: !contractMatch && !tierMatch && !activeSched },
+        ];
+
+        const applied = steps.find(s => s.applied);
+        return HttpResponse.json({
+          finalCents: applied ? applied.price : retailCents,
+          source: applied ? applied.rule : "Retail base price",
+          steps,
+        });
+      }),
+    ];
+  })(),
+
   // ── Warehouse Management (WMS) ──────────────────────────────────────────────
   ...(() => {
     const now = Date.now();
