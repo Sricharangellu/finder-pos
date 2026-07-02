@@ -15,6 +15,8 @@ const nextConfig = {
   // below proxy them to the backend server-side — so there is no browser CORS.
   env: {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "",
+    // Always run MSW mock service worker — there is no real backend in this deployment.
+    NEXT_PUBLIC_MOCK: "true",
   },
 
   // Proxy all backend routes to BACKEND_URL (set per-env). Covers identity

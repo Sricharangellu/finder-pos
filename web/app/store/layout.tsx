@@ -104,7 +104,7 @@ function StoreHeader() {
 function StoreLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window !== "undefined") {
-      import("@/mocks/browser").then(({ startMsw }) => startMsw()).catch(() => {});
+      import("@/mocks/browser").then(({ startWorker }) => startWorker()).catch(() => {});
     }
   }, []);
 
