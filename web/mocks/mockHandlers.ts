@@ -55,6 +55,16 @@ const registerSessions = new Map<string, any>();
 const onlineProducts = new Map<string, any>();
 const onlineSettings = new Map<string, Record<string, unknown>>();
 let ecSoSeq = 0;
+
+// ── Store customer auth ────────────────────────────────────────────────────────
+interface StoreCustomer { id: string; name: string; email: string; password: string; created_at: number; }
+let storeCustomers: StoreCustomer[] = [
+  { id: "sc_demo_1", name: "Alice Johnson", email: "alice@demo.com", password: "demo1234", created_at: Date.now() - 30 * 86400000 },
+  { id: "sc_demo_2", name: "Bob Smith",     email: "bob@demo.com",   password: "demo1234", created_at: Date.now() - 15 * 86400000 },
+];
+const storeTokens = new Map<string, string>(); // token → customerId
+let scSeq = 10;
+const storeSettings = { visibility: "private" as "public" | "private", store_name: "FinderPOS Store" };
 // Settings dev stores
 let shippingMethods: any[] = [];
 let paymentTerms: any[] = [];
@@ -1927,6 +1937,61 @@ mockHandlers.push(
 
 // ── Ecommerce: storefront + checkout + portal ───────────────────────────────
 mockHandlers.push(
+  // ── Store settings ────────────────────────────────────────────────────────
+  http.get(`${V1}/ecommerce/store/settings`, async () => {
+    await lat();
+    return HttpResponse.json(storeSettings);
+  }),
+  http.patch(`${V1}/ecommerce/store/settings`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as Partial<typeof storeSettings>;
+    Object.assign(storeSettings, b);
+    return HttpResponse.json(storeSettings);
+  }),
+
+  // ── Customer auth ──────────────────────────────────────────────────────────
+  http.post(`${V1}/ecommerce/auth/login`, async ({ request }) => {
+    await lat();
+    const { email, password } = (await request.json()) as { email: string; password: string };
+    const customer = storeCustomers.find((c) => c.email.toLowerCase() === email.toLowerCase() && c.password === password);
+    if (!customer) return HttpResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    const token = `sct_${Math.random().toString(36).slice(2, 18)}`;
+    storeTokens.set(token, customer.id);
+    const { password: _pw, ...safe } = customer;
+    return HttpResponse.json({ token, customer: safe });
+  }),
+  http.post(`${V1}/ecommerce/auth/register`, async ({ request }) => {
+    await lat();
+    const { name, email, password } = (await request.json()) as { name: string; email: string; password: string };
+    if (!name?.trim() || !email?.trim() || !password) return HttpResponse.json({ error: "All fields are required." }, { status: 400 });
+    if (storeCustomers.find((c) => c.email.toLowerCase() === email.toLowerCase())) {
+      return HttpResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    }
+    const customer: StoreCustomer = { id: `sc_${++scSeq}`, name: name.trim(), email: email.trim().toLowerCase(), password, created_at: Date.now() };
+    storeCustomers.push(customer);
+    const token = `sct_${Math.random().toString(36).slice(2, 18)}`;
+    storeTokens.set(token, customer.id);
+    const { password: _pw, ...safe } = customer;
+    return HttpResponse.json({ token, customer: safe }, { status: 201 });
+  }),
+  http.get(`${V1}/ecommerce/auth/me`, async ({ request }) => {
+    await lat();
+    const auth = request.headers.get("authorization") ?? "";
+    const token = auth.replace("Bearer ", "").trim();
+    const cid = storeTokens.get(token);
+    const customer = cid ? storeCustomers.find((c) => c.id === cid) : null;
+    if (!customer) return HttpResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { password: _pw, ...safe } = customer;
+    return HttpResponse.json(safe);
+  }),
+  http.post(`${V1}/ecommerce/auth/logout`, async ({ request }) => {
+    await lat();
+    const auth = request.headers.get("authorization") ?? "";
+    const token = auth.replace("Bearer ", "").trim();
+    storeTokens.delete(token);
+    return HttpResponse.json({ ok: true });
+  }),
+
   http.get(`${V1}/ecommerce/catalog`, async ({ request }) => {
     await lat();
     const u = new URL(request.url);
