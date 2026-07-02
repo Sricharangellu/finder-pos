@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -64,6 +65,7 @@ const creditTypeLabel = {
 };
 
 export default function VendorsPage() {
+  const router = useRouter();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [credits, setCredits] = useState<VendorCredit[]>([]);
   const [returns, setReturns] = useState<VendorReturn[]>([]);
@@ -215,7 +217,7 @@ export default function VendorsPage() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {filteredVendors.map((vendor) => (
-                  <VendorRow key={vendor.id} vendor={vendor} onSelect={() => setSelectedVendorId(vendor.id)} selected={vendor.id === selectedVendorId} />
+                  <VendorRow key={vendor.id} vendor={vendor} onSelect={() => setSelectedVendorId(vendor.id)} selected={vendor.id === selectedVendorId} onViewDetail={() => router.push(`/vendors/${vendor.id}`)} />
                 ))}
               </div>
             )}
@@ -356,12 +358,12 @@ function Metric({
   );
 }
 
-function VendorRow({ vendor, selected, onSelect }: { vendor: Vendor; selected: boolean; onSelect: () => void }) {
+function VendorRow({ vendor, selected, onSelect, onViewDetail }: { vendor: Vendor; selected: boolean; onSelect: () => void; onViewDetail: () => void }) {
   const hasComplianceGap = !vendor.tax_id || !vendor.fein_number || !vendor.vendor_type;
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => { onSelect(); onViewDetail(); }}
       className={`grid w-full gap-3 border-l-4 px-4 py-4 text-left transition-colors lg:grid-cols-[minmax(0,1.2fr)_0.8fr_0.8fr_auto] ${
         selected ? "border-l-brand-600 bg-brand-50/50" : hasComplianceGap ? "border-l-warning-500 hover:bg-warning-50/40" : "border-l-success-500 hover:bg-slate-50"
       }`}

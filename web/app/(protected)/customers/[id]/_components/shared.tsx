@@ -41,7 +41,7 @@ export interface CustomerFinancials {
   storeCredit?: number;
 }
 
-export type DetailTab = "general" | "transactions" | "financials" | "store-credit" | "contacts" | "addresses";
+export type DetailTab = "general" | "transactions" | "orders" | "financials" | "store-credit" | "contacts" | "addresses";
 
 export interface CustomerLoyalty {
   customerId: string;

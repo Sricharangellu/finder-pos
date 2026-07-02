@@ -349,9 +349,143 @@ export const mockHandlers = [
   http.get(`${V1}/purchasing/vendors`, async () => {
     await lat();
     return HttpResponse.json({ items: [
-      { id: "sup_acme", tenant_id: "tnt_demo", name: "Acme Coffee Co", email: "orders@acme.example", created_at: Date.now(), poCount: 6, totalSpentCents: 184200, openCreditsCents: 5000 },
-      { id: "sup_tea", tenant_id: "tnt_demo", name: "Tea Traders", email: null, created_at: Date.now(), poCount: 2, totalSpentCents: 41250, openCreditsCents: 0 },
+      { id: "sup_acme", tenant_id: "tnt_demo", name: "Acme Coffee Co",  email: "orders@acme.example", created_at: Date.now(), poCount: 6, totalSpentCents: 184200, openCreditsCents: 5000, status: "active",   vendor_type: "distributor", terms_days: 30, contact_name: "Bob Martinez",   city: "Austin",  state: "TX" },
+      { id: "sup_tea",  tenant_id: "tnt_demo", name: "Tea Traders",      email: "hello@teatraders.co", created_at: Date.now(), poCount: 2, totalSpentCents: 41250,  openCreditsCents: 0,    status: "active",   vendor_type: "manufacturer", terms_days: 15, contact_name: "Priya Nair",     city: "Portland", state: "OR" },
+      { id: "sup_pac",  tenant_id: "tnt_demo", name: "Pacific Wholesale", email: "ops@pacwhole.com",   created_at: Date.now(), poCount: 1, totalSpentCents: 12500,  openCreditsCents: 0,    status: "inactive", vendor_type: "wholesaler",   terms_days: 45, contact_name: "Derek Chan",     city: "Seattle", state: "WA" },
     ] });
+  }),
+
+  http.get(`${V1}/purchasing/vendors/:id`, async ({ params }) => {
+    await lat();
+    const id = String(params["id"]);
+    const NOW = Date.now(); const D = 86_400_000;
+    const profiles: Record<string, unknown> = {
+      sup_acme: {
+        id: "sup_acme", tenant_id: "tnt_demo", name: "Acme Coffee Co", company: "Acme Coffee Co LLC",
+        dba: null, email: "orders@acme.example", phone: "+1-555-0101", contact_name: "Bob Martinez",
+        primary_sales_rep: "Jennifer Wu", address1: "123 Roastery Row", city: "Austin", state: "TX", zip: "78701",
+        tax_id: "82-1234567", fein_number: "82-1234567", vendor_type: "distributor", msa_type: "standard",
+        terms_days: 30, payment_method: "ach", lead_time_days: 3, status: "active",
+        poCount: 6, totalSpentCents: 184200, openCreditsCents: 5000, avg_po_value_cents: 30700,
+        on_time_delivery_pct: 94, fill_rate_pct: 98, dispute_rate_pct: 1,
+        notes: "Preferred coffee distributor. Net-30 terms. Orders must be placed by Monday for Thursday delivery.",
+        created_at: NOW - 365 * D,
+      },
+      sup_tea: {
+        id: "sup_tea", tenant_id: "tnt_demo", name: "Tea Traders", company: "Tea Traders International",
+        dba: "TTI", email: "hello@teatraders.co", phone: "+1-503-555-0199", contact_name: "Priya Nair",
+        primary_sales_rep: "Mark Chen", address1: "88 Harbor Blvd", city: "Portland", state: "OR", zip: "97201",
+        tax_id: "91-7654321", fein_number: "91-7654321", vendor_type: "manufacturer", msa_type: null,
+        terms_days: 15, payment_method: "check", lead_time_days: 7, status: "active",
+        poCount: 2, totalSpentCents: 41250, openCreditsCents: 0, avg_po_value_cents: 20625,
+        on_time_delivery_pct: 87, fill_rate_pct: 95, dispute_rate_pct: 3,
+        notes: null, created_at: NOW - 180 * D,
+      },
+      sup_pac: {
+        id: "sup_pac", tenant_id: "tnt_demo", name: "Pacific Wholesale", company: "Pacific Wholesale LLC",
+        dba: null, email: "ops@pacwhole.com", phone: "+1-206-555-0177", contact_name: "Derek Chan",
+        primary_sales_rep: null, address1: "900 Pier St", city: "Seattle", state: "WA", zip: "98101",
+        tax_id: null, fein_number: null, vendor_type: "wholesaler", msa_type: null,
+        terms_days: 45, payment_method: "wire", lead_time_days: 10, status: "inactive",
+        poCount: 1, totalSpentCents: 12500, openCreditsCents: 0, avg_po_value_cents: 12500,
+        on_time_delivery_pct: 70, fill_rate_pct: 80, dispute_rate_pct: 8,
+        notes: "On hold — pricing dispute unresolved.", created_at: NOW - 90 * D,
+      },
+    };
+    const v = profiles[id];
+    if (!v) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+    return HttpResponse.json(v);
+  }),
+
+  http.get(`${V1}/purchasing/vendors/:id/products`, async ({ params }) => {
+    await lat();
+    const id = String(params["id"]);
+    const NOW = Date.now(); const D = 86_400_000;
+    const byVendor: Record<string, unknown[]> = {
+      sup_acme: [
+        { id: "vp_1", product_id: "prod_1", product_name: "Premium Whiskey 750ml", sku: "LIQ-001", vendor_sku: "ACM-0042", cost_cents: 1400, retail_price_cents: 2499, margin_pct: 44.0, last_cost_cents: 1380, moq: 6,  lead_time_days: 3, is_preferred: true,  last_ordered_at: NOW - 7 * D },
+        { id: "vp_2", product_id: "prod_2", product_name: "Craft Beer 6-Pack",    sku: "BEV-004", vendor_sku: "ACM-0088", cost_cents: 3100, retail_price_cents: 5499, margin_pct: 43.6, last_cost_cents: 3100, moq: 1,  lead_time_days: 3, is_preferred: true,  last_ordered_at: NOW - 5 * D },
+        { id: "vp_3", product_id: "prod_3", product_name: "House Red Wine",       sku: "LIQ-003", vendor_sku: "ACM-0211", cost_cents: 699,  retail_price_cents: 1299, margin_pct: 46.2, last_cost_cents: 680,  moq: 12, lead_time_days: 3, is_preferred: false, last_ordered_at: NOW - 30 * D },
+      ],
+      sup_tea: [
+        { id: "vp_4", product_id: "prod_7", product_name: "Organic Green Tea 100g", sku: "TEA-001", vendor_sku: "TTI-GREEN-100", cost_cents: 599, retail_price_cents: 1199, margin_pct: 50.0, last_cost_cents: 599, moq: 24, lead_time_days: 7, is_preferred: true, last_ordered_at: NOW - 14 * D },
+        { id: "vp_5", product_id: "prod_8", product_name: "Earl Grey Loose Leaf",  sku: "TEA-002", vendor_sku: "TTI-EARL-50",   cost_cents: 450, retail_price_cents: 999,  margin_pct: 55.0, last_cost_cents: 430, moq: 12, lead_time_days: 7, is_preferred: true, last_ordered_at: NOW - 21 * D },
+      ],
+      sup_pac: [],
+    };
+    return HttpResponse.json({ items: byVendor[id] ?? [] });
+  }),
+
+  http.get(`${V1}/purchasing/vendors/:id/purchase-orders`, async ({ params }) => {
+    await lat();
+    const id = String(params["id"]);
+    const NOW = Date.now(); const D = 86_400_000;
+    const byVendor: Record<string, unknown[]> = {
+      sup_acme: [
+        { id: "po_1", po_number: "PO-4001", status: "received",  receive_status: "received", total_cost_cents: 24000, line_count: 2, created_at: NOW - 2 * D, received_at: NOW - D },
+        { id: "po_3", po_number: "PO-4003", status: "ordered",   receive_status: "partial",  total_cost_cents: 43500, line_count: 3, created_at: NOW - 5 * D, received_at: null },
+        { id: "po_5", po_number: "PO-4005", status: "billed",    receive_status: "received", total_cost_cents: 18700, line_count: 1, created_at: NOW - 14 * D, received_at: NOW - 12 * D },
+        { id: "po_6", po_number: "PO-4006", status: "received",  receive_status: "received", total_cost_cents: 31200, line_count: 4, created_at: NOW - 30 * D, received_at: NOW - 28 * D },
+      ],
+      sup_tea: [
+        { id: "po_2", po_number: "PO-4002", status: "ordered",   receive_status: "pending",  total_cost_cents: 11250, line_count: 2, created_at: NOW - 3600000, received_at: null },
+        { id: "po_4", po_number: "PO-4004", status: "received",  receive_status: "received", total_cost_cents: 8750,  line_count: 1, created_at: NOW - 45 * D, received_at: NOW - 40 * D },
+      ],
+      sup_pac: [
+        { id: "po_7", po_number: "PO-4007", status: "cancelled", receive_status: "pending",  total_cost_cents: 12500, line_count: 1, created_at: NOW - 60 * D, received_at: null },
+      ],
+    };
+    return HttpResponse.json({ items: byVendor[id] ?? [] });
+  }),
+
+  http.get(`${V1}/purchasing/vendors/:id/invoices`, async ({ params }) => {
+    await lat();
+    const id = String(params["id"]);
+    const NOW = Date.now(); const D = 86_400_000;
+    const byVendor: Record<string, unknown[]> = {
+      sup_acme: [
+        { id: "bil_1", bill_number: "BILL-00001", po_id: "po_1", po_number: "PO-4001", status: "open",    total_cents: 24000, paid_cents: 0,     due_date: NOW + 30 * D, issued_at: NOW - 2 * D },
+        { id: "bil_3", bill_number: "BILL-00003", po_id: null,   po_number: null,       status: "open",    total_cents: 6500,  paid_cents: 0,     due_date: NOW + 45 * D, issued_at: NOW - 3 * D },
+        { id: "bil_5", bill_number: "BILL-00005", po_id: "po_5", po_number: "PO-4005", status: "paid",    total_cents: 18700, paid_cents: 18700, due_date: NOW - 5 * D,  issued_at: NOW - 20 * D },
+      ],
+      sup_tea: [
+        { id: "bil_2", bill_number: "BILL-00002", po_id: "po_2", po_number: "PO-4002", status: "partial", total_cents: 11250, paid_cents: 5000,  due_date: NOW + 20 * D, issued_at: NOW - D },
+      ],
+      sup_pac: [],
+    };
+    return HttpResponse.json({ items: byVendor[id] ?? [] });
+  }),
+
+  http.get(`${V1}/purchasing/vendors/:id/credits`, async ({ params }) => {
+    await lat();
+    const id = String(params["id"]);
+    const NOW = Date.now(); const D = 86_400_000;
+    const byVendor: Record<string, unknown[]> = {
+      sup_acme: [
+        { id: "vcr_1", type: "chargeback",  amount_cents: 5000, reason: "expired stock return", po_id: "po_1", po_number: "PO-4001", status: "open",    created_at: NOW - D },
+        { id: "vcr_2", type: "credit_memo", amount_cents: 2200, reason: "price adjustment",      po_id: null,   po_number: null,       status: "applied", created_at: NOW - 3 * D },
+      ],
+      sup_tea:  [],
+      sup_pac:  [],
+    };
+    return HttpResponse.json({ items: byVendor[id] ?? [] });
+  }),
+
+  http.get(`${V1}/purchasing/vendors/:id/receiving`, async ({ params }) => {
+    await lat();
+    const id = String(params["id"]);
+    const NOW = Date.now(); const D = 86_400_000;
+    const byVendor: Record<string, unknown[]> = {
+      sup_acme: [
+        { id: "rcv_1", po_id: "po_1", po_number: "PO-4001", received_by: "Alex T.", received_at: NOW - D,     qty_ordered: 48, qty_received: 48, short_qty: 0, damage_qty: 0, notes: null },
+        { id: "rcv_2", po_id: "po_3", po_number: "PO-4003", received_by: "Maria S.", received_at: NOW - 4 * D, qty_ordered: 90, qty_received: 60, short_qty: 30, damage_qty: 2, notes: "30 units back-ordered; 2 damaged on arrival." },
+      ],
+      sup_tea: [
+        { id: "rcv_3", po_id: "po_4", po_number: "PO-4004", received_by: "John D.", received_at: NOW - 40 * D, qty_ordered: 24, qty_received: 24, short_qty: 0, damage_qty: 0, notes: null },
+      ],
+      sup_pac: [],
+    };
+    return HttpResponse.json({ items: byVendor[id] ?? [] });
   }),
   http.get(`${V1}/purchasing/vendor-credits`, async () => {
     await lat();
@@ -1474,7 +1608,7 @@ export const mockHandlers = [
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
-          products.push(newProduct as typeof products[0]);
+          products.push(newProduct as unknown as typeof products[0]);
           added++;
         }
 
