@@ -6909,4 +6909,133 @@ mockHandlers.push(
       }),
     ];
   })(),
+
+  // ── Inventory Pipeline ────────────────────────────────────────────────────
+  ...(() => {
+    const D = 86_400_000;
+    const now = () => Date.now();
+
+    const pendingItems = [
+      { id: "pip_1", po_number: "PO-4002", supplier_name: "Tea Traders", product_name: "Wildflower Honey", sku: "GRO-HONEY-001", qty_ordered: 48, qty_received: 0, unit_cost_cents: 420, total_cost_cents: 20160, expected_date: now() + 3 * D, status: "ordered", days_overdue: 0, outlet: "Main Store" },
+      { id: "pip_2", po_number: "PO-4003", supplier_name: "Acme Coffee Co", product_name: "Organic Dark Roast Beans", sku: "BEV-001", qty_ordered: 200, qty_received: 80, unit_cost_cents: 80, total_cost_cents: 16000, expected_date: now() - 1 * D, status: "partial", days_overdue: 1, outlet: "Main Store" },
+      { id: "pip_3", po_number: "PO-4005", supplier_name: "Snack World", product_name: "Potato Chips 150g", sku: "SNK-001", qty_ordered: 100, qty_received: 0, unit_cost_cents: 110, total_cost_cents: 11000, expected_date: now() + 7 * D, status: "ordered", days_overdue: 0, outlet: "Downtown" },
+      { id: "pip_4", po_number: "PO-4006", supplier_name: "Tea Traders", product_name: "Mixed Nuts 200g", sku: "SNK-002", qty_ordered: 60, qty_received: 0, unit_cost_cents: 250, total_cost_cents: 15000, expected_date: now() - 3 * D, status: "ordered", days_overdue: 3, outlet: "Main Store" },
+    ];
+
+    const receivingItems = [
+      { id: "rec_1", po_number: "PO-4004", supplier_name: "Acme Coffee Co", product_name: "Energy Drink 250ml", sku: "BEV-003", qty_ordered: 144, qty_received: 72, qty_remaining: 72, unit_cost_cents: 100, started_at: now() - 45 * 60_000, receiver: "Maria S.", outlet: "Main Store", batch_id: "BATCH-2407-01" },
+      { id: "rec_2", po_number: "PO-4007", supplier_name: "Snack World", product_name: "Classic Cigarettes 20pk", sku: "TOB-001", qty_ordered: 500, qty_received: 320, qty_remaining: 180, unit_cost_cents: 850, started_at: now() - 2 * 3_600_000, receiver: "John D.", outlet: "Downtown", batch_id: "BATCH-2407-02" },
+    ];
+
+    const reorderAlerts = [
+      { id: "ral_1", product_id: "prod_2", product_name: "Wildflower Honey", sku: "GRO-HONEY-001", current_stock: 6, reorder_point: 8, safety_stock: 4, avg_daily_sales: 1.2, days_until_stockout: 1, preferred_supplier: "Tea Traders", suggested_qty: 48, estimated_cost_cents: 20160, urgency: "critical", open_po_qty: 0 },
+      { id: "ral_2", product_id: "prod_4", product_name: "Ceramic Coffee Mug", sku: "HOME-MUG-001", current_stock: 0, reorder_point: 4, safety_stock: 2, avg_daily_sales: 0.8, days_until_stockout: 0, preferred_supplier: "Home Goods Co", suggested_qty: 24, estimated_cost_cents: 14400, urgency: "critical", open_po_qty: 0 },
+      { id: "ral_3", product_id: "prod_1", product_name: "Spring Water 500ml", sku: "BEV-001", current_stock: 42, reorder_point: 50, safety_stock: 10, avg_daily_sales: 8.5, days_until_stockout: 4, preferred_supplier: "Acme Coffee Co", suggested_qty: 200, estimated_cost_cents: 16000, urgency: "warning", open_po_qty: 120 },
+      { id: "ral_4", product_id: "prod_7", product_name: "Mango Blast Vape 50mg", sku: "TOB-FLV", current_stock: 18, reorder_point: 25, safety_stock: 5, avg_daily_sales: 2.1, days_until_stockout: 8, preferred_supplier: "Vape Supply Co", suggested_qty: 100, estimated_cost_cents: 45000, urgency: "warning", open_po_qty: 0 },
+    ];
+
+    const issueItems = [
+      { id: "iss_1", po_number: "PO-3998", supplier_name: "Tea Traders", product_name: "Wildflower Honey", sku: "GRO-HONEY-001", issue_type: "price_variance", description: "Invoice price $5.20 vs PO price $4.20 — variance exceeds 10% threshold", severity: "high", created_at: now() - 2 * D, assigned_to: "Finance Team", status: "open" },
+      { id: "iss_2", po_number: "PO-4001", supplier_name: "Acme Coffee Co", product_name: "Organic Dark Roast Beans", sku: "BEV-001", issue_type: "qty_discrepancy", description: "Received 180 units vs ordered 200 units — shortfall of 20 units", severity: "medium", created_at: now() - 1 * D, assigned_to: "Receiving Team", status: "open" },
+      { id: "iss_3", po_number: "PO-3990", supplier_name: "Snack World", product_name: "Potato Chips 150g", sku: "SNK-001", issue_type: "quality_reject", description: "14 units rejected — packaging damage on arrival, supplier notified", severity: "low", created_at: now() - 5 * D, assigned_to: "Warehouse", status: "resolved" },
+      { id: "iss_4", po_number: "PO-3995", supplier_name: "Home Goods Co", product_name: "Ceramic Coffee Mug", sku: "HOME-MUG-001", issue_type: "duplicate_po", description: "Possible duplicate of PO-3992 sent to same supplier same day — pending review", severity: "high", created_at: now() - 4 * D, assigned_to: "Purchasing Manager", status: "investigating" },
+    ];
+
+    const historyItems = [
+      { id: "his_1", po_number: "PO-3998", supplier_name: "Tea Traders", product_name: "Wildflower Honey", sku: "GRO-HONEY-001", qty_ordered: 48, qty_received: 48, total_cost_cents: 20160, ordered_at: now() - 10 * D, received_at: now() - 7 * D, lead_time_days: 3, status: "closed", cost_variance_cents: 0, receiver: "Maria S." },
+      { id: "his_2", po_number: "PO-3992", supplier_name: "Acme Coffee Co", product_name: "Organic Dark Roast Beans", sku: "BEV-001", qty_ordered: 200, qty_received: 200, total_cost_cents: 16000, ordered_at: now() - 15 * D, received_at: now() - 11 * D, lead_time_days: 4, status: "closed", cost_variance_cents: 0, receiver: "John D." },
+      { id: "his_3", po_number: "PO-3985", supplier_name: "Snack World", product_name: "Potato Chips 150g", sku: "SNK-001", qty_ordered: 100, qty_received: 86, total_cost_cents: 9460, ordered_at: now() - 22 * D, received_at: now() - 18 * D, lead_time_days: 4, status: "closed_short", cost_variance_cents: -1540, receiver: "Maria S." },
+      { id: "his_4", po_number: "PO-3980", supplier_name: "Vape Supply Co", product_name: "Mango Blast Vape 50mg", sku: "TOB-FLV", qty_ordered: 60, qty_received: 60, total_cost_cents: 36000, ordered_at: now() - 30 * D, received_at: now() - 25 * D, lead_time_days: 5, status: "closed", cost_variance_cents: 1200, receiver: "John D." },
+    ];
+
+    return [
+      // GET /inventory/pipeline/summary — stage counts + KPIs
+      http.get(`${V1}/inventory/pipeline/summary`, async () => {
+        await lat();
+        return HttpResponse.json({
+          stages: [
+            { key: "suggested",        label: "Suggested",       count: 4,  value_cents: 91160 },
+            { key: "draft",            label: "Draft PO",        count: 2,  value_cents: 31000 },
+            { key: "sent",             label: "Sent to Supplier",count: 3,  value_cents: 46160 },
+            { key: "confirmed",        label: "Confirmed",       count: 2,  value_cents: 26000 },
+            { key: "in_transit",       label: "In Transit",      count: 4,  value_cents: 92160 },
+            { key: "partially_received", label: "Partial",       count: 2,  value_cents: 32000 },
+            { key: "receiving",        label: "Receiving",       count: 2,  value_cents: 57160 },
+            { key: "billed",           label: "Billed",          count: 1,  value_cents: 16000 },
+            { key: "closed",           label: "Closed",          count: 24, value_cents: 210000 },
+          ],
+          kpis: {
+            pending_pos: 4,
+            overdue_pos: 2,
+            open_issues: 3,
+            reorder_alerts: 4,
+            receiving_active: 2,
+            total_pipeline_value_cents: 325480,
+            avg_lead_time_days: 4.2,
+            on_time_delivery_pct: 87,
+          },
+        });
+      }),
+
+      // GET /inventory/pipeline/pending
+      http.get(`${V1}/inventory/pipeline/pending`, async () => {
+        await lat();
+        return HttpResponse.json({ items: pendingItems });
+      }),
+
+      // GET /inventory/pipeline/receiving
+      http.get(`${V1}/inventory/pipeline/receiving`, async () => {
+        await lat();
+        return HttpResponse.json({ items: receivingItems });
+      }),
+
+      // POST /inventory/pipeline/receiving/:id/update — scan units in
+      http.post(`${V1}/inventory/pipeline/receiving/:id/update`, async ({ params, request }) => {
+        await lat();
+        const body = (await request.json()) as { qty_scanned: number };
+        const item = receivingItems.find((r) => r.id === String(params["id"]));
+        if (!item) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const newReceived = Math.min(item.qty_ordered, item.qty_received + (body.qty_scanned ?? 0));
+        item.qty_received = newReceived;
+        item.qty_remaining = item.qty_ordered - newReceived;
+        return HttpResponse.json(item);
+      }),
+
+      // GET /inventory/pipeline/reorder-alerts
+      http.get(`${V1}/inventory/pipeline/reorder-alerts`, async () => {
+        await lat();
+        return HttpResponse.json({ items: reorderAlerts });
+      }),
+
+      // POST /inventory/pipeline/reorder-alerts/:id/create-po
+      http.post(`${V1}/inventory/pipeline/reorder-alerts/:id/create-po`, async ({ params }) => {
+        await lat();
+        const alert = reorderAlerts.find((a) => a.id === String(params["id"]));
+        if (!alert) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json({ po_id: `po_${rid()}`, po_number: `PO-${4000 + Math.floor(Math.random() * 1000)}`, supplier: alert.preferred_supplier, product: alert.product_name, qty: alert.suggested_qty, status: "draft" }, { status: 201 });
+      }),
+
+      // GET /inventory/pipeline/issues
+      http.get(`${V1}/inventory/pipeline/issues`, async () => {
+        await lat();
+        return HttpResponse.json({ items: issueItems });
+      }),
+
+      // PATCH /inventory/pipeline/issues/:id — update issue status
+      http.patch(`${V1}/inventory/pipeline/issues/:id`, async ({ params, request }) => {
+        await lat();
+        const body = (await request.json()) as { status: string };
+        const idx = issueItems.findIndex((i) => i.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        issueItems[idx] = { ...issueItems[idx], status: body.status };
+        return HttpResponse.json(issueItems[idx]);
+      }),
+
+      // GET /inventory/pipeline/history
+      http.get(`${V1}/inventory/pipeline/history`, async () => {
+        await lat();
+        return HttpResponse.json({ items: historyItems });
+      }),
+    ];
+  })(),
 );
