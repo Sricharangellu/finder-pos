@@ -869,6 +869,15 @@ export const mockHandlers = [
         return HttpResponse.json({ items: employees });
       }),
 
+      // GET /team/:id — single employee
+      http.get(`${V1}/team/:id`, async ({ params }) => {
+        await lat();
+        const id = String(params["id"]);
+        const emp = employees.find((e) => e.id === id);
+        if (!emp) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        return HttpResponse.json(emp);
+      }),
+
       // POST /team (create)
       http.post(`${V1}/team`, async ({ request }) => {
         await lat();
@@ -1797,6 +1806,219 @@ export const mockHandlers = [
           }),
         ];
       })(),
+
+      // ── Catalog: Pricing ──────────────────────────────────────────────────
+      ...(() => {
+        interface PriceTier { id: string; product_id: string; min_qty: number; price_cents: number; label: string | null; created_at: number; }
+        interface PriceBookEntry { id: string; price_book_id: string; price_book_name: string; price_cents: number; active: boolean; }
+        const tiers: PriceTier[] = [
+          { id: "pt_1", product_id: "prod_1", min_qty: 6,  price_cents: 2099, label: "6-pack",   created_at: Date.now() - 864e5 * 10 },
+          { id: "pt_2", product_id: "prod_1", min_qty: 12, price_cents: 1899, label: "Case",      created_at: Date.now() - 864e5 * 8  },
+          { id: "pt_3", product_id: "prod_2", min_qty: 5,  price_cents: 3499, label: "5-pack",   created_at: Date.now() - 864e5 * 5  },
+        ];
+        const priceBooks: PriceBookEntry[] = [
+          { id: "pbe_1", price_book_id: "pb_wholesale", price_book_name: "Wholesale",        price_cents: 1799, active: true  },
+          { id: "pbe_2", price_book_id: "pb_vip",       price_book_name: "VIP Members",      price_cents: 2299, active: true  },
+          { id: "pbe_3", price_book_id: "pb_b2b",       price_book_name: "B2B Contract",     price_cents: 1699, active: false },
+        ];
+        const productMeta: Record<string, { wholesale_price_cents: number | null; map_price_cents: number | null }> = {
+          prod_1: { wholesale_price_cents: 1800, map_price_cents: 2400 },
+          prod_2: { wholesale_price_cents: 3200, map_price_cents: null },
+        };
+        let tierSeq = 10;
+        return [
+          http.get(`${V1}/catalog/:id/pricing`, async ({ params }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const meta = productMeta[pid] ?? { wholesale_price_cents: null, map_price_cents: null };
+            return HttpResponse.json({ tiers: tiers.filter((t) => t.product_id === pid), price_books: priceBooks, ...meta });
+          }),
+          http.patch(`${V1}/catalog/:id/pricing`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const b = (await request.json()) as { wholesale_price_cents?: number | null; map_price_cents?: number | null };
+            productMeta[pid] = { ...(productMeta[pid] ?? { wholesale_price_cents: null, map_price_cents: null }), ...b };
+            return HttpResponse.json({ ok: true });
+          }),
+          http.post(`${V1}/catalog/:id/pricing/tiers`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const b = (await request.json()) as { min_qty?: number; price_cents?: number; label?: string | null };
+            const tier: PriceTier = { id: `pt_${++tierSeq}`, product_id: pid, min_qty: b.min_qty ?? 1, price_cents: b.price_cents ?? 0, label: b.label ?? null, created_at: Date.now() };
+            tiers.push(tier);
+            return HttpResponse.json(tier, { status: 201 });
+          }),
+          http.delete(`${V1}/catalog/:id/pricing/tiers/:tid`, async ({ params }) => {
+            await lat();
+            const idx = tiers.findIndex((t) => t.id === String(params["tid"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            tiers.splice(idx, 1);
+            return new HttpResponse(null, { status: 204 });
+          }),
+        ];
+      })(),
+
+      // ── Catalog: Suppliers per product ────────────────────────────────────
+      ...(() => {
+        interface ProductSupplier {
+          id: string; product_id: string; vendor_id: string; vendor_name: string;
+          vendor_sku: string | null; cost_cents: number | null; lead_time_days: number | null;
+          moq: number | null; case_pack: number | null; is_preferred: boolean; notes: string | null;
+          created_at: number; updated_at: number;
+        }
+        const productSuppliers: ProductSupplier[] = [
+          { id: "ps_1", product_id: "prod_1", vendor_id: "ven_1", vendor_name: "Acme Distributors",  vendor_sku: "ACM-0042",  cost_cents: 1400, lead_time_days: 3,  moq: 6,  case_pack: 12, is_preferred: true,  notes: "Primary supplier — best pricing at 6+ units", created_at: Date.now() - 864e5 * 30, updated_at: Date.now() - 864e5 * 2 },
+          { id: "ps_2", product_id: "prod_1", vendor_id: "ven_2", vendor_name: "Global Supply Co",   vendor_sku: "GS-11209",  cost_cents: 1550, lead_time_days: 7,  moq: 12, case_pack: 12, is_preferred: false, notes: null,                                              created_at: Date.now() - 864e5 * 20, updated_at: Date.now() - 864e5 * 5 },
+          { id: "ps_3", product_id: "prod_2", vendor_id: "ven_1", vendor_name: "Acme Distributors",  vendor_sku: "ACM-0088",  cost_cents: 3100, lead_time_days: 5,  moq: 1,  case_pack: 6,  is_preferred: true,  notes: null,                                              created_at: Date.now() - 864e5 * 15, updated_at: Date.now() - 864e5 * 1 },
+        ];
+        let supSeq = 10;
+        return [
+          http.get(`${V1}/catalog/:id/suppliers`, async ({ params }) => {
+            await lat();
+            const pid = String(params["id"]);
+            return HttpResponse.json({ items: productSuppliers.filter((s) => s.product_id === pid) });
+          }),
+          http.post(`${V1}/catalog/:id/suppliers`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const b = (await request.json()) as Partial<ProductSupplier>;
+            const now = Date.now();
+            const s: ProductSupplier = { id: `ps_${++supSeq}`, product_id: pid, vendor_id: b.vendor_id ?? `ven_${supSeq}`, vendor_name: b.vendor_name ?? "New Vendor", vendor_sku: b.vendor_sku ?? null, cost_cents: b.cost_cents ?? null, lead_time_days: b.lead_time_days ?? null, moq: b.moq ?? null, case_pack: b.case_pack ?? null, is_preferred: b.is_preferred ?? false, notes: b.notes ?? null, created_at: now, updated_at: now };
+            if (s.is_preferred) productSuppliers.filter((x) => x.product_id === pid).forEach((x) => { x.is_preferred = false; });
+            productSuppliers.push(s);
+            return HttpResponse.json(s, { status: 201 });
+          }),
+          http.patch(`${V1}/catalog/:id/suppliers/:sid`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const idx = productSuppliers.findIndex((s) => s.id === String(params["sid"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            const b = (await request.json()) as Partial<ProductSupplier>;
+            if (b.is_preferred) productSuppliers.filter((x) => x.product_id === pid).forEach((x) => { x.is_preferred = false; });
+            productSuppliers[idx] = { ...productSuppliers[idx], ...b, updated_at: Date.now() };
+            return HttpResponse.json(productSuppliers[idx]);
+          }),
+          http.delete(`${V1}/catalog/:id/suppliers/:sid`, async ({ params }) => {
+            await lat();
+            const idx = productSuppliers.findIndex((s) => s.id === String(params["sid"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            productSuppliers.splice(idx, 1);
+            return new HttpResponse(null, { status: 204 });
+          }),
+        ];
+      })(),
+
+      // ── Catalog: Purchase History per product ─────────────────────────────
+      http.get(`${V1}/catalog/:id/purchases`, async ({ params, request }) => {
+        await lat();
+        const pid = String(params["id"]);
+        const url = new URL(request.url);
+        const limit  = Number(url.searchParams.get("limit")  ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        const BASE   = Date.now();
+        const all = [
+          { id: "pol_1", product_id: pid, po_id: "po_101", po_number: "PO-2025-101", vendor_name: "Acme Distributors",  ordered_at: BASE - 864e5 * 60, received_at: BASE - 864e5 * 57, qty_ordered: 48, qty_received: 48, unit_cost_cents: 1400, total_cost_cents: 67200, status: "received" },
+          { id: "pol_2", product_id: pid, po_id: "po_089", po_number: "PO-2025-089", vendor_name: "Acme Distributors",  ordered_at: BASE - 864e5 * 90, received_at: BASE - 864e5 * 86, qty_ordered: 24, qty_received: 24, unit_cost_cents: 1420, total_cost_cents: 34080, status: "received" },
+          { id: "pol_3", product_id: pid, po_id: "po_112", po_number: "PO-2025-112", vendor_name: "Global Supply Co",   ordered_at: BASE - 864e5 * 14, received_at: null,              qty_ordered: 60, qty_received: 0,  unit_cost_cents: 1550, total_cost_cents: 93000, status: "ordered"  },
+        ];
+        const items = all.slice(offset, offset + limit);
+        const totalQty  = all.reduce((s, r) => s + r.qty_received, 0);
+        const totalCost = all.reduce((s, r) => s + (r.qty_received * r.unit_cost_cents), 0);
+        return HttpResponse.json({ items, total: all.length, total_qty_received: totalQty, total_cost_cents: totalCost });
+      }),
+
+      // ── Catalog: Analytics per product ───────────────────────────────────
+      http.get(`${V1}/catalog/:id/analytics`, async ({ params, request }) => {
+        await lat();
+        const url    = new URL(request.url);
+        const period = url.searchParams.get("period") ?? "30d";
+        const days   = period === "7d" ? 7 : period === "90d" ? 90 : period === "12m" ? 365 : 30;
+        const BASE   = Date.now();
+        const trend = Array.from({ length: days }, (_, i) => {
+          const date = BASE - 864e5 * (days - 1 - i);
+          const units = Math.floor(Math.random() * 15 + 2);
+          const revenue_cents = units * (2499 + Math.floor(Math.random() * 200 - 100));
+          return { date, units, revenue_cents };
+        });
+        const totalUnits   = trend.reduce((s, d) => s + d.units, 0);
+        const totalRevenue = trend.reduce((s, d) => s + d.revenue_cents, 0);
+        const totalCost    = totalUnits * 1400;
+        const grossMargin  = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0;
+        return HttpResponse.json({
+          period, trend,
+          summary: {
+            revenue_cents: totalRevenue, units_sold: totalUnits, orders: Math.floor(totalUnits / 3),
+            avg_order_qty: 3, return_rate_pct: 1.8, gross_margin_pct: Math.round(grossMargin * 10) / 10,
+            inventory_turnover: 4.2, abc_class: "A",
+          },
+        });
+      }),
+
+      // ── Catalog: Audit Log per product ────────────────────────────────────
+      http.get(`${V1}/catalog/:id/audit-log`, async ({ params, request }) => {
+        await lat();
+        const pid = String(params["id"]);
+        const url    = new URL(request.url);
+        const limit  = Number(url.searchParams.get("limit")  ?? 50);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        const BASE   = Date.now();
+        const all = [
+          { id: "pal_1", product_id: pid, actor: "Sarah Kim",      actor_role: "manager", action: "update", field: "price_cents",       old_value: "2299", new_value: "2499", reason: "Q4 price adjustment", ip: "192.168.1.12", device: "MacBook Pro", created_at: BASE - 864e5 * 2  },
+          { id: "pal_2", product_id: pid, actor: "Marcus Chen",    actor_role: "manager", action: "update", field: "status",            old_value: "draft", new_value: "active", reason: null,                    ip: "192.168.1.8",  device: "iPad",        created_at: BASE - 864e5 * 5  },
+          { id: "pal_3", product_id: pid, actor: "Sarah Kim",      actor_role: "manager", action: "update", field: "raw_cost_price_cents", old_value: "1350", new_value: "1400", reason: "Cost update from PO",   ip: "192.168.1.12", device: "MacBook Pro", created_at: BASE - 864e5 * 12 },
+          { id: "pal_4", product_id: pid, actor: "Admin",          actor_role: "owner",   action: "update", field: "reorder_point",     old_value: "10",   new_value: "15",   reason: null,                    ip: "192.168.1.1",  device: "Desktop",     created_at: BASE - 864e5 * 20 },
+          { id: "pal_5", product_id: pid, actor: "James Rivera",   actor_role: "staff",   action: "create", field: null,               old_value: null,   new_value: null,   reason: "Initial product creation", ip: "192.168.1.5",  device: "Terminal",    created_at: BASE - 864e5 * 30 },
+          { id: "pal_6", product_id: pid, actor: "Sarah Kim",      actor_role: "manager", action: "update", field: "barcode",            old_value: "",     new_value: "0123456789012", reason: null,            ip: "192.168.1.12", device: "MacBook Pro", created_at: BASE - 864e5 * 8  },
+          { id: "pal_7", product_id: pid, actor: "Marcus Chen",    actor_role: "manager", action: "update", field: "track_inventory",   old_value: "false", new_value: "true", reason: "Enable tracking",        ip: "192.168.1.8",  device: "iPad",        created_at: BASE - 864e5 * 18 },
+        ].sort((a, b) => b.created_at - a.created_at);
+        return HttpResponse.json({ items: all.slice(offset, offset + limit), total: all.length });
+      }),
+
+      // ── Catalog: Images per product ───────────────────────────────────────
+      ...(() => {
+        interface ProductImage { id: string; product_id: string; url: string; alt: string | null; sort_order: number; is_primary: boolean; created_at: number; }
+        const productImages: ProductImage[] = [
+          { id: "img_1", product_id: "prod_1", url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400", alt: "Product front view",  sort_order: 0, is_primary: true,  created_at: Date.now() - 864e5 * 10 },
+          { id: "img_2", product_id: "prod_1", url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=60", alt: "Product side view", sort_order: 1, is_primary: false, created_at: Date.now() - 864e5 * 9  },
+          { id: "img_3", product_id: "prod_2", url: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=400", alt: "Product main",       sort_order: 0, is_primary: true,  created_at: Date.now() - 864e5 * 7  },
+        ];
+        let imgSeq = 10;
+        return [
+          http.get(`${V1}/catalog/:id/images`, async ({ params }) => {
+            await lat();
+            const pid = String(params["id"]);
+            return HttpResponse.json({ items: productImages.filter((i) => i.product_id === pid).sort((a, b) => a.sort_order - b.sort_order) });
+          }),
+          http.post(`${V1}/catalog/:id/images`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const b   = (await request.json()) as { url?: string; alt?: string | null };
+            if (!b.url) return HttpResponse.json({ error: { code: "bad_request", message: "url required" } }, { status: 400 });
+            const existing = productImages.filter((i) => i.product_id === pid);
+            const img: ProductImage = { id: `img_${++imgSeq}`, product_id: pid, url: b.url, alt: b.alt ?? null, sort_order: existing.length, is_primary: existing.length === 0, created_at: Date.now() };
+            productImages.push(img);
+            return HttpResponse.json(img, { status: 201 });
+          }),
+          http.patch(`${V1}/catalog/:id/images/:imgId`, async ({ params, request }) => {
+            await lat();
+            const pid = String(params["id"]);
+            const idx = productImages.findIndex((i) => i.id === String(params["imgId"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            const b = (await request.json()) as Partial<ProductImage>;
+            if (b.is_primary) productImages.filter((i) => i.product_id === pid).forEach((i) => { i.is_primary = false; });
+            productImages[idx] = { ...productImages[idx], ...b };
+            return HttpResponse.json(productImages[idx]);
+          }),
+          http.delete(`${V1}/catalog/:id/images/:imgId`, async ({ params }) => {
+            await lat();
+            const idx = productImages.findIndex((i) => i.id === String(params["imgId"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            productImages.splice(idx, 1);
+            return new HttpResponse(null, { status: 204 });
+          }),
+        ];
+      })(),
+
     ];
   })(),
 
