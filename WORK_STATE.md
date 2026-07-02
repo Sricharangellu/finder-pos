@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-01  |  Last commit: `aba0197`
+> Last updated: 2026-07-01  |  Last commit: `e5c9289`
 
 ---
 
@@ -162,45 +162,18 @@ _None._
 
 Score: 94/100 — launch-ready, zero CRITICAL.
 
-#### Catalog detail page — backend built, frontend dark (highest priority)
+#### Catalog detail page — DONE (2026-07-01)
 
-These endpoints exist in the mock handlers and backend but the catalog/[id] UI never calls them:
-
-| # | What | Endpoint | Where to surface |
-|---|---|---|---|
-| 1 | **Stock by location** | `GET /catalog/:id/stock` | InventoryTab — add per-location table: on-hand / committed / available / avg cost per location |
-| 2 | **Richer expiry system** | `GET/POST/PATCH/DELETE /catalog/:id/expiry` | ExpiryTab — upgrade from /batches; adds `lot_code`, `location_name`, 4-tier `expiry_status`, `days_until_expiry`, `notes` |
-| 3 | **Dedicated compliance PATCH** | `PATCH /catalog/:id/compliance` | MarketingTab — currently sends to general PATCH /catalog/:id; wire to compliance endpoint |
-
-Fields in `api-client/types.ts` that are invisible in the catalog detail UI:
-
-| Field | Type | Where to add |
+| # | What | Status |
 |---|---|---|
-| `tags` | `string \| null` | GeneralTab — comma-separated tag input |
-| `length_mm / width_mm / height_mm` | `number` | GeneralTab — shipping dimensions section |
-| `weight_grams` | `number` | GeneralTab — alongside dimensions |
-| `vendor_upc` | `string` | InventoryTab — supplier barcode field |
-| `ecommerce` | `0 \| 1` | GeneralTab — toggle for online visibility |
-| `qty_committed` | from stock endpoint | InventoryTab — reserved/committed stock |
-| `qty_available` | from stock endpoint | InventoryTab — true available-to-sell |
-
-#### Catalog detail — suggested UI upgrades (priority order)
-
-**High impact:**
-1. Stock by location panel in InventoryTab — `/catalog/:id/stock` → table with on-hand/committed/available columns
-2. Upgrade ExpiryTab to `/catalog/:id/expiry` — lot_code, location tracking, 4-tier status, pre-computed days
-3. Live margin calculator in GeneralTab — cost + sell price → gross margin % and $ inline, updates as you type
-4. Tab badges — show counts on tabs (e.g. Expiry: 2 if batches expiring, Returns: pending count)
-5. Product dimensions in GeneralTab — L × W × H + weight_grams
-
-**Medium impact:**
-6. Tags field in GeneralTab — comma-separated input, mapped to `tags`
-7. eCommerce toggle in GeneralTab — `ecommerce: 0|1` flag
-8. Vendor UPC field in InventoryTab — `vendor_upc`
-9. Barcode lookup test button in product header — `GET /catalog/barcode/:code` to verify scan
-
-**Quick wins:**
-10. Profit margin on product header — `Margin: 38%` badge next to price
+| 1 | Stock by location (`GET /catalog/:id/stock`) | ✅ DONE — InventoryTab StockByLocation panel, on-hand/committed/available/avg-cost |
+| 2 | Richer expiry (`/catalog/:id/expiry`) | ✅ DONE — ExpiryTab rewritten: 4-tier status, lot_code, location, notes, pre-computed days |
+| 3 | Compliance endpoint (`PATCH /catalog/:id/compliance`) | ✅ DONE — already wired in MarketingTab |
+| 4 | Hidden fields (tags, dims, ecommerce, vendor_upc) | ✅ DONE — all present in GeneralTab/InventoryTab |
+| 5 | Live margin calculator | ✅ DONE — already in GeneralTab price table |
+| 6 | Tab badges (expiry alert count) | ✅ DONE — red pill on Expiry tab when expired/critical batches |
+| 7 | Margin + price on product header | ✅ DONE — price pill + colour-coded margin % in header |
+| 8 | Barcode test button | ✅ DONE — in Actions menu, 3s inline pass/fail result |
 
 #### Page splits still pending
 - `customers/page.tsx` — 810 ln — extract filter bar, table, customer detail drawer
