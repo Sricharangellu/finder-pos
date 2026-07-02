@@ -17,29 +17,42 @@ import { SalesTab }      from "./_components/SalesTab";
 import { ReturnsTab }    from "./_components/ReturnsTab";
 import { CreditsTab }    from "./_components/CreditsTab";
 import { InvoicesTab }   from "./_components/InvoicesTab";
-import { VariantsTab }    from "./_components/VariantsTab";
+import { VariantsTab }   from "./_components/VariantsTab";
 import { EcommerceTab }  from "./_components/EcommerceTab";
+import { PricingTab }    from "./_components/PricingTab";
+import { SuppliersTab }  from "./_components/SuppliersTab";
+import { PurchasesTab }  from "./_components/PurchasesTab";
+import { AnalyticsTab }  from "./_components/AnalyticsTab";
+import { AuditLogTab }   from "./_components/AuditLogTab";
+import { ImagesTab }     from "./_components/ImagesTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
   | "general" | "variants" | "categories" | "inventory" | "expiry"
-  | "sales" | "returns" | "credits" | "invoices" | "marketing" | "ecommerce";
+  | "sales" | "returns" | "credits" | "invoices" | "marketing" | "ecommerce"
+  | "pricing" | "suppliers" | "purchases" | "analytics" | "audit-log" | "images";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "general",    label: "General" },
   { key: "variants",   label: "Variants" },
-  { key: "categories", label: "Categories" },
+  { key: "pricing",    label: "Pricing" },
   { key: "inventory",  label: "Inventory" },
+  { key: "suppliers",  label: "Suppliers" },
+  { key: "purchases",  label: "Purchases" },
+  { key: "categories", label: "Categories" },
   { key: "expiry",     label: "Expiry" },
+  { key: "images",     label: "Images" },
+  { key: "ecommerce",  label: "eCommerce" },
   { key: "sales",      label: "Sales" },
   { key: "returns",    label: "Returns" },
   { key: "credits",    label: "Credits" },
   { key: "invoices",   label: "Invoices" },
   { key: "marketing",  label: "Compliance" },
-  { key: "ecommerce",  label: "eCommerce" },
+  { key: "analytics",  label: "Analytics" },
+  { key: "audit-log",  label: "Audit Log" },
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -359,6 +372,24 @@ export default function ProductDetailPage() {
         )}
         {activeTab === "ecommerce" && (
           <EcommerceTab product={product} />
+        )}
+        {activeTab === "pricing" && (
+          <PricingTab product={product} />
+        )}
+        {activeTab === "suppliers" && (
+          <SuppliersTab productId={product.id} />
+        )}
+        {activeTab === "purchases" && (
+          <PurchasesTab productId={product.id} />
+        )}
+        {activeTab === "analytics" && (
+          <AnalyticsTab productId={product.id} />
+        )}
+        {activeTab === "audit-log" && (
+          <AuditLogTab productId={product.id} />
+        )}
+        {activeTab === "images" && (
+          <ImagesTab productId={product.id} />
         )}
 
       </div>
