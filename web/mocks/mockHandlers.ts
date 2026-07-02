@@ -5927,6 +5927,94 @@ mockHandlers.push(
         wf.updatedAt = Date.now();
         return new HttpResponse(null, { status: 204 });
       }),
+
+      // ── Approval Chains ──────────────────────────────────────────────────
+      ...(() => {
+        interface ApprovalStep { role: string; label: string }
+        interface ApprovalChain {
+          id: string; name: string; trigger: string; threshold: number | null;
+          steps: ApprovalStep[]; enabled: boolean; runs: number; created_at: number;
+        }
+        let chainSeq = 10;
+        const chains: ApprovalChain[] = [
+          { id: "ac_1", name: "Price Override Approval",  trigger: "price_override",  threshold: 10,   steps: [{ role: "manager", label: "Manager approval" }],                                         enabled: true,  runs: 47, created_at: BASE - 60 * 86_400_000 },
+          { id: "ac_2", name: "Large Refund Gate",        trigger: "refund",          threshold: 10000,steps: [{ role: "supervisor", label: "Supervisor sign-off" }, { role: "manager", label: "Manager final confirm" }], enabled: true,  runs: 12, created_at: BASE - 45 * 86_400_000 },
+          { id: "ac_3", name: "New Vendor Onboard",       trigger: "vendor_create",   threshold: null, steps: [{ role: "finance", label: "Finance review" }, { role: "legal", label: "Legal sign-off" }, { role: "owner", label: "Owner approval" }], enabled: true, runs: 3, created_at: BASE - 30 * 86_400_000 },
+          { id: "ac_4", name: "Discount > 25% Gate",      trigger: "discount_create", threshold: 25,   steps: [{ role: "manager", label: "Manager review" }],                                          enabled: false, runs: 0,  created_at: BASE - 10 * 86_400_000 },
+        ];
+        return [
+          http.get(`${V1}/workflows/approval-chains`, async () => {
+            await lat();
+            return HttpResponse.json({ items: chains });
+          }),
+          http.post(`${V1}/workflows/approval-chains`, async ({ request }) => {
+            await lat();
+            const b = (await request.json()) as Partial<ApprovalChain>;
+            const c: ApprovalChain = { id: `ac_${++chainSeq}`, name: b.name ?? "New Chain", trigger: b.trigger ?? "custom", threshold: b.threshold ?? null, steps: b.steps ?? [], enabled: true, runs: 0, created_at: Date.now() };
+            chains.push(c);
+            return HttpResponse.json(c, { status: 201 });
+          }),
+          http.patch(`${V1}/workflows/approval-chains/:id`, async ({ params, request }) => {
+            await lat();
+            const idx = chains.findIndex(c => c.id === String(params["id"]));
+            if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+            const b = (await request.json()) as Partial<ApprovalChain>;
+            chains[idx] = { ...chains[idx]!, ...b };
+            return HttpResponse.json(chains[idx]);
+          }),
+        ];
+      })(),
+
+      // ── Run History ──────────────────────────────────────────────────────
+      http.get(`${V1}/workflows/run-history`, async ({ request }) => {
+        await lat();
+        const limit = Number(new URL(request.url).searchParams.get("limit") ?? 50);
+        const runs = Array.from({ length: Math.min(limit, 30) }, (_, i) => ({
+          id: `run_${i + 1}`,
+          workflow_name: ["Age Verification", "Loyalty Capture", "Custom Prompt", "Price Override"][i % 4],
+          trigger: ["age_verification", "loyalty_capture", "custom_prompt", "price_override"][i % 4],
+          status: i % 7 === 0 ? "failed" : i % 11 === 0 ? "skipped" : "passed",
+          cashier: ["Alex Johnson", "Maria Chen", "Sam Rivera", "Jamie Taylor"][i % 4],
+          duration_ms: Math.floor(Math.random() * 3000 + 200),
+          ran_at: BASE - i * 3_600_000,
+          outlet: i % 3 === 0 ? "Store #2" : "Main Store",
+        }));
+        return HttpResponse.json({ items: runs, total: 320 });
+      }),
+
+      // ── Templates ────────────────────────────────────────────────────────
+      http.get(`${V1}/workflows/templates`, async () => {
+        await lat();
+        return HttpResponse.json({
+          items: [
+            { id: "tpl_1", name: "Age Verification (21+)",    category: "compliance", description: "Prompts cashier to scan ID and confirm customer is 21+. Blocks transaction until confirmed.", steps: 2, installs: 1240, installed: true  },
+            { id: "tpl_2", name: "Age Verification (18+)",    category: "compliance", description: "Prompts cashier to verify customer is 18+ for tobacco, lottery, or other age-restricted items.", steps: 2, installs: 890, installed: false },
+            { id: "tpl_3", name: "Loyalty Phone Capture",     category: "loyalty",    description: "Prompts cashier to ask for loyalty phone number before completing the transaction.", steps: 1, installs: 2100, installed: true  },
+            { id: "tpl_4", name: "Manager Price Override",    category: "approvals",  description: "Requires manager PIN entry when a manual price override exceeds 10% of retail.", steps: 3, installs: 560, installed: false },
+            { id: "tpl_5", name: "Signature Required",        category: "compliance", description: "Captures customer signature on screen for orders over the configured threshold.", steps: 1, installs: 340, installed: false },
+            { id: "tpl_6", name: "SNAP/EBT Eligible Check",   category: "payments",   description: "Prompts cashier to confirm which items are SNAP-eligible before EBT tender.", steps: 2, installs: 210, installed: false },
+            { id: "tpl_7", name: "ID Scan Required",          category: "compliance", description: "Captures government-issued ID barcode or manual entry for restricted product categories.", steps: 1, installs: 780, installed: false },
+            { id: "tpl_8", name: "Customer Required (B2B)",   category: "b2b",        description: "Blocks checkout until a customer account is selected — enforces B2B order tracking.", steps: 1, installs: 420, installed: false },
+          ],
+        });
+      }),
+
+      http.post(`${V1}/workflows/templates/:id/install`, async ({ params }) => {
+        await lat();
+        const tplId = String(params["id"]);
+        const names: Record<string, string> = {
+          tpl_2: "Age Verification (18+)", tpl_4: "Manager Price Override",
+          tpl_5: "Signature Required", tpl_6: "SNAP/EBT Eligible Check",
+          tpl_7: "ID Scan Required", tpl_8: "Customer Required (B2B)",
+        };
+        const wf: Wf = {
+          id: `wf_tpl_${tplId}`, tenantId: "tnt_demo",
+          name: names[tplId] ?? "Installed Template", description: "Installed from template",
+          outletId: null, enabled: true, steps: [], createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        workflows.push(wf);
+        return HttpResponse.json({ workflow: wf }, { status: 201 });
+      }),
     ];
   })(),
 
