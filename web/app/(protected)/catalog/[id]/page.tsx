@@ -19,40 +19,47 @@ import { CreditsTab }    from "./_components/CreditsTab";
 import { InvoicesTab }   from "./_components/InvoicesTab";
 import { VariantsTab }   from "./_components/VariantsTab";
 import { EcommerceTab }  from "./_components/EcommerceTab";
-import { PricingTab }    from "./_components/PricingTab";
-import { SuppliersTab }  from "./_components/SuppliersTab";
-import { PurchasesTab }  from "./_components/PurchasesTab";
-import { AnalyticsTab }  from "./_components/AnalyticsTab";
-import { AuditLogTab }   from "./_components/AuditLogTab";
-import { ImagesTab }     from "./_components/ImagesTab";
+import { PricingTab }                from "./_components/PricingTab";
+import { SuppliersTab }             from "./_components/SuppliersTab";
+import { PurchasesTab }             from "./_components/PurchasesTab";
+import { AnalyticsTab }             from "./_components/AnalyticsTab";
+import { AuditLogTab }              from "./_components/AuditLogTab";
+import { ImagesTab }                from "./_components/ImagesTab";
+import { SalesCustomerTab }         from "./_components/SalesCustomerTab";
+import { ReorderSuggestionsTab }    from "./_components/ReorderSuggestionsTab";
+import { SupplierPriceComparisonTab } from "./_components/SupplierPriceComparisonTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
   | "general" | "variants" | "categories" | "inventory" | "expiry"
   | "sales" | "returns" | "credits" | "invoices" | "marketing" | "ecommerce"
-  | "pricing" | "suppliers" | "purchases" | "analytics" | "audit-log" | "images";
+  | "pricing" | "suppliers" | "purchases" | "analytics" | "audit-log" | "images"
+  | "sales-customer" | "reorder" | "price-comparison";
 
 const STATUS_BADGE = { active: "green", draft: "yellow", archived: "gray" } as const;
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "general",    label: "General" },
-  { key: "variants",   label: "Variants" },
-  { key: "pricing",    label: "Pricing" },
-  { key: "inventory",  label: "Inventory" },
-  { key: "suppliers",  label: "Suppliers" },
-  { key: "purchases",  label: "Purchases" },
-  { key: "categories", label: "Categories" },
-  { key: "expiry",     label: "Expiry" },
-  { key: "images",     label: "Images" },
-  { key: "ecommerce",  label: "eCommerce" },
-  { key: "sales",      label: "Sales" },
-  { key: "returns",    label: "Returns" },
-  { key: "credits",    label: "Credits" },
-  { key: "invoices",   label: "Invoices" },
-  { key: "marketing",  label: "Compliance" },
-  { key: "analytics",  label: "Analytics" },
-  { key: "audit-log",  label: "Audit Log" },
+  { key: "general",          label: "General" },
+  { key: "variants",         label: "Variants" },
+  { key: "pricing",          label: "Pricing" },
+  { key: "inventory",        label: "Inventory" },
+  { key: "purchases",        label: "Purchase by Supplier" },
+  { key: "sales-customer",   label: "Sales by Customer" },
+  { key: "reorder",          label: "Reorder" },
+  { key: "price-comparison", label: "Supplier Prices" },
+  { key: "suppliers",        label: "Suppliers" },
+  { key: "expiry",           label: "Expiry" },
+  { key: "images",           label: "Images" },
+  { key: "ecommerce",        label: "eCommerce" },
+  { key: "categories",       label: "Categories" },
+  { key: "sales",            label: "Sales" },
+  { key: "returns",          label: "Returns" },
+  { key: "credits",          label: "Credits" },
+  { key: "invoices",         label: "Invoices" },
+  { key: "marketing",        label: "Compliance" },
+  { key: "analytics",        label: "Analytics" },
+  { key: "audit-log",        label: "Audit Log" },
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -390,6 +397,15 @@ export default function ProductDetailPage() {
         )}
         {activeTab === "images" && (
           <ImagesTab productId={product.id} />
+        )}
+        {activeTab === "sales-customer" && (
+          <SalesCustomerTab productId={product.id} />
+        )}
+        {activeTab === "reorder" && (
+          <ReorderSuggestionsTab productId={product.id} />
+        )}
+        {activeTab === "price-comparison" && (
+          <SupplierPriceComparisonTab productId={product.id} />
         )}
 
       </div>
