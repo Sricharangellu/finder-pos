@@ -10,8 +10,8 @@ Status: ACTIVE
 | Queue item | Product lifecycle hardening: make multi-child catalog variant assignment/generation atomic so failed operations cannot partially apply |
 | Files/areas expected | `src/modules/catalog/service.ts`, `src/modules/catalog/catalog.test.ts`, WORK evidence only. NO `web/e2e/**` (Antigravity active), NO report/EOD files (session A active), NO orders/payments/outlets/smoke script. |
 | Started | 2026-07-04 13:35 CDT |
-| Last update | 2026-07-04 13:48 CDT |
-| Status | ACTIVE - implementation and gates complete; release pending commit + push |
+| Last update | 2026-07-04 13:51 CDT |
+| Status | RELEASED - shipped in `efd7873`; catalog focused test 31/31, backend typecheck PASS, smoke 15/15, backend suite 322/322, frontend typecheck/lint/test/build PASS |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — EOD frontend harvest)
