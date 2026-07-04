@@ -18,12 +18,12 @@ Status: ACTIVE
 
 | Field | Value |
 |---|---|
-| Agent/session | Claude session D (desktop app, "next" directive from Sri) |
-| Queue item | #3 — Implement ~14 mock-only endpoints on the real backend (inventory transfers/adjustments first — core; then team invite/detail, workflow templates, AR-aging sweep, Vendor-360 family ×6) |
-| Files/areas expected | `src/modules/inventory/**`, `src/modules/team/**`, `src/modules/workflows/**`, `src/modules/reports/**`, `src/modules/purchasing/**` — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
+| Agent/session | Claude session E (desktop app, "next" directive from Sri) |
+| Queue item | #3 — Implement ~14 mock-only endpoints on the real backend (inventory transfers/adjustments, team invite/detail, workflow templates, AR-aging sweep, Vendor-360 family ×6) |
+| Files/areas expected | `src/modules/inventory/**`, `src/modules/team/**`, `src/modules/workflows/**`, `src/modules/reports/**`, `src/modules/purchasing/**`, `src/identity/migrations.ts` (additive users.name) — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — all endpoints implemented + verified (probe 22/22 on real Postgres, tsc 0 errors, smoke 14/14, backend tests green); committed and pushed. See WORK/AUDIT_2026-07-04B.md |
 | Blockers | none |
 
 ## Released Claims

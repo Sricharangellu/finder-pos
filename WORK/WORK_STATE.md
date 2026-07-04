@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-03 21:36 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,19 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 session E (parallel non-overlapping mock-only endpoints — full findings in
+`WORK/AUDIT_2026-07-04B.md`): queue item #3 is **Built and verified**. All ~14 mock-only
+endpoints now exist on the real backend against real Postgres tables: inventory
+transfers (new `inventory_transfers` table + GET/POST), location-level adjustments
+(mode-aware add/remove/set), team invite + detail (`users.name` column added), workflow
+templates catalog + install, AR-aging dunning sweep, and the full Vendor-360 family
+(6 GET routes with computed KPIs from PO/bill/credit history). Also fixed a pre-existing
+bug the live probe exposed: `adjustStock` INSERT referenced a nonexistent `id` column on
+`inventory_stock` — every first per-location adjustment would 500 (invisible to unit
+tests). Verification: live-Postgres probe 22/22 HTTP checks including stock movement
+verified in the DB; `tsc` 0 errors; smoke 14/14; backend `npm test` green. No `web/**`,
+e2e specs, ports, or shared DB resources touched — session A owns queue item #1.
 
 2026-07-03 session D (parallel non-overlapping stale Vitest cleanup — full findings in
 `WORK/AUDIT_2026-07-03D.md`): queue item #2 is **Built and verified**. Updated only
@@ -63,7 +76,8 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
    until core specs green against production build + real backend.
 2. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3) — **DONE 2026-07-03 session D; full `cd web && npm test` PASS 83/83.**
 3. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
-   `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes).
+   `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes) —
+   **DONE 2026-07-04 session E; live-Postgres probe 22/22, smoke 14/14. See AUDIT_2026-07-04B.md.**
 4. **RLS gap**: `withTenant()` adopted in only ~10/46 modules; policy permissive when unset.
 5. **Mock default flip decision**: deployed frontend is 100% mock; needs real-backend
    deployment target + staging DB before flipping `NEXT_PUBLIC_MOCK` default.
