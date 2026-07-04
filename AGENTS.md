@@ -13,9 +13,10 @@ dated copies of living docs. Full rules: `WORK/README.md`.
 ## Session start (in order, ~2 minutes)
 
 1. `WORK/README.md` — folder rules
-2. `WORK/WORK_STATE.md` — active task, next actions, blockers
-3. `WORK/FORWARD_PLAN.md` — phase plan and release gates
-4. Newest `WORK/AUDIT_*.md` — last verified truth
+2. `WORK/RULES.md` — build rules, definition of done, per-task prompt, readiness matrix
+3. `WORK/WORK_STATE.md` — active task, next actions, blockers
+4. `WORK/FORWARD_PLAN.md` — phase plan and release gates
+5. Newest `WORK/AUDIT_*.md` — last verified truth
 
 Do not cold-read the whole repo; the context you need is in those four files.
 

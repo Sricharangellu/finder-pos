@@ -31,6 +31,10 @@ created anywhere else in the repo.
 | File | Kind | Write policy |
 |---|---|---|
 | `README.md` | Folder rules | Override only when the rules themselves change |
+| `RULES.md` | Build rules: prime directive, domain rules, definition of done, per-task prompt, readiness matrix | Matrix updated with new evidence only; rules change only on Sri's directive |
 | `WORK_STATE.md` | Live session state (active task, files in flight, decisions, next actions, blockers) | Override in place after every commit |
 | `FORWARD_PLAN.md` | Authoritative phase-based plan + release gates + audit prompt | Override only when the plan genuinely changes |
 | `AUDIT_YYYY-MM-DD.md` | Immutable audit snapshot + readiness matrix | Append-only during its session; never edited after |
+
+Session read order is: `README.md` → `RULES.md` → `WORK_STATE.md` → `FORWARD_PLAN.md` →
+newest `AUDIT_*.md`.
