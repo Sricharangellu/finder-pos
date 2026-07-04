@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `.github/workflows/deploy-prod.yml` ONLY. No src/**, no web/**, no e2e |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `ed5f861`; FIRST successful production deploy in this workflow's history (run 28716269968): verify green under Node 24, deploy.sh shipped both Vercel projects, live /healthz returns version=ed5f861 + builtAt (version stamp proven in prod), /readyz 200, frontend 200 |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session H — product variant atomicity)
