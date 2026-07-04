@@ -127,8 +127,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       # ── Build and start the backend ─────────────────────────────────────────
+      # --include=dev is required: NODE_ENV=production at job level makes a
+      # bare `npm ci` skip devDependencies (typescript, tsx), and `npx tsc`
+      # then resolves to the bogus `tsc` npm package.
       - name: Install backend deps
-        run: npm ci
+        run: npm ci --include=dev
       - name: Build backend
         run: npx tsc -p tsconfig.json
       - name: Start backend (background)
@@ -152,7 +155,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
       # ── Build and start the frontend ────────────────────────────────────────
       - name: Install frontend deps
-        run: npm ci
+        run: npm ci --include=dev
         working-directory: web
       # NEXT_PUBLIC_MOCK=false is what makes this a REAL e2e run: the default
       # is mock mode, and the previously used NEXT_PUBLIC_E2E_MODE flag is read
