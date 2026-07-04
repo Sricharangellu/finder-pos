@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 01:08 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 01:35 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,19 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 session G (parallel non-overlapping frontend API hardening — full findings
+in `WORK/AUDIT_2026-07-04E.md`): SEC-8 is **Built and verified**. Catalog CSV export
+no longer uses a direct authenticated `fetch()` from `imports-exports/page.tsx`; it now
+uses a shared `apiDownload()` helper that attaches the bearer token, handles API error
+envelopes, and performs the same one-time silent refresh/retry path as JSON `apiFetch`.
+Added API-client tests proving blob downloads include the bearer token and retry after a
+401 with a refreshed token. Also verified the stale BUG-1/BUG-2/BUG-3 work-state items
+were already fixed before this session: only one `customer-invoices` MSW handler block
+exists, and Warehouse/Pricing tab loads already catch errors and clear loading state.
+Verification: focused API-client Vitest PASS, full frontend Vitest PASS 86/86, frontend
+typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312. Lint
+still reports the same 4 pre-existing hook warnings.
 
 2026-07-04 session F (parallel non-overlapping frontend security hardening — full
 findings in `WORK/AUDIT_2026-07-04D.md`): SEC-4 is **Built and verified**. The catalog
@@ -527,7 +540,7 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 | ID | Issue |
 |---|---|
 | **SEC-7** | No `SameSite=Strict` or `SameSite=Lax` attribute documented for `finder_refresh` cookie. CSRF risk if backend ever adds state-mutating GET endpoints. |
-| **SEC-8** | `imports-exports/page.tsx:116` attaches `Authorization: Bearer <token>` via a direct `fetch()` call outside `apiFetch` — bypasses the 401-refresh retry logic. If token expires mid-upload, the request fails silently with no refresh. |
+| **SEC-8** | **DONE 2026-07-04 session G** — catalog CSV export now uses `apiDownload()` from the shared API client, including bearer auth, API error envelopes, and one-time 401 silent-refresh retry. |
 | **SEC-9** | Rate limiter uses `Math.floor(Date.now() / windowMs)` for Redis fixed-window. This means all clients reset simultaneously at window boundaries — a "thundering herd" burst is possible. Upgrade to sliding window for sensitive endpoints (login, password reset). |
 | **SEC-10** | Password reset and signup pages have no client-side rate limiting UI feedback. Backend rate limits, but UX shows no "too many attempts" state — users retry excessively. |
 
@@ -705,9 +718,9 @@ Score: 94/100 — launch-ready, zero CRITICAL.
 
 #### Immediate fixes (before any new features)
 
-1. **BUG-1** — Remove duplicate `customer-invoices` handlers from `mockHandlers.ts` (lines 5517–5627)
-2. **BUG-2 / BUG-3** — Add `.catch(setError)` to all tab fetches in `/warehouse` and `/pricing`
-3. **SEC-1** — Rotate the Vercel token in `.env` immediately
+1. **SEC-1** — Rotate the Vercel token in `.env` immediately
+2. **SEC-7** — Verify/document refresh cookie SameSite behavior end-to-end
+3. **SEC-9** — Upgrade sensitive rate-limit paths away from fixed-window bursts
 
 #### Next domain build
 

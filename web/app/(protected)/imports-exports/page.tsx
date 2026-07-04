@@ -5,8 +5,8 @@ import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
-import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import { getAccessToken, hasRole } from "@/lib/auth";
+import { apiDownload, apiGet, apiPost, ApiResponseError } from "@/api-client/client";
+import { hasRole } from "@/lib/auth";
 import { fmtDate } from "@/lib/date";
 import { ImportWizard, parsePreview } from "./_components/ImportWizard";
 import type { CsvPreviewRow } from "./_components/ImportWizard";
@@ -110,13 +110,7 @@ export default function ImportsExportsPage() {
     setBusy(true);
     setError(null);
     try {
-      const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-      const token = getAccessToken();
-      const response = await fetch(`${base}/api/v1/catalog/export`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (!response.ok) throw new Error(`Export failed (${response.status})`);
-      const blob = await response.blob();
+      const blob = await apiDownload("/api/v1/catalog/export");
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;

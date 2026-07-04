@@ -1,15 +1,28 @@
 /**
+ * @vitest-environment jsdom
+ *
  * Integration test for the API client against MSW mocks.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { apiPost, ApiResponseError } from "@/api-client/client";
+import { http, HttpResponse } from "msw";
+import { apiDownload, apiPost, ApiResponseError } from "@/api-client/client";
 import type { LoginResponse } from "@/api-client/types";
-import { clearSession } from "@/lib/auth";
+import { clearSession, setSession } from "@/lib/auth";
+import { server } from "@/mocks/server";
 
 beforeEach(() => {
   clearSession();
 });
+
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blob);
+  });
+}
 
 describe("apiFetch — login flow", () => {
   it("returns a session on valid credentials", async () => {
@@ -71,5 +84,69 @@ describe("apiFetch — health endpoints", () => {
     });
     const data = await apiGet<{ flags: Record<string, boolean> }>("/api/v1/flags");
     expect(typeof data.flags).toBe("object");
+  });
+});
+
+describe("apiDownload", () => {
+  it("downloads blob responses with the bearer token", async () => {
+    let authHeader = "";
+    server.use(
+      http.get("*/api/v1/catalog/export", ({ request }) => {
+        authHeader = request.headers.get("authorization") ?? "";
+        return new HttpResponse("sku,name\nA-1,Apple\n", {
+          status: 200,
+          headers: { "Content-Type": "text/csv" },
+        });
+      }),
+    );
+
+    setSession("download-token", 900, "ref", {
+      id: "u1",
+      email: "owner@example.com",
+      name: "Owner",
+      role: "owner",
+      tenantId: "t1",
+    });
+
+    const blob = await apiDownload("/api/v1/catalog/export");
+    expect(authHeader).toBe("Bearer download-token");
+    expect(await readBlob(blob)).toBe("sku,name\nA-1,Apple\n");
+  });
+
+  it("refreshes once on 401 before retrying a blob download", async () => {
+    localStorage.setItem("finder_pos_demo", "1");
+    let exportCalls = 0;
+    const seenAuthHeaders: string[] = [];
+    server.use(
+      http.get("*/api/v1/catalog/export", ({ request }) => {
+        exportCalls += 1;
+        seenAuthHeaders.push(request.headers.get("authorization") ?? "");
+        if (exportCalls === 1) {
+          return HttpResponse.json(
+            { error: { code: "unauthenticated", message: "Expired", requestId: "req_1" } },
+            { status: 401 },
+          );
+        }
+        return new HttpResponse("sku,name\nB-2,Banana\n", {
+          status: 200,
+          headers: { "Content-Type": "text/csv" },
+        });
+      }),
+    );
+
+    setSession("expired-token", 900, "mock-refresh-token-dev", {
+      id: "u1",
+      email: "owner@example.com",
+      name: "Owner",
+      role: "owner",
+      tenantId: "t1",
+    });
+    document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
+
+    const blob = await apiDownload("/api/v1/catalog/export");
+    expect(await readBlob(blob)).toBe("sku,name\nB-2,Banana\n");
+    expect(exportCalls).toBe(2);
+    expect(seenAuthHeaders[0]).toBe("Bearer expired-token");
+    expect(seenAuthHeaders[1]).toMatch(/^Bearer mock-access-token\./);
   });
 });

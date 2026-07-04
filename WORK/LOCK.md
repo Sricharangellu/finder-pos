@@ -58,6 +58,18 @@ Status: ACTIVE
 | Status | RELEASED — non-overlapping work complete; focused Vitest PASS, full frontend Vitest 84/84, frontend typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312; pushed in `540caf9` |
 | Blockers | none |
 
+## Parallel Non-Overlapping Claim (Codex session D — SEC-8)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session D |
+| Queue item | SEC-8 — route catalog CSV export through shared API client refresh/error handling instead of direct authenticated `fetch()` |
+| Files/areas expected | `web/api-client/client.ts`, `web/app/(protected)/imports-exports/page.tsx`, focused frontend API-client tests, `WORK/WORK_STATE.md`, new audit note. No `.github/**`, no `web/e2e/**`, no backend/server/ports/database. |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | READY TO RELEASE AFTER PUSH — non-overlapping work complete; focused API-client Vitest PASS, full frontend Vitest 86/86, frontend typecheck/lint/build PASS, backend typecheck PASS, backend tests PASS 312/312 |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim
 
 | Field | Value |
