@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — audit-log coverage)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Audit-log coverage for critical actions (readiness matrix "Partial"): audit_log gets NO entries from order create/refund/void, payment capture/refund, or register open/close — only identity events + one workflow write. Add writes at those mutations + smoke proof |
+| Files/areas expected | `src/shared/audit.ts` (new), `src/modules/orders/**`, `src/modules/payments/**`, `src/modules/outlets/**`, `scripts/smoke.ts` (new assertion step). NO `src/gateway/rateLimit*` (Codex F), NO `web/**` (session E), no ports |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — /healthz version stamp)
 
 | Field | Value |
@@ -34,9 +46,9 @@ Status: ACTIVE
 | Queue item | #1 — Triage/fix 10 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3, logout ×1) |
 | Files/areas expected | `web/e2e/*.spec.ts`; possibly terminal/purchasing/finance pages + components if real gaps found. Production build (`NEXT_PUBLIC_MOCK=false`) + real backend + Postgres via harness |
 | Started | 2026-07-04 |
-| Last update | 2026-07-04 |
-| Status | ACTIVE |
-| Blockers | none |
+| Last update | 2026-07-04 — backend verified; frontend build gate blocked locally |
+| Status | ACTIVE — code complete, not released; backend gates green, frontend build hung locally |
+| Blockers | `cd web && npm run build` repeatedly hangs at `Creating an optimized production build ...` on this machine even after moving generated `web/.next`/`web/test-results` out of the web tree. Do not mark released until frontend build passes in a clean environment or this local build hang is resolved. |
 
 ## Superseded Claim (session A — stale, released by Sri 2026-07-04)
 
