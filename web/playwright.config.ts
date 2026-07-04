@@ -35,11 +35,14 @@ export default defineConfig({
   },
 
   projects: [
-    // Setup project — runs login once and saves auth state.
+    // Setup project — runs login once and saves auth state. Must start with
+    // an explicit empty state: `storageState: undefined` inherits the global
+    // value (Playwright treats undefined as "not set"), which makes the setup
+    // try to READ the file it exists to create — ENOENT on fresh checkouts/CI.
     {
       name: "setup",
       testMatch: "**/global.setup.ts",
-      use: { storageState: undefined },
+      use: { storageState: { cookies: [], origins: [] } },
     },
     // Main test project — all .spec.ts files, reuses saved auth state.
     {
