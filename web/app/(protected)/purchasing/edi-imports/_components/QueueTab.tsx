@@ -224,7 +224,7 @@ export function QueueTab({ refreshKey }: { refreshKey: number }) {
                       <div key={line.line}>
                         <span className="text-slate-500 mr-2">{String(line.line).padStart(2, "0")}</span>
                         <span className="text-green-300">{line.raw.length > 60 ? line.raw.slice(0, 60) + "…" : line.raw}</span>
-                        <span className="ml-3 text-slate-400">// {line.parsed}</span>
+                        <span className="ml-3 text-slate-400">{`// ${line.parsed}`}</span>
                       </div>
                     ))}
                   </div>
