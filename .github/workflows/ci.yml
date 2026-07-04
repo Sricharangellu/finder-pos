@@ -71,6 +71,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # Strongest real-DB gate: boots the assembled app on the service Postgres
+      # and drives the full POS lifecycle over HTTP, asserting zero failed
+      # workflow instances. Uses its own throwaway schema, so it cannot clash
+      # with the unit-test database state.
+      - name: Smoke — full POS lifecycle on real Postgres
+        run: npm run smoke
 
   frontend:
     name: Frontend — typecheck + lint + build
@@ -135,35 +141,47 @@ jobs:
       - name: Wait for backend
         run: |
           for i in $(seq 1 20); do
-            curl -sf http://localhost:3001/healthz && break
+            curl -sf http://localhost:3001/healthz && exit 0
             sleep 2
           done
+          echo "❌ backend never became healthy on :3001"
+          exit 1
       - name: Seed E2E demo data
-        run: tsx scripts/seed-e2e.ts
+        run: npx tsx scripts/seed-e2e.ts
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
       # ── Build and start the frontend ────────────────────────────────────────
       - name: Install frontend deps
         run: npm ci
         working-directory: web
+      # NEXT_PUBLIC_MOCK=false is what makes this a REAL e2e run: the default
+      # is mock mode, and the previously used NEXT_PUBLIC_E2E_MODE flag is read
+      # by nothing. API base stays empty → same-origin calls proxied to the
+      # backend via next.config rewrites (BACKEND_URL, baked at build time),
+      # which avoids production CORS restrictions on the backend.
       - name: Build frontend
         run: npm run build
         working-directory: web
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
-          NEXT_PUBLIC_E2E_MODE: "true"
+          NEXT_PUBLIC_MOCK: "false"
+          BACKEND_URL: http://localhost:3001
+      # output is "standalone": `next start` refuses that config — run the
+      # generated server.js with static assets and public/ copied in.
       - name: Start frontend (background)
-        run: npm start &
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+          (PORT=3000 HOSTNAME=127.0.0.1 node .next/standalone/server.js > /tmp/frontend.log 2>&1 &)
         working-directory: web
-        env:
-          PORT: 3000
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
       - name: Wait for frontend
         run: |
           for i in $(seq 1 20); do
-            curl -sf http://localhost:3000/ && break
+            curl -sf http://localhost:3000/login >/dev/null && exit 0
             sleep 3
           done
+          echo "❌ frontend never became healthy on :3000"
+          cat /tmp/frontend.log || true
+          exit 1
       # ── Run Playwright ───────────────────────────────────────────────────────
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
@@ -173,7 +191,6 @@ jobs:
         working-directory: web
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
           E2E_EMAIL: owner@finder-pos.dev
           E2E_PASSWORD: FinderDemo!2026
       - name: Upload Playwright report on failure
