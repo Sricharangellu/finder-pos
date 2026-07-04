@@ -1,9 +1,27 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-02  |  Last commit: `35f9133`
+> Last updated: 2026-07-03  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
-## Enterprise Domain Roadmap (authoritative)
+## Active task
+
+**Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
+**PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-03 session: established `WORK/` folder, moved work state here, removed
+`WORK_STATE 2.md` duplicate, ran full verification (see `WORK/AUDIT_2026-07-03.md`),
+repaired `es-abstract` install, fixed JSX lint error in EDI QueueTab.
+
+**Next 3 actions**
+1. Fix 8 stale frontend tests: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3).
+2. Live-stack proof: docker-compose Postgres → `npm run seed:e2e` → run 5 Playwright specs.
+3. Page-by-page mock-dependence matrix for all 143 routes (append to next dated audit).
+
+**Blockers:** none.
+
+---
+
+## Enterprise Domain Roadmap (reference — sequencing PAUSED per FORWARD_PLAN Phase 1)
 
 > Full spec: [`docs/ENTERPRISE_DOMAIN_ROADMAP.md`](docs/ENTERPRISE_DOMAIN_ROADMAP.md)
 
