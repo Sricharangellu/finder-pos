@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-04 01:35 CDT  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-04 (session E, e2e core-flow green)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -7,6 +7,23 @@
 
 **Phase 1: Truth and cleanup** per `WORK/FORWARD_PLAN.md`. Feature/module expansion is
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
+
+2026-07-04 session E part 3 (e2e core-flow triage — full findings in
+`WORK/AUDIT_2026-07-04H.md`): queue item #1 is **Built and verified** — **all 13 core
+specs PASS** against production build (`NEXT_PUBLIC_MOCK=false`) + real backend + real
+Postgres, including a full cash sale (search → add → tender → collect → receipt).
+Baseline was 25/47 with all 10 core-flow specs failing. Went beyond spec fixes: 6 real
+product bugs fixed — hardcoded `reg_01` register default (real tenants stranded on
+"register not found"), $NaN money from snake_case/camelCase wire drift across
+product/order/payment shapes (normalizers at the terminal's fetch boundaries), a
+session-killing `silentRefresh` race (single-use rotation + concurrent refreshes →
+random logouts; now single-flight), register guard stranding cashiers on 409, missing
+page h1s (sr-only in shell), unlabeled user-menu/register-form controls. New
+`web/e2e/fixtures.ts`: worker-scoped context (rotation-compatible) with self-healing
+auth + drain-before-close. Double-claim collision with the Antigravity team arbitrated
+by Sri: session E's implementation kept; team's merged foundation fixes retained
+(next.config webpackBuildWorker — the real cause of the "build hang" — and the
+playwright storageState fix). Vertical-page e2e failures (12) remain deprioritized.
 
 2026-07-04 session F / SEC-9 (parallel non-overlapping backend security hardening —
 full findings in `WORK/AUDIT_2026-07-04G.md`, pushed in `a83ed5a`): Redis-backed IP
@@ -169,7 +186,9 @@ adjustment modal branches are Phase-2 relevant). `NEXT_PUBLIC_MOCK` made env-ove
 **Confirmed defects (priority order — each is one session's work item)**
 1. **e2e core-flow failures (10/47)**: triage checkout ×3, inventory-receive ×3,
    invoice-pay ×3, logout ×1 — separate stale locators from real integration gaps; fix
-   until core specs green against production build + real backend.
+   until core specs green against production build + real backend —
+   **DONE 2026-07-04 session E; all 13 core specs PASS incl. full cash sale; 6 product
+   bugs fixed along the way. See AUDIT_2026-07-04H.md.**
 2. **8 stale vitest tests**: `web/tests/catalogCart.test.tsx` (5), `web/tests/reportsDashboard.test.tsx` (3) — **DONE 2026-07-03 session D; full `cd web && npm test` PASS 83/83.**
 3. **~14 mock-only endpoints** incl. core `POST /inventory/transfers`, `POST /inventory/adjustments`,
    `POST /team`, `GET /team/:id`, `GET /workflows/templates`, Vendor-360 family (6 routes) —

@@ -50,26 +50,22 @@ Status: ACTIVE
 | Status | RELEASED — shipped in `de374ad`: six mutations audit-logged with real actor ids; smoke step 15 gates coverage in CI. Gates: typecheck clean, smoke 15/15, targeted module suite 54/54; full-suite hang was machine contention (ecommerce.test.ts passes 8/8 in isolation) |
 | Blockers | none |
 
-## Active Team Claim (Antigravity team — e2e core-flow triage)
+## Released Claim (e2e core-flow triage — RESOLVED by session E, conflict arbitrated by Sri)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app) — collision with Antigravity team resolved by Sri: "keep session E's work, merge theirs" |
+| Queue item | #1 — Triage/fix 10 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3, logout ×1) |
+| Status | RELEASED — **all 13 core specs PASS** against production build + real backend (login ×3, checkout ×3, inventory-receive ×3, invoice-pay ×3, setup). Went beyond spec-only fixes: 6 real product bugs fixed (hardcoded reg_01 register default, $NaN snake_case/camelCase drift across product/order/payment shapes, session-killing silentRefresh race, register-guard 409 stranding, missing page h1s, unlabeled user menu). See WORK/AUDIT_2026-07-04H.md |
+| Blockers | none |
+
+## Superseded Claim (Antigravity team — e2e core-flow triage)
 
 | Field | Value |
 |---|---|
 | Agent/session | Antigravity session (VSCode), team of 3 teammates + lead |
-| Queue item | #1 — Triage/fix 9 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3) |
-| Files/areas expected | `web/e2e/checkout.spec.ts` (teammate 1), `web/e2e/inventory-receive.spec.ts` (teammate 2), `web/e2e/invoice-pay.spec.ts` (teammate 3). Read-only: page components, mock handlers, seed data. No page/component edits — spec-only fixes. |
-| Started | 2026-07-04 12:16 CDT |
-| Last update | 2026-07-04 12:16 CDT |
-| Status | ACTIVE — triage in progress |
-| Blockers | none |
-| Root causes identified | (1) Checkout: RegisterSessionGuard blocks product grid — spec must open register first; stale "coffee" search term (seed uses retail products). (2) Inventory-receive & invoice-pay: auth state (storageState) not surviving across spec files — tests land on login page. (3) Logout: user menu button label "O owner" doesn't match spec's `/user\|account\|profile/i` pattern. |
-
-## Stale Claim (session E — e2e triage, superseded)
-
-| Field | Value |
-|---|---|
-| Agent/session | Claude session E (desktop app, takeover confirmed by Sri) |
-| Queue item | #1 — Triage/fix 10 core-flow e2e failures |
-| Status | STALE — blocked on local frontend build hang (`cd web && npm run build` hangs at "Creating an optimized production build"); no progress since 2026-07-04; superseded by Antigravity team claim above per Sri's directive |
+| Queue item | #1 — same item as above (double-claim while session E's build appeared hung) |
+| Status | SUPERSEDED — Sri chose to keep session E's implementation (spec-only scope could not fix the underlying product bugs). The team's pushed foundation work was merged and kept: `next.config.mjs` webpackBuildWorker fix (the actual cause of the build hangs) and the playwright setup storageState fix. Team may stand down from this item. |
 
 ## Parallel Non-Overlapping Claim (session A — /healthz version stamp)
 
