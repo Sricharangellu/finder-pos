@@ -9,10 +9,11 @@
 **PAUSED** until Phase 2 (core release spine) exit criteria pass.
 
 2026-07-04 session F / SEC-9 (parallel non-overlapping backend security hardening —
-full findings in `WORK/AUDIT_2026-07-04G.md`): Redis-backed IP and tenant rate limiters
-now use a sorted-set rolling window instead of fixed-window bucket keys, so clients
-cannot double-dip across a window boundary. Added focused tests proving both IP and
-tenant Redis paths deny the boundary burst and keep stable non-timestamped Redis keys.
+full findings in `WORK/AUDIT_2026-07-04G.md`, pushed in `a83ed5a`): Redis-backed IP
+and tenant rate limiters now use a sorted-set rolling window instead of fixed-window
+bucket keys, so clients cannot double-dip across a window boundary. Added focused tests
+proving both IP and tenant Redis paths deny the boundary burst and keep stable
+non-timestamped Redis keys.
 Verification passed: focused rate-limit test PASS 6/6, backend typecheck PASS, smoke
 PASS 14/14, full backend suite PASS 315/315, frontend typecheck PASS, frontend lint PASS
 with the same 4 pre-existing React hook warnings, and frontend production build PASS.

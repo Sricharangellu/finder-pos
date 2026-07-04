@@ -147,8 +147,8 @@ Status: ACTIVE
 | Queue item | SEC-9 — upgrade Redis-backed sensitive rate limiting away from fixed-window bursts |
 | Files/areas expected | `src/gateway/rateLimit.ts`, `src/gateway/rateLimit.test.ts`, `web/next.config.mjs` build-worker unblock, WORK evidence only. No `.github/**`, no e2e, no app health/version stamp files, no ports/DB. |
 | Started | 2026-07-04 |
-| Last update | 2026-07-04 — all gates green locally; ready to commit/push |
-| Status | READY TO RELEASE AFTER PUSH |
+| Last update | 2026-07-04 — pushed in `a83ed5a` |
+| Status | RELEASED — Redis rolling-window limiter + Next build-worker unblock verified; focused rate-limit PASS 6/6, backend typecheck PASS, smoke PASS 14/14, full backend suite PASS 315/315, frontend typecheck/lint/build PASS |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim
