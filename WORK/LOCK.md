@@ -1,6 +1,6 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: ACTIVE
+Status: FREE
 
 ## Parallel Non-Overlapping Claim (Codex session K - business capabilities endpoint)
 
@@ -10,8 +10,8 @@ Status: ACTIVE
 | Queue item | Retail-first queue item #1: build the read-only capabilities endpoint that reports the current tenant's business type, enabled module pack, plan placeholder, and effective user access |
 | Files/areas expected | `src/modules/settings/service.ts`, `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, maybe `src/app.ts` for a top-level alias, WORK evidence only. NO frontend UI rewrite, NO e2e specs, NO product/catalog/order/payment feature changes. |
 | Started | 2026-07-04 15:02 CDT |
-| Last update | 2026-07-04 15:02 CDT |
-| Status | ACTIVE |
+| Last update | 2026-07-04 15:19 CDT |
+| Status | RELEASED - shipped in `f919ffd`; read-only `GET /api/v1/capabilities` plus `GET /api/v1/settings/capabilities` now report effective business-pack/module/user/plan capability state. Gates: backend typecheck PASS, focused settings suite PASS 17/17, backend suite PASS 324/324, smoke PASS 15/15, frontend typecheck/lint/test PASS, frontend `NEXT_PUBLIC_MOCK=false` build PASS. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session J - retail-first platform scope rewrite)
