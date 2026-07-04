@@ -1,6 +1,6 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: ACTIVE
+Status: FREE
 
 ## Parallel Non-Overlapping Claim (Codex session I — production mock-off deploy guard)
 
@@ -10,8 +10,8 @@ Status: ACTIVE
 | Queue item | Queue item #5 preparation: prevent production frontend deploys from silently shipping MSW mock mode now that core real-backend e2e is green |
 | Files/areas expected | `scripts/deploy.sh`, `.github/workflows/deploy-prod.yml` if needed, WORK evidence only. NO `web/e2e/**`, NO app feature code, NO backend business modules. |
 | Started | 2026-07-04 14:08 CDT |
-| Last update | 2026-07-04 14:41 CDT |
-| Status | ACTIVE - implementation and gates complete; release pending commit and push |
+| Last update | 2026-07-04 14:42 CDT |
+| Status | RELEASED - shipped in `a90fbe4`; production deploy path now forces/refuses mock-off correctly, WORK scope corrected to modular business platform; gates: deploy script syntax PASS, prod mock guard refusal PASS, frontend prod build mock-off PASS, backend typecheck PASS, frontend typecheck/lint/test PASS, backend suite PASS 322/322 with `PG_TX_TIMEOUT_MS=120000` after local timeout contention |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — deploy pipeline Node fix + production deploy)
