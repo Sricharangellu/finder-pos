@@ -26,6 +26,12 @@ Lint still reports 4 pre-existing React hook warnings. `cd web && npm test` stil
 8 stale Vitest assertions (`web/tests/catalogCart.test.tsx` 5,
 `web/tests/reportsDashboard.test.tsx` 3), matching the known queue item.
 
+Coordination update: `WORK/LOCK.md` is now the required multi-agent claim file. Before
+editing code, any AI agent must claim one queue item there, stop on overlapping active
+claims, and release the lock only after commit + push. This prevents duplicate work,
+dirty-tree overwrites, stale verification, server/port conflicts, and migration/test
+failures caused by another active AI session.
+
 2026-07-03 session B (deep verification — full findings in `WORK/AUDIT_2026-07-03B.md`):
 live-stack proof DONE on local Postgres 15. Smoke 13/13 green (real POS lifecycle).
 Endpoint probe: ~464/484 frontend-declared endpoints exist on the real backend.

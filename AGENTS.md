@@ -26,6 +26,26 @@ Feature/module/page expansion is **PAUSED**. Work the phase plan in
 `WORK/FORWARD_PLAN.md`: verify truth → harden the core retail spine → production
 hardening → only then expand. One work item per session, verified before commit.
 
+## Multi-agent coordination lock
+
+Before editing code, check `WORK/LOCK.md`.
+
+- If it is marked `FREE`, claim exactly one queue item by editing `WORK/LOCK.md` with:
+  agent/session name, queue item, files/areas expected, start time, and status `ACTIVE`.
+- If it is `ACTIVE` and the item overlaps your intended work, **stop**. Do not build the
+  same fix in parallel. Pull latest, read the active claim, and either wait or pick a
+  non-overlapping queue item only if `WORK/WORK_STATE.md` allows it.
+- If it is `ACTIVE` but clearly stale, do not delete it silently. Mark it `STALE?` in
+  `WORK/LOCK.md`, add a note to `WORK/WORK_STATE.md`, and stop for human/lead review.
+- At handoff, update `WORK/LOCK.md` back to `FREE` only after commit + push succeeds and
+  `WORK/WORK_STATE.md` records what changed. If blocked, leave the lock `ACTIVE` with
+  blocker details so another agent does not duplicate the same broken path.
+
+Parallel AI sessions can create false errors: stale builds, port conflicts, dirty-tree
+overwrites, duplicate fixes, migration mismatches, and e2e failures caused by another
+server/process. Treat unexplained failures as possible coordination conflicts until
+`git status`, `git pull --ff-only`, ports, and `WORK/LOCK.md` are checked.
+
 ## Verification commands (run before claiming anything works)
 
 ```bash

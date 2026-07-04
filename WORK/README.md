@@ -25,6 +25,9 @@ created anywhere else in the repo.
    Never describe a module as done without saying which label applies.
 6. **Product documentation is separate.** `docs/`, `contracts/`, `orchestration/` hold
    product/architecture specs and stay where they are. `WORK/` holds *process* state.
+7. **One active queue item.** Before touching code, claim work in `LOCK.md`. Do not work
+   the same queue item as another active agent. If the lock overlaps your intended task,
+   stop and reconcile instead of creating competing fixes.
 
 ## File index
 
@@ -33,6 +36,7 @@ created anywhere else in the repo.
 | `README.md` | Folder rules | Override only when the rules themselves change |
 | `RULES.md` | Build rules: prime directive, domain rules, definition of done, per-task prompt, readiness matrix | Matrix updated with new evidence only; rules change only on Sri's directive |
 | `WORK_STATE.md` | Live session state (active task, files in flight, decisions, next actions, blockers) | Override in place after every commit |
+| `LOCK.md` | Multi-agent coordination lock: active queue item, owner, files/areas, status | Update at session start and end; never ignore an active overlapping lock |
 | `FORWARD_PLAN.md` | Authoritative phase-based plan + release gates + audit prompt | Override only when the plan genuinely changes |
 | `AUDIT_YYYY-MM-DD.md` | Immutable audit snapshot + readiness matrix | Append-only during its session; never edited after |
 

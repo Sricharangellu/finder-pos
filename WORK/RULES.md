@@ -12,6 +12,27 @@ Do not build more features until the current project state is verified.
 
 Finder POS already has many modules, pages, documents, and claims. The risk is not lack of ideas. The risk is building wider before proving that the core product works correctly.
 
+## Multi-agent rule
+
+Only one agent may work a queue item at a time.
+
+Before editing code:
+
+1. Pull latest with `git pull --ff-only origin master`.
+2. Read `WORK/LOCK.md`.
+3. If `WORK/LOCK.md` is `FREE`, claim exactly one queue item.
+4. If `WORK/LOCK.md` is `ACTIVE` and overlaps your intended task, stop.
+5. If you see unexpected failures, check for another active process, dirty tree, changed branch, or lock conflict before debugging the application.
+
+At handoff:
+
+- Record results in `WORK/WORK_STATE.md`.
+- Create a new audit only for new verification evidence.
+- Commit and push.
+- Release `WORK/LOCK.md` back to `FREE`.
+
+Never leave an unpushed local fix while another agent may start from GitHub. That creates duplicate work and misleading failures.
+
 ## What every AI agent must understand
 
 Finder is not a normal CRUD dashboard. It is a POS, inventory, payment, accounting, and compliance system.
