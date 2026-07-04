@@ -30,9 +30,9 @@ Status: ACTIVE
 | Queue item | CI hardening (AUDIT_2026-07-03B rec #2): make CI gates real — add `npm run smoke` to backend job; fix e2e job (mocks were ON: dead `NEXT_PUBLIC_E2E_MODE`, missing `NEXT_PUBLIC_MOCK=false`; bare `tsx` not on PATH; `npm start` incompatible with standalone output; wait loops never fail) |
 | Files/areas expected | `.github/workflows/ci.yml` ONLY. No `web/**`, no `src/**`, no e2e specs, no local ports — zero overlap with session E's item #1 |
 | Started | 2026-07-04 |
-| Last update | 2026-07-04 |
-| Status | ACTIVE |
-| Blockers | none |
+| Last update | 2026-07-04 — smoke gate VERIFIED green in CI run 28696807979; e2e job fixed through 6 defects (also: devDeps skipped by NODE_ENV=production `npm ci`; prod mode structurally impossible on CI — DB SSL + Secure cookies over plain HTTP); final fix `c01e609` committed locally |
+| Status | ACTIVE — push blocked |
+| Blockers | `git push`/`git fetch` to github.com time out (git transport unreachable from this network; web/API respond fine). Same blocker as Codex SEC-7 (`ffa5207`). Background retry armed; lock stays ACTIVE until push lands per rules. |
 
 ## Parallel Non-Overlapping Claim (Codex session C — SEC-3)
 
