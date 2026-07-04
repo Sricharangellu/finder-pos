@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const REPORT_LINKS = [
   { label: "Overview", href: "/reporting" },
   { label: "Sales", href: "/reporting/sales" },
+  { label: "End of Day", href: "/reporting/closing" },
   { label: "P&L", href: "/reporting/p-l" },
   { label: "By Rep", href: "/reporting/sales-by-rep" },
   { label: "By Vendor", href: "/reporting/sales-by-vendor" },

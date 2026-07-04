@@ -15,9 +15,9 @@ import { fmtTime } from "@/lib/date";
 interface EndOfDayReport {
   date: string;
   businessDate: string;
-  openedAt: number;
+  openedAt: number | null;
   closedAt: number | null;
-  status: "open" | "closed";
+  status: "open" | "closed" | "no_session";
   transactions: {
     count: number;
     voidCount: number;
@@ -130,7 +130,12 @@ export default function EndOfDayPage() {
         {!loading && !error && report && (
           <>
             {/* Status banner */}
-            {report.status === "open" ? (
+            {report.status === "no_session" ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-semibold">No register session</span> was opened on this day
+                — drawer figures show sales activity only.
+              </div>
+            ) : report.status === "open" ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 <span className="font-semibold">Shift is still open</span> — figures may change
                 until the shift is closed.
