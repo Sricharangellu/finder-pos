@@ -2,6 +2,30 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (Codex session G — product catalog variants)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session G |
+| Queue item | Product catalog end-to-end proof: strengthen product creation and master/parent/child variant relationships without expanding unrelated features |
+| Files/areas expected | `src/modules/catalog/service.ts`, `src/modules/catalog/catalog.test.ts`, `web/app/(protected)/inventory/products/new/page.tsx`, `web/app/(protected)/inventory/products/[id]/_components/VariantsTab.tsx`, focused frontend test if needed, WORK evidence. NO `src/modules/orders/**`, NO `src/modules/payments/**`, NO `src/modules/outlets/**`, NO `scripts/smoke.ts`, NO `web/e2e/**`. |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
+## Parallel Non-Overlapping Claim (session A — EOD report backend)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | End-of-day report backend (core flow: "close register → end-of-day report"): implement real `GET /api/v1/reports/end-of-day` matching the contract defined by the salvage branch's mock (transactions, sales totals, tender breakdown, top items, cash drawer expected-vs-counted). Backend only; frontend page harvest (`worktree-agent-abecc2986…`) deferred until Antigravity e2e claim releases |
+| Files/areas expected | `src/modules/reports/service.ts`, `src/modules/reports/routes.ts`, `src/modules/reports/reports.test.ts`. NO `src/modules/catalog/**` (Codex G), NO `web/**`, NO `scripts/smoke.ts`, no ports |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — audit-log coverage)
 
 | Field | Value |
@@ -11,7 +35,7 @@ Status: ACTIVE
 | Files/areas expected | `src/shared/audit.ts` (new), `src/modules/orders/**`, `src/modules/payments/**`, `src/modules/outlets/**`, `scripts/smoke.ts` (new assertion step). NO `src/gateway/rateLimit*` (Codex F), NO `web/**` (session E), no ports |
 | Started | 2026-07-04 |
 | Last update | 2026-07-04 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `de374ad`: six mutations audit-logged with real actor ids; smoke step 15 gates coverage in CI. Gates: typecheck clean, smoke 15/15, targeted module suite 54/54; full-suite hang was machine contention (ecommerce.test.ts passes 8/8 in isolation) |
 | Blockers | none |
 
 ## Active Team Claim (Antigravity team — e2e core-flow triage)
