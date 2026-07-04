@@ -5,6 +5,7 @@ import { HttpError } from "../shared/http.js";
 import type { Role } from "../identity/types.js";
 import { hasRole } from "../identity/types.js";
 import type { DB } from "../shared/db.js";
+import { runWithTenant } from "../shared/tenant-context.js";
 
 export interface AuthPayload {
   tenantId: string;
@@ -273,10 +274,15 @@ export function requirePlan(required: Plan): RequestHandler {
   };
 }
 
-export function tenantResolver(_req: Request, _res: Response, next: NextFunction): void {
-  // The DB layer sets `app.tenant_id` inside each transaction via the service
-  // layer helpers (`withTenant`). The middleware records the tenantId so those
-  // helpers can read it without touching the JWT again.
-  // Actual SET LOCAL happens in identity/db.ts `withTenant()` helper.
+export function tenantResolver(_req: Request, res: Response, next: NextFunction): void {
+  // Enter the request-scoped tenant context (AsyncLocalStorage). From here on,
+  // every DB query issued anywhere in this request's async chain runs inside a
+  // transaction with `app.tenant_id` set (see shared/db.ts), so Postgres RLS
+  // enforces tenant isolation even if a query forgets its WHERE clause.
+  const auth = res.locals["auth"] as AuthPayload | undefined;
+  if (auth?.tenantId) {
+    runWithTenant(auth.tenantId, () => next());
+    return;
+  }
   next();
 }

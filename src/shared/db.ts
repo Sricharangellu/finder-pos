@@ -1,4 +1,5 @@
 import pg from "pg";
+import { currentTenantId } from "./tenant-context.js";
 
 const { Pool, types } = pg;
 
@@ -86,6 +87,14 @@ export function compile(sql: string, params: Params): { text: string; values: un
 function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
   const db: DB = {
     async query<T = any>(sql: string, params?: Params): Promise<T[]> {
+      // Request-scoped RLS backstop: when the current async context carries a
+      // tenant id (set by the gateway's tenantResolver), run the query inside
+      // a transaction that sets app.tenant_id so Postgres RLS enforces tenant
+      // isolation even if the SQL forgot its WHERE tenant_id clause. Inside an
+      // existing transaction the config was already set at BEGIN.
+      if (!opts.isTx && currentTenantId()) {
+        return db.tx((tdb) => tdb.query<T>(sql, params));
+      }
       const { text, values } = compile(sql, params);
       const res = await q.query(text, values);
       return res.rows as T[];
@@ -95,6 +104,9 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       return rows[0];
     },
     async exec(sql: string): Promise<void> {
+      if (!opts.isTx && currentTenantId()) {
+        return db.tx((tdb) => tdb.exec(sql));
+      }
       await q.query(sql);
     },
     async tx<T>(fn: (tdb: DB) => Promise<T>): Promise<T> {
@@ -105,9 +117,17 @@ function makeDb(q: Queryable, opts: { isTx: boolean; pool?: pg.Pool }): DB {
       try {
         // Prevent runaway transactions from holding locks indefinitely.
         // 30 s is generous for any single business transaction; tune via PG_TX_TIMEOUT_MS.
-        const txTimeoutMs = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
-        await client.query(`SET LOCAL statement_timeout = ${txTimeoutMs}`);
-        await client.query("BEGIN");
+        // SET LOCAL must run inside the transaction, so BEGIN and the timeout
+        // travel in one combined statement (also saves a round trip).
+        const rawTimeout = Number(process.env["PG_TX_TIMEOUT_MS"] ?? 30_000);
+        const txTimeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.floor(rawTimeout) : 30_000;
+        await client.query(`BEGIN; SET LOCAL statement_timeout = ${txTimeoutMs}`);
+        // Tenant context (if any) applies to the whole transaction. Explicit
+        // withTenant() views set their own value afterwards and take precedence.
+        const ctxTenant = currentTenantId();
+        if (ctxTenant) {
+          await client.query("SELECT set_config('app.tenant_id', $1, true)", [ctxTenant]);
+        }
         const out = await fn(tdb);
         await client.query("COMMIT");
         return out;

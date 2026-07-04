@@ -10,10 +10,19 @@ import type { PosModule } from "../types.js";
  * that forgets the WHERE clause.
  *
  * Policy logic:
+ *   tenant_id IS NULL                    → platform-global rows (e.g. global
+ *                                          feature flags) visible to everyone
+ *   tenant_id = 'system'                 → system job/outbox rows visible to
+ *                                          everyone (the /jobs endpoint reads them)
  *   COALESCE(current_setting('app.tenant_id', true), '') IN ('', tenant_id::text)
  *
  *   unset / '' → allow all rows  (backwards-compatible with code not yet using withTenant)
  *   set to X  → allow only rows where tenant_id = X
+ *
+ * The context is now set automatically for every authenticated request: the
+ * gateway's tenantResolver enters an AsyncLocalStorage scope (shared/
+ * tenant-context.ts) and shared/db.ts sets app.tenant_id on every query in
+ * that scope — a forgotten WHERE tenant_id clause can no longer leak rows.
  *
  * FORCE ROW LEVEL SECURITY applies the policy even to the table owner so the
  * app user (who owns the tables) is subject to the same rules.
@@ -35,19 +44,17 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
-    IF NOT EXISTS (
-      SELECT 1 FROM pg_policies
-      WHERE schemaname = current_schema()
-        AND tablename = tbl
-        AND policyname = 'tenant_isolation'
-    ) THEN
-      EXECUTE format(
-        'CREATE POLICY tenant_isolation ON %I USING (
-           COALESCE(current_setting(''app.tenant_id'', true), '''') IN ('''', tenant_id::text)
-         )',
-        tbl
-      );
-    END IF;
+    -- Recreate so policy edits here roll out to existing databases (the
+    -- migration string's content hash changes, which re-runs this block).
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', tbl);
+    EXECUTE format(
+      'CREATE POLICY tenant_isolation ON %I USING (
+         tenant_id IS NULL
+         OR tenant_id::text = ''system''
+         OR COALESCE(current_setting(''app.tenant_id'', true), '''') IN ('''', tenant_id::text)
+       )',
+      tbl
+    );
   END LOOP;
 END $$;
 `;
