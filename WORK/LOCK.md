@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `web/e2e/*.spec.ts`; possibly terminal/purchasing/finance pages + components if real gaps found. Using ports 3000/3001 + Postgres 5432 (`finder_e2e`) |
 | Started | 2026-07-03 ~21:35 CDT |
 | Last update | 2026-07-03 ~21:35 CDT |
-| Status | ACTIVE |
+| Status | STALE? — flagged 2026-07-04 by session E: no lock update and no pushed commits since claim (>24h). Awaiting Sri's review per lock rules — if session A is no longer running, release this claim so the e2e item can be taken over. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim
