@@ -19,6 +19,18 @@ Status: ACTIVE
 | Field | Value |
 |---|---|
 | Agent/session | Claude session E (desktop app, "next" directive from Sri) |
+| Queue item | #4 — RLS gap: request-scoped tenant context (AsyncLocalStorage) so the DB layer sets app.tenant_id on every authenticated query; cross-tenant regression test on real Postgres. Policy stays permissive-when-unset (strict flip deferred until e2e green) |
+| Files/areas expected | `src/shared/db.ts`, `src/shared/tenant-context.ts` (new), `src/app.ts` (middleware wiring), new backend test file — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
+## Released Claims (session E, item #3)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" directive from Sri) |
 | Queue item | #3 — Implement ~14 mock-only endpoints on the real backend (inventory transfers/adjustments, team invite/detail, workflow templates, AR-aging sweep, Vendor-360 family ×6) |
 | Files/areas expected | `src/modules/inventory/**`, `src/modules/team/**`, `src/modules/workflows/**`, `src/modules/reports/**`, `src/modules/purchasing/**`, `src/identity/migrations.ts` (additive users.name) — backend only, NO `web/**` edits. Embedded Postgres via test harness (no fixed ports) |
 | Started | 2026-07-04 |
