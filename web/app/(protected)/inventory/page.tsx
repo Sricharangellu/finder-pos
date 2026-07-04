@@ -349,16 +349,16 @@ export default function InventoryPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <Metric
             label="Active products"
             value={String(metrics.active)}
             detail="sellable catalog items"
           />
           <Metric
-            label="Low stock"
+            label="Reorder items"
             value={String(metrics.low)}
-            detail={`${metrics.watch} watch items`}
+            detail={`${metrics.watch} items on watch`}
             tone="warning"
           />
           <Metric
@@ -366,7 +366,6 @@ export default function InventoryPage() {
             value={formatMoney(metrics.value)}
             detail="using tracked cost"
           />
-          <Metric label="Pending transfers" value="2" detail="receiving today" />
         </div>
 
         {/* Tab switcher */}

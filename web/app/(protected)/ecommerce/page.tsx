@@ -16,7 +16,7 @@ export default function EcommercePage() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const r = await apiGet<{ items: CatalogItem[] }>(`/api/v1/ecommerce/catalog${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const r = await apiGet<{ items: CatalogItem[] }>(`/api/v1/catalog?limit=200${q ? `&q=${encodeURIComponent(q)}` : ""}`);
       setItems(r.items ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load catalog");
