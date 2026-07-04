@@ -1,17 +1,17 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: FREE
+Status: ACTIVE
 
 ## Active Claim
 
 | Field | Value |
 |---|---|
-| Agent/session | none |
-| Queue item | none |
-| Files/areas expected | none |
-| Started | none |
-| Last update | none |
-| Status | FREE |
+| Agent/session | Claude session A (VSCode, "NEXT" directive from Sri) |
+| Queue item | #1 — Triage/fix 10 core-flow e2e failures (checkout ×3, inventory-receive ×3, invoice-pay ×3, logout ×1) |
+| Files/areas expected | `web/e2e/*.spec.ts`; possibly terminal/purchasing/finance pages + components if real gaps found. Using ports 3000/3001 + Postgres 5432 (`finder_e2e`) |
+| Started | 2026-07-03 ~21:35 CDT |
+| Last update | 2026-07-03 ~21:35 CDT |
+| Status | ACTIVE |
 | Blockers | none |
 
 ## Rules
