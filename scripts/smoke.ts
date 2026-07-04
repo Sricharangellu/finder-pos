@@ -145,6 +145,12 @@ async function main() {
   assert.match(metricsText, /http_request_duration_ms_count\{/);
   ok(`/metrics exposes RED metrics (Prometheus format)`);
 
+  const failedWorkflows = await db.query<{ id: string; type: string; current_step: string | null }>(
+    "SELECT id, type, current_step FROM workflow_instances WHERE status = 'failed'",
+  );
+  assert.deepEqual(failedWorkflows, [], `workflow failures: ${JSON.stringify(failedWorkflows)}`);
+  ok(`orchestration recorded no failed workflow instances`);
+
   console.log(`\n✅ SMOKE PASSED — ${step} steps, full POS lifecycle verified end-to-end.\n`);
 }
 

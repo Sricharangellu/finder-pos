@@ -42,6 +42,13 @@ export class CommandRegistry {
 
   constructor(private readonly bus: CommandBus) {}
 
+  syncFromBus(): void {
+    const registered = new Set(this.bus.registeredTypes());
+    for (const entry of this.definitions) {
+      if (registered.has(entry.type)) entry.registered = true;
+    }
+  }
+
   markRegistered(type: CommandType): void {
     const entry = this.definitions.find((d) => d.type === type);
     if (entry) entry.registered = true;

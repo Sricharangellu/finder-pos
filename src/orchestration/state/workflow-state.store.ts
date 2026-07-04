@@ -71,12 +71,12 @@ export class WorkflowStateStore {
   ): Promise<WorkflowStepRow> {
     const now = Date.now();
     const existing = await this.db.one<WorkflowStepRow>(
-      "SELECT id, attempts FROM workflow_steps WHERE workflow_id = @workflowId AND step_name = @stepName",
+      "SELECT id, attempts FROM workflow_instance_steps WHERE workflow_id = @workflowId AND step_name = @stepName",
       { workflowId, stepName },
     );
     if (existing) {
       await this.db.query(
-        `UPDATE workflow_steps
+        `UPDATE workflow_instance_steps
            SET status = @status, output = COALESCE(@output, output), error = @error,
                attempts = @attempts, completed_at = CASE WHEN @status IN ('completed','failed','compensated') THEN @now ELSE completed_at END
          WHERE id = @id`,
@@ -104,7 +104,7 @@ export class WorkflowStateStore {
       completed_at: ["completed", "failed", "compensated"].includes(status) ? now : null,
     };
     await this.db.query(
-      `INSERT INTO workflow_steps
+      `INSERT INTO workflow_instance_steps
          (id, workflow_id, step_name, status, input, output, error, attempts, started_at, completed_at)
        VALUES
          (@id, @workflow_id, @step_name, @status, @input, @output, @error, @attempts, @started_at, @completed_at)`,

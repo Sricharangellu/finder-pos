@@ -37,6 +37,17 @@ export function registerCheckoutHandlers(bus: CommandBus, db: DB, events: EventB
     return result;
   });
 
+  bus.register(CommandTypes.AUTHORIZE_PAYMENT, async (cmd: Command<{ orderId: string; amountCents: number; method?: string }>) => {
+    await events.publish("payment.authorization_requested", {
+      tenantId: cmd.tenantId,
+      orderId: cmd.payload.orderId,
+      amountCents: cmd.payload.amountCents,
+      method: cmd.payload.method,
+      correlationId: cmd.correlationId,
+    });
+    return { authorized: true, orderId: cmd.payload.orderId };
+  });
+
   bus.register(CommandTypes.COMMIT_INVENTORY, async (cmd: Command<{ orderId: string }>) => {
     await events.publish("inventory.committed", {
       tenantId: cmd.tenantId,

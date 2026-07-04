@@ -11,6 +11,7 @@
  */
 
 export { WorkflowRunner } from "./workflow-runner.js";
+export { ORCHESTRATION_MIGRATIONS } from "./migrations.js";
 
 // Workflows
 export { CheckoutWorkflow } from "./workflows/checkout.workflow.js";
@@ -66,6 +67,8 @@ export { registerPurchasingHandlers } from "./handlers/purchasing.handler.js";
 export { registerPaymentHandlers } from "./handlers/payment.handler.js";
 export { registerInventoryHandlers } from "./handlers/inventory.handler.js";
 export { registerAccountingHandlers } from "./handlers/accounting.handler.js";
+export { registerEcommerceHandlers } from "./handlers/ecommerce.handler.js";
+export { registerStoreHandlers } from "./handlers/store.handler.js";
 
 // Sagas
 export { registerCheckoutSaga } from "./sagas/checkout.saga.js";
@@ -111,6 +114,8 @@ import { registerPurchasingHandlers } from "./handlers/purchasing.handler.js";
 import { registerPaymentHandlers } from "./handlers/payment.handler.js";
 import { registerInventoryHandlers } from "./handlers/inventory.handler.js";
 import { registerAccountingHandlers } from "./handlers/accounting.handler.js";
+import { registerEcommerceHandlers } from "./handlers/ecommerce.handler.js";
+import { registerStoreHandlers } from "./handlers/store.handler.js";
 import { registerCheckoutSaga } from "./sagas/checkout.saga.js";
 import { registerFulfillmentSaga } from "./sagas/fulfillment.saga.js";
 import { registerPurchasingSaga } from "./sagas/purchasing.saga.js";
@@ -168,8 +173,11 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   registerPaymentHandlers(commandBus, db, events);
   registerInventoryHandlers(commandBus, db, events);
   registerAccountingHandlers(commandBus, db, events);
+  registerEcommerceHandlers(commandBus, db, events);
+  registerStoreHandlers(commandBus, db, events);
 
   // Audit: log any unregistered commands at startup.
+  commandRegistry.syncFromBus();
   commandRegistry.audit();
 
   // ── 5. Sagas ───────────────────────────────────────────────────────────────
@@ -183,6 +191,9 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   const jobConsumer = new QueueConsumer(db);
   const jobProducer = new QueueProducer(db);
   const DAY_MS = 24 * 60 * 60 * 1000;
+  const backgroundJobsEnabled =
+    process.env["NODE_ENV"] !== "test" &&
+    process.env["FINDER_BACKGROUND_JOBS"] !== "false";
 
   jobConsumer.register(QueueNames.EXPIRE_RESERVATIONS, async (job) => {
     await expireReservationsJob(job, db, events);
@@ -215,22 +226,24 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
 
   // Seed dunning jobs for every active tenant on startup (once per tenant;
   // enqueueOnce is a no-op if a pending job already exists).
-  void (async () => {
-    try {
-      const tenants = await db.query<{ id: string }>("SELECT id FROM tenants");
-      for (const t of tenants) {
-        await jobProducer.enqueueOnce({
-          type: QueueNames.AR_DUNNING,
-          tenantId: t.id,
-          payload: { tenantId: t.id },
-          runAt: Date.now(), // run immediately on first boot
-          maxAttempts: 3,
-        });
+  if (backgroundJobsEnabled) {
+    void (async () => {
+      try {
+        const tenants = await db.query<{ id: string }>("SELECT id FROM tenants");
+        for (const t of tenants) {
+          await jobProducer.enqueueOnce({
+            type: QueueNames.AR_DUNNING,
+            tenantId: t.id,
+            payload: { tenantId: t.id },
+            runAt: Date.now(), // run immediately on first boot
+            maxAttempts: 3,
+          });
+        }
+      } catch {
+        // Non-fatal — dunning jobs will be seeded on next startup or manual trigger.
       }
-    } catch {
-      // Non-fatal — dunning jobs will be seeded on next startup or manual trigger.
-    }
-  })();
+    })();
+  }
 
   // DB-10: Idempotency key expiry — global job (not per-tenant), runs every 6h.
   jobConsumer.register(QueueNames.IDEMPOTENCY_EXPIRY, async (job) => {
@@ -244,13 +257,15 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
     });
   });
   // Seed on first startup.
-  void jobProducer.enqueueOnce({
-    type: QueueNames.IDEMPOTENCY_EXPIRY,
-    tenantId: "system",
-    payload: {},
-    runAt: Date.now(),
-    maxAttempts: 3,
-  }).catch(() => {});
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.IDEMPOTENCY_EXPIRY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
 
   // DB-8: Outbox relay — dispatches pending event_outbox rows every 5 seconds.
   jobConsumer.register(QueueNames.OUTBOX_RELAY, async (job) => {
@@ -264,16 +279,20 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
       maxAttempts: 3,
     });
   });
-  void jobProducer.enqueueOnce({
-    type: QueueNames.OUTBOX_RELAY,
-    tenantId: "system",
-    payload: {},
-    runAt: Date.now(),
-    maxAttempts: 3,
-  }).catch(() => {});
+  if (backgroundJobsEnabled) {
+    void jobProducer.enqueueOnce({
+      type: QueueNames.OUTBOX_RELAY,
+      tenantId: "system",
+      payload: {},
+      runAt: Date.now(),
+      maxAttempts: 3,
+    }).catch(() => {});
+  }
 
   // Start polling background jobs.
-  jobConsumer.start(10_000); // poll every 10 seconds
+  if (backgroundJobsEnabled) {
+    jobConsumer.start(10_000); // poll every 10 seconds
+  }
 
   return { runner, commandBus, eventRegistry, commandRegistry, jobConsumer };
 }

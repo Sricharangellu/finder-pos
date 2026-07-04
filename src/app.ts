@@ -20,7 +20,7 @@ import {
   requireRole,
 } from "./gateway/index.js";
 import { handler } from "./shared/http.js";
-import { bootstrapOrchestration } from "./orchestration/index.js";
+import { bootstrapOrchestration, ORCHESTRATION_MIGRATIONS } from "./orchestration/index.js";
 import { SseBroker } from "./shared/sse.js";
 import type { AuthPayload } from "./gateway/auth.js";
 
@@ -194,6 +194,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       for (const [i, sql] of mod.migrations.entries()) {
         await runIfNew(sql, `${mod.name}[${i}]`, tdb);
       }
+    }
+    for (const [i, sql] of ORCHESTRATION_MIGRATIONS.entries()) {
+      await runIfNew(sql, `orchestration[${i}]`, tdb);
     }
 
     logger.info("migrations complete");
@@ -371,9 +374,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       const auth = res.locals["auth"] as AuthPayload;
       const rows = await db.query<{
         id: string; type: string; status: string; run_at: number;
-        attempt_count: number; max_attempts: number; created_at: number;
+        attempts: number; max_attempts: number; created_at: number;
       }>(
-        `SELECT id, type, status, run_at, attempt_count, max_attempts, created_at
+        `SELECT id, type, status, run_at, attempts, max_attempts, created_at
          FROM job_queue
          WHERE tenant_id IN (@t, 'system')
          ORDER BY created_at DESC LIMIT 100`,
@@ -381,7 +384,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       );
       const counts = { pending: 0, running: 0, done: 0, failed: 0 };
       for (const r of rows) {
-        if (r.status in counts) (counts as Record<string, number>)[r.status]++;
+        const key = r.status === "completed" ? "done" : r.status;
+        if (key in counts) (counts as Record<string, number>)[key]++;
       }
       res.json({ items: rows, summary: counts });
     }),
