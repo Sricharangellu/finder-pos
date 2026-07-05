@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — seed-demo production guard)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Sibling of the seed-e2e guard (`7715f68`): `scripts/seed-demo.ts` has NO production guard — pointed at a real DATABASE_URL it pollutes prod with demo commerce data (12 products, 8 customers, 25 orders). Add the same ALLOW_DEMO_SEED opt-in refusal + refuse when NODE_ENV=production |
+| Files/areas expected | `scripts/seed-demo.ts` ONLY. Does NOT touch session M's new `scripts/ops-check.ts` (session M explicitly disclaims seed changes), no `package.json`, no `web/**`, no prod DB |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — production demo credentials)
 
 | Field | Value |
