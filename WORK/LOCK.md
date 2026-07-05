@@ -26,6 +26,18 @@ Status: ACTIVE
 | Status | RELEASED - shipped in `c7b84b5`; read-only `GET /api/v1/capabilities/impact` plus `GET /api/v1/settings/capabilities/impact` now preview business-type/module deltas before applying settings. Gates: backend typecheck PASS, focused settings suite PASS 20/20, backend suite PASS 327/327, smoke PASS 15/15, frontend typecheck/lint/test PASS, frontend `NEXT_PUBLIC_MOCK=false` build PASS. |
 | Blockers | none |
 
+## Active Claim (session E — capabilities-driven shell + Business Profile settings)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" directive from Sri) |
+| Queue item | Retail-first queue item #3 (frontend consumption): consume `GET /api/v1/capabilities` on the frontend — shell/nav renders from tenant module enablement (four-layer check: tenant modules AND user features), and the Settings modes page becomes a capabilities-driven Business Profile / Plan & Modules view (replaces its hardcoded MODES list) showing business type, active pack, enabled/disabled modules with reasons, and plan summary |
+| Files/areas expected | `web/contexts/CapabilitiesContext.tsx` (new), `web/components/EnterpriseShell.tsx` (nav gating only), `web/app/(protected)/settings/modes/page.tsx`, `web/app/(protected)/layout.tsx` (provider wiring), `web/mocks/mockHandlers.ts` (capabilities handler parity), `web/api-client/types.ts`, new vitest file. NO backend changes, NO `web/e2e/**`, no dev servers/ports, no concurrent `next build`. No overlap with session A's demo-credentials claim (prod DB data only) |
+| Started | 2026-07-04 |
+| Last update | 2026-07-04 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (Codex session K - business capabilities endpoint)
 
 | Field | Value |
