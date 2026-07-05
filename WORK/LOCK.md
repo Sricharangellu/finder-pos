@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `src/identity/signup-provision.test.ts` (NEW file only). No source edits (session E active on `src/modules/settings/**` + web), no `scripts/**`, no `.github/**`, no `web/**` |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `3f669be`: 3/3 on real Postgres. Proves fresh signup → owner + retail-default capabilities → owner can operate their tenant → two independently-registered tenants are isolated (no cross-tenant reads; by-id fetch 404/403). First coverage of the signup provisioning path + tenant isolation from signup. FINDING (not a bug, documented): `tenant.registered` has no listener; business type is lazy read-time default, not provisioned/audited at signup — a future item could persist+audit the initial retail assignment per RULES.md. |
 | Blockers | none |
 
 ## Active Claim (session E — business-profile change contract + audit history)
