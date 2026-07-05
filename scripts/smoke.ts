@@ -166,6 +166,67 @@ async function main() {
   );
   ok(`audit log recorded order.created, payment.captured, order.refunded`);
 
+  // ── Register lifecycle → end-of-day (Z-report) ────────────────────────────
+  // RULES.md core retail flow: open register → sell → close register →
+  // end-of-day report. Prove the drawer reconciliation is internally exact.
+  r = await api("POST", "/api/v1/outlets", { name: "Smoke Outlet" });
+  assert.equal(r.status, 201, `create outlet: ${JSON.stringify(r.json)}`);
+  const outletId = r.json.id;
+  r = await api("POST", `/api/v1/outlets/${outletId}/registers`, { name: "Till S" });
+  assert.equal(r.status, 201, `create register: ${JSON.stringify(r.json)}`);
+  const registerId = r.json.id;
+  r = await api("POST", `/api/v1/outlets/registers/${registerId}/open`, { openingFloatCents: 10000 });
+  assert.equal(r.status, 201, `open session: ${JSON.stringify(r.json)}`);
+  ok(`register opened with $100.00 float`);
+
+  // A cash sale during the session (its own product, kept independent of the
+  // earlier lifecycle so this segment stands alone).
+  r = await api("POST", "/api/v1/catalog", { sku: "SMOKE-Z", name: "Z Item", price_cents: 500, category: "general" });
+  assert.equal(r.status, 201, `z product: ${JSON.stringify(r.json)}`);
+  const zProductId = r.json.id;
+  await api("POST", `/api/v1/inventory/${zProductId}/receive`, { quantity: 5 });
+  r = await api("POST", "/api/v1/orders", { stateCode: "CA", lines: [{ productId: zProductId, quantity: 1 }] });
+  assert.equal(r.status, 201, `z order: ${JSON.stringify(r.json)}`);
+  const zOrder = r.json;
+  r = await api("POST", "/api/v1/payments", { orderId: zOrder.id, method: "cash", tenderedCents: zOrder.total_cents });
+  assert.equal(r.status, 201, `z payment: ${JSON.stringify(r.json)}`);
+  ok(`cash sale rung through the open register`);
+
+  // While OPEN, the report scoped to this register shows the shift open and no
+  // counted drawer yet. Read the expected cash so the close can be exact.
+  r = await api("GET", `/api/v1/reports/end-of-day?registerId=${registerId}`);
+  assert.equal(r.status, 200, `eod(open): ${JSON.stringify(r.json)}`);
+  assert.equal(r.json.status, "open", "shift open before close");
+  assert.equal(r.json.cashDrawer.actualCash_cents, null, "no counted cash while open");
+  assert.equal(r.json.cashDrawer.variance_cents, null, "no variance while open");
+  const expectedCash = r.json.cashDrawer.expectedCash_cents;
+  ok(`end-of-day report (open): expected drawer $${(expectedCash / 100).toFixed(2)}`);
+
+  // Close counting a deliberate $2.50 overage — the Z-report must surface it.
+  const counted = expectedCash + 250;
+  r = await api("POST", `/api/v1/outlets/registers/${registerId}/close`, { countedCashCents: counted });
+  assert.equal(r.status, 200, `close session: ${JSON.stringify(r.json)}`);
+
+  r = await api("GET", `/api/v1/reports/end-of-day?registerId=${registerId}`);
+  assert.equal(r.status, 200, `eod(closed): ${JSON.stringify(r.json)}`);
+  assert.equal(r.json.status, "closed", "shift closed after close");
+  assert.equal(r.json.cashDrawer.actualCash_cents, counted, "counted cash recorded");
+  assert.equal(r.json.cashDrawer.variance_cents, 250, "Z-report surfaces the $2.50 overage");
+  assert.ok(r.json.topItems.length > 0, "top items present");
+  ok(`register closed -> Z-report reconciles: variance +$2.50`);
+
+  // The register lifecycle must be auditable (RULES.md).
+  const regAudit = await db.query<{ action: string }>(
+    `SELECT DISTINCT action FROM audit_log
+     WHERE action IN ('register.session_opened', 'register.session_closed')`,
+  );
+  assert.deepEqual(
+    regAudit.map((a) => a.action).sort(),
+    ["register.session_closed", "register.session_opened"],
+    `register audit incomplete — found: ${JSON.stringify(regAudit)}`,
+  );
+  ok(`audit log recorded register.session_opened + register.session_closed`);
+
   console.log(`\n✅ SMOKE PASSED — ${step} steps, full POS lifecycle verified end-to-end.\n`);
 }
 
