@@ -151,6 +151,9 @@ jobs:
         run: npx tsx scripts/seed-e2e.ts
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_e2e
+          # Opt-in required by the script's production guard — this is the
+          # ephemeral CI Postgres service, never a real database.
+          ALLOW_E2E_SEED: "1"
       # ── Build and start the frontend ────────────────────────────────────────
       - name: Install frontend deps
         run: npm ci --include=dev

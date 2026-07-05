@@ -19,6 +19,20 @@ const DEMO_EMAIL = "owner@finder-pos.dev";
 const DEMO_PASSWORD = "FinderDemo!2026";
 
 async function main() {
+  // SECURITY: this script plants PUBLICLY-KNOWN demo credentials and bypasses
+  // seedDemo()'s production guard. Running it against a real/production database
+  // opens the live site to anyone. Require an explicit opt-in so a stray
+  // `DATABASE_URL=<prod> tsx scripts/seed-e2e.ts` refuses instead of seeding.
+  // The CI e2e job sets ALLOW_E2E_SEED=1 against its ephemeral test database.
+  if (process.env["ALLOW_E2E_SEED"] !== "1") {
+    console.error(
+      "✗ Refusing to seed demo credentials.\n" +
+        "  This inserts known demo logins and bypasses the production guard.\n" +
+        "  Set ALLOW_E2E_SEED=1 ONLY against a disposable test/CI database — never production.",
+    );
+    process.exit(1);
+  }
+
   const db = openDb();
   try {
     const now = Date.now();

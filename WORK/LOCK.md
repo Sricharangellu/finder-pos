@@ -7,12 +7,12 @@ Status: ACTIVE
 | Field | Value |
 |---|---|
 | Agent/session | Claude session A (VSCode) |
-| Queue item | URGENT security: publicly-known demo credentials (owner@ + cashier@finder-pos.dev, password hardcoded in src/identity/service.ts) authenticate against the LIVE real-mode production site. Rotate both password hashes in the production DB to a strong random value; file structural follow-up (seed scripts must not plant known creds in production-like DBs) |
-| Files/areas expected | Production DB data fix (2 rows in users, via Vercel env DATABASE_URL — no schema change), `WORK/WORK_STATE.md`, `WORK/LOCK.md`. NO code edits this claim |
+| Queue item | STRUCTURAL half of the demo-credentials security item: `scripts/seed-e2e.ts` deliberately bypasses the production guard and plants known creds (owner@/cashier@finder-pos.dev) — this is how they reached the live prod DB. Guard it to refuse unless ALLOW_E2E_SEED=1; wire that flag into the CI e2e seed step. (The one-time prod-DB hash rotation is Sri's, Option B, running it manually.) |
+| Files/areas expected | `scripts/seed-e2e.ts` (guard), `.github/workflows/ci.yml` (ALLOW_E2E_SEED=1 on seed step), `WORK/WORK_STATE.md`. Does NOT touch session M's new `scripts/ops-check.ts` or `package.json`. No prod DB edits (Sri owns those) |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE — blocked awaiting Sri's explicit go |
-| Blockers | Permission gate: production-DB mutation (rotating the two demo password hashes) requires Sri's explicit authorization in-session. Sri: reply "rotate the prod demo passwords" to proceed, or run the rotation yourself (script provided in chat). Risk while open: anyone can log into the live site as owner@finder-pos.dev with the password printed in src/identity/service.ts:40 |
+| Status | ACTIVE |
+| Blockers | none. HANDOFF TO SRI: (1) run the Option B rotation script from chat; (2) confirm `NODE_ENV=production` is set in the Vercel backend project env — it governs the seed-boot guard, DB SSL, and secure cookies |
 
 ## Parallel Non-Overlapping Claim (Codex session M - backend operational readiness)
 
