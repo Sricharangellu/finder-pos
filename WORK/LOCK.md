@@ -1,6 +1,6 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: ACTIVE
+Status: FREE
 
 ## Parallel Non-Overlapping Claim (Codex session L - business impact preview)
 
@@ -10,8 +10,8 @@ Status: ACTIVE
 | Queue item | Retail-first queue item #2: read-only business-type/module impact preview for setup/settings/demo switchers before applying changes |
 | Files/areas expected | `src/modules/settings/service.ts`, `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, `src/app.ts` for top-level alias, WORK evidence only. NO frontend UI rewrite, NO e2e specs, NO unrelated domain feature work. |
 | Started | 2026-07-04 15:45 CDT |
-| Last update | 2026-07-05 01:19 CDT |
-| Status | ACTIVE - implementation and gates complete; preparing WORK evidence, commit, and push |
+| Last update | 2026-07-05 01:21 CDT |
+| Status | RELEASED - shipped in `c7b84b5`; read-only `GET /api/v1/capabilities/impact` plus `GET /api/v1/settings/capabilities/impact` now preview business-type/module deltas before applying settings. Gates: backend typecheck PASS, focused settings suite PASS 20/20, backend suite PASS 327/327, smoke PASS 15/15, frontend typecheck/lint/test PASS, frontend `NEXT_PUBLIC_MOCK=false` build PASS. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session K - business capabilities endpoint)
