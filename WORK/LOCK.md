@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — retail setup checklist + honest onboarding)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" directive from Sri) |
+| Queue item | Retail-first queue item (plan "Signup and setup" requirements): (a) retail setup checklist with LIVE completion detection — outlet, register, tax rate, payment modes, receipt, first product, first receiving — surfaced on the dashboard until complete, each task deep-linking to its setup page; (b) onboarding wizard renders business types from the capabilities registry instead of its hardcoded 13-vertical list, marking retail as the completed pack and all others as Preview ("Setup must not present every vertical as equally complete") |
+| Files/areas expected | `web/components/setup/RetailSetupChecklist.tsx` (new), `web/app/(protected)/dashboard/page.tsx` (mount card), `web/app/(protected)/onboarding/page.tsx`, new vitest file. NO backend changes, NO `web/e2e/**`, NO `scripts/**` (session A active there), NO `.github/**` (Codex N active there), no ports, no concurrent `next build` |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — smoke register→EOD coverage)
 
 | Field | Value |
