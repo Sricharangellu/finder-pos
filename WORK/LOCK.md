@@ -22,8 +22,8 @@ Status: ACTIVE
 | Queue item | Backend infra operational readiness: add a deploy/live-backend readiness check and documentation so real backend operations can be verified end to end without touching production demo credentials |
 | Files/areas expected | `scripts/**` ops/readiness checker, `package.json` script wiring if needed, `WORK/WORK_STATE.md`, new audit note, `WORK/LOCK.md`. NO production DB data edits, NO identity/demo credential rotation, NO seed credential changes, NO frontend UI, NO business feature modules. |
 | Started | 2026-07-05 01:23 CDT |
-| Last update | 2026-07-05 01:23 CDT |
-| Status | ACTIVE |
+| Last update | 2026-07-05 01:43 CDT |
+| Status | RELEASED - shipped in `4a72ae5`; added `npm run ops:check`, deployed-backend ops gate wiring, production-safe metrics behavior, default deployed-frontend CORS allowance, and `PG_SSL` override. Gates: backend typecheck PASS, ops/metrics tests PASS 4/4, local production-mode ops check PASS 6/6, focused settings PASS 20/20, backend suite PASS 329/329, smoke PASS 15/15, frontend typecheck/lint/test/build PASS. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session L - business impact preview)
