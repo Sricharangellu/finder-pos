@@ -11,8 +11,8 @@ Status: ACTIVE
 | Files/areas expected | `scripts/seed-e2e.ts` (guard), `.github/workflows/ci.yml` (ALLOW_E2E_SEED=1 on seed step), `WORK/WORK_STATE.md`. Does NOT touch session M's new `scripts/ops-check.ts` or `package.json`. No prod DB edits (Sri owns those) |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
-| Blockers | none. HANDOFF TO SRI: (1) run the Option B rotation script from chat; (2) confirm `NODE_ENV=production` is set in the Vercel backend project env — it governs the seed-boot guard, DB SSL, and secure cookies |
+| Status | RELEASED — structural fix shipped `7715f68`: seed-e2e.ts refuses without ALLOW_E2E_SEED=1 (verified exit 1), CI e2e seed step sets it against its ephemeral DB only; backend typecheck clean. Re-planting is now blocked. |
+| Blockers | OPEN — TWO SRI ACTIONS still required: (1) run the Option B rotation script (from chat) once against the prod DB to close the currently-open door — the code fix stops re-planting but does NOT change the creds already in prod; (2) confirm `NODE_ENV=production` in the Vercel backend project env (governs seed-boot guard, DB SSL, secure cookies). Until (1), owner@finder-pos.dev with the src/identity/service.ts:40 password still logs into the live site. |
 
 ## Parallel Non-Overlapping Claim (Codex session M - backend operational readiness)
 
