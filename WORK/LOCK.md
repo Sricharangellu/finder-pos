@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — store_locations top-level mount fix)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, "do what's best" directive) |
+| Queue item | Real retail-core connection bug (runtime-verified): inventory/locations page calls `/api/v1/product-locations` + `/api/v1/store-locations` (404 on real backend, works only via mock) but the store_locations module serves those routes at `/api/v1/store_locations/...`. The route names are already top-level resource names → intended top-level. Fix: add optional `mountPath` to PosModule; store_locations mounts at `/api/v1` so its routes resolve where the frontend + mocks already expect. Additive (default mount unchanged for all other modules). |
+| Files/areas expected | `src/modules/types.ts` (optional mountPath field), `src/app.ts` (honor mountPath in module loop), `src/modules/store_locations/index.ts` (set mountPath). Backend only. NO `web/**` (frontend + mocks already correct), NO settings module (other sessions) |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — anti-duplication guardrail)
 
 | Field | Value |
