@@ -1,5 +1,5 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-05 (Codex session M, backend operational readiness)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-05 (session E, capabilities-driven shell)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
 
 ---
 
@@ -10,6 +10,23 @@
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
 
+2026-07-05 session E (capabilities-driven shell + Business Profile — full findings in
+`WORK/AUDIT_2026-07-05C.md`): retail-first queue item #3 is **Built and verified**.
+The frontend now renders from the business-pack control plane: new
+`CapabilitiesContext` (tenant layer, fail-open, 5-min cache) feeds a rewired
+`useModuleFlags` (same signature, 5 consumers untouched) and four-layer nav filtering
+in `EnterpriseShell` (moduleGate → capabilities route gate → user feature gate). The
+Settings modes page's hardcoded MODES list is replaced by a capabilities-driven
+Business Profile / Plan & Modules view with a business-type switcher that previews
+impact (`GET /capabilities/impact`) before applying, and per-module toggles with
+source/disabled-reason badges. Mock parity: `GET /capabilities` (+ aliases + impact)
+served from the same in-memory bundle state as the business-profile handlers.
+**Real-backend nav bug fixed:** useModuleFlags previously read raw feature-flags and
+missed business-pack DEFAULTS — a fresh real tenant's nav collapsed to core-only.
+Gates: web tsc 0, Vitest 91/91 (new context tests), lint same 4 pre-existing warnings,
+`NEXT_PUBLIC_MOCK=false` build green, backend tsc 0 (no backend changes). Follow-ups
+noted in the audit: migrate `useAccountMode` onto capabilities.features; retail setup
+task checklist UX; demo switcher Preview labels.
 2026-07-05 Codex session M (backend operational readiness - full findings in
 `WORK/AUDIT_2026-07-05B.md`): production/backend infra readiness is **Built and
 verified as a deploy gate**, not a claim that the whole app is deployment-ready.
