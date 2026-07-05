@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — smoke register→EOD coverage)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Retail golden-path verification gap: `scripts/smoke.ts` exercises login→product→receive→order→payment→refund→audit but NOT the register lifecycle. RULES.md core flow includes "open register → close register → end-of-day report". Extend smoke to open a register, run a cash sale through it, close it counting the drawer, GET /reports/end-of-day, assert the Z-report reconciles + register.session_opened/closed audit rows exist — proving that segment against the real assembled app. |
+| Files/areas expected | `scripts/smoke.ts` ONLY. NOT `.github/workflows/ci.yml` (Codex session N active there — different "smoke": the CI post-deploy HTTP check). No `web/**`, no other src, no `scripts/ops-check.ts` |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (Codex session N - production smoke auth alignment)
 
 | Field | Value |
