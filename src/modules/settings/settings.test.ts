@@ -345,3 +345,69 @@ test("invalid edition is rejected with 400", async () => {
   const r = await call(app, "POST", "/api/settings/edition", { edition: "invalid" });
   assert.equal(r.status, 400);
 });
+
+// ─── Business profile: moduleFlags delta + audit trail ───────────────────────
+
+test("moduleFlags-only POST toggles one module without resetting the profile", async () => {
+  const app = await freshApp();
+
+  // Baseline: retail default — loyalty enabled by the pack, tables disabled.
+  let caps = await call(app, "GET", "/api/settings/capabilities");
+  assert.equal(caps.json.business.type, "retail");
+  const before = new Map(caps.json.modules.map((m: { key: string; enabled: boolean }) => [m.key, m.enabled]));
+  assert.equal(before.get("loyalty"), true, "retail pack enables loyalty");
+
+  // Delta update: disable loyalty only — no businessType in the body.
+  const r = await call(app, "POST", "/api/settings/business-profile", {
+    moduleFlags: { loyalty: false },
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ok, true);
+  assert.equal(r.json.businessType, "retail", "type unchanged by a module toggle");
+
+  caps = await call(app, "GET", "/api/settings/capabilities");
+  const after = new Map(caps.json.modules.map((m: { key: string; enabled: boolean }) => [m.key, m.enabled]));
+  assert.equal(after.get("loyalty"), false, "loyalty disabled");
+  assert.equal(caps.json.business.type, "retail", "business type untouched");
+  // Every OTHER module keeps its previous state — delta, not reset.
+  for (const [key, was] of before) {
+    if (key === "loyalty") continue;
+    assert.equal(after.get(key), was, `module '${key}' unchanged by the delta update`);
+  }
+
+  // "module:"-prefixed keys are accepted too (mock-layer convention).
+  const r2 = await call(app, "POST", "/api/settings/business-profile", {
+    moduleFlags: { "module:loyalty": true },
+  });
+  assert.equal(r2.status, 200);
+  caps = await call(app, "GET", "/api/settings/capabilities");
+  const restored = caps.json.modules.find((m: { key: string }) => m.key === "loyalty");
+  assert.equal(restored.enabled, true, "prefixed key re-enabled loyalty");
+});
+
+test("empty business-profile POST is rejected with 400", async () => {
+  const app = await freshApp();
+  const r = await call(app, "POST", "/api/settings/business-profile", {});
+  assert.equal(r.status, 400);
+});
+
+test("business-profile changes are audit-logged with actor and timestamp", async () => {
+  const app = await freshApp();
+
+  // Type switch + a module toggle.
+  let r = await call(app, "POST", "/api/settings/business-profile", { businessType: "wholesale" });
+  assert.equal(r.status, 200);
+  r = await call(app, "POST", "/api/settings/business-profile", { moduleFlags: { quotes: false } });
+  assert.equal(r.status, 200);
+
+  const log = await call(app, "GET", "/api/audit-log?resource_type=business_profile&limit=10");
+  assert.equal(log.status, 200);
+  const actions = log.json.items.map((e: { action: string }) => e.action);
+  assert.ok(actions.includes("business_profile.type_changed"), "type change audited");
+  assert.ok(actions.includes("business_profile.modules_changed"), "module toggle audited");
+
+  const typeChange = log.json.items.find((e: { action: string }) => e.action === "business_profile.type_changed");
+  assert.ok(typeChange.actor.id, "actor recorded");
+  assert.ok(typeChange.created_at > 0, "timestamp recorded");
+  assert.equal(typeChange.changes.businessType.to, "wholesale", "diff shows the new type");
+});

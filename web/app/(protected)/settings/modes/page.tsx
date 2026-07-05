@@ -14,7 +14,7 @@
  * bundles, and module states all come from the capabilities contract.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { apiGet, apiPost } from "@/api-client/client";
@@ -23,6 +23,70 @@ import type {
   CapabilitiesImpactResponse,
   CapabilityModule,
 } from "@/api-client/types";
+
+// ── Recent business-profile changes (audit trail) ─────────────────────────────
+
+interface BusinessProfileAuditEvent {
+  id: string;
+  actor: { id: string; email: string | null; role: string | null };
+  action: string;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  created_at: number;
+}
+
+function describeChange(event: BusinessProfileAuditEvent): string {
+  if (event.action === "business_profile.type_changed") {
+    const c = event.changes?.["businessType"];
+    return c ? `Business type: ${String(c.from ?? "—")} → ${String(c.to)}` : "Business type changed";
+  }
+  const parts = Object.entries(event.changes ?? {}).map(
+    ([key, c]) => `${key} ${c.to === true || c.to === "true" ? "enabled" : "disabled"}`,
+  );
+  return parts.length > 0 ? `Modules: ${parts.join(", ")}` : "Modules changed";
+}
+
+function RecentProfileChanges({ refreshToken }: { refreshToken: number }) {
+  const [events, setEvents] = useState<BusinessProfileAuditEvent[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<{ items: BusinessProfileAuditEvent[] }>(
+      "/api/v1/audit-log?resource_type=business_profile&limit=8",
+    )
+      .then((r) => { if (!cancelled) setEvents(r.items); })
+      .catch(() => { if (!cancelled) setEvents([]); });
+    return () => { cancelled = true; };
+  }, [refreshToken]);
+
+  if (events === null || events.length === 0) return null;
+
+  return (
+    <section aria-label="Recent business profile changes" className="mt-6">
+      <h2 className="mb-1 text-sm font-semibold text-[#111]">Recent changes</h2>
+      <p className="mb-3 text-xs text-slate-500">
+        Business-type and module changes, with who made them and when.
+      </p>
+      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
+        {events.map((event) => (
+          <li key={event.id} className="flex items-start justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm text-[#111]">{describeChange(event)}</p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                by {event.actor.email ?? event.actor.id}
+              </p>
+            </div>
+            <time
+              dateTime={new Date(event.created_at).toISOString()}
+              className="shrink-0 text-xs text-slate-400"
+            >
+              {new Date(event.created_at).toLocaleString()}
+            </time>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +146,7 @@ export default function BusinessProfilePage() {
   const [impactLoading, setImpactLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [auditRefresh, setAuditRefresh] = useState(0);
 
   const groups = useMemo(() => {
     if (!capabilities) return [] as Array<{ key: string; label: string; modules: CapabilityModule[] }>;
@@ -125,6 +190,7 @@ export default function BusinessProfilePage() {
       await apiPost("/api/v1/settings/business-profile", { businessType: switchTarget });
       setSwitchTarget(null);
       setImpact(null);
+      setAuditRefresh((n) => n + 1);
       await refresh();
     } catch {
       setError("Could not switch business type. Please try again.");
@@ -139,6 +205,7 @@ export default function BusinessProfilePage() {
     setError(null);
     try {
       await apiPost("/api/v1/settings/business-profile", { moduleFlags: { [mod.key]: on } });
+      setAuditRefresh((n) => n + 1);
       await refresh();
     } catch {
       setError(`Could not ${on ? "enable" : "disable"} ${mod.name}. Please try again.`);
@@ -320,6 +387,9 @@ export default function BusinessProfilePage() {
             </div>
           </section>
         )}
+
+        {/* ── Recent changes (audit trail) ────────────────────────────── */}
+        {capabilities && <RecentProfileChanges refreshToken={auditRefresh} />}
 
       </div>
     </EnterpriseShell>

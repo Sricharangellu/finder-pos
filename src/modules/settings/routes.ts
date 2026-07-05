@@ -160,60 +160,118 @@ export function registerRoutes(router: Router, service: SettingsService): void {
 
   /**
    * POST /settings/business-profile
-   * Sets the business type and enables the corresponding module bundle.
-   * Managers and owners can additionally toggle individual modules.
-   * body: { businessType, enabledModules?: string[] }
+   * Two update shapes, matching the Business Profile settings page:
+   *   { businessType, enabledModules?: string[] } — switch business type;
+   *     resets module flags to the bundle (or the provided list).
+   *   { moduleFlags: { [key]: boolean } } — delta update: toggle individual
+   *     modules WITHOUT changing the business type or other flags. Keys may
+   *     be bare module keys or "module:"-prefixed.
+   * Both may be combined (type switch first, then per-module overrides).
+   * Every change is audit-logged with the acting user (Settings requirement:
+   * "last business-type/module changes with actor and timestamp").
    */
   router.post(
     "/business-profile",
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(
-        z.object({
-          businessType: z.enum(businessTypeValues),
-          enabledModules: z.array(z.string().min(1)).optional(),
-        }),
+        z
+          .object({
+            businessType: z.enum(businessTypeValues).optional(),
+            enabledModules: z.array(z.string().min(1)).optional(),
+            moduleFlags: z.record(z.boolean()).optional(),
+          })
+          .refine(
+            (b) => b.businessType !== undefined || b.moduleFlags !== undefined || b.enabledModules !== undefined,
+            { message: "provide businessType, enabledModules, or moduleFlags" },
+          ),
         req.body,
       );
 
       const t = tenantId(res);
-      const bundle = BUSINESS_BUNDLES[body.businessType];
+      const actorId = auth(res).userId ?? "system";
+      const previous = (await service.getBusiness(t)) as { businessType?: string };
+      const flagUpdates: Record<string, boolean> = {};
+      let enabledModulesOut: string[] | undefined;
 
-      // Start from the bundle's default modules, or the provided list for "custom"
-      const desiredModules = new Set(
-        body.enabledModules ?? bundle?.modules ?? [],
-      );
+      if (body.businessType) {
+        const bundle = BUSINESS_BUNDLES[body.businessType];
 
-      // Core modules are always on
-      for (const core of CORE_MODULES) desiredModules.add(core);
+        // Start from the bundle's default modules, or the provided list for "custom"
+        const desiredModules = new Set(body.enabledModules ?? bundle?.modules ?? []);
 
-      // Build flag updates: enable desired modules, disable others
-      const flagUpdates: Record<string, boolean> = {
-        business_type_retail:      body.businessType === "retail" || body.businessType === "hybrid",
-        business_type_restaurant:  body.businessType === "restaurant",
-        business_type_wholesale:   body.businessType === "wholesale" || body.businessType === "hybrid",
-        business_type_golf:        body.businessType === "golf",
+        // Core modules are always on
+        for (const core of CORE_MODULES) desiredModules.add(core);
+
+        // Build flag updates: enable desired modules, disable others
+        flagUpdates["business_type_retail"] = body.businessType === "retail" || body.businessType === "hybrid";
+        flagUpdates["business_type_restaurant"] = body.businessType === "restaurant";
+        flagUpdates["business_type_wholesale"] = body.businessType === "wholesale" || body.businessType === "hybrid";
+        flagUpdates["business_type_golf"] = body.businessType === "golf";
         // Legacy edition flags — keep compatible
-        groupRetailPOS:   desiredModules.has("pos_terminal"),
-        groupWholesale:   desiredModules.has("sales_orders") || desiredModules.has("purchasing"),
-        groupEnterprise:  desiredModules.has("sso") || desiredModules.has("webhooks"),
-      };
+        flagUpdates["groupRetailPOS"] = desiredModules.has("pos_terminal");
+        flagUpdates["groupWholesale"] = desiredModules.has("sales_orders") || desiredModules.has("purchasing");
+        flagUpdates["groupEnterprise"] = desiredModules.has("sso") || desiredModules.has("webhooks");
 
-      // Set module feature flags
-      for (const mod of MODULE_REGISTRY) {
-        if (!mod.core) {
-          flagUpdates[moduleFlag(mod.key)] = desiredModules.has(mod.key);
+        // Set module feature flags
+        for (const mod of MODULE_REGISTRY) {
+          if (!mod.core) {
+            flagUpdates[moduleFlag(mod.key)] = desiredModules.has(mod.key);
+          }
+        }
+
+        enabledModulesOut = Array.from(desiredModules);
+
+        // Persist the business type via the existing business KV store
+        await service.setBusiness({ businessType: body.businessType }, t);
+      }
+
+      // enabledModules WITHOUT a type switch = explicit module set (mock
+      // parity): enable exactly the listed modules, disable the rest.
+      const moduleChanges: Record<string, boolean> = {};
+      if (!body.businessType && body.enabledModules) {
+        const desired = new Set(body.enabledModules);
+        for (const core of CORE_MODULES) desired.add(core);
+        for (const mod of MODULE_REGISTRY) {
+          if (mod.core) continue;
+          flagUpdates[moduleFlag(mod.key)] = desired.has(mod.key);
+          moduleChanges[mod.key] = desired.has(mod.key);
         }
       }
 
-      // Persist the business type via the existing business KV store
-      await service.setBusiness({ businessType: body.businessType }, t);
-      await service.setFlags(flagUpdates as Record<string, boolean>, t);
+      // Per-module delta overrides — applied on top of (or without) a type
+      // switch; never resets flags that weren't named.
+      if (body.moduleFlags) {
+        for (const [rawKey, on] of Object.entries(body.moduleFlags)) {
+          const key = rawKey.startsWith("module:") ? rawKey.slice(7) : rawKey;
+          if (CORE_MODULES.has(key)) continue; // core modules cannot be disabled
+          flagUpdates[moduleFlag(key)] = on;
+          moduleChanges[key] = on;
+        }
+      }
+
+      if (Object.keys(flagUpdates).length > 0) {
+        await service.setFlags(flagUpdates, t);
+      }
+
+      // Audit trail — best-effort, never fails the mutation.
+      if (body.businessType && body.businessType !== previous.businessType) {
+        await service.auditBusinessProfileChange(t, actorId, "business_profile.type_changed", {
+          before: { businessType: previous.businessType ?? "retail" },
+          after: { businessType: body.businessType },
+        });
+      }
+      if (Object.keys(moduleChanges).length > 0) {
+        await service.auditBusinessProfileChange(t, actorId, "business_profile.modules_changed", {
+          after: moduleChanges,
+        });
+      }
 
       res.json({
         ok: true,
-        businessType: body.businessType,
-        enabledModules: Array.from(desiredModules),
+        businessType: body.businessType ?? previous.businessType ?? "retail",
+        ...(enabledModulesOut ? { enabledModules: enabledModulesOut } : {}),
+        ...(Object.keys(moduleChanges).length > 0 ? { moduleChanges } : {}),
       });
     }),
   );

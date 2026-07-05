@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { badRequest, notFound } from "../../shared/http.js";
+import { writeAudit } from "../../shared/audit.js";
 import {
   BUSINESS_BUNDLES,
   CORE_MODULES,
@@ -263,6 +264,27 @@ export class SettingsService {
     await this.kvSet("business", merged, tenantId);
     return merged;
   }
+
+  /** Audit a business-type or module-flag change (Settings requirement:
+   *  "last business-type/module changes with actor and timestamp").
+   *  Best-effort via writeAudit — never fails the mutation it records. */
+  async auditBusinessProfileChange(
+    tenantId: string,
+    actorId: string,
+    action: "business_profile.type_changed" | "business_profile.modules_changed",
+    detail: { before?: unknown; after?: unknown },
+  ): Promise<void> {
+    await writeAudit(this.db, {
+      tenantId,
+      actorId,
+      action,
+      entityType: "business_profile",
+      entityId: "business_profile",
+      before: detail.before,
+      after: detail.after,
+    });
+  }
+
   async getFlags(tenantId: string) {
     const flags = { ...DEFAULT_FLAGS, ...(await this.kvGet("feature_flags", tenantId, {} as Record<string, boolean>)) };
     const accountMode = flags["groupEnterprise"] ? "ENTERPRISE" : flags["groupWholesale"] ? "WHOLESALE" : "RETAIL";

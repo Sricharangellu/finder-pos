@@ -153,6 +153,23 @@ function buildFeatureFlags(type: string, extraEnabled: Set<string>): Record<stri
 let featureFlags: Record<string, boolean> = buildFeatureFlags("retail", new Set());
 let businessProfile: Record<string, unknown> = {};
 let _btLocked = false; // locked after first setup — only support can change
+// Business-profile audit trail — merged into the /audit-log feed so the
+// Business Profile page's Recent Changes section works in mock mode too.
+const _bpAuditEvents: Array<Record<string, unknown>> = [];
+let _bpAuditSeq = 0;
+function pushBpAudit(action: string, changes: Record<string, { from: unknown; to: unknown }>): void {
+  _bpAuditEvents.push({
+    id: `aud_bp_${++_bpAuditSeq}`,
+    actor: { id: "usr_demo_owner", email: "owner@finder-pos.dev", role: "owner" },
+    action,
+    resource_type: "business_profile",
+    resource_id: "business_profile",
+    resource_label: "Business Profile",
+    changes,
+    ip_address: null,
+    created_at: Date.now(),
+  });
+}
 // ── UX-2: Module marketplace state ─────────────────────────────────────────
 type _BPMod = { key: string; name: string; description: string; group: string; core?: boolean; route?: string };
 const _BP_CATALOG: _BPMod[] = [
@@ -2646,19 +2663,24 @@ mockHandlers.push(
     const body = (await request.json()) as { businessType?: string; moduleFlags?: Record<string, boolean>; enabledModules?: string[]; lock?: boolean };
 
     if (body.businessType && body.businessType !== _bpType) {
+      const prevType = _bpType;
       // Apply the bundle for the new business type — this wires the nav immediately.
       _bpType = body.businessType;
       _bpEnabled = new Set(BT_BUNDLES[_bpType] ?? []);
       featureFlags = buildFeatureFlags(_bpType, new Set());
+      pushBpAudit("business_profile.type_changed", { businessType: { from: prevType, to: _bpType } });
     }
 
     // Fine-grained module toggles (within the current type's bundle).
     if (body.moduleFlags) {
+      const moduleChanges: Record<string, { from: unknown; to: unknown }> = {};
       for (const [fk, on] of Object.entries(body.moduleFlags)) {
         const key = fk.startsWith("module:") ? fk.slice(7) : fk;
+        moduleChanges[key] = { from: _bpEnabled.has(key), to: on };
         if (on) { _bpEnabled.add(key); featureFlags[`module:${key}`] = true; }
         else    { _bpEnabled.delete(key); delete featureFlags[`module:${key}`]; }
       }
+      pushBpAudit("business_profile.modules_changed", moduleChanges);
     } else if (body.enabledModules) {
       const extra = new Set(body.enabledModules.filter(k => !_BP_CORE_KEYS.has(k)));
       _bpEnabled = extra;
@@ -3915,7 +3937,8 @@ mockHandlers.push(
         const action = url.searchParams.get("action");
         const limit = Number(url.searchParams.get("limit") ?? 50);
         const offset = Number(url.searchParams.get("offset") ?? 0);
-        let filtered = [...events];
+        // Include live business-profile change events (see pushBpAudit).
+        let filtered = [...events, ...(_bpAuditEvents as unknown as typeof events)];
         if (actor) filtered = filtered.filter(e => e.actor.email.includes(actor));
         if (resource_type) filtered = filtered.filter(e => e.resource_type === resource_type);
         if (action) filtered = filtered.filter(e => e.action === action);
