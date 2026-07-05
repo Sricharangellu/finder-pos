@@ -11,6 +11,18 @@ Status: ACTIVE
 | Files/areas expected | Production DB data fix (2 rows in users, via Vercel env DATABASE_URL — no schema change), `WORK/WORK_STATE.md`, `WORK/LOCK.md`. NO code edits this claim |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
+| Status | ACTIVE — blocked awaiting Sri's explicit go |
+| Blockers | Permission gate: production-DB mutation (rotating the two demo password hashes) requires Sri's explicit authorization in-session. Sri: reply "rotate the prod demo passwords" to proceed, or run the rotation yourself (script provided in chat). Risk while open: anyone can log into the live site as owner@finder-pos.dev with the password printed in src/identity/service.ts:40 |
+
+## Parallel Non-Overlapping Claim (Codex session M - backend operational readiness)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session M |
+| Queue item | Backend infra operational readiness: add a deploy/live-backend readiness check and documentation so real backend operations can be verified end to end without touching production demo credentials |
+| Files/areas expected | `scripts/**` ops/readiness checker, `package.json` script wiring if needed, `WORK/WORK_STATE.md`, new audit note, `WORK/LOCK.md`. NO production DB data edits, NO identity/demo credential rotation, NO seed credential changes, NO frontend UI, NO business feature modules. |
+| Started | 2026-07-05 01:23 CDT |
+| Last update | 2026-07-05 01:23 CDT |
 | Status | ACTIVE |
 | Blockers | none |
 
