@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `src/modules/types.ts` (optional mountPath field), `src/app.ts` (honor mountPath in module loop), `src/modules/store_locations/index.ts` (set mountPath). Backend only. NO `web/**` (frontend + mocks already correct), NO settings module (other sessions) |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `ae79907`: PosModule.mountPath (default unchanged); store_locations → `/api/v1`. Runtime-verified /api/v1/product-locations + store-locations + /map now 200 (were 404), core endpoints uncollided, smoke 20/20, typecheck clean. Retail-core inventory/locations page now works against the real backend, not just mocks. REMAINING connection gaps (runtime-confirmed, documented for future items): `/api/v1/promotions/*` real gap (full promotions UI, backend has `discounts` instead — Promotion Engine domain); `/warehouse` `/pricing` `/golf` `/documents` are expected Preview verticals / unbuilt domains per RULES.md (UI-only by design until their phase — NOT bugs). |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — anti-duplication guardrail)
