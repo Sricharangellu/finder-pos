@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — business-profile change contract + audit history)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" directive from Sri) |
+| Queue item | Retail-first Settings requirement ("last business-type/module changes with actor and timestamp") + real drift bug: real `POST /settings/business-profile` requires businessType and ignores `moduleFlags`, so the Business Profile page's per-module toggles only work against the mock (400 on real backend) and a type switch resets ALL manual overrides. Fix: accept optional `moduleFlags` delta updates (businessType optional when toggling), write audit_log rows for business-type/module changes with real actor ids, and show a Recent Changes section on the Business Profile page reading GET /audit-log |
+| Files/areas expected | `src/modules/settings/routes.ts`, `src/modules/settings/settings.test.ts`, `web/app/(protected)/settings/modes/page.tsx` (Recent changes section), `web/mocks/mockHandlers.ts` (parity), WORK evidence. NO `scripts/**`, NO `.github/**`, NO e2e, no ports, no concurrent `next build` |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — retail setup checklist + honest onboarding)
 
 | Field | Value |
