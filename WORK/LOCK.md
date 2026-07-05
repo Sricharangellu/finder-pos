@@ -23,7 +23,7 @@ Status: ACTIVE
 | Files/areas expected | `scripts/smoke.ts` ONLY. NOT `.github/workflows/ci.yml` (Codex session N active there — different "smoke": the CI post-deploy HTTP check). No `web/**`, no other src, no `scripts/ops-check.ts` |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `3a03fb9`: smoke now 20 steps, adds register open→cash sale→close→EOD Z-report reconciliation (exact variance +$2.50) + register audit assertions. The core retail "close register → end-of-day report" segment is now proven against the assembled app on every CI push. Verified green on real Postgres, typecheck clean. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (Codex session N - production smoke auth alignment)
