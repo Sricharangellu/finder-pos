@@ -22,8 +22,8 @@ Status: ACTIVE
 | Queue item | Fix red post-deploy smoke after session M: `/api/v1/flags` is intentionally authenticated in production, so CI must assert 401 auth-boundary behavior instead of expecting public 200 |
 | Files/areas expected | `.github/workflows/ci.yml`, `WORK/WORK_STATE.md`, new audit note, `WORK/LOCK.md`. NO backend source changes, NO seed scripts, NO production DB edits, NO frontend UI. |
 | Started | 2026-07-05 01:52 CDT |
-| Last update | 2026-07-05 01:52 CDT |
-| Status | ACTIVE |
+| Last update | 2026-07-05 01:55 CDT |
+| Status | RELEASED - shipped in `64fdc78`; post-deploy smoke now asserts unauthenticated `/api/v1/flags` returns 401 instead of expecting public 200. Verification: live flags auth-boundary curl PASS (`401`), `git diff --check` PASS. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — seed-demo production guard)
