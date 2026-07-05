@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `.gitignore`, `.github/workflows/ci.yml` (append to existing guard job), `AGENTS.md` (additive section). No `src/**`, no `web/**`, no other WORK docs |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `b257f9a`: `.gitignore` blocks `* N.<ext>` copy junk + `*.collision-backup.md`; CI guard fails on any tracked duplicate/backup file and on >1 AGENTS.md; AGENTS.md documents one-agent-file / one-plan / one-canonical-checkout (git worktree, never a second clone). Verified: check-ignore blocks a sample, guard catches a force-add, passes clean, YAML valid. HANDOFF TO SRI: consolidate to ONE checkout — the divergent `finder-pos-github` clone should be abandoned (or its unpushed consolidation pulled here then deleted); use git worktree for future parallelism. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — Stripe webhook verification test)
