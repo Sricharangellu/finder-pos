@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — anti-duplication guardrail)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, "make sure this doesn't happen again" directive) |
+| Queue item | Structural prevention so the recurring duplicate-file / multi-checkout collision mess cannot recur: (1) `.gitignore` the export/copy junk pattern (`* 2.*`, `*.collision-backup.md`) so it never gets tracked or clutters `git status`/blocks rebases; (2) CI `guard` job fails on any tracked duplicate-suffix / collision-backup file; (3) AGENTS.md gains a concise repo-hygiene + single-canonical-checkout rule (use `git worktree`, never a second clone). Works ONLY in this checkout (finder-pos), per Sri. |
+| Files/areas expected | `.gitignore`, `.github/workflows/ci.yml` (append to existing guard job), `AGENTS.md` (additive section). No `src/**`, no `web/**`, no other WORK docs |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — Stripe webhook verification test)
 
 | Field | Value |
