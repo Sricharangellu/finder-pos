@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## EXCLUSIVE Claim (session A — Foundation Hardening initiative) — OTHER SESSIONS STAND DOWN
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, Sri: "do as u recommend" → run WORK/FOUNDATION_HARDENING.md) |
+| Queue item | Execute the whole-repo Foundation Hardening initiative (`WORK/FOUNDATION_HARDENING.md`, sections 0–8): cleanup/de-dup, governance consolidation (one agent file + one plan, collision-proof audits), backend↔frontend end-to-end wiring + mock/real drift fixes, structure streamlining. Board confirmed clear before claiming. |
+| Files/areas expected | **BROAD / whole tree** — `WORK/**`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`, `web/**`, `src/**`, `scripts/**` as needed. This is an EXCLUSIVE claim: no other session should start work until released. Executing in phases; presenting a restructure plan to Sri before moving files (per the spec). |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE — EXCLUSIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — persist foundation-hardening initiative)
 
 | Field | Value |
