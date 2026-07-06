@@ -31,6 +31,7 @@ import { auditLogModule } from "./audit_log/index.js";
 import { loyaltyModule } from "./loyalty/index.js";
 import { rlsModule } from "./rls/index.js";
 import { storeLocationsModule } from "./store_locations/index.js";
+import { permissionRequestsModule } from "./permission_requests/index.js";
 import { productBatchesModule } from "./product_batches/index.js";
 import { customerInvoicesModule } from "./customer_invoices/index.js";
 import { serviceOrdersModule } from "./service_orders/index.js";
@@ -82,6 +83,7 @@ export const modules: PosModule[] = [
   auditLogModule,
   loyaltyModule,
   storeLocationsModule,
+  permissionRequestsModule,
   productBatchesModule,
   customerInvoicesModule,
   serviceOrdersModule,

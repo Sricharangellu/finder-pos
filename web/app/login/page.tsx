@@ -3,7 +3,7 @@
 /**
  * /login — enterprise sign-in page.
  *
- * - Calls POST /api/v1/auth/login (mocked by MSW in dev)
+ * - Authenticates via POST /api/identity/login (MSW-mocked in demo mode)
  * - On success, stores the token in memory + sessionStorage (refresh token)
  *   and redirects to the terminal
  * - SSO/SAML providers are presented per the enterprise login spec but are
