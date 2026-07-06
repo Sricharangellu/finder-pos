@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `src/identity/service.ts` (new neutralize method), `src/identity/index.ts` (call after seedDemo), new focused test. Identity module only — board free. NO settings/web/scripts |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `51e7449`: production boot scrambles demo accounts still carrying the published password. 3/3 tests, smoke 20/20, typecheck clean. Takes effect on next production deploy; live login re-verified after deploy (see WORK_STATE). The demo-credentials queue item is now fully closed autonomously — seed guards prevent re-planting, boot guard neutralizes already-planted. NODE_ENV=production confirmed active (Secure cookies). |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — store_locations top-level mount fix)
