@@ -23,7 +23,7 @@ Status: ACTIVE
 | Files/areas expected | NEW `src/modules/permission_requests/{index,service,routes,permission-requests.test}.ts`; `src/modules/index.ts` (register); `web/app/login/page.tsx` (comment only). NO other web app pages, NO settings module, NO promotions |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `d81cc14`: real permission_requests backend module (2 tables, 6 endpoints, mounted at /api/v1/permission-requests via mountPath, tenant-scoped + RBAC + audit + state-machine). Focused suite 3/3, backend typecheck clean, smoke 20/20. Auth login JSDoc comment fixed. DEFERRED (documented in wiring-matrix audit, not half-built): full Promotion Engine + MFA backup-codes. |
 | Blockers | none |
 
 ## EXCLUSIVE Claim (session A — Foundation Hardening initiative) — RELEASED
