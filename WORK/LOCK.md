@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — persist foundation-hardening initiative)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode) |
+| Queue item | Persist Sri's foundation-hardening / cleanup / end-to-end-wiring spec into the canonical docs so it can be executed later as a SINGLE EXCLUSIVE claim when the board is clear (running it now would collide with parallel sessions). New `WORK/FOUNDATION_HARDENING.md` (verbatim spec + how-to-run), referenced from `WORK/FORWARD_PLAN.md` (queued initiative) and `AGENTS.md` (marching orders). Docs only — NOT executing the restructure. |
+| Files/areas expected | `WORK/FOUNDATION_HARDENING.md` (new), `WORK/FORWARD_PLAN.md` (add pointer), `AGENTS.md` (add pointer). No src/web/scripts |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — production demo-account neutralization)
 
 | Field | Value |
