@@ -1,6 +1,18 @@
 # FinderPOS — Multi-Agent Work Lock
 
-Status: FREE
+Status: ACTIVE
+
+## Parallel Non-Overlapping Claim (session A — permission-requests backend + auth fix)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, "build/fix what's required" from wiring matrix) |
+| Queue item | Close the RBAC wiring gap: build the real `permission-requests` backend module (was UI+mock only, 404 on real backend) matching the mock contract — list/create/get/approve/reject/revoke + permission_overrides, tenant-scoped, RBAC-guarded, audit-logged, mounted at `/api/v1/permission-requests` via mountPath. Plus fix the stale `/api/v1/auth/login` JSDoc comment. DEFER (documented, not half-built): full Promotion Engine (large feature expansion) + MFA backup-codes (needs login-flow consumption). |
+| Files/areas expected | NEW `src/modules/permission_requests/{index,service,routes,permission-requests.test}.ts`; `src/modules/index.ts` (register); `web/app/login/page.tsx` (comment only). NO other web app pages, NO settings module, NO promotions |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
 
 ## EXCLUSIVE Claim (session A — Foundation Hardening initiative) — RELEASED
 
