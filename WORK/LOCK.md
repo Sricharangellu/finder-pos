@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — persist verified prod findings to standing surface)
+## Released Claim (session E — persist verified prod findings to standing surface)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `WORK/WORK_STATE.md` ONLY (docs). NO src, NO web, NO scripts — no overlap with session A's permission_requests module |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `8460d72`: standing "Open Production Actions (Sri only)" block at the top of WORK/WORK_STATE.md, re-verified live 2026-07-06 (demo creds now 401 = RESOLVED; finder-pos.vercel.app still 500 = orphaned project, open). Also saved to cross-session memory. Docs only. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — permission-requests backend + auth fix)

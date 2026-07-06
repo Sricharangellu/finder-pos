@@ -1,5 +1,27 @@
 # FinderPOS — Work State
-> Last updated: 2026-07-05 (Codex session O, retail-first E2E CI follow-up)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+> Last updated: 2026-07-06 (session E, standing prod-actions surface)  |  Location: `WORK/` (canonical AI work folder — see `WORK/README.md`)
+
+---
+
+## ⚠️ OPEN PRODUCTION ACTIONS — Sri only (re-verified 2026-07-06)
+
+Live production exposures that CODE CANNOT close — they need a human with prod access.
+Every session: re-probe before assuming these are resolved, and update this block.
+
+- 🔴 **`finder-pos.vercel.app` returns HTTP 500.** This is a STALE/ORPHANED Vercel
+  project outside the CI deploy pipeline. The pipeline builds + aliases
+  **`finder-pos-frontend.vercel.app`** (healthy, 200, wired to the backend). Anyone
+  visiting the "obvious" URL sees a crash. FIX: delete the orphaned project OR repoint
+  its domain to the current frontend deployment. NOTE: `src/app.ts` CORS allowlist +
+  email-reset fallback still name `finder-pos.vercel.app` as canonical, so pick ONE
+  canonical host and make it consistent.
+- 🟡 **Confirm `NODE_ENV=production`** on the Vercel backend project (governs seed-boot
+  guard, DB SSL, secure cookies).
+- 🟡 **`METRICS_TOKEN` unset in prod** — `/metrics` is correctly closed (503) but no
+  scraper can read it until set. Non-blocking.
+- ✅ **Demo credentials rotated (RESOLVED 2026-07-06).** `owner@finder-pos.dev` now
+  returns 401 on the live backend — Sri ran the rotation. Code guards (seed-e2e /
+  seed-demo refuse without opt-in) remain in place to prevent re-planting.
 
 ---
 
