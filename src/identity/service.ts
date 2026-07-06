@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { DB } from "../shared/db.js";
 import type { EventBus } from "../shared/events.js";
 import { sendEmail } from "../shared/email.js";
+import { moduleLogger } from "../shared/logger.js";
 import { HttpError } from "../shared/http.js";
 import type { Role, TokenClaims, UserRow, AuditLogRow } from "./types.js";
 import { hasRole } from "./types.js";
@@ -352,6 +353,42 @@ export class IdentityService {
         "INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at) VALUES (@id, @t, @e, @h, @r, @c, @u) ON CONFLICT (tenant_id, email) DO NOTHING",
         { id: u.id, t: DEMO_TENANT_ID, e: u.email, h: hash, r: u.role, c: now, u: now },
       );
+    }
+  }
+
+  /**
+   * Defense-in-depth for production: seed guards prevent NEW demo accounts, but
+   * any demo user already planted in a production database (e.g. by an old
+   * seed-e2e run) would still accept the well-known password that is committed
+   * in plaintext in this repo. On production boot, detect demo users that still
+   * carry the published DEMO_PASSWORD and scramble their hash to a random,
+   * unknown value so the published password stops working.
+   *
+   * Idempotent: once scrambled, bcrypt.compare no longer matches, so it becomes
+   * a no-op. Only runs in production — test/CI/dev demo login is untouched.
+   */
+  async neutralizeDemoAccountsInProduction(): Promise<void> {
+    if (process.env["NODE_ENV"] !== "production") return;
+    const { default: bcrypt } = await import("bcryptjs");
+    const { randomBytes } = await import("node:crypto");
+    const demoEmails = ["owner@finder-pos.dev", "cashier@finder-pos.dev"];
+    for (const email of demoEmails) {
+      try {
+        const row = await this.db.one<{ id: string; password_hash: string }>(
+          "SELECT id, password_hash FROM users WHERE email = @email",
+          { email },
+        );
+        if (!row) continue;
+        if (!(await bcrypt.compare(DEMO_PASSWORD, row.password_hash))) continue; // already safe
+        const scrambled = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
+        await this.db.query(
+          "UPDATE users SET password_hash = @h, updated_at = @now WHERE id = @id",
+          { h: scrambled, now: Date.now(), id: row.id },
+        );
+        moduleLogger("identity").warn({ email }, "neutralized seeded demo account carrying the published password (production)");
+      } catch {
+        // Never block startup on this best-effort cleanup.
+      }
     }
   }
 

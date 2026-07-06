@@ -10,6 +10,9 @@ export const identityModule: PosModule = {
     const service = new IdentityService(db, events);
     // Idempotent demo seed (only runs when the users table is empty).
     await service.seedDemo();
+    // Production defense-in-depth: neutralize any pre-existing demo account that
+    // still carries the published password (no-op outside production).
+    await service.neutralizeDemoAccountsInProduction();
     registerIdentityRoutes(router, service);
   },
 };
