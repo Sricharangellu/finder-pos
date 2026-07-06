@@ -37,4 +37,12 @@ version.json
 * [0-9].yml
 * [0-9].yaml
 * [0-9].sh
+* [0-9].tsbuildinfo
 *.collision-backup.md
+
+# TypeScript incremental build info (backend + any stray copies)
+*.tsbuildinfo
+# Orphaned / stuck Next.js build output (root or web)
+.next
+.next.stuck-*
+web/.next.stuck-*
