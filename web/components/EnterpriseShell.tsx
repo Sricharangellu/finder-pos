@@ -68,7 +68,29 @@ type NavChild = {
   label: string;
   href: string;
   featureGate?: string; // hide if user lacks this feature
+  partial?: boolean;    // mock-backed / preview — hidden unless NEXT_PUBLIC_SHOW_PARTIAL_PAGES=true
 };
+
+// Partial/preview pages are hidden from normal navigation in production. They
+// exist in the tree (deep-linkable, developable) but only surface when the
+// operator opts in. See AGENTS.md "Mock And Partial Rules".
+const SHOW_PARTIAL_PAGES = process.env["NEXT_PUBLIC_SHOW_PARTIAL_PAGES"] === "true";
+
+/**
+ * Whether a nav child is visible — the four-layer gate (partial → tenant route
+ * → user feature), pure and exported so it can be unit-tested without rendering
+ * the whole shell. `routeEnabled`/`hasFeature` are injected (capabilities +
+ * permissions layers); `showPartial` is the NEXT_PUBLIC_SHOW_PARTIAL_PAGES opt-in.
+ */
+export function isNavChildVisible(
+  child: NavChild,
+  deps: { showPartial: boolean; routeEnabled: (href: string) => boolean; hasFeature: (f: string) => boolean },
+): boolean {
+  if (child.partial && !deps.showPartial) return false;
+  if (!deps.routeEnabled(child.href)) return false;
+  if (child.featureGate && !deps.hasFeature(child.featureGate)) return false;
+  return true;
+}
 
 type NavSection = {
   section: RailSection;
@@ -125,8 +147,8 @@ const NAV_TREE: NavSection[] = [
     icon: <CatalogIcon />,
     children: [
       { label: "Products",    href: "/catalog",             featureGate: "catalog" },
-      { label: "Pricing",     href: "/pricing",             featureGate: "catalog" },
-      { label: "Promotions",  href: "/catalog/promotions",  featureGate: "catalog" },
+      { label: "Pricing",     href: "/pricing",             featureGate: "catalog", partial: true },
+      { label: "Promotions",  href: "/catalog/promotions",  featureGate: "catalog", partial: true },
       { label: "Discounts",   href: "/discounts",           featureGate: "discounts" },
       { label: "Gift Cards",  href: "/gift-cards",          featureGate: "gift-cards" },
       { label: "Loyalty",     href: "/loyalty",             featureGate: "loyalty" },
@@ -140,7 +162,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
       { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
-      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory" },
+      { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
       { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },
@@ -181,7 +203,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Workflows",       href: "/workflows",            featureGate: "workflows" },
       { label: "Integrations",    href: "/integrations",         featureGate: "integrations" },
       { label: "Imports/Exports", href: "/imports-exports",      featureGate: "imports-exports" },
-      { label: "Document Center", href: "/documents",            featureGate: "documents" },
+      { label: "Document Center", href: "/documents",            featureGate: "documents", partial: true },
       { label: "Audit Log",       href: "/audit-log",            featureGate: "audit-log" },
     ],
   },
@@ -408,11 +430,12 @@ function LeftRail({
   };
 
   // Filter nav items — four-layer check, tenant layer first:
+  //   0. partial/preview gate (mock-backed pages hidden unless the operator opts in)
   //   1. tenant module gate (explicit moduleGate key)
   //   2. tenant route gate (href owned by a capabilities module that is disabled)
   //   3. user feature gate (permissions)
-  const childVisible = (c: { href: string; featureGate?: string }) =>
-    routeEnabled(c.href) && (!c.featureGate || hasFeature(c.featureGate));
+  const childVisible = (c: NavChild) =>
+    isNavChildVisible(c, { showPartial: SHOW_PARTIAL_PAGES, routeEnabled, hasFeature });
   const navItems = NAV_TREE.filter((item) => {
     if (item.moduleGate && !enabledModules.has(item.moduleGate) && !enabledModules.has("*")) return false;
     if (item.href && !routeEnabled(item.href)) return false;
