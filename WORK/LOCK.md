@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — persist Sri's Agent Operating Prompt as authoritative AGENTS.md)
+## Released Claim (session E — persist Sri's Agent Operating Prompt as authoritative AGENTS.md)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `AGENTS.md` ONLY (docs). NO src, NO web, NO RULES.md/WORK_STATE.md deletion. No overlap with any code work |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `8620650`: Sri's 2026-07-06 Agent Operating Prompt saved verbatim as the authoritative Operating Contract in AGENTS.md (+ Operational Reference appendix; CLAUDE.md trimmed to pointer). Adopts new status labels (built_verified/…/missing) + read order. RULES.md/WORK_STATE.md NOT deleted (in-flight sessions read them) — their removal is the pending Foundation Hardening exclusive-lock restructure. Docs only. |
 | Blockers | none |
 
 ## Released Claim (session E — §4 dedup: single feature-gating authority)
