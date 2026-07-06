@@ -48,6 +48,19 @@ Every session: re-probe before assuming these are resolved, and update this bloc
 **Retail release pack**: finish one complete business type end-to-end before deepening
 wholesale, restaurant, mobile, grocery, ecommerce, or other packs.
 
+2026-07-06 Codex session P (retail progress truth tracking — full findings in
+`WORK/audits/AUDIT_2026-07-06T175615Z-progress-truth-tracking.md`): the missing
+"Tracking Reality" backend slice is **built_verified**. New `progress` module tracks
+hypotheses, tasks, evidence, decisions, and honest statuses; users cannot casually mark
+tasks/hypotheses validated through the generic status endpoint. Evidence attachment moves
+tasks to `evidence_attached`, decisions require evidence, and `system_verified` only
+passes when Finder can prove the task from tenant-scoped operating data (`retail.first_product`,
+`retail.first_receiving`, `retail.first_sale`, `retail.expenses_categorized`,
+`retail.cost_prices_complete`). Gates: focused progress 3/3, backend tsc 0, backend
+suite 354/354, smoke 20/20, hygiene clean, web tsc 0, web lint same existing hook
+warnings, web Vitest 102/102, web build green. Follow-up: wire a UI that consumes
+`/api/v1/progress` and can convert retail-proof signals into progress tasks.
+
 2026-07-06 session A — **Foundation Hardening initiative** (`WORK/FOUNDATION_HARDENING.md`),
 ran under an EXCLUSIVE lock (board was clear). Completed §1–§3:
 - **§1 cleanup** (`0c7a736`): removed orphaned stuck Next build dir + stray

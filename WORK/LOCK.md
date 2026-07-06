@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Codex session P — retail progress truth tracking)
+
+| Field | Value |
+|---|---|
+| Agent/session | Codex session P |
+| Queue item | Implement the missing "Tracking Reality" backend slice from the retail-first plan: hypotheses, tasks, evidence, decisions, honest status transitions, and system verification from real retail-proof data. Extend existing code only; do not duplicate retail-proof or expenses modules. |
+| Files/areas expected | NEW `src/modules/progress/{index,service,routes,progress.test,test-request}.ts`; `src/modules/index.ts` registration; WORK evidence/audit. NO web, NO settings, NO reports, NO expenses, NO CI. |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | RELEASED — built_verified: new progress backend module with hypotheses, tasks, evidence, decisions, honest status transitions, and tenant-data system verification. Gates: focused progress 3/3, backend typecheck PASS, backend suite 354/354 PASS, smoke 20/20 PASS, hygiene PASS, web typecheck/lint/test/build PASS. |
+| Blockers | none |
+
 ## Released Claim (session E — profit visibility metrics)
 
 | Field | Value |
