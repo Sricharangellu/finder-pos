@@ -248,3 +248,91 @@ test("retail-proof: profit visibility — expenses reduce net profit and raise s
   assert.ok(codes.includes("negative_net_profit"), "flags negative net profit");
   assert.ok(codes.includes("uncategorized_expenses"), "flags uncategorized expense");
 });
+
+// ── Deterministic recommendation engine (issue #5) ──────────────────────────
+const SEV_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+const CATEGORIES = ["setup", "inventory", "pricing", "sales", "expenses", "profit"];
+
+test("recommendations: ranked, actionable, and derived only from real signals", async () => {
+  const app = await freshApp();
+
+  const rec = await call(app, "GET", "/api/reports/recommendations");
+  assert.equal(rec.status, 200);
+  const items: any[] = rec.json.recommendations;
+  assert.ok(Array.isArray(items) && items.length > 0, "seeded tenant yields recommendations");
+
+  // Cross-check: every signal-backed recommendation traces to a real retail-proof signal.
+  const proof = await call(app, "GET", "/api/reports/retail-proof");
+  const signalCodes = new Set(proof.json.signals.map((s: { code: string }) => s.code));
+
+  for (const [i, r] of items.entries()) {
+    assert.equal(r.rank, i + 1, "ranks are contiguous 1..n in array order");
+    assert.ok(r.title && r.action && r.href, "each recommendation is actionable (title/action/href)");
+    assert.ok(CATEGORIES.includes(r.category), `valid category: ${r.category}`);
+    if (r.signalCode !== null) assert.ok(signalCodes.has(r.signalCode), `${r.signalCode} is a real signal`);
+    if (i > 0) assert.ok(SEV_RANK[items[i - 1].severity] <= SEV_RANK[r.severity], "sorted by severity");
+  }
+
+  // Setup is unfinished and nothing has sold on the seeded tenant.
+  const ids = items.map((r) => r.id);
+  assert.ok(ids.includes("rec_setup_incomplete"), "recommends finishing setup");
+  assert.ok(ids.includes("rec_no_sales_yet"), "recommends recording a first sale");
+  assert.ok(!ids.includes("rec_thin_margin"), "no thin-margin rec without revenue");
+
+  // Summary mirrors the list.
+  assert.equal(rec.json.summary.total, items.length);
+  assert.equal(rec.json.summary.critical, items.filter((r) => r.severity === "critical").length);
+  assert.equal(rec.json.summary.warning, items.filter((r) => r.severity === "warning").length);
+  assert.equal(rec.json.summary.info, items.filter((r) => r.severity === "info").length);
+});
+
+test("recommendations: negative net profit is critical, ranks first, and suppresses thin-margin", async () => {
+  const app = await freshApp();
+
+  // Stocked product (no cost → COGS 0), one cash sale, then an outsized expense.
+  const p = await call(app, "POST", "/api/catalog/", { sku: "REC-NEG", name: "Neg Widget", price_cents: 1000, category: "general" });
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  const o = await call(app, "POST", "/api/orders/", { stateCode: "CA", lines: [{ productId: p.json.id, quantity: 1 }] });
+  await call(app, "POST", "/api/payments/", { orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents });
+  const e = await call(app, "POST", "/api/expenses/", { amountCents: o.json.total_cents + 5000 });
+  assert.equal(e.status, 201);
+
+  const rec = await call(app, "GET", "/api/reports/recommendations");
+  const items: any[] = rec.json.recommendations;
+  const neg = items.find((r) => r.id === "rec_negative_net_profit");
+  assert.ok(neg, "negative net profit recommended");
+  assert.equal(neg.severity, "critical");
+  assert.equal(neg.category, "profit");
+  assert.equal(items[0].id, "rec_negative_net_profit", "critical outranks all warnings/infos");
+  assert.ok(!items.some((r) => r.id === "rec_thin_margin"), "thin-margin suppressed while net is negative");
+});
+
+test("recommendations: raises a thin-margin pricing rec when gross margin is low but net is positive", async () => {
+  const app = await freshApp();
+
+  // Real cost via the purchasing receive flow: cost 490 on a $5.00 product → thin margin.
+  const p = await call(app, "POST", "/api/catalog/", { sku: "REC-THIN", name: "Thin Widget", price_cents: 500, category: "general" });
+  const s = await call(app, "POST", "/api/purchasing/suppliers", { name: "Cost Co", email: "orders@costco.test" });
+  const po = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: s.json.id, lines: [{ productId: p.json.id, quantity: 10, unitCostCents: 490 }],
+  });
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.json.id}/receive`, {
+    lines: [{ lineId: po.json.lines[0].id, qty: 10 }],
+  });
+  assert.equal(recv.status, 200, `receive failed: ${JSON.stringify(recv.json)}`);
+  const o = await call(app, "POST", "/api/orders/", { stateCode: "CA", lines: [{ productId: p.json.id, quantity: 1 }] });
+  await call(app, "POST", "/api/payments/", { orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents });
+
+  // Sanity: real data really is thin-margin and net-positive (no expenses).
+  const proof = await call(app, "GET", "/api/reports/retail-proof");
+  assert.ok(proof.json.metrics.grossMarginPct !== null && proof.json.metrics.grossMarginPct <= 15, `gm should be thin: ${proof.json.metrics.grossMarginPct}`);
+  assert.ok(proof.json.metrics.netProfitCents >= 0, "net is positive");
+
+  const rec = await call(app, "GET", "/api/reports/recommendations");
+  const thin = rec.json.recommendations.find((r: any) => r.id === "rec_thin_margin");
+  assert.ok(thin, "thin-margin recommended");
+  assert.equal(thin.category, "pricing");
+  assert.equal(thin.severity, "warning");
+  assert.equal(thin.signalCode, null, "derived from metrics, not a signal");
+  assert.ok(!rec.json.recommendations.some((r: any) => r.id === "rec_negative_net_profit"), "not negative net profit");
+});

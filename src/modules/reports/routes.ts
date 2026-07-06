@@ -70,6 +70,14 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json(await service.retailProof(tenantId(res), recentDays));
   }));
 
+  // GET /api/v1/reports/recommendations?recentDays=30 — deterministic, rule-based
+  // recommendations ranked most-urgent-first, derived from retail-proof signals.
+  router.get("/recommendations", handler(async (req, res) => {
+    const raw = typeof req.query.recentDays === "string" ? Number(req.query.recentDays) : 30;
+    const recentDays = Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 365) : 30;
+    res.json(await service.retailRecommendations(tenantId(res), recentDays));
+  }));
+
   // GET /api/v1/reports/ar-aging — Accounts Receivable aging buckets.
   router.get("/ar-aging", handler(async (_req, res) => {
     res.json(await service.arAging(tenantId(res)));
