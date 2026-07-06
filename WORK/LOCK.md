@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `WORK/FOUNDATION_HARDENING.md` (new), `WORK/FORWARD_PLAN.md` (add pointer), `AGENTS.md` (add pointer). No src/web/scripts |
 | Started | 2026-07-05 |
 | Last update | 2026-07-05 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped `088f633`: `WORK/FOUNDATION_HARDENING.md` holds the verbatim spec + how-to-run (single exclusive claim when board clear); referenced from FORWARD_PLAN.md + AGENTS.md marching orders. Initiative is QUEUED, not started. |
 | Blockers | none |
 
 ## Parallel Non-Overlapping Claim (session A — production demo-account neutralization)
