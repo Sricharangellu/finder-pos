@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — persist Sri's Agent Operating Prompt as authoritative AGENTS.md)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "save this operating prompt" from Sri) |
+| Queue item | Save Sri's Agent Operating Prompt (2026-07-06) as the authoritative operating contract in AGENTS.md (the one agent file), preserving the concrete operational reference (lock mechanics, git modes, local runbook, handoff) as an appendix. Resolve conflicts in favor of the new prompt (status-label vocabulary built_verified/…/missing; read order). DO NOT delete RULES.md/WORK_STATE.md (in-flight sessions read them) — flag their consolidation as the pending exclusive-lock restructure. Also update cross-session memory. |
+| Files/areas expected | `AGENTS.md` ONLY (docs). NO src, NO web, NO RULES.md/WORK_STATE.md deletion. No overlap with any code work |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — §4 dedup: single feature-gating authority)
 
 | Field | Value |
