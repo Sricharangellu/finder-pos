@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — NEXT_PUBLIC_SHOW_PARTIAL_PAGES gating)
+## Released Claim (session E — NEXT_PUBLIC_SHOW_PARTIAL_PAGES gating)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `web/components/EnterpriseShell.tsx` (nav partial marker + gate), new vitest. NO backend, NO page deletion, NO file moves, no ports |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `4c79378`: partial pages (Pricing, Promotions, Warehouse, Document Center) hidden from nav unless NEXT_PUBLIC_SHOW_PARTIAL_PAGES=true; pure exported isNavChildVisible() gate. Gates: web tsc 0, Vitest 100/100 (4 new), lint 4 pre-existing, mock-off build green. Audit: WORK/audits/AUDIT_2026-07-06T072347Z-partial-page-gating.md |
 | Blockers | none |
 
 ## Released Claim (session E — persist Sri's Agent Operating Prompt as authoritative AGENTS.md)
