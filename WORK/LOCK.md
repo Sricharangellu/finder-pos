@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — §4 dedup: single feature-gating authority)
+## Released Claim (session E — §4 dedup: single feature-gating authority)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | `web/lib/useAccountMode.tsx` (rewire onto capabilities), `web/contexts/CapabilitiesContext.tsx` if a getter is needed, new/updated vitest. NO backend, NO file moves, NO e2e, no ports, no concurrent next build |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped in `e994d0a`: useAccountMode now derives accountMode + edition flags from useCapabilities() (no separate /settings/feature-flags fetch); one fewer gating authority + one fewer per-page request. Mock /capabilities gains accountMode+group flags for parity. Gates: web tsc 0, Vitest 96/96 (2 new), lint 4 pre-existing, mock-off build green. Larger §4 file-move restructure still needs Sri's OK (see below). |
 | Blockers | none |
 
 ## Released Claim (session E — persist verified prod findings to standing surface)
