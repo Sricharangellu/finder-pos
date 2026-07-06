@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { apiGet } from "@/api-client/client";
+import { createContext, useContext, type ReactNode } from "react";
+import { useCapabilities } from "@/contexts/CapabilitiesContext";
 
 export type AccountMode = "RETAIL" | "WHOLESALE" | "ENTERPRISE";
 
@@ -60,19 +60,25 @@ const AccountModeContext = createContext<AccountModeContextValue>({
 });
 
 export function AccountModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<AccountMode>("ENTERPRISE");
-  const [editionFlags, setEditionFlags] = useState<Record<string, boolean>>(DEFAULT_EDITION_FLAGS);
+  // Derive account mode + edition flags from the capabilities contract — the
+  // single tenant-layer authority — instead of a separate /settings/feature-flags
+  // fetch. GET /capabilities already computes features.accountMode and the
+  // group* edition flags server-side, so this hook no longer issues its own
+  // request. Fail-open to ENTERPRISE (all features) while capabilities load or
+  // on error, matching the prior default.
+  const { capabilities } = useCapabilities();
+  const rawMode = capabilities?.features?.["accountMode"];
+  const mode: AccountMode =
+    rawMode === "RETAIL" || rawMode === "WHOLESALE" || rawMode === "ENTERPRISE"
+      ? rawMode
+      : "ENTERPRISE";
 
-  useEffect(() => {
-    apiGet<Record<string, boolean | string>>("/api/v1/settings/feature-flags")
-      .then((resp) => {
-        const m = resp["accountMode"];
-        if (m === "RETAIL" || m === "WHOLESALE" || m === "ENTERPRISE") setMode(m);
-        const { accountMode: _, ...flags } = resp;
-        setEditionFlags((prev) => ({ ...prev, ...(flags as Record<string, boolean>) }));
-      })
-      .catch(() => { /* keep defaults */ });
-  }, []);
+  const editionFlags: Record<string, boolean> = { ...DEFAULT_EDITION_FLAGS };
+  if (capabilities?.features) {
+    for (const [k, v] of Object.entries(capabilities.features)) {
+      if (typeof v === "boolean") editionFlags[k] = v;
+    }
+  }
 
   const features = MODE_FEATURES[mode];
   const value: AccountModeContextValue = {

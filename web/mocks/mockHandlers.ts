@@ -2731,7 +2731,20 @@ mockHandlers.push(
       },
       plan: { key: "demo", name: "Demo", source: "mock" },
       entitlements: { source: "placeholder", enforced: false, note: "Demo mode — plan entitlements are not enforced." },
-      features: { ...featureFlags },
+      // Mirror the real backend: features carries the derived accountMode +
+      // group edition flags (service.ts effectiveFeatures) so the frontend
+      // reads one authority in both mock and real modes.
+      features: (() => {
+        const groupWholesale = _bpEnabled.has("sales_orders") || _bpEnabled.has("purchasing");
+        const groupEnterprise = _bpEnabled.has("sso") || _bpEnabled.has("webhooks");
+        return {
+          ...featureFlags,
+          groupRetailPOS: _bpEnabled.has("pos_terminal"),
+          groupWholesale,
+          groupEnterprise,
+          accountMode: groupEnterprise ? "ENTERPRISE" : groupWholesale ? "WHOLESALE" : "RETAIL",
+        };
+      })(),
       requiredFields: { customer: ["name"], product: ["sku", "name", "price_cents"] },
       workflows: [],
       moduleGroups: {
