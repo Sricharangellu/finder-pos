@@ -14,6 +14,7 @@ import { DashboardOperational } from "./_components/DashboardOperational";
 import { DashboardKpiSection } from "./_components/DashboardKpiSection";
 import { DashboardCharts } from "./_components/DashboardCharts";
 import { DashboardQuickActions } from "./_components/DashboardQuickActions";
+import { DashboardRecommendations, type RecommendationReport } from "./_components/DashboardRecommendations";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,12 +120,14 @@ export default function DashboardPage() {
   const fetchTrend = useCallback(() => apiGet<TrendResponse>(`/api/v1/reports/revenue-trend?range=${trendRange}&${scope}`), [scope, trendRange]);
   const fetchHourly = useCallback(() => apiGet<HourlyResponse>(`/api/v1/reports/hourly?range=${range}&${scope}`), [range, scope]);
   const fetchCategory = useCallback(() => apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}&${scope}`), [range, scope]);
+  const fetchRecommendations = useCallback(() => apiGet<RecommendationReport>("/api/v1/reports/recommendations?recentDays=30"), []);
 
   useRealtimeStream(
     useCallback((event) => {
       if (event.type === "order_created" || event.type === "payment_captured") {
         invalidateQuery(`dashboard:summary:${range}:${scope}`);
         invalidateQuery(`dashboard:top-products:${range}:${scope}`);
+        invalidateQuery("dashboard:recommendations:30d");
       }
     }, [range, scope]),
   );
@@ -141,6 +144,8 @@ export default function DashboardPage() {
     useQuery(`dashboard:hourly:${range}:${scope}`, fetchHourly, { staleMs: 60_000 });
   const { data: categoryData, loading: loadingCategory } =
     useQuery(`dashboard:category:${range}:${scope}`, fetchCategory, { staleMs: 60_000 });
+  const { data: recommendationsData, loading: loadingRecommendations, error: errorRecommendations } =
+    useQuery("dashboard:recommendations:30d", fetchRecommendations, { staleMs: 60_000 });
 
   const topProducts = (topProductsData?.items ?? []).map((item) => ({
     ...item,
@@ -242,6 +247,12 @@ export default function DashboardPage() {
           discountedPct={discountedPct}
           sparkRev={sparkRev}
           sparkSales={sparkSales}
+        />
+
+        <DashboardRecommendations
+          report={recommendationsData}
+          loading={loadingRecommendations}
+          error={errorRecommendations}
         />
 
         <DashboardCharts
