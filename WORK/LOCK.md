@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — auth route drift: /api/v1/auth/* -> real identity paths)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" — route-alignment queue) |
+| Queue item | Fix the wiring-matrix auth/* REAL DRIFT. (1) PermissionsContext calls GET /api/v1/auth/me which 404s on the real backend → catch keeps role="owner" for EVERY user (privilege bug) and fails open to all features. Point at real GET /api/identity/me (returns role); owner/admin/manager → all features, others fail-open (documented — real /me exposes no per-user feature list; capabilities is the module authority). (2) SecuritySection fires a no-op POST /api/v1/auth/backup-codes with no backend (missing) — remove the dead 404 call; codes are client-generated only, documented as missing-backend. Add mock /api/identity/me for parity. |
+| Files/areas expected | `web/contexts/PermissionsContext.tsx`, `web/app/(protected)/settings/_components/SecuritySection.tsx`, `web/mocks/handlers.ts` or `mockHandlers.ts` (me parity), vitest. NO backend module build (backup-codes backend is separate future work), no file moves |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — NEXT_PUBLIC_SHOW_PARTIAL_PAGES gating)
 
 | Field | Value |
