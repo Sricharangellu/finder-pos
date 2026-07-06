@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — profit visibility metrics)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "continue" — FORWARD_PLAN queue #4) |
+| Queue item | Add profit visibility: retail-proof reports gross profit only and DISCLAIMS expenses (queue #3 now built). Wire expenses into retail-proof — expensesCents, netProfitCents (revenue-COGS-expenses), grossMarginPct, netMarginPct; flip expenses to available:true with real total + uncategorizedCount; add deterministic profit signals (negative_net_profit, uncategorized_expenses). |
+| Files/areas expected | src/modules/reports/service.ts (retailProof), src/modules/reports/reports.test.ts. NO new module, NO web, single isolated test runs |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — expenses MVP backend module)
 
 | Field | Value |
