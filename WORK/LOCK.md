@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — persist verified prod findings to standing surface)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "add required data to shared file" from Sri) |
+| Queue item | Persist re-verified open production actions into the agent-followed surface so no session loses them: add a standing "Open Production Actions (Sri only)" block to WORK/WORK_STATE.md. Re-verified 2026-07-06: demo creds now 401 (RESOLVED); finder-pos.vercel.app still 500 (orphaned Vercel project outside CI — deployed frontend is finder-pos-frontend.vercel.app). |
+| Files/areas expected | `WORK/WORK_STATE.md` ONLY (docs). NO src, NO web, NO scripts — no overlap with session A's permission_requests module |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — permission-requests backend + auth fix)
 
 | Field | Value |
