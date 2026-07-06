@@ -184,6 +184,30 @@ export interface RetailProofSignal {
   message: string;
 }
 
+/** A ranked, actionable recommendation derived from a retail-proof signal. */
+export type RecommendationCategory = "setup" | "inventory" | "pricing" | "sales" | "expenses" | "profit";
+
+export interface Recommendation {
+  id: string;                       // stable, e.g. "rec_no_products"
+  signalCode: string | null;        // source retail-proof signal, or null when derived from metrics
+  category: RecommendationCategory;
+  severity: "info" | "warning" | "critical";
+  title: string;                    // short imperative label
+  detail: string;                   // human explanation (the signal message)
+  action: string;                   // the concrete next step to take
+  href: string;                     // where in the app to act
+  count: number;                    // affected entities (0 when not applicable)
+  rank: number;                     // 1-based position after deterministic ordering (1 = most urgent)
+}
+
+export interface RecommendationReport {
+  ready: boolean;                   // mirrors retail-proof readiness
+  recommendations: Recommendation[];// ranked, most urgent first
+  summary: { total: number; critical: number; warning: number; info: number };
+  generatedAt: number;
+  recentDays: number;
+}
+
 export interface RetailProof {
   ready: boolean;
   setup: {
@@ -204,6 +228,37 @@ export interface RetailProof {
   generatedAt: number;
   recentDays: number;
 }
+
+/**
+ * Deterministic recommendation playbook (NOT AI — see AGENTS.md AI rules).
+ * Each retail-proof signal maps to an actionable recommendation: what to do and
+ * where. Signals with no entry here are informational only and are not surfaced
+ * as recommendations. Derived (non-signal) recommendations use the `null` code
+ * and are keyed by their own id.
+ */
+const RECO_PLAYBOOK: Record<string, { category: RecommendationCategory; title: string; action: string; href: string }> = {
+  no_products:           { category: "setup",     title: "Add your products",          action: "Add or import products so the register has something to sell.",        href: "/catalog" },
+  setup_incomplete:      { category: "setup",     title: "Finish store setup",         action: "Complete the remaining setup tasks to get ready to sell.",             href: "/onboarding" },
+  products_without_cost: { category: "pricing",   title: "Set cost prices",            action: "Add cost prices so gross profit and margin can be measured.",          href: "/catalog" },
+  out_of_stock:          { category: "inventory", title: "Restock out-of-stock items", action: "Receive stock for products that are out of stock.",                    href: "/inventory" },
+  negative_net_profit:   { category: "profit",    title: "Fix negative net profit",    action: "Raise margins or cut expenses — spending is outpacing gross profit.",  href: "/reports" },
+  thin_margin:           { category: "pricing",   title: "Improve thin margin",        action: "Review pricing or supplier costs to lift a low gross margin.",         href: "/reports" },
+  low_stock:             { category: "inventory", title: "Reorder low stock",          action: "Reorder products at or below their reorder point.",                    href: "/inventory" },
+  no_sales_yet:          { category: "sales",     title: "Record your first sale",     action: "Ring up a sale at the register to start measuring performance.",       href: "/terminal" },
+  products_never_sold:   { category: "sales",     title: "Review never-sold products", action: "Promote, reprice, or discontinue products that have never sold.",       href: "/catalog" },
+  slow_movers:           { category: "sales",     title: "Clear slow movers",          action: "Discount or clear stock that has not sold recently.",                  href: "/catalog" },
+  uncategorized_expenses:{ category: "expenses",  title: "Categorize expenses",        action: "Assign categories to expenses for accurate profit reporting.",         href: "/finance" },
+};
+
+/** Severity ordering (lower = more urgent) and a stable in-severity precedence. */
+const SEVERITY_RANK: Record<Recommendation["severity"], number> = { critical: 0, warning: 1, info: 2 };
+const CODE_ORDER = [
+  "no_products", "setup_incomplete", "products_without_cost", "out_of_stock",
+  "negative_net_profit", "thin_margin", "low_stock", "no_sales_yet",
+  "products_never_sold", "slow_movers", "uncategorized_expenses",
+];
+/** Gross margin (%) at or below which a "thin margin" recommendation is raised. */
+const THIN_MARGIN_PCT = 15;
 
 export class ReportsService {
   constructor(private readonly db: DB) {}
@@ -1192,6 +1247,69 @@ export class ReportsService {
       expenses: { available: true, totalCents: expensesCents, count: expensesCount, uncategorizedCount: uncategorizedExpenses },
       generatedAt: now,
       recentDays,
+    };
+  }
+
+  /**
+   * Deterministic, rule-based recommendation engine (NOT AI — AGENTS.md).
+   * Consumes the retail-proof signals (the single source of truth for the rules)
+   * and turns each actionable one into a ranked recommendation with a concrete
+   * next step and destination. Also raises a small number of recommendations
+   * derived directly from real metrics that the signals do not already cover.
+   * Read-only and tenant-scoped (every figure traces back to real tenant data).
+   */
+  async retailRecommendations(tenantId: string, recentDays = 30): Promise<RecommendationReport> {
+    const proof = await this.retailProof(tenantId, recentDays);
+    const recs: Recommendation[] = [];
+
+    // 1) Enrich every actionable signal into a recommendation.
+    for (const s of proof.signals) {
+      const play = RECO_PLAYBOOK[s.code];
+      if (!play) continue; // purely informational signal — not an action
+      recs.push({
+        id: `rec_${s.code}`, signalCode: s.code, category: play.category, severity: s.severity,
+        title: play.title, detail: s.message, action: play.action, href: play.href, count: s.count, rank: 0,
+      });
+    }
+
+    // 2) Derived recommendation: thin gross margin. Only when there is revenue,
+    //    margin is measurable, and net profit is NOT already negative (that case
+    //    is covered by the more severe negative_net_profit recommendation).
+    const gm = proof.metrics.grossMarginPct;
+    const alreadyNegative = proof.signals.some((s) => s.code === "negative_net_profit");
+    if (proof.metrics.revenueCents > 0 && gm !== null && gm <= THIN_MARGIN_PCT && !alreadyNegative) {
+      const play = RECO_PLAYBOOK["thin_margin"]!;
+      recs.push({
+        id: "rec_thin_margin", signalCode: null, category: play.category, severity: "warning",
+        title: play.title, detail: `Gross margin is ${gm}% — at or below the ${THIN_MARGIN_PCT}% healthy floor.`,
+        action: play.action, href: play.href, count: 0, rank: 0,
+      });
+    }
+
+    // 3) Deterministic ranking: severity first, then a fixed playbook precedence.
+    const codeOf = (r: Recommendation) => r.id.replace(/^rec_/, "");
+    const codeIndex = (r: Recommendation) => {
+      const i = CODE_ORDER.indexOf(codeOf(r));
+      return i === -1 ? CODE_ORDER.length : i;
+    };
+    recs.sort((a, b) =>
+      SEVERITY_RANK[a.severity] !== SEVERITY_RANK[b.severity]
+        ? SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+        : codeIndex(a) - codeIndex(b),
+    );
+    recs.forEach((r, i) => { r.rank = i + 1; });
+
+    return {
+      ready: proof.ready,
+      recommendations: recs,
+      summary: {
+        total: recs.length,
+        critical: recs.filter((r) => r.severity === "critical").length,
+        warning: recs.filter((r) => r.severity === "warning").length,
+        info: recs.filter((r) => r.severity === "info").length,
+      },
+      generatedAt: proof.generatedAt,
+      recentDays: proof.recentDays,
     };
   }
 }
