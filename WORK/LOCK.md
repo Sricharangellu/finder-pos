@@ -2,7 +2,7 @@
 
 Status: ACTIVE
 
-## Active Claim (session E — expenses MVP backend module)
+## Released Claim (session E — expenses MVP backend module)
 
 | Field | Value |
 |---|---|
@@ -11,7 +11,7 @@ Status: ACTIVE
 | Files/areas expected | NEW src/modules/expenses/{index,service,routes,expenses.test}.ts; src/modules/index.ts (register). NO reports/retail-proof edits (separate follow-up), NO web, NO accounting module edits, no ports. SINGLE isolated test runs only (tooling-incident discipline) |
 | Started | 2026-07-06 |
 | Last update | 2026-07-06 |
-| Status | ACTIVE |
+| Status | RELEASED — shipped: new expenses module (POST/GET/summary/:id/DELETE; manager+, integer cents, audit-logged, tenant-scoped). Gates: expenses suite 3/3 real Postgres, backend tsc 0, smoke 20/20. Follow-ups: frontend page + feed retail-proof/dashboard. |
 | Blockers | none |
 
 ## Released Claim (session E — retail proof audit endpoint)

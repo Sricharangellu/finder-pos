@@ -15,6 +15,13 @@ Every session: re-probe before assuming these are resolved, and update this bloc
   endpoint was re-applied from session record and re-verified. GUIDANCE: work in ONE clone;
   never run two `scripts/test.ts` full suites at once (use `git worktree`, and isolated
   single-file runs for spot checks).
+- 🧭 **CLONE TOPOLOGY DECISION (Sri, 2026-07-06): ONE canonical clone + `git worktree` for
+  parallel work — never a second independent clone** (per AGENTS.md). Reality: TWO clones of
+  the same remote exist — `finder-pos` (original, has `tsx watch` dev servers, was STALE at
+  183d0cf) and `finder-pos-github` (clean, current). All work is on origin; neither holds
+  unique state. ACTION for Sri: pick one canonical dir, `git pull` it current, retire the
+  other, use `git worktree add ../wt-<task>` for isolation. Agents: confirm cwd is the
+  canonical clone before editing.
 
 
 - 🔴 **`finder-pos.vercel.app` returns HTTP 500.** This is a STALE/ORPHANED Vercel
