@@ -26,6 +26,11 @@ Feature/module/page expansion is **PAUSED**. Work the phase plan in
 `WORK/FORWARD_PLAN.md`: verify truth → harden the core retail spine → production
 hardening → only then expand. One work item per session, verified before commit.
 
+**Queued major initiative:** `WORK/FOUNDATION_HARDENING.md` — a whole-repo cleanup +
+governance-consolidation + end-to-end-wiring pass. It must run as a **single exclusive
+lock claim when the board is otherwise clear** (it touches the whole tree). Do not start
+it piecemeal alongside other active claims.
+
 ## Multi-agent coordination lock
 
 Before editing code, check `WORK/LOCK.md`.

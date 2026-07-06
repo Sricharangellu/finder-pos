@@ -7,6 +7,11 @@ Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 > criteria pass — never by calendar. Point-in-time verification results live in the
 > dated `WORK/AUDIT_*.md` files, not in this document.
 
+> **QUEUED MAJOR INITIATIVE — `WORK/FOUNDATION_HARDENING.md`.** A whole-repo cleanup /
+> governance-consolidation / end-to-end-wiring pass authored by Sri (2026-07-05). Run it
+> as a **single exclusive lock claim when no other session is active** — it touches the
+> whole tree and will collide otherwise. See that file for the full spec and how to run.
+
 ## Executive summary
 
 Finder is moving in a reasonable technical direction, but it is not deployment-ready as a serious production SaaS product yet.
