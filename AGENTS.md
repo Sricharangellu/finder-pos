@@ -362,10 +362,18 @@ lost-then-recovered work). These rules exist so it cannot recur:
   than one `AGENTS.md` is tracked.
 - **Never create ` 2.<ext>` copies or `*.collision-backup.md`.** They are `.gitignore`d and a
   CI guard fails if one is force-committed. Dated audits use a collision-proof
-  UTC-ISO-timestamp name, never the next-free letter.
+  UTC-ISO-timestamp name, never the next-free letter. **Run `node tools/hygiene-check.mjs`
+  before committing** — it fails on copy files, collision backups, merge leftovers, and a
+  duplicate `AGENTS.md` (dependency-free; see `tools/README.md`).
 - **One canonical checkout.** Work only in the primary clone. Do NOT make a second clone
   (e.g. `finder-pos-github`) — two clones of the same remote diverge and collide on push. For
-  parallel sessions use `git worktree add ../wt-<task>`, never independent clones.
+  parallel sessions run **`tools/new-worktree.sh <task-slug>`** (isolated worktree off
+  `origin/master`), never independent clones.
+- **Before building any feature/module/endpoint, check it does not already exist** —
+  `git grep -n "<name>" origin/master` and scan `src/modules/`. Duplicate *work* (two
+  sessions building the same thing) is the costliest collision; extend, don't fork.
+- **New agent/session onboarding:** paste `tools/AGENT_PROMPT.md` — the copy-paste
+  coordination brief (read order, lock claim, worktree, duplicate-check, gates, PR flow).
 - Before ending a session: `git status` must show no untracked ` 2.` / backup junk.
 
 ## Local runbook (macOS dev machine)
