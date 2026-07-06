@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — retail proof audit endpoint)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" — FORWARD_PLAN queue #2) |
+| Queue item | Build the retail-proof audit endpoint: GET /api/v1/reports/retail-proof — a real-data readiness report answering the operating prompt's retailer questions (what I sell / in stock / sold / made / low-slow-profitable-risky / what next). Backend authority for: the 7 setup tasks (outlet/register/tax/paymentModes/receipt/firstProduct/firstReceiving — currently detected client-side), retail metrics (product count, products without cost, low/out-of-stock, orders, revenue, COGS, gross profit, products never sold), and DETERMINISTIC rule-based signals (per the AI/Recommendations rule: missing setup, no cost, low stock, no recent sales, etc.). Expenses noted as unbuilt (queue #3). Tenant-scoped, read-only, in the reports module. |
+| Files/areas expected | `src/modules/reports/service.ts` (retailProof method), `src/modules/reports/routes.ts` (route), `src/modules/reports/reports.test.ts` (real-Postgres test), WORK evidence. NO web, NO new tables, NO catalog/orders/settings module edits, no ports |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — auth route drift: /api/v1/auth/* -> real identity paths)
 
 | Field | Value |
