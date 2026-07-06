@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Active Claim (session E — expenses MVP backend module)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session E (desktop app, "next" — FORWARD_PLAN queue #3) |
+| Queue item | Complete expenses MVP (backend): the "Record expenses" step of the retail flow has no backend (only chart-of-accounts expense *accounts* exist; no way to record a spend). New expenses module — table (tenant_id, category nullable, amount_cents, spent_at, vendor, note, account_id, created_by, created_at), POST create (validated, manager+, audit-logged), GET list (filters), GET summary (total, by-category, uncategorized count), DELETE (manager+, audit). Integer cents, tenant-scoped, tenant-isolated. Frontend wiring is a follow-up. |
+| Files/areas expected | NEW src/modules/expenses/{index,service,routes,expenses.test}.ts; src/modules/index.ts (register). NO reports/retail-proof edits (separate follow-up), NO web, NO accounting module edits, no ports. SINGLE isolated test runs only (tooling-incident discipline) |
+| Started | 2026-07-06 |
+| Last update | 2026-07-06 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Released Claim (session E — retail proof audit endpoint)
 
 | Field | Value |
