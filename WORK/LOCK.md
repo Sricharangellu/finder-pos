@@ -2,6 +2,18 @@
 
 Status: ACTIVE
 
+## Parallel Non-Overlapping Claim (session A — production demo-account neutralization)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (VSCode, Sri authorized prod security work) |
+| Queue item | Close the live demo-credentials exposure autonomously. Confirmed NODE_ENV=production active (Secure cookies), and demo login still works on prod. DATABASE_URL is Vercel-"sensitive" (unreadable) so a manual rotation isn't possible from here. Fix: a production-only boot guard in identity that detects seeded demo accounts still carrying the PUBLISHED password (bcrypt.compare) and scrambles their hash to a random value — self-healing, idempotent, no external DB URL, pairs with the seed guards. Closes the hole on next deploy. Only runs in production (test/CI/dev demo login unaffected). |
+| Files/areas expected | `src/identity/service.ts` (new neutralize method), `src/identity/index.ts` (call after seedDemo), new focused test. Identity module only — board free. NO settings/web/scripts |
+| Started | 2026-07-05 |
+| Last update | 2026-07-05 |
+| Status | ACTIVE |
+| Blockers | none |
+
 ## Parallel Non-Overlapping Claim (session A — store_locations top-level mount fix)
 
 | Field | Value |
