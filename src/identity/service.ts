@@ -697,8 +697,16 @@ export class IdentityService {
       ...(customRoleId ? { customRoleId } : {}),
       ...(permissions && permissions.length > 0 ? { permissions } : {}),
     };
-    const accessToken = jwt.sign(claims, secret, { subject: userId, expiresIn: ACCESS_TOKEN_TTL });
-    const refreshToken = jwt.sign(claims, secret + ":refresh", { subject: userId, expiresIn: REFRESH_TOKEN_TTL });
+    const accessToken = jwt.sign(claims, secret, {
+      subject: userId,
+      expiresIn: ACCESS_TOKEN_TTL,
+      jwtid: `atk_${uuidv7()}`,
+    });
+    const refreshToken = jwt.sign(claims, secret + ":refresh", {
+      subject: userId,
+      expiresIn: REFRESH_TOKEN_TTL,
+      jwtid: `rtk_${uuidv7()}`,
+    });
     return { accessToken, refreshToken, expiresIn: 15 * 60 };
   }
 

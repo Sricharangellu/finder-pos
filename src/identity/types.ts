@@ -18,6 +18,7 @@ export interface TokenClaims {
   role: Role;
   customRoleId?: string;
   permissions?: string[];
+  jti?: string;
   iat?: number;
   exp?: number;
 }

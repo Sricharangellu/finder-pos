@@ -65,6 +65,37 @@ test("IdentityService issues a verifiable access token", async () => {
   await app.db.close();
 });
 
+test("IdentityService issues unique refresh tokens for rapid repeated login", async () => {
+  const app = await freshApp();
+  const svc = new IdentityService(app.db, app.events);
+
+  const unique = `${process.pid}_${Date.now()}`;
+  const tenantId = `ten_repeat_${unique}`;
+  const userId = `usr_repeat_${unique}`;
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'Repeat Corp', 'repeat-corp-${unique}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'repeat-owner@example.com', 'secret123', 'owner', ${Date.now()}, ${Date.now()})
+  `);
+
+  const first = await svc.login({ email: "repeat-owner@example.com", password: "secret123" });
+  const second = await svc.login({ email: "repeat-owner@example.com", password: "secret123" });
+
+  assert.notEqual(first.accessToken, second.accessToken, "access token changes on repeated login");
+  assert.notEqual(first.refreshToken, second.refreshToken, "refresh token changes on repeated login");
+
+  const storedTokens = await app.db.one<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM refresh_tokens WHERE tenant_id = @tenantId AND user_id = @userId",
+    { tenantId, userId },
+  );
+  assert.equal(storedTokens?.count, 2, "both refresh tokens are stored");
+
+  await app.db.close();
+});
+
 test("verifyAccessToken rejects a tampered token", async () => {
   const app = await freshApp();
   const svc = new IdentityService(app.db, app.events);
