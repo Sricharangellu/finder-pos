@@ -43,7 +43,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
-  const { status, login, loginError, isLoading } = useAuth();
+  const { status, login, completeMfaLogin, loginError, isLoading } = useAuth();
 
   const [email, setEmail] = useState(
     isDemo || process.env.NODE_ENV === "development" ? "owner@finder-pos.dev" : ""
@@ -52,6 +52,8 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [capsLockOn, setCapsLockOn] = useState(false);
+  const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
   const [touched, setTouched] = useState<{ email: boolean; password: boolean }>({
     email: false,
     password: false,
@@ -79,9 +81,18 @@ function LoginContent() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (mfaPendingToken) {
+      if (!mfaCode.trim()) return;
+      await completeMfaLogin(mfaPendingToken, mfaCode.trim());
+      return;
+    }
     setTouched({ email: true, password: true });
     if (!email.trim() || !password) return;
-    await login(email.trim(), password);
+    const challenge = await login(email.trim(), password);
+    if (challenge) {
+      setMfaPendingToken(challenge.pendingToken);
+      setMfaCode("");
+    }
   }
 
   if (status === "authenticated") {
@@ -231,8 +242,33 @@ function LoginContent() {
             Remember me on this device
           </label>
 
+          {mfaPendingToken && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="mfa-code" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Authentication code
+                <span className="ml-1 text-danger-600" aria-hidden="true">*</span>
+                <span className="sr-only">(required)</span>
+              </label>
+              <input
+                id="mfa-code"
+                name="mfa-code"
+                inputMode="text"
+                autoComplete="one-time-code"
+                required
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                disabled={isLoading}
+                placeholder="123456 or backup code"
+                className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white/90 px-3 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Enter the 6-digit code from your authenticator app or a saved backup code.
+              </p>
+            </div>
+          )}
+
           <Button type="submit" fullWidth loading={isLoading} disabled={isLoading} size="lg">
-            {isLoading ? "Signing in…" : "Sign in"}
+            {isLoading ? "Signing in…" : mfaPendingToken ? "Verify and sign in" : "Sign in"}
           </Button>
         </form>
 

@@ -36,6 +36,16 @@ export interface LoginResponse {
   user: UserProfile;
 }
 
+export interface MfaRequiredResponse {
+  error: {
+    code: "mfa_required";
+    message: string;
+    requestId?: string;
+  };
+  pendingToken: string;
+  expiresIn: number;
+}
+
 export interface RefreshRequest {
   refreshToken: string;
 }

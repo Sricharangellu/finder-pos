@@ -54,6 +54,11 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const loginMfaSchema = z.object({
+  pendingToken: z.string().min(1),
+  code: z.string().min(6).max(32),
+});
+
 const registerSchema = z.object({
   storeName: z.string().min(2).max(80),
   email: z.string().email(),
@@ -91,6 +96,31 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
         req.socket.remoteAddress ??
         null;
       const tokens = await service.login(body, ip);
+      if ("mfaRequired" in tokens) {
+        res.status(401).json({
+          error: {
+            code: "mfa_required",
+            message: "Multi-factor authentication is required.",
+          },
+          pendingToken: tokens.pendingToken,
+          expiresIn: tokens.expiresIn,
+        });
+        return;
+      }
+      setAuthCookies(res, tokens.refreshToken);
+      res.status(200).json(tokens);
+    }),
+  );
+
+  router.post(
+    "/login/mfa",
+    handler(async (req, res) => {
+      const body = parseBody(loginMfaSchema, req.body);
+      const ip =
+        (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
+        req.socket.remoteAddress ??
+        null;
+      const tokens = await service.completeMfaLogin(body, ip);
       setAuthCookies(res, tokens.refreshToken);
       res.status(200).json(tokens);
     }),
@@ -193,8 +223,8 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
       const auth = res.locals["auth"] as { userId: string; tenantId: string } | undefined;
       if (!auth) { res.status(401).end(); return; }
       const body = parseBody(z.object({ code: z.string().length(6) }), req.body);
-      await service.verifyAndEnableMfa(auth.userId, auth.tenantId, body.code);
-      res.json({ ok: true, message: "MFA enabled successfully" });
+      const result = await service.verifyAndEnableMfa(auth.userId, auth.tenantId, body.code);
+      res.json({ ok: true, message: "MFA enabled successfully", backupCodes: result.backupCodes });
     }),
   );
 

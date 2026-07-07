@@ -1052,7 +1052,14 @@ export const handlers = [
   // ── MFA (Sprint 10C) ─────────────────────────────────────────────────────────
   http.get("*/api/identity/mfa/status", async () => { await latency(); return HttpResponse.json({ enabled: false, setupRequired: true }); }),
   http.post("*/api/identity/mfa/setup", async () => { await latency(); return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" }); }),
-  http.post("*/api/identity/mfa/verify", async () => { await latency(); return HttpResponse.json({ ok: true, message: "MFA enabled successfully" }); }),
+  http.post("*/api/identity/mfa/verify", async () => {
+    await latency();
+    return HttpResponse.json({
+      ok: true,
+      message: "MFA enabled successfully",
+      backupCodes: ["ABCD-2345", "EFGH-6789", "JKLM-2345", "NPQR-6789"],
+    });
+  }),
   http.post("*/api/identity/mfa/disable", async () => { await latency(); return HttpResponse.json({ ok: true }); }),
 
   // ── Backup codes (Sprint 16) ──────────────────────────────────────────────

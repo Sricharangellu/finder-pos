@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { v7 as uuidv7 } from "uuid";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { DB } from "../shared/db.js";
 import type { EventBus } from "../shared/events.js";
 import { sendEmail } from "../shared/email.js";
@@ -11,6 +11,8 @@ import { hasRole } from "./types.js";
 
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL = "7d";
+const MFA_PENDING_TOKEN_TTL_SECONDS = 5 * 60;
+const MFA_BACKUP_CODE_COUNT = 8;
 
 // Account lockout policy
 const MAX_FAILED_ATTEMPTS = 10;           // lock after 10 consecutive failures
@@ -25,6 +27,19 @@ export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   expiresIn: number; // seconds
+}
+
+export interface MfaRequiredLogin {
+  mfaRequired: true;
+  pendingToken: string;
+  expiresIn: number;
+}
+
+export type LoginResult = (TokenPair & { user: AuthUser }) | MfaRequiredLogin;
+
+export interface MfaLoginInput {
+  pendingToken: string;
+  code: string;
 }
 
 /** User summary returned to the client on login (matches the frontend contract). */
@@ -118,7 +133,7 @@ export class IdentityService {
    * if the hash column is unavailable we fall back to a dev-only plaintext
    * comparison (must not reach production).
    */
-  async login(input: LoginInput, ip: string | null = null): Promise<TokenPair & { user: AuthUser }> {
+  async login(input: LoginInput, ip: string | null = null): Promise<LoginResult> {
     const user = await this.db.one<UserRow>(
       "SELECT * FROM users WHERE email = @email",
       { email: input.email.toLowerCase().trim() },
@@ -160,7 +175,54 @@ export class IdentityService {
       { now: Date.now(), id: user.id },
     );
 
-    await this.logLoginAttempt({ email: input.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip });
+    if (user.mfa_enabled) {
+      await this.logLoginAttempt({ email: input.email, success: false, reason: "mfa_required", userId: user.id, tenantId: user.tenant_id, ip });
+      return {
+        mfaRequired: true,
+        pendingToken: this.issueMfaPendingToken(user.id, user.tenant_id),
+        expiresIn: MFA_PENDING_TOKEN_TTL_SECONDS,
+      };
+    }
+
+    return this.issueLoginSession(user, ip);
+  }
+
+  async completeMfaLogin(input: MfaLoginInput, ip: string | null = null): Promise<TokenPair & { user: AuthUser }> {
+    const claims = this.verifyMfaPendingToken(input.pendingToken);
+    const user = await this.db.one<UserRow>(
+      "SELECT * FROM users WHERE id = @userId AND tenant_id = @tenantId",
+      { userId: claims.sub, tenantId: claims.tenantId },
+    );
+    if (!user || !user.mfa_enabled) {
+      throw new HttpError(401, "invalid_mfa_token", "The MFA challenge is no longer valid.");
+    }
+
+    const code = input.code.trim();
+    const verified =
+      (await this.verifyMfaCode(user.id, user.tenant_id, code)) ||
+      (await this.consumeMfaBackupCode(user.id, user.tenant_id, code));
+
+    if (!verified) {
+      const newCount = (user.failed_login_attempts ?? 0) + 1;
+      const lockedUntil = newCount >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_DURATION_MS : null;
+      await this.db.query(
+        "UPDATE users SET failed_login_attempts = @count, locked_until_ms = @locked, updated_at = @now WHERE id = @id AND tenant_id = @tenantId",
+        { count: newCount, locked: lockedUntil, now: Date.now(), id: user.id, tenantId: user.tenant_id },
+      );
+      await this.logLoginAttempt({ email: user.email, success: false, reason: "invalid_mfa", userId: user.id, tenantId: user.tenant_id, ip });
+      throw new HttpError(401, "invalid_mfa", "Invalid or expired MFA code.");
+    }
+
+    await this.db.query(
+      "UPDATE users SET failed_login_attempts = 0, locked_until_ms = NULL, updated_at = @now WHERE id = @id AND tenant_id = @tenantId",
+      { now: Date.now(), id: user.id, tenantId: user.tenant_id },
+    );
+
+    return this.issueLoginSession(user, ip);
+  }
+
+  private async issueLoginSession(user: UserRow, ip: string | null): Promise<TokenPair & { user: AuthUser }> {
+    await this.logLoginAttempt({ email: user.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip });
 
     const permissions = user.custom_role_id
       ? await this.resolveCustomRolePermissions(user.custom_role_id)
@@ -579,7 +641,7 @@ export class IdentityService {
     return { secret: secret.base32, otpauthUrl: totp.toString(), qrDataUrl: "" };
   }
 
-  async verifyAndEnableMfa(userId: string, tenantId: string, code: string): Promise<void> {
+  async verifyAndEnableMfa(userId: string, tenantId: string, code: string): Promise<{ backupCodes: string[] }> {
     const OTPAuth = await import("otpauth");
     const row = await this.db.one<{ totp_secret: string }>("SELECT totp_secret FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
     if (!row) throw new HttpError(404, "not_found", "MFA not set up");
@@ -587,14 +649,20 @@ export class IdentityService {
     const delta = totp.validate({ token: code, window: 1 });
     if (delta === null) throw new HttpError(400, "invalid_code", "Invalid or expired TOTP code");
     const now = Date.now();
-    await this.db.query("UPDATE user_mfa SET enabled = true, updated_at = @now WHERE user_id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
+    const backupCodes = this.generateBackupCodes();
+    const hashedBackupCodes = backupCodes.map((backupCode) => this.hashMfaBackupCode(userId, tenantId, backupCode));
+    await this.db.query(
+      "UPDATE user_mfa SET enabled = true, backup_codes = @backupCodes, updated_at = @now WHERE user_id = @uid AND tenant_id = @t",
+      { backupCodes: JSON.stringify(hashedBackupCodes), now, uid: userId, t: tenantId },
+    );
     await this.db.query("UPDATE users SET mfa_enabled = true, updated_at = @now WHERE id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
+    return { backupCodes };
   }
 
   async verifyMfaCode(userId: string, tenantId: string, code: string): Promise<boolean> {
     const OTPAuth = await import("otpauth");
     const row = await this.db.one<{ totp_secret: string; enabled: boolean }>("SELECT totp_secret, enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
-    if (!row || !row.enabled) return true; // MFA not enabled — pass through
+    if (!row || !row.enabled) return false;
     const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
     return totp.validate({ token: code, window: 1 }) !== null;
   }
@@ -681,6 +749,78 @@ export class IdentityService {
 
   private hashToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
+  }
+
+  private issueMfaPendingToken(userId: string, tenantId: string): string {
+    return jwt.sign({ tenantId, purpose: "mfa_login" }, this.getSecret() + ":mfa", {
+      subject: userId,
+      expiresIn: MFA_PENDING_TOKEN_TTL_SECONDS,
+    });
+  }
+
+  private verifyMfaPendingToken(token: string): TokenClaims & { purpose: string } {
+    try {
+      const claims = jwt.verify(token, this.getSecret() + ":mfa") as TokenClaims & { purpose?: string };
+      if (claims.purpose !== "mfa_login") {
+        throw new HttpError(401, "invalid_mfa_token", "The MFA challenge is invalid.");
+      }
+      return claims as TokenClaims & { purpose: string };
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      if (err instanceof jwt.TokenExpiredError) {
+        throw new HttpError(401, "mfa_token_expired", "The MFA challenge expired. Sign in again.");
+      }
+      throw new HttpError(401, "invalid_mfa_token", "The MFA challenge is invalid.");
+    }
+  }
+
+  private generateBackupCodes(): string[] {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    return Array.from({ length: MFA_BACKUP_CODE_COUNT }, () => {
+      const bytes = randomBytes(8);
+      const chars = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+      return `${chars.slice(0, 4)}-${chars.slice(4, 8)}`;
+    });
+  }
+
+  private normalizeBackupCode(code: string): string {
+    return code.trim().toUpperCase().replace(/\s+/g, "");
+  }
+
+  private hashMfaBackupCode(userId: string, tenantId: string, code: string): string {
+    return createHash("sha256")
+      .update(`${tenantId}:${userId}:${this.normalizeBackupCode(code)}`)
+      .digest("hex");
+  }
+
+  private async consumeMfaBackupCode(userId: string, tenantId: string, code: string): Promise<boolean> {
+    const normalized = this.normalizeBackupCode(code);
+    if (!/^[A-Z2-9]{4}-?[A-Z2-9]{4}$/.test(normalized)) return false;
+    const hash = this.hashMfaBackupCode(userId, tenantId, normalized);
+    return this.db.tx(async (tx) => {
+      const row = await tx.one<{ backup_codes: string; enabled: boolean }>(
+        "SELECT backup_codes, enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t FOR UPDATE",
+        { uid: userId, t: tenantId },
+      );
+      if (!row?.enabled) return false;
+      let hashes: string[];
+      try {
+        hashes = JSON.parse(row.backup_codes) as string[];
+      } catch {
+        return false;
+      }
+      if (!hashes.includes(hash)) return false;
+      await tx.query(
+        "UPDATE user_mfa SET backup_codes = @backupCodes, updated_at = @now WHERE user_id = @uid AND tenant_id = @t",
+        {
+          backupCodes: JSON.stringify(hashes.filter((storedHash) => storedHash !== hash)),
+          now: Date.now(),
+          uid: userId,
+          t: tenantId,
+        },
+      );
+      return true;
+    });
   }
 
   private issueTokens(

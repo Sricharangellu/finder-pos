@@ -18,7 +18,8 @@ export class ApiResponseError extends Error {
     public readonly code: string,
     message: string,
     public readonly requestId: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly payload?: unknown
   ) {
     super(message);
     this.name = "ApiResponseError";
@@ -129,7 +130,8 @@ export async function apiFetch<TResponse>(
       err?.code ?? "UNKNOWN_ERROR",
       err?.message ?? `HTTP ${response.status}`,
       err?.requestId ?? "",
-      response.status
+      response.status,
+      json
     );
   }
 

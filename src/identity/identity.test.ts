@@ -47,10 +47,12 @@ test("IdentityService issues a verifiable access token", async () => {
     VALUES ('${userId}', '${tenantId}', 'owner@example.com', 'secret123', 'owner', ${Date.now()}, ${Date.now()})
   `);
 
-  const { accessToken, refreshToken, expiresIn } = await svc.login({
+  const loginResult = await svc.login({
     email: "owner@example.com",
     password: "secret123",
   });
+  assert.ok(!("mfaRequired" in loginResult), "non-MFA login issues tokens");
+  const { accessToken, refreshToken, expiresIn } = loginResult;
 
   assert.ok(typeof accessToken === "string" && accessToken.length > 0, "accessToken present");
   assert.ok(typeof refreshToken === "string" && refreshToken.length > 0, "refreshToken present");
@@ -61,6 +63,126 @@ test("IdentityService issues a verifiable access token", async () => {
   assert.equal(claims.sub, userId, "sub = userId");
   assert.equal(claims.tenantId, tenantId, "tenantId claim correct");
   assert.equal(claims.role, "owner", "role claim correct");
+
+  await app.db.close();
+});
+
+test("login with enabled MFA returns a challenge without auth cookies", async () => {
+  const app = await freshApp();
+  const OTPAuth = await import("otpauth");
+
+  const tenantId = `ten_mfa_challenge_${Date.now()}`;
+  const userId = `usr_mfa_challenge_${Date.now()}`;
+  const secret = new OTPAuth.Secret({ size: 20 }).base32;
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'MFA Corp', 'mfa-corp-${Date.now()}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, mfa_enabled, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'mfa-owner@example.com', 'secret123', 'owner', true, ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, backup_codes, created_at, updated_at)
+    VALUES ('mfa_${Date.now()}', '${tenantId}', '${userId}', '${secret}', true, '[]', ${Date.now()}, ${Date.now()})
+  `);
+
+  const { status, json, headers } = await request(app.express, "POST", "/api/identity/login", {
+    email: "mfa-owner@example.com",
+    password: "secret123",
+  });
+
+  assert.equal(status, 401);
+  assert.equal(json.error.code, "mfa_required");
+  assert.equal(typeof json.pendingToken, "string");
+  assert.equal(headers["set-cookie"], undefined);
+
+  await app.db.close();
+});
+
+test("login MFA endpoint exchanges a valid TOTP challenge for auth cookies", async () => {
+  const app = await freshApp();
+  const OTPAuth = await import("otpauth");
+
+  const tenantId = `ten_mfa_totp_${Date.now()}`;
+  const userId = `usr_mfa_totp_${Date.now()}`;
+  const secret = new OTPAuth.Secret({ size: 20 });
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'TOTP Corp', 'totp-corp-${Date.now()}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, mfa_enabled, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'totp-owner@example.com', 'secret123', 'owner', true, ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, backup_codes, created_at, updated_at)
+    VALUES ('mfa_${Date.now()}', '${tenantId}', '${userId}', '${secret.base32}', true, '[]', ${Date.now()}, ${Date.now()})
+  `);
+
+  const login = await request(app.express, "POST", "/api/identity/login", {
+    email: "totp-owner@example.com",
+    password: "secret123",
+  });
+  const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret });
+  const code = totp.generate();
+
+  const { status, json, headers } = await request(app.express, "POST", "/api/identity/login/mfa", {
+    pendingToken: login.json.pendingToken,
+    code,
+  });
+
+  assert.equal(status, 200);
+  assert.equal(json.user.email, "totp-owner@example.com");
+  assert.ok(Array.isArray(headers["set-cookie"]), "MFA login should set auth cookies");
+
+  await app.db.close();
+});
+
+test("MFA backup code can complete login once and is then consumed", async () => {
+  const app = await freshApp();
+  const OTPAuth = await import("otpauth");
+  const svc = new IdentityService(app.db, app.events);
+
+  const tenantId = `ten_mfa_backup_${Date.now()}`;
+  const userId = `usr_mfa_backup_${Date.now()}`;
+  const secret = new OTPAuth.Secret({ size: 20 });
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'Backup Corp', 'backup-corp-${Date.now()}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, mfa_enabled, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'backup-owner@example.com', 'secret123', 'owner', false, ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, backup_codes, created_at, updated_at)
+    VALUES ('mfa_${Date.now()}', '${tenantId}', '${userId}', '${secret.base32}', false, '[]', ${Date.now()}, ${Date.now()})
+  `);
+
+  const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret });
+  const { backupCodes } = await svc.verifyAndEnableMfa(userId, tenantId, totp.generate());
+  const login = await request(app.express, "POST", "/api/identity/login", {
+    email: "backup-owner@example.com",
+    password: "secret123",
+  });
+
+  const firstUse = await request(app.express, "POST", "/api/identity/login/mfa", {
+    pendingToken: login.json.pendingToken,
+    code: backupCodes[0],
+  });
+  assert.equal(firstUse.status, 200);
+
+  const secondLogin = await request(app.express, "POST", "/api/identity/login", {
+    email: "backup-owner@example.com",
+    password: "secret123",
+  });
+  const secondUse = await request(app.express, "POST", "/api/identity/login/mfa", {
+    pendingToken: secondLogin.json.pendingToken,
+    code: backupCodes[0],
+  });
+  assert.equal(secondUse.status, 401);
+  assert.equal(secondUse.json.error.code, "invalid_mfa");
 
   await app.db.close();
 });
@@ -84,6 +206,8 @@ test("IdentityService issues unique refresh tokens for rapid repeated login", as
   const first = await svc.login({ email: "repeat-owner@example.com", password: "secret123" });
   const second = await svc.login({ email: "repeat-owner@example.com", password: "secret123" });
 
+  assert.ok(!("mfaRequired" in first), "first non-MFA login issues tokens");
+  assert.ok(!("mfaRequired" in second), "second non-MFA login issues tokens");
   assert.notEqual(first.accessToken, second.accessToken, "access token changes on repeated login");
   assert.notEqual(first.refreshToken, second.refreshToken, "refresh token changes on repeated login");
 

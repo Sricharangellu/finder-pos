@@ -19,34 +19,19 @@ interface MfaSetupData {
 
 type BackupCodesState = "idle" | "revealed" | "hidden";
 
-function generateCodes(): string[] {
-  const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 8 }, () => {
-    const buf = new Uint8Array(8);
-    crypto.getRandomValues(buf);
-    const part = (arr: Uint8Array, start: number) =>
-      Array.from(arr.slice(start, start + 4)).map((b) => CHARS[b % CHARS.length]).join("");
-    return `${part(buf, 0)}-${part(buf, 4)}`;
-  });
+interface MfaVerifyResponse {
+  ok: boolean;
+  message: string;
+  backupCodes: string[];
 }
 
-function BackupCodesCard() {
+function BackupCodesCard({ codes }: { codes: string[] }) {
   const [codesState, setCodesState] = useState<BackupCodesState>("idle");
-  const [codes, setCodes] = useState<string[]>([]);
-  const [confirmRegen, setConfirmRegen] = useState(false);
   const { addToast } = useToast();
 
-  const generate = () => {
-    const newCodes = generateCodes();
-    setCodes(newCodes);
-    setCodesState("revealed");
-    setConfirmRegen(false);
-    // NOTE: backup codes are generated client-side only. There is no backend
-    // route to persist/validate them yet (missing feature) — the previous
-    // POST /api/v1/auth/backup-codes 404'd on the real backend. Do not re-add a
-    // production call until a real endpoint exists; until then these codes are
-    // display-only and cannot be verified at login.
-  };
+  useEffect(() => {
+    setCodesState(codes.length > 0 ? "revealed" : "idle");
+  }, [codes]);
 
   const copyAll = async () => {
     try {
@@ -83,7 +68,9 @@ function BackupCodesCard() {
       </div>
 
       {codesState === "idle" && (
-        <Button variant="primary" size="sm" onClick={generate}>Generate</Button>
+        <p className="text-sm text-slate-500">
+          New backup codes are generated when MFA is enabled. Save them before leaving this page.
+        </p>
       )}
 
       {codesState === "revealed" && (
@@ -100,27 +87,6 @@ function BackupCodesCard() {
             <Button variant="secondary" size="sm" onClick={() => void copyAll()}>Copy all</Button>
             <Button variant="secondary" size="sm" onClick={download}>Download .txt</Button>
             <Button variant="ghost" size="sm" onClick={() => setCodesState("hidden")}>Hide codes</Button>
-            {confirmRegen ? (
-              <span className="flex items-center gap-2 text-sm text-slate-600">
-                This will invalidate all existing codes. Continue?
-                <button
-                  type="button"
-                  className="font-semibold text-red-600 hover:text-red-700"
-                  onClick={generate}
-                >
-                  Yes, regenerate
-                </button>
-                <button
-                  type="button"
-                  className="text-slate-500 hover:text-slate-700"
-                  onClick={() => setConfirmRegen(false)}
-                >
-                  Cancel
-                </button>
-              </span>
-            ) : (
-              <Button variant="danger" size="sm" onClick={() => setConfirmRegen(true)}>Regenerate codes</Button>
-            )}
           </div>
         </>
       )}
@@ -154,6 +120,7 @@ export function SecuritySection() {
   const [busy, setBusy] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -178,10 +145,11 @@ export function SecuritySection() {
     if (!verifyCode.trim()) return;
     setBusy(true);
     try {
-      await apiPost("/api/identity/mfa/verify", { code: verifyCode.trim() });
+      const result = await apiPost<MfaVerifyResponse>("/api/identity/mfa/verify", { code: verifyCode.trim() });
       setMfaStatus({ enabled: true, setupRequired: false });
       setSetupData(null);
       setVerifyCode("");
+      setBackupCodes(result.backupCodes);
       addToast({ title: "MFA enabled", description: "Your account is now protected with MFA.", variant: "success" });
     } catch (e) {
       addToast({ title: "Verification failed", description: e instanceof Error ? e.message : "Invalid code", variant: "error" });
@@ -196,6 +164,7 @@ export function SecuritySection() {
     try {
       await apiPost("/api/identity/mfa/disable", {});
       setMfaStatus({ enabled: false, setupRequired: false });
+      setBackupCodes([]);
       addToast({ title: "MFA disabled", variant: "success" });
     } catch (e) {
       addToast({ title: "Failed to disable MFA", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
@@ -308,7 +277,7 @@ export function SecuritySection() {
         )}
       </Card>
 
-      <BackupCodesCard />
+      <BackupCodesCard codes={backupCodes} />
 
       <Card className="flex flex-col gap-3">
         <h2 className="text-base font-semibold text-slate-950">Security posture</h2>

@@ -21,11 +21,21 @@ import type { LoginRequest, LoginResponse, UserProfile } from "@/api-client/type
 import { ApiResponseError } from "@/api-client/client";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+export interface MfaChallenge {
+  pendingToken: string;
+  expiresIn: number;
+}
+
+interface MfaRequiredPayload {
+  pendingToken?: string;
+  expiresIn?: number;
+}
 
 export interface UseAuthReturn {
   status: AuthStatus;
   user: UserProfile | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<MfaChallenge | null>;
+  completeMfaLogin: (pendingToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Human-readable error from the last login attempt */
   loginError: string | null;
@@ -84,13 +94,51 @@ export function useAuth(): UseAuthReturn {
         setUser(data.user);
         setStatus("authenticated");
         router.replace("/terminal");
+        return null;
       } catch (err) {
         if (err instanceof ApiResponseError) {
+          if (err.status === 401 && err.code === "mfa_required") {
+            const payload = err.payload as MfaRequiredPayload | undefined;
+            if (payload?.pendingToken) {
+              return {
+                pendingToken: payload.pendingToken,
+                expiresIn: typeof payload.expiresIn === "number" ? payload.expiresIn : 300,
+              };
+            }
+          }
           if (err.status === 401) {
             setLoginError("Invalid email or password.");
           } else {
             setLoginError(err.message);
           }
+        } else {
+          setLoginError("An unexpected error occurred. Please try again.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+      return null;
+    },
+    [router]
+  );
+
+  const completeMfaLogin = useCallback(
+    async (pendingToken: string, code: string) => {
+      setLoginError(null);
+      setIsLoading(true);
+      try {
+        const data = await apiPost<LoginResponse>(
+          "/api/identity/login/mfa",
+          { pendingToken, code },
+          { anonymous: true }
+        );
+        setSession(data.accessToken, data.expiresIn, data.refreshToken, data.user);
+        setUser(data.user);
+        setStatus("authenticated");
+        router.replace("/terminal");
+      } catch (err) {
+        if (err instanceof ApiResponseError) {
+          setLoginError(err.status === 401 ? "Invalid or expired MFA code." : err.message);
         } else {
           setLoginError("An unexpected error occurred. Please try again.");
         }
@@ -114,5 +162,5 @@ export function useAuth(): UseAuthReturn {
     router.replace("/login");
   }, [router]);
 
-  return { status, user, login, logout, loginError, isLoading };
+  return { status, user, login, completeMfaLogin, logout, loginError, isLoading };
 }
