@@ -393,3 +393,147 @@ test("authMiddleware populates res.locals.auth for a valid token", async () => {
   assert.equal(res.locals.auth?.userId, "usr_xyz");
   assert.equal(res.locals.auth?.role, "manager");
 });
+
+// ── 4. MFA backup-code management (regenerate / count / scope / auth) ──────────
+
+/** Seed a tenant + password-login user + disabled user_mfa row, enable MFA, and
+ *  return the service, ids, TOTP, and the initial backup codes. */
+async function seedMfaUser(
+  app: App,
+  label: string,
+): Promise<{
+  svc: IdentityService;
+  tenantId: string;
+  userId: string;
+  email: string;
+  backupCodes: string[];
+}> {
+  const OTPAuth = await import("otpauth");
+  const svc = new IdentityService(app.db, app.events);
+  const stamp = `${label}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const tenantId = `ten_${stamp}`;
+  const userId = `usr_${stamp}`;
+  // login() lower-cases the email for lookup, so store it lower-cased too.
+  const email = `${stamp}@example.com`.toLowerCase();
+  const secret = new OTPAuth.Secret({ size: 20 });
+  const now = Date.now();
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'MFA Corp', 'mfa-${stamp}', ${now}, ${now})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, mfa_enabled, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', '${email}', 'secret123', 'owner', false, ${now}, ${now})
+  `);
+  await app.db.exec(`
+    INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, backup_codes, created_at, updated_at)
+    VALUES ('mfa_${stamp}', '${tenantId}', '${userId}', '${secret.base32}', false, '[]', ${now}, ${now})
+  `);
+  const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret });
+  const { backupCodes } = await svc.verifyAndEnableMfa(userId, tenantId, totp.generate());
+  return { svc, tenantId, userId, email, backupCodes };
+}
+
+/** Attempt an MFA login with a backup code; returns the /login/mfa HTTP status. */
+async function loginWithBackupCode(app: App, email: string, code: string): Promise<number> {
+  const login = await request(app.express, "POST", "/api/identity/login", { email, password: "secret123" });
+  const use = await request(app.express, "POST", "/api/identity/login/mfa", {
+    pendingToken: login.json.pendingToken,
+    code,
+  });
+  return use.status;
+}
+
+test("regenerateBackupCodes invalidates old codes and issues a fresh set", async () => {
+  const app = await freshApp();
+  const { svc, tenantId, userId, email, backupCodes: original } = await seedMfaUser(app, "regen");
+  assert.equal(original.length, 8);
+
+  const { backupCodes: regenerated } = await svc.regenerateBackupCodes(userId, tenantId);
+  assert.equal(regenerated.length, 8, "regeneration issues a full new set");
+  assert.notDeepEqual(regenerated, original, "new codes differ from the old set");
+
+  assert.equal(await loginWithBackupCode(app, email, original[0]!), 401, "old code is dead after regeneration");
+  assert.equal(await loginWithBackupCode(app, email, regenerated[0]!), 200, "a new code completes login");
+
+  await app.db.close();
+});
+
+test("getMfaStatus reports remaining backup-code count and decrements on use", async () => {
+  const app = await freshApp();
+  const { svc, tenantId, userId, email, backupCodes } = await seedMfaUser(app, "count");
+
+  let status = await svc.getMfaStatus(userId, tenantId);
+  assert.equal(status.enabled, true);
+  assert.equal(status.backupCodesRemaining, 8, "all 8 codes present after enable");
+
+  assert.equal(await loginWithBackupCode(app, email, backupCodes[0]!), 200);
+  status = await svc.getMfaStatus(userId, tenantId);
+  assert.equal(status.backupCodesRemaining, 7, "consuming one code drops the count");
+
+  await svc.regenerateBackupCodes(userId, tenantId);
+  status = await svc.getMfaStatus(userId, tenantId);
+  assert.equal(status.backupCodesRemaining, 8, "regeneration restores a full set");
+
+  const missing = await svc.getMfaStatus("usr_nobody", tenantId);
+  assert.equal(missing.setupRequired, true);
+  assert.equal(missing.backupCodesRemaining, 0, "no mfa row → zero codes");
+
+  await app.db.close();
+});
+
+test("backup-code regeneration is tenant-scoped", async () => {
+  const app = await freshApp();
+  const a = await seedMfaUser(app, "scopeA");
+  const b = await seedMfaUser(app, "scopeB");
+
+  // Regenerate only tenant A's codes.
+  await a.svc.regenerateBackupCodes(a.userId, a.tenantId);
+
+  // Tenant B is untouched: count unchanged and its original code still works.
+  const statusB = await b.svc.getMfaStatus(b.userId, b.tenantId);
+  assert.equal(statusB.backupCodesRemaining, 8, "other tenant's codes are not cleared");
+  assert.equal(await loginWithBackupCode(app, b.email, b.backupCodes[0]!), 200, "other tenant's code still valid");
+
+  // Tenant A's original code is dead.
+  assert.equal(await loginWithBackupCode(app, a.email, a.backupCodes[0]!), 401, "regenerated tenant's old code is dead");
+
+  await app.db.close();
+});
+
+test("regenerateBackupCodes refuses when MFA is not enabled", async () => {
+  const app = await freshApp();
+  const svc = new IdentityService(app.db, app.events);
+  const stamp = `disabled_${Date.now()}`;
+  const tenantId = `ten_${stamp}`;
+  const userId = `usr_${stamp}`;
+  const now = Date.now();
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'No MFA Corp', 'nomfa-${stamp}', ${now}, ${now})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, mfa_enabled, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', '${stamp}@example.com', 'secret123', 'owner', false, ${now}, ${now})
+  `);
+  await app.db.exec(`
+    INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, backup_codes, created_at, updated_at)
+    VALUES ('mfa_${stamp}', '${tenantId}', '${userId}', 'JBSWY3DPEHPK3PXP', false, '[]', ${now}, ${now})
+  `);
+
+  await assert.rejects(
+    () => svc.regenerateBackupCodes(userId, tenantId),
+    (err: unknown) =>
+      err instanceof HttpError && err.status === 400 && err.code === "mfa_not_enabled",
+    "regeneration is refused until MFA is enabled",
+  );
+
+  await app.db.close();
+});
+
+test("POST /mfa/backup-codes/regenerate requires authentication", async () => {
+  const app = await freshApp();
+  const { status, json } = await request(app.express, "POST", "/api/identity/mfa/backup-codes/regenerate", {});
+  assert.ok(status === 401 || json?.error?.code === "unauthenticated", "no token → 401/unauthenticated");
+  await app.db.close();
+});

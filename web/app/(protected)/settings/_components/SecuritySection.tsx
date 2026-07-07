@@ -10,6 +10,7 @@ import { useToast } from "@/components/Toast";
 interface MfaStatus {
   enabled: boolean;
   setupRequired: boolean;
+  backupCodesRemaining: number;
 }
 
 interface MfaSetupData {
@@ -25,7 +26,24 @@ interface MfaVerifyResponse {
   backupCodes: string[];
 }
 
-function BackupCodesCard({ codes }: { codes: string[] }) {
+interface RegenerateResponse {
+  ok: boolean;
+  backupCodes: string[];
+}
+
+function BackupCodesCard({
+  codes,
+  remaining,
+  mfaEnabled,
+  regenerating,
+  onRegenerateClick,
+}: {
+  codes: string[];
+  remaining: number;
+  mfaEnabled: boolean;
+  regenerating: boolean;
+  onRegenerateClick: () => void;
+}) {
   const [codesState, setCodesState] = useState<BackupCodesState>("idle");
   const { addToast } = useToast();
 
@@ -52,30 +70,36 @@ function BackupCodesCard({ codes }: { codes: string[] }) {
     URL.revokeObjectURL(url);
   };
 
+  const regenerateButton = (
+    <Button variant="secondary" size="sm" loading={regenerating} onClick={onRegenerateClick}>
+      {remaining > 0 || codes.length > 0 ? "Regenerate codes" : "Generate codes"}
+    </Button>
+  );
+
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-950">Backup codes</h2>
-          <p className="text-sm text-slate-500">Generate one-time recovery codes in case you lose access to your authenticator app.</p>
+          <p className="text-sm text-slate-500">One-time recovery codes to sign in if you lose access to your authenticator app.</p>
         </div>
-        {codesState !== "idle" && (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            <span className="h-2 w-2 rounded-full bg-blue-500" />
-            {codes.length} codes remaining
+        {mfaEnabled && (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600" aria-live="polite">
+            <span className={`h-2 w-2 rounded-full ${remaining > 0 ? "bg-blue-500" : "bg-amber-500"}`} />
+            {remaining} {remaining === 1 ? "code" : "codes"} remaining
           </span>
         )}
       </div>
 
-      {codesState === "idle" && (
+      {!mfaEnabled && (
         <p className="text-sm text-slate-500">
-          New backup codes are generated when MFA is enabled. Save them before leaving this page.
+          Backup codes are generated when MFA is enabled. Enable MFA above to receive your recovery codes.
         </p>
       )}
 
-      {codesState === "revealed" && (
+      {mfaEnabled && codesState === "revealed" && (
         <>
-          <p className="text-sm text-slate-500">Save these somewhere safe. Each code can only be used once.</p>
+          <p className="text-sm text-slate-500">Save these somewhere safe. Each code can only be used once, and generating new codes invalidates any previous set.</p>
           <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
             {codes.map((c) => (
               <span key={c} className="font-mono text-sm font-semibold tracking-wider text-slate-950 select-all">
@@ -87,17 +111,22 @@ function BackupCodesCard({ codes }: { codes: string[] }) {
             <Button variant="secondary" size="sm" onClick={() => void copyAll()}>Copy all</Button>
             <Button variant="secondary" size="sm" onClick={download}>Download .txt</Button>
             <Button variant="ghost" size="sm" onClick={() => setCodesState("hidden")}>Hide codes</Button>
+            {regenerateButton}
           </div>
         </>
       )}
 
-      {codesState === "hidden" && (
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-sm text-slate-600">
-            <span className="h-2 w-2 rounded-full bg-blue-500" />
-            {codes.length} codes remaining
-          </span>
-          <Button variant="secondary" size="sm" onClick={() => setCodesState("revealed")}>Show codes</Button>
+      {mfaEnabled && codesState !== "revealed" && (
+        <div className="flex flex-wrap items-center gap-3">
+          {remaining === 0 && (
+            <p className="text-sm text-amber-700">
+              No backup codes remain. Generate a new set so you can recover access if you lose your authenticator.
+            </p>
+          )}
+          {codes.length > 0 && (
+            <Button variant="secondary" size="sm" onClick={() => setCodesState("revealed")}>Show codes</Button>
+          )}
+          {regenerateButton}
         </div>
       )}
     </Card>
@@ -118,8 +147,10 @@ export function SecuritySection() {
   const [setupData, setSetupData] = useState<MfaSetupData | null>(null);
   const [verifyCode, setVerifyCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const { addToast } = useToast();
 
@@ -146,7 +177,7 @@ export function SecuritySection() {
     setBusy(true);
     try {
       const result = await apiPost<MfaVerifyResponse>("/api/identity/mfa/verify", { code: verifyCode.trim() });
-      setMfaStatus({ enabled: true, setupRequired: false });
+      setMfaStatus({ enabled: true, setupRequired: false, backupCodesRemaining: result.backupCodes.length });
       setSetupData(null);
       setVerifyCode("");
       setBackupCodes(result.backupCodes);
@@ -163,13 +194,28 @@ export function SecuritySection() {
     setConfirmDisable(false);
     try {
       await apiPost("/api/identity/mfa/disable", {});
-      setMfaStatus({ enabled: false, setupRequired: false });
+      setMfaStatus({ enabled: false, setupRequired: false, backupCodesRemaining: 0 });
       setBackupCodes([]);
       addToast({ title: "MFA disabled", variant: "success" });
     } catch (e) {
       addToast({ title: "Failed to disable MFA", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const regenerateBackupCodes = async () => {
+    setConfirmRegenerate(false);
+    setRegenerating(true);
+    try {
+      const result = await apiPost<RegenerateResponse>("/api/identity/mfa/backup-codes/regenerate", {});
+      setBackupCodes(result.backupCodes);
+      setMfaStatus((s) => (s ? { ...s, backupCodesRemaining: result.backupCodes.length } : s));
+      addToast({ title: "Backup codes regenerated", description: "Your previous codes no longer work. Save the new ones.", variant: "success" });
+    } catch (e) {
+      addToast({ title: "Couldn’t regenerate codes", description: e instanceof Error ? e.message : "Unknown error", variant: "error" });
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -183,6 +229,16 @@ export function SecuritySection() {
         destructive
         onConfirm={() => void disableMfa()}
         onCancel={() => setConfirmDisable(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmRegenerate}
+        title="Regenerate backup codes"
+        message="This immediately invalidates all of your current backup codes and issues a new set. Any previously saved codes will stop working. Continue?"
+        confirmLabel="Regenerate now"
+        destructive
+        onConfirm={() => void regenerateBackupCodes()}
+        onCancel={() => setConfirmRegenerate(false)}
       />
 
       <Card className="flex flex-col gap-4">
@@ -277,7 +333,13 @@ export function SecuritySection() {
         )}
       </Card>
 
-      <BackupCodesCard codes={backupCodes} />
+      <BackupCodesCard
+        codes={backupCodes}
+        remaining={mfaStatus?.backupCodesRemaining ?? 0}
+        mfaEnabled={mfaStatus?.enabled ?? false}
+        regenerating={regenerating}
+        onRegenerateClick={() => setConfirmRegenerate(true)}
+      />
 
       <Card className="flex flex-col gap-3">
         <h2 className="text-base font-semibold text-slate-950">Security posture</h2>

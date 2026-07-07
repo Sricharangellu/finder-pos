@@ -673,9 +673,45 @@ export class IdentityService {
     await this.db.query("UPDATE users SET mfa_enabled = false, updated_at = @now WHERE id = @uid AND tenant_id = @t", { now, uid: userId, t: tenantId });
   }
 
-  async getMfaStatus(userId: string, tenantId: string): Promise<{ enabled: boolean; setupRequired: boolean }> {
-    const row = await this.db.one<{ enabled: boolean }>("SELECT enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
-    return { enabled: row?.enabled ?? false, setupRequired: !row };
+  async getMfaStatus(
+    userId: string,
+    tenantId: string,
+  ): Promise<{ enabled: boolean; setupRequired: boolean; backupCodesRemaining: number }> {
+    const row = await this.db.one<{ enabled: boolean; backup_codes: string }>(
+      "SELECT enabled, backup_codes FROM user_mfa WHERE user_id = @uid AND tenant_id = @t",
+      { uid: userId, t: tenantId },
+    );
+    return {
+      enabled: row?.enabled ?? false,
+      setupRequired: !row,
+      backupCodesRemaining: this.countBackupCodes(row?.backup_codes),
+    };
+  }
+
+  /**
+   * Issue a fresh set of one-time backup codes, invalidating every prior code.
+   * MFA must already be enabled — regeneration is a post-setup recovery-code
+   * rotation, not a way to bootstrap MFA. Runs in a transaction with a row lock
+   * so a concurrent login backup-code consumption can't race the replacement.
+   * Returns the plaintext codes ONCE; only their hashes are persisted.
+   */
+  async regenerateBackupCodes(userId: string, tenantId: string): Promise<{ backupCodes: string[] }> {
+    const backupCodes = this.generateBackupCodes();
+    const hashedBackupCodes = backupCodes.map((code) => this.hashMfaBackupCode(userId, tenantId, code));
+    await this.db.tx(async (tx) => {
+      const row = await tx.one<{ enabled: boolean }>(
+        "SELECT enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t FOR UPDATE",
+        { uid: userId, t: tenantId },
+      );
+      if (!row?.enabled) {
+        throw new HttpError(400, "mfa_not_enabled", "Enable MFA before regenerating backup codes.");
+      }
+      await tx.query(
+        "UPDATE user_mfa SET backup_codes = @backupCodes, updated_at = @now WHERE user_id = @uid AND tenant_id = @t",
+        { backupCodes: JSON.stringify(hashedBackupCodes), now: Date.now(), uid: userId, t: tenantId },
+      );
+    });
+    return { backupCodes };
   }
 
   // ── API Keys ──────────────────────────────────────────────────────────────────
@@ -771,6 +807,17 @@ export class IdentityService {
         throw new HttpError(401, "mfa_token_expired", "The MFA challenge expired. Sign in again.");
       }
       throw new HttpError(401, "invalid_mfa_token", "The MFA challenge is invalid.");
+    }
+  }
+
+  /** Count remaining backup codes from the stored JSON hash array (defensive against bad JSON). */
+  private countBackupCodes(raw: string | null | undefined): number {
+    if (!raw) return 0;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
     }
   }
 

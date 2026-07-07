@@ -1049,31 +1049,46 @@ export const handlers = [
     });
   }),
 
-  // ── MFA (Sprint 10C) ─────────────────────────────────────────────────────────
-  http.get("*/api/identity/mfa/status", async () => { await latency(); return HttpResponse.json({ enabled: false, setupRequired: true }); }),
-  http.post("*/api/identity/mfa/setup", async () => { await latency(); return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" }); }),
-  http.post("*/api/identity/mfa/verify", async () => {
-    await latency();
-    return HttpResponse.json({
-      ok: true,
-      message: "MFA enabled successfully",
-      backupCodes: ["ABCD-2345", "EFGH-6789", "JKLM-2345", "NPQR-6789"],
-    });
-  }),
-  http.post("*/api/identity/mfa/disable", async () => { await latency(); return HttpResponse.json({ ok: true }); }),
-
-  // ── Backup codes (Sprint 16) ──────────────────────────────────────────────
+  // ── MFA (Sprint 10C) — stateful so status/enable/regenerate/disable stay coherent.
+  //    Backup-code management lives under the REAL /api/identity/mfa/* routes; the
+  //    legacy /api/v1/auth/backup-codes mock path has been removed. ───────────────
   ...(() => {
+    let mfaEnabled = false;
     let backupCodes: string[] = [];
+    const genCodes = (): string[] => {
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const block = () => Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+      return Array.from({ length: 8 }, () => `${block()}-${block()}`);
+    };
     return [
-      http.get("*/api/v1/auth/backup-codes", async () => {
+      http.get("*/api/identity/mfa/status", async () => {
         await latency();
-        return HttpResponse.json({ codes: backupCodes, remaining: backupCodes.length });
+        return HttpResponse.json({ enabled: mfaEnabled, setupRequired: !mfaEnabled, backupCodesRemaining: backupCodes.length });
       }),
-      http.post("*/api/v1/auth/backup-codes", async () => {
+      http.post("*/api/identity/mfa/setup", async () => {
         await latency();
+        return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" });
+      }),
+      http.post("*/api/identity/mfa/verify", async () => {
+        await latency();
+        mfaEnabled = true;
+        backupCodes = genCodes();
+        return HttpResponse.json({ ok: true, message: "MFA enabled successfully", backupCodes });
+      }),
+      http.post("*/api/identity/mfa/disable", async () => {
+        await latency();
+        mfaEnabled = false;
         backupCodes = [];
-        return HttpResponse.json({ codes: backupCodes });
+        return HttpResponse.json({ ok: true });
+      }),
+      // Rotate recovery codes — invalidates the previous set (mirrors the real route).
+      http.post("*/api/identity/mfa/backup-codes/regenerate", async () => {
+        await latency();
+        if (!mfaEnabled) {
+          return HttpResponse.json({ error: { code: "mfa_not_enabled", message: "Enable MFA before regenerating backup codes." } }, { status: 400 });
+        }
+        backupCodes = genCodes();
+        return HttpResponse.json({ ok: true, backupCodes });
       }),
     ];
   })(),

@@ -238,6 +238,17 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
     }),
   );
 
+  // Rotate recovery codes after setup — invalidates all previous backup codes.
+  router.post(
+    "/mfa/backup-codes/regenerate",
+    handler(async (_req, res) => {
+      const auth = res.locals["auth"] as { userId: string; tenantId: string } | undefined;
+      if (!auth) { res.status(401).end(); return; }
+      const result = await service.regenerateBackupCodes(auth.userId, auth.tenantId);
+      res.json({ ok: true, backupCodes: result.backupCodes });
+    }),
+  );
+
   // ── API Keys (owner only) ─────────────────────────────────────────────────────
   router.get(
     "/api-keys",
