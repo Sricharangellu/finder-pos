@@ -2,70 +2,43 @@
 
 ## Goal
 
-Separate retail, wholesale, ecommerce, and owner reporting while allowing combined executive views.
+Separate retail, wholesale, ecommerce, and shared reporting while allowing a
+combined executive view. Reports are permission- and business-unit-aware.
 
-## Required Filters
+## Required filters
 
-Every report must filter by:
-
-```txt
-tenant_id
-business_unit_id
-channel
-location_id
-date range
-user role and permissions
-```
-
-## Report Families
-
-Retail:
+Every report filters by:
 
 ```txt
-POS sales summary
-register closeout
-cashier performance
-payment method summary
-returns
-discounts
-low stock
-age verification logs
+tenant_id  business_unit_id  channel  location_id  date range  user role/permissions
 ```
 
-Wholesale:
+## Report families
+
+Retail: POS sales summary · register closeout · cashier performance · payment
+method summary · returns · discounts · low stock · age-verification logs.
+
+Wholesale: sales-order summary · quotes conversion · AR aging · customer sales ·
+sales-rep performance · warehouse fulfillment · margin report · invoice status.
+
+Shared: inventory valuation · tax report · product performance · vendor
+performance · purchase report · accounting summary · audit logs.
+
+## Database changes
 
 ```txt
-sales order summary
-quotes conversion
-AR aging
-customer sales
-sales rep performance
-warehouse fulfillment
-margin report
-invoice status
+daily_sales_summary      daily_inventory_summary   report_jobs
+scheduled_reports        dashboard_widgets
 ```
 
-Shared:
+Use aggregated summary tables for performance-sensitive reports.
 
-```txt
-inventory valuation
-tax report
-product performance
-vendor performance
-purchase report
-accounting summary
-audit logs
-```
+## Current repo files affected
 
-## Existing Files To Touch
+- `src/modules/reports`, `src/modules/insights`, `src/modules/monitoring`.
+- `web/app/(protected)/retail/reports`, `.../wholesale/reports`, `.../admin/reports`.
 
-- `src/modules/reports`
-- `src/modules/insights`
-- `web/app/(protected)/retail/reports`
-- `web/app/(protected)/wholesale/reports`
-- `web/app/(protected)/admin/reports`
-
-## Backend Endpoints
+## Backend endpoints
 
 ```txt
 GET  /api/v1/reports/retail/summary
@@ -77,13 +50,30 @@ POST /api/v1/reports/scheduled
 GET  /api/v1/dashboard
 ```
 
-## Tests
+## Frontend screens
 
-- Retail manager cannot view wholesale AR unless granted.
-- Wholesale manager cannot view register closeout unless granted.
-- Owner can view combined company dashboard.
+- Retail dashboard; wholesale dashboard; owner combined dashboard.
+- Filters by business unit / channel / location / date.
+- Export CSV/PDF; scheduled email reports.
+- Permission-based widgets.
 
-## Acceptance Criteria
+## Tests required
+
+- A retail manager cannot view wholesale AR unless granted.
+- A wholesale manager cannot view register closeout unless granted.
+- An owner can view the combined company dashboard.
+- Reports use aggregated tables where needed for performance.
+
+## Acceptance criteria
 
 - Report data never crosses unauthorized business-unit boundaries.
+- Owner sees combined; retail/wholesale managers see only their granted scope.
+- Aggregated tables back heavy reports.
 
+## Implementation checklist
+
+- [ ] Summary tables (`daily_sales_summary`, `daily_inventory_summary`) + jobs.
+- [ ] Retail/wholesale/shared report endpoints with the required filters.
+- [ ] Permission checks per report family (WP 02).
+- [ ] Scheduled reports + export CSV/PDF.
+- [ ] Retail/wholesale/owner dashboards with permission-based widgets.

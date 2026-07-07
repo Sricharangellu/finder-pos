@@ -2,74 +2,70 @@
 
 ## Goal
 
-Connect modules through events and workflows rather than direct imports, keeping retail and wholesale behavior separate but coordinated.
+Connect modules through domain events and workflows — not direct imports —
+keeping retail and wholesale behavior separate but coordinated, reliable, and
+idempotent.
 
-## Event Model
+## Event model
 
-Retail events:
+Retail: `retail.order.created` · `retail.payment.captured` ·
+`retail.order.completed` · `retail.return.created` · `retail.register.closed`.
 
-```txt
-retail.order.created
-retail.payment.captured
-retail.order.completed
-retail.return.created
-retail.register.closed
-```
+Wholesale: `wholesale.quote.created` · `wholesale.sales_order.approved` ·
+`wholesale.pick_list.created` · `wholesale.order.shipped` ·
+`wholesale.invoice.created` · `customer.credit_exceeded`.
 
-Wholesale events:
+Shared: `inventory.reserved` · `inventory.decremented` · `payment.captured` ·
+`invoice.created` · `accounting.entry.posted` · `report.aggregate.updated`.
 
-```txt
-wholesale.quote.created
-wholesale.sales_order.approved
-wholesale.pick_list.created
-wholesale.order.shipped
-wholesale.invoice.created
-customer.credit_exceeded
-```
-
-Shared events:
-
-```txt
-inventory.reserved
-inventory.decremented
-payment.captured
-invoice.created
-accounting.entry.posted
-report.aggregate.updated
-```
-
-## Existing Files To Touch
-
-- `src/orchestration`
-- `src/shared/events.ts`
-- `src/modules/orders`
-- `src/modules/sales`
-- `src/modules/inventory`
-- `src/modules/payments`
-- `src/modules/accounting`
-
-## Workflow Requirements
+## Workflows
 
 Retail checkout:
 
 ```txt
-price resolve -> tax calculate -> payment capture -> inventory decrement -> receipt -> accounting -> reports
+price resolve -> tax calculate -> payment capture -> inventory decrement
+-> receipt -> accounting post -> report aggregate
 ```
 
 Wholesale order:
 
 ```txt
-price resolve -> credit check -> approval -> inventory reserve -> pick -> ship -> invoice -> AR -> accounting -> reports
+price resolve -> credit check -> approval -> inventory reserve -> pick list
+-> shipment -> invoice -> AR update -> accounting post -> report aggregate
 ```
 
-## Tests
+## Backend requirements
 
-- Payment failure does not decrement inventory.
-- Inventory failure does not create invoice.
-- Duplicate requests do not duplicate sales.
-- Failed workflows can be retried.
+- Use the event bus (`src/shared/events.ts`), not cross-module imports.
+- Use idempotency keys.
+- Use an outbox table for reliable event processing.
+- Use compensating actions for failed workflows.
+- Keep module boundaries clean.
 
-## Acceptance Criteria
+## Current repo files affected
+
+- `src/orchestration/*`, `src/shared/events.ts`.
+- `src/modules/orders`, `src/modules/sales`, `src/modules/inventory`, `src/modules/payments`, `src/modules/accounting`.
+
+## Tests required
+
+- A payment failure does not decrement inventory.
+- An inventory failure does not create an invoice.
+- A duplicate webhook/order request does not duplicate a sale.
+- A failed workflow can be retried or manually reviewed.
+- Workflow status is visible to the frontend.
+
+## Acceptance criteria
 
 - Every cross-module side effect is event-driven, idempotent, and auditable.
+- Payment failure → no inventory decrement; inventory failure → no invoice.
+- Duplicate requests never duplicate sales.
+- Failed workflows are retryable/reviewable and their status is visible.
 
+## Implementation checklist
+
+- [ ] Retail + wholesale event contracts on the bus.
+- [ ] Outbox table + reliable dispatch + idempotency keys.
+- [ ] Retail checkout and wholesale order workflows wired via events.
+- [ ] Compensating actions on failure (no partial commits).
+- [ ] Workflow-status surface for the frontend + retry/review.

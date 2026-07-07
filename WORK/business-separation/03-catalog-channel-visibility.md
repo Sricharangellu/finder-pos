@@ -2,17 +2,37 @@
 
 ## Goal
 
-Allow one product master to be used differently in retail, wholesale, ecommerce, and warehouse contexts.
+One product master, used differently across retail, wholesale, ecommerce, and
+warehouse — without data collision. The same SKU may need different prices,
+visibility, descriptions, barcodes, tax rules, restrictions, and pack sizes per
+channel. Products are master data; channel behavior is an overlay.
 
-## User Feature Separation
+## User feature separation
 
-- Retail sees scan-friendly names, each-unit sale, age restrictions, and POS visibility.
-- Wholesale sees case/box units, minimum order quantity, vendor UPCs, margin, and customer-specific visibility.
-- Ecommerce sees web names, images, descriptions, SEO fields, and online visibility.
+- Retail: scan-friendly names, each-unit sale, age restrictions, POS visibility only.
+- Wholesale: case/box/unit pack sizes, minimum order qty, vendor + case UPCs, margin/cost (permitted roles), customer-specific visibility.
+- Ecommerce: web names, images, descriptions/SEO, online visibility.
 
-## Data Scheme
+## Database changes
 
-Extend catalog with:
+Master/overlay tables:
+
+```txt
+products                 product_variants        product_barcodes
+product_categories       product_images          product_attributes
+product_units            product_packaging       product_vendor_mappings
+product_compliance_rules
+```
+
+Key product fields:
+
+```txt
+tenant_id  business_unit_id?  sku  name  base_unit  status  tax_class
+age_restricted  track_inventory  msa_reportable  restricted_states
+retail_visible  wholesale_visible  ecommerce_visible
+```
+
+Per-channel overlay:
 
 ```sql
 product_channel_visibility (
@@ -32,45 +52,54 @@ product_channel_visibility (
 );
 ```
 
-Related tables:
+## Current repo files affected
 
-```txt
-products
-product_variants
-product_barcodes
-product_categories
-product_images
-product_attributes
-product_units
-product_packaging
-product_vendor_mappings
-product_compliance_rules
-```
+- `src/modules/catalog`, `src/modules/product_batches`, `src/modules/serial_numbers`.
+- `web/app/(protected)/admin/catalog` (channel-visibility tabs, barcode/unit mgmt).
 
-## Existing Files To Touch
-
-- `src/modules/catalog`
-- `src/modules/product_batches`
-- `web/app/(protected)/admin/catalog`
-
-## Backend Endpoints
+## Backend endpoints
 
 ```txt
 GET    /api/v1/catalog/products?channel=retail_pos
 GET    /api/v1/catalog/products?channel=wholesale_b2b
+POST   /api/v1/catalog/products
+PATCH  /api/v1/catalog/products/:id
 POST   /api/v1/catalog/products/:id/channel-visibility
 GET    /api/v1/catalog/barcodes/:barcode/resolve
 POST   /api/v1/catalog/import
 GET    /api/v1/catalog/export
 ```
 
-## Tests
+Barcode resolve must return the correct product + unit/pack for the scanned code.
 
-- Product can be visible in retail and hidden in wholesale.
-- Product can have per-channel name and unit defaults.
-- Barcode resolves correct pack/unit.
+## Frontend screens
 
-## Acceptance Criteria
+- Shared product admin screen with channel tabs: Retail, Wholesale, Ecommerce.
+- Barcode management; unit/pack-size management.
+- Compliance fields for restricted products (age, restricted states, MSA).
+- Product import/export.
 
-- Product master data stays shared, while visibility and selling rules vary by channel.
+## Tests required
 
+- One product visible in retail but hidden in wholesale.
+- Per-channel name and unit defaults (retail name vs wholesale name override).
+- Barcode scan resolves the correct unit/pack.
+- Wholesale users cannot edit POS-only settings unless permitted.
+- Product data stays tenant-isolated.
+
+## Acceptance criteria
+
+- Product master stays shared while visibility and selling rules vary by channel.
+- Retail name/each-unit vs wholesale case-unit resolve correctly at sale time.
+- Barcode scan resolves the right unit/pack.
+- Restricted-product compliance fields are enforced downstream (WP 05 age check).
+
+## Implementation checklist
+
+- [ ] `product_channel_visibility` table + service resolution by `channel`.
+- [ ] Channel query param on catalog list; per-channel name/unit overrides.
+- [ ] Barcode resolve returns unit/pack.
+- [ ] Compliance fields on products (age_restricted, restricted_states, msa_reportable).
+- [ ] Import/export honoring channel visibility.
+- [ ] Admin UI channel tabs + barcode/unit/compliance management.
+- [ ] Permission gate on POS-only vs wholesale-only edits (WP 02).
