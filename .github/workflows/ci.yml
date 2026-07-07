@@ -61,6 +61,9 @@ jobs:
         # (no deps); the script is a plain ESM module.
         run: node tools/hygiene-check.mjs
 
+      - name: Prevention agent — no dirty drift or stray modules
+        run: npm run prevent:drift
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may

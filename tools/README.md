@@ -30,6 +30,23 @@ Exits non-zero if the tree contains a numeric copy file (`AGENTS 2.md`), a
 node tools/hygiene-check.mjs || exit 1
 ```
 
+## `prevention-agent.mjs` — fail-fast on dirty drift
+
+```bash
+npm run prevent:drift
+```
+
+This stricter guard blocks the local patterns that create unrelated dirty code:
+
+- tracked edits/deletions left in the working tree;
+- generated design-sync folders such as `.design-sync/`, `.ds-sync/`, `ds-bundle/`;
+- untracked source modules under `src/modules/`;
+- obsolete duplicate planning/instruction files such as `CLAUDE.md`, `WORK/RULES.md`,
+  `WORK/WORK_STATE.md`, `web/PROJECT_PLAN.md`, and `web/WORK_STATE.md`;
+- numeric copy files such as `Report 2.md`.
+
+Run this before opening a PR or handing off a session. CI also runs it in the guard job.
+
 ## `new-worktree.sh` — one isolated checkout per session
 
 ```bash

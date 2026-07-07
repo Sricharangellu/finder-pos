@@ -11,6 +11,7 @@
     "test": "tsx scripts/test.ts",
     "smoke": "tsx scripts/smoke.ts",
     "ops:check": "tsx scripts/ops-check.ts",
+    "prevent:drift": "node tools/prevention-agent.mjs",
     "seed:e2e": "tsx scripts/seed-e2e.ts",
     "seed:demo": "tsx scripts/seed-demo.ts"
   },
