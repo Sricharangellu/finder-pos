@@ -182,6 +182,12 @@ finder-pos/
 └── .env.example               # Environment variable template
 ```
 
+### Business separation work packages
+
+Retail, wholesale, ecommerce, warehouse, and shared-platform implementation prompts are tracked as work packages in `WORK/business-separation/README.md`.
+
+Read those packages before changing module schemas, route contracts, permissions, pricing, inventory, reporting, integrations, workflow orchestration, or frontend navigation that varies by business model.
+
 ---
 
 ## API Reference

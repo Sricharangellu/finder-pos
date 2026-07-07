@@ -13,6 +13,7 @@ Finder POS is a modular, multi-vertical point-of-sale platform. One codebase pow
 | Manage staff | [Team & roles](admin/team-and-roles.md) |
 | Understand my vertical | [Verticals index](#verticals) |
 | Integrate via API | [REST API overview](api/overview.md) |
+| Implement retail/wholesale separation | [Business separation work packages](../WORK/business-separation/README.md) |
 
 ## Verticals
 
