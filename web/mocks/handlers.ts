@@ -756,6 +756,56 @@ export const handlers = [
     return HttpResponse.json(response, { status: 200 });
   }),
 
+  // ── GET /api/v1/reports/recommendations ──────────────────────────────────
+  http.get(`${V1}/reports/recommendations`, async () => {
+    await latency();
+    const generatedAt = Date.now();
+    return HttpResponse.json({
+      ready: false,
+      recommendations: [
+        {
+          id: "rec_negative_net_profit",
+          signalCode: "negative_net_profit",
+          category: "profit",
+          severity: "critical",
+          title: "Review negative net profit",
+          detail: "Net profit is below zero after cost of goods and expenses.",
+          action: "Open profit report",
+          href: "/reports/p-l",
+          count: 1,
+          rank: 1,
+        },
+        {
+          id: "rec_low_stock",
+          signalCode: "low_stock",
+          category: "inventory",
+          severity: "warning",
+          title: "Restock low inventory",
+          detail: "Some products are at or below their reorder point.",
+          action: "Review reorder list",
+          href: "/inventory/reorder",
+          count: 4,
+          rank: 2,
+        },
+        {
+          id: "rec_uncategorized_expenses",
+          signalCode: "uncategorized_expenses",
+          category: "expenses",
+          severity: "info",
+          title: "Categorize expenses",
+          detail: "Uncategorized expenses reduce confidence in profit reports.",
+          action: "Open expenses",
+          href: "/finance",
+          count: 3,
+          rank: 3,
+        },
+      ],
+      summary: { total: 3, critical: 1, warning: 1, info: 1 },
+      generatedAt,
+      recentDays: 30,
+    });
+  }),
+
   // ── Gift cards (S7-GIFTCARDS) ─────────────────────────────────────────────────
   http.get(`${V1}/giftcards`, async () => {
     await latency();
