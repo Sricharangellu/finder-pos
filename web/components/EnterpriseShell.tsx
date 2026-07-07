@@ -405,7 +405,7 @@ function LeftRail({
 }) {
   const pathname = usePathname();
   const { enabled: enabledModules } = useModuleFlags();
-  const { hasFeature } = usePermissions();
+  const { hasFeature, error: permissionsError } = usePermissions();
   const { routeEnabled } = useCapabilities();
   const activeSection = SECTION_MAP[active] ?? "home";
   const { registerId } = useFinderContext();
@@ -459,6 +459,16 @@ function LeftRail({
     >
       {/* ── Nav items ─────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
+        {/* Permissions could not load → fail closed. Tell the operator that
+            privileged items are hidden rather than silently dropping them. */}
+        {permissionsError && expanded && (
+          <div
+            role="alert"
+            className="mx-2 mb-2 rounded-md bg-amber-500/15 px-3 py-2 text-xs leading-snug text-amber-100"
+          >
+            Permissions couldn’t load. Some features are hidden until access is restored — refresh to retry.
+          </div>
+        )}
         {navItems.map((item) => {
           const isActive = activeSection === item.section;
           const hasChildren = !!(item.children && item.children.length > 0);
