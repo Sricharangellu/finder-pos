@@ -92,6 +92,49 @@ test("expenses: create/delete require manager+, list is readable, and delete wor
   assert.equal(r.status, 404, "deleted expense is gone");
 });
 
+test("expenses: PATCH categorizes an uncategorized expense (manager+), audited", async () => {
+  const app = await freshApp();
+
+  // Uncategorized expense.
+  let r = await makeRequest(app, "POST", "/api/expenses", "manager", { amountCents: 2500 });
+  assert.equal(r.status, 201);
+  assert.equal(r.json.category, null);
+  const id = r.json.id;
+
+  // Cashier cannot categorize.
+  r = await makeRequest(app, "PATCH", `/api/expenses/${id}`, "cashier", { category: "Utilities" });
+  assert.equal(r.status, 403, "cashier is forbidden from updating expenses");
+
+  // Manager categorizes it.
+  r = await makeRequest(app, "PATCH", `/api/expenses/${id}`, "manager", { category: "Utilities" });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.category, "Utilities");
+  assert.equal(r.json.amount_cents, 2500, "untouched fields preserved");
+
+  // Reflected in the summary — the uncategorized count clears.
+  r = await makeRequest(app, "GET", "/api/expenses/summary", "owner");
+  assert.equal(r.json.uncategorizedCount, 0, "no longer uncategorized");
+  assert.equal(r.json.byCategory[0].category, "Utilities");
+
+  // Un-categorize by setting null.
+  r = await makeRequest(app, "PATCH", `/api/expenses/${id}`, "manager", { category: null });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.category, null);
+});
+
+test("expenses: PATCH rejects empty body and unknown id", async () => {
+  const app = await freshApp();
+  const created = await makeRequest(app, "POST", "/api/expenses", "manager", { amountCents: 100, category: "Rent" });
+
+  // Empty patch → 400 (at least one field required).
+  let r = await makeRequest(app, "PATCH", `/api/expenses/${created.json.id}`, "manager", {});
+  assert.equal(r.status, 400, "empty patch rejected");
+
+  // Unknown id → 404.
+  r = await makeRequest(app, "PATCH", "/api/expenses/exp_does_not_exist", "manager", { category: "X" });
+  assert.equal(r.status, 404, "unknown expense not found");
+});
+
 test("expenses: rejects non-positive amounts and is tenant-scoped", async () => {
   const app = await freshApp();
 

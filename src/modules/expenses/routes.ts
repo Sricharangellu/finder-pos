@@ -29,6 +29,16 @@ const createSchema = z.object({
   accountId: z.string().min(1).nullable().optional(),
 });
 
+const updateSchema = z
+  .object({
+    amountCents: z.number().int().positive().optional(),
+    category: z.string().min(1).max(64).nullable().optional(),
+    spentAt: z.number().int().positive().optional(),
+    vendor: z.string().max(128).nullable().optional(),
+    note: z.string().max(512).nullable().optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: "at least one field is required" });
+
 export function registerRoutes(router: Router, service: ExpensesService): void {
   const mgr = requireRole("manager");
 
@@ -57,6 +67,12 @@ export function registerRoutes(router: Router, service: ExpensesService): void {
 
   router.get("/:id", handler(async (req, res) => {
     res.json(await service.get(String(req.params.id), tenantId(res)));
+  }));
+
+  // PATCH /api/v1/expenses/:id — categorize/correct an expense (manager+). Audited in the service.
+  router.patch("/:id", mgr, handler(async (req, res) => {
+    const body = parseBody(updateSchema, req.body);
+    res.json(await service.update(String(req.params.id), body, tenantId(res), actorId(res)));
   }));
 
   // DELETE /api/v1/expenses/:id — correction (manager+). Audited in the service.

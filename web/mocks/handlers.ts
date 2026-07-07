@@ -1151,6 +1151,86 @@ export const handlers = [
     await latency();
     return HttpResponse.json({ success: true, message: "Stock transferred successfully." });
   }),
+
+  // ── Expenses (record / list / summary / categorize / delete) ──────────────────
+  ...(() => {
+    let seq = 0;
+    const BASE = Date.now();
+    interface MockExpense {
+      id: string; tenant_id: string; category: string | null; amount_cents: number;
+      spent_at: number; vendor: string | null; note: string | null;
+      account_id: string | null; created_by: string; created_at: number;
+    }
+    let items: MockExpense[] = [
+      { id: "exp_demo_1", tenant_id: "tnt_demo", category: "Rent", amount_cents: 250000, spent_at: BASE - 86400000 * 3, vendor: "Landlord Co", note: "Monthly rent", account_id: null, created_by: "usr_demo_owner", created_at: BASE - 86400000 * 3 },
+      { id: "exp_demo_2", tenant_id: "tnt_demo", category: null, amount_cents: 4200, spent_at: BASE - 86400000, vendor: "Corner Store", note: "Cleaning supplies", account_id: null, created_by: "usr_demo_owner", created_at: BASE - 86400000 },
+    ];
+    const summarize = () => {
+      const byCat = new Map<string, { totalCents: number; count: number }>();
+      for (const e of items) {
+        if (e.category === null) continue;
+        const cur = byCat.get(e.category) ?? { totalCents: 0, count: 0 };
+        cur.totalCents += e.amount_cents; cur.count += 1;
+        byCat.set(e.category, cur);
+      }
+      return {
+        totalCents: items.reduce((s, e) => s + e.amount_cents, 0),
+        count: items.length,
+        uncategorizedCount: items.filter((e) => e.category === null).length,
+        byCategory: [...byCat.entries()]
+          .map(([category, v]) => ({ category, totalCents: v.totalCents, count: v.count }))
+          .sort((a, b) => b.totalCents - a.totalCents),
+      };
+    };
+
+    return [
+      http.get(`${V1}/expenses/summary`, async () => {
+        await latency();
+        return HttpResponse.json(summarize());
+      }),
+      http.get(`${V1}/expenses`, async () => {
+        await latency();
+        const sorted = [...items].sort((a, b) => b.spent_at - a.spent_at);
+        return HttpResponse.json({ items: sorted, total: sorted.length });
+      }),
+      http.post(`${V1}/expenses`, async ({ request }) => {
+        await latency();
+        const body = (await request.json()) as Partial<MockExpense> & { amountCents?: number; spentAt?: number };
+        const now = Date.now();
+        const exp: MockExpense = {
+          id: `exp_mock_${++seq}`, tenant_id: "tnt_demo",
+          category: (body.category as string) ?? null,
+          amount_cents: body.amountCents ?? 0,
+          spent_at: body.spentAt ?? now,
+          vendor: (body.vendor as string) ?? null,
+          note: (body.note as string) ?? null,
+          account_id: null, created_by: "usr_demo_owner", created_at: now,
+        };
+        items.push(exp);
+        return HttpResponse.json(exp, { status: 201 });
+      }),
+      http.patch(`${V1}/expenses/:id`, async ({ request, params }) => {
+        await latency();
+        const idx = items.findIndex((e) => e.id === String(params["id"]));
+        if (idx === -1) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        const body = (await request.json()) as { category?: string | null; vendor?: string | null; note?: string | null; amountCents?: number };
+        const cur = items[idx]!;
+        if (body.category !== undefined) cur.category = body.category?.trim() ? body.category.trim() : null;
+        if (body.vendor !== undefined) cur.vendor = body.vendor?.trim() ? body.vendor.trim() : null;
+        if (body.note !== undefined) cur.note = body.note?.trim() ? body.note.trim() : null;
+        if (body.amountCents !== undefined) cur.amount_cents = body.amountCents;
+        return HttpResponse.json(cur);
+      }),
+      http.delete(`${V1}/expenses/:id`, async ({ params }) => {
+        await latency();
+        const id = String(params["id"]);
+        const existed = items.some((e) => e.id === id);
+        if (!existed) return HttpResponse.json({ error: { code: "not_found" } }, { status: 404 });
+        items = items.filter((e) => e.id !== id);
+        return HttpResponse.json({ ok: true, id });
+      }),
+    ];
+  })(),
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

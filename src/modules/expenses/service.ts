@@ -29,6 +29,14 @@ export interface CreateExpenseInput {
   accountId?: string | null;
 }
 
+export interface UpdateExpenseInput {
+  category?: string | null;
+  vendor?: string | null;
+  note?: string | null;
+  amountCents?: number;
+  spentAt?: number;
+}
+
 export interface ListExpensesQuery {
   category?: string;
   from?: number;
@@ -131,6 +139,45 @@ export class ExpensesService {
     );
     if (!row) throw notFound(`expense '${id}' not found`);
     return row;
+  }
+
+  /** Partial update — the categorize/correct workflow. Only provided fields change;
+   *  category can be set to null to un-categorize. Manager+ (enforced at the route). */
+  async update(id: string, input: UpdateExpenseInput, tenantId: string, actorId: string): Promise<Expense> {
+    const existing = await this.get(id, tenantId); // throws notFound if missing/other tenant
+    const sets: string[] = [];
+    const params: Record<string, unknown> = { id, tenantId };
+    const next: Partial<Expense> = {};
+    if (input.category !== undefined) {
+      const c = input.category?.trim() ? input.category.trim() : null;
+      sets.push("category = @category"); params["category"] = c; next.category = c;
+    }
+    if (input.vendor !== undefined) {
+      const v = input.vendor?.trim() ? input.vendor.trim() : null;
+      sets.push("vendor = @vendor"); params["vendor"] = v; next.vendor = v;
+    }
+    if (input.note !== undefined) {
+      const n = input.note?.trim() ? input.note.trim() : null;
+      sets.push("note = @note"); params["note"] = n; next.note = n;
+    }
+    if (input.amountCents !== undefined) {
+      sets.push("amount_cents = @amountCents"); params["amountCents"] = input.amountCents; next.amount_cents = input.amountCents;
+    }
+    if (input.spentAt !== undefined) {
+      sets.push("spent_at = @spentAt"); params["spentAt"] = input.spentAt; next.spent_at = input.spentAt;
+    }
+    if (sets.length === 0) return existing; // no-op
+
+    await this.db.query(
+      `UPDATE expenses SET ${sets.join(", ")} WHERE id = @id AND tenant_id = @tenantId`,
+      params,
+    );
+    await writeAudit(this.db, {
+      tenantId, actorId, action: "expense.updated", entityType: "expense", entityId: existing.id,
+      before: { category: existing.category, vendor: existing.vendor, note: existing.note, amount_cents: existing.amount_cents },
+      after: next,
+    });
+    return { ...existing, ...next };
   }
 
   async remove(id: string, tenantId: string, actorId: string): Promise<Expense> {

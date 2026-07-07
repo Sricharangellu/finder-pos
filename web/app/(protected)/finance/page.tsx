@@ -11,6 +11,7 @@ import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import type { AgingReport, Bill, Invoice, BillingStatus } from "@/api-client/types";
 import { usePathname, useRouter } from "next/navigation";
 import { fmtDate } from "@/lib/date";
+import ExpensesPanel from "./_components/ExpensesPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ const BILLING_STYLE: Record<BillingStatus, string> = {
 const TABS = [
   { id: "ar", label: "Receivables (AR)" },
   { id: "ap", label: "Payables (AP)" },
+  { id: "expenses", label: "Expenses" },
   { id: "aging", label: "Aging" },
 ] as const;
 
@@ -476,6 +478,8 @@ export default function FinancePage() {
         )}
 
         {/* ── Tab: Aging ────────────────────────────────────────────────── */}
+        {tab === "expenses" && <ExpensesPanel />}
+
         {tab === "aging" && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Card title="AR Aging" description="Receivables broken down by days outstanding.">
