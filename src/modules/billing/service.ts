@@ -27,6 +27,12 @@ export interface Bill {
   discount_applied_cents: number;       // 0 until the discount is taken
 }
 
+/** A bill joined to its supplier for display in the Bill List. */
+export interface BillWithSupplier extends Bill {
+  supplier_name: string | null;
+  supplier_company: string | null;
+}
+
 export interface Invoice {
   id: string;
   tenant_id: string;
@@ -108,9 +114,28 @@ export class BillingService {
     }
   }
 
-  async listBills(tenantId: string, status?: string): Promise<Bill[]> {
-    if (status) return this.db.query<Bill>("SELECT * FROM bills WHERE tenant_id = @t AND status = @s ORDER BY issued_at DESC LIMIT 500", { t: tenantId, s: status });
-    return this.db.query<Bill>("SELECT * FROM bills WHERE tenant_id = @t ORDER BY issued_at DESC LIMIT 500", { t: tenantId });
+  /**
+   * List supplier bills, newest first. Filterable by status and/or supplier, and
+   * enriched with the supplier's name/company so the Bill List can show and group
+   * by supplier without a second round-trip (the "by supplier" filter option).
+   */
+  async listBills(
+    tenantId: string,
+    opts: { status?: string; supplierId?: string } = {},
+  ): Promise<BillWithSupplier[]> {
+    const where = ["b.tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId };
+    if (opts.status) { where.push("b.status = @s"); params["s"] = opts.status; }
+    if (opts.supplierId) { where.push("b.supplier_id = @sid"); params["sid"] = opts.supplierId; }
+    return this.db.query<BillWithSupplier>(
+      `SELECT b.*, s.name AS supplier_name, s.company AS supplier_company
+         FROM bills b
+         LEFT JOIN suppliers s ON s.tenant_id = b.tenant_id AND s.id = b.supplier_id
+        WHERE ${where.join(" AND ")}
+        ORDER BY b.issued_at DESC
+        LIMIT 500`,
+      params,
+    );
   }
 
   async payBill(id: string, amountCents: number, method: string, tenantId: string): Promise<Bill> {

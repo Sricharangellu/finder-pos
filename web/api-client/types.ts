@@ -584,6 +584,9 @@ export interface Bill {
   discount_pct: number | null;
   discount_date: number | null;
   discount_applied_cents: number;
+  // Joined from the supplier on list responses (Bill List display + filter).
+  supplier_name?: string | null;
+  supplier_company?: string | null;
 }
 
 export interface BillsResponse {

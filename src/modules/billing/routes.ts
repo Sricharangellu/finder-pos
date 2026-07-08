@@ -39,7 +39,8 @@ export function registerRoutes(router: Router, service: BillingService): void {
   }));
   router.get("/bills", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    res.json({ items: await service.listBills(tenantId(res), status) });
+    const supplierId = typeof req.query.supplierId === "string" ? req.query.supplierId : undefined;
+    res.json({ items: await service.listBills(tenantId(res), { status, supplierId }) });
   }));
   router.post("/bills/:id/pay", handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);

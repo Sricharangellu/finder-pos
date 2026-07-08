@@ -125,3 +125,47 @@ test("invoice creation without customerId is rejected", async () => {
   const r = await call(app, "POST", "/api/billing/invoices", { totalCents: 500 });
   assert.equal(r.status, 400);
 });
+
+// ─── Bill list: supplier filter + auto-draft from receiving ────────────────────
+
+test("listBills filters by supplier and includes the joined supplier name", async () => {
+  const app = await freshApp();
+  const supA = await mkSupplier(app, "Alpha Distributing");
+  const supB = await mkSupplier(app, "Beta Wholesale");
+  await call(app, "POST", "/api/billing/bills", { supplierId: supA.id, totalCents: 5000 });
+  await call(app, "POST", "/api/billing/bills", { supplierId: supB.id, totalCents: 9000 });
+
+  const all = await call(app, "GET", "/api/billing/bills");
+  assert.equal(all.status, 200);
+  assert.equal(all.json.items.length, 2);
+
+  const onlyA = await call(app, "GET", `/api/billing/bills?supplierId=${supA.id}`);
+  assert.equal(onlyA.status, 200);
+  assert.equal(onlyA.json.items.length, 1, `supplier filter should return one bill: ${JSON.stringify(onlyA.json.items)}`);
+  assert.equal(onlyA.json.items[0].supplier_id, supA.id);
+  assert.equal(onlyA.json.items[0].supplier_name, "Alpha Distributing", "bill carries the joined supplier name");
+});
+
+test("receiving a PO auto-drafts a bill retrievable by supplier", async () => {
+  const app = await freshApp();
+  const supplier = await mkSupplier(app, "Gamma Foods");
+  const prod = (await call(app, "POST", "/api/catalog/", { sku: "AUTO-BILL-1", name: "Case of Water", price_cents: 1000, category: "general" })).json;
+
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supplier.id,
+    lines: [{ productId: prod.id, quantity: 4, unitCostCents: 500 }],
+  })).json;
+
+  // Full receive → billing's purchase_order.received listener drafts a bill
+  // synchronously (the event bus awaits handlers before publish() returns).
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 4 }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+
+  const bills = await call(app, "GET", `/api/billing/bills?supplierId=${supplier.id}`);
+  assert.equal(bills.status, 200);
+  assert.equal(bills.json.items.length, 1, `expected one auto-drafted bill: ${JSON.stringify(bills.json.items)}`);
+  assert.equal(bills.json.items[0].po_id, po.id, "auto-bill links back to the received PO");
+  assert.equal(bills.json.items[0].supplier_name, "Gamma Foods");
+});

@@ -29,7 +29,7 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors";
+  | "inventory-errors" | "bills";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
   warehouse: "inventory",
   customers: "customers", appointments: "customers", healthcare: "customers",
-  finance: "finance", accounting: "finance", invoicing: "finance",
+  finance: "finance", accounting: "finance", invoicing: "finance", bills: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
   notifications: "setup", "audit-log": "setup", "imports-exports": "setup",
   "module-marketplace": "setup", documents: "setup",
@@ -186,6 +186,7 @@ const NAV_TREE: NavSection[] = [
     children: [
       { label: "Overview",   href: "/finance",    featureGate: "finance" },
       { label: "Accounting", href: "/accounting", featureGate: "accounting" },
+      { label: "Bills",      href: "/bills",      featureGate: "accounting" },
       { label: "Invoicing",  href: "/invoicing",  featureGate: "invoicing" },
     ],
   },

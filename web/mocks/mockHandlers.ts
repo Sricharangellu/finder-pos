@@ -542,9 +542,16 @@ export const mockHandlers = [
   // ── Billing: bills (AP) + invoices (AR) ───────────────────────────────────
   http.get(`${V1}/billing/bills`, async ({ request }) => {
     await lat();
-    const status = new URL(request.url).searchParams.get("status");
-    const items = Object.keys(BASE_BILLS).map((id) => billsStore.get(id) ?? BASE_BILLS[id]);
-    return HttpResponse.json({ items: status ? items.filter((b) => b.status === status) : items });
+    const url = new URL(request.url);
+    const status = url.searchParams.get("status");
+    const supplierId = url.searchParams.get("supplierId");
+    const supNames: Record<string, string> = { sup_acme: "Acme Coffee Co", sup_tea: "Tea Traders", sup_pac: "Pacific Wholesale" };
+    let items = Object.keys(BASE_BILLS).map((id) => billsStore.get(id) ?? BASE_BILLS[id]);
+    if (status) items = items.filter((b) => b.status === status);
+    if (supplierId) items = items.filter((b) => b.supplier_id === supplierId);
+    // Mirror the backend join: each bill carries its supplier's name/company.
+    items = items.map((b) => ({ ...b, supplier_name: supNames[b.supplier_id] ?? null, supplier_company: supNames[b.supplier_id] ?? null }));
+    return HttpResponse.json({ items });
   }),
   http.get(`${V1}/billing/invoices`, async ({ request }) => {
     await lat();
