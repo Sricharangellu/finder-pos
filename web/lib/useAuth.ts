@@ -35,9 +35,16 @@ export interface UseAuthReturn {
   status: AuthStatus;
   user: UserProfile | null;
   login: (email: string, password: string) => Promise<MfaChallenge | null>;
+  /**
+   * Create a new tenant + owner account and establish a session. Mirrors
+   * `login` so /signup and /login share one auth pathway. Resolves `true` on
+   * success (session established), `false` on failure — the reason is surfaced
+   * via `loginError`.
+   */
+  register: (storeName: string, email: string, password: string) => Promise<boolean>;
   completeMfaLogin: (pendingToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
-  /** Human-readable error from the last login attempt */
+  /** Human-readable error from the last login/registration attempt */
   loginError: string | null;
   isLoading: boolean;
 }
@@ -122,6 +129,38 @@ export function useAuth(): UseAuthReturn {
     [router]
   );
 
+  const register = useCallback(
+    async (storeName: string, email: string, password: string) => {
+      setLoginError(null);
+      setIsLoading(true);
+      try {
+        const data = await apiPost<LoginResponse>(
+          "/api/identity/register",
+          { storeName, email, password },
+          { anonymous: true }
+        );
+        setSession(data.accessToken, data.expiresIn, data.refreshToken, data.user);
+        setUser(data.user);
+        setStatus("authenticated");
+        return true;
+      } catch (err) {
+        if (err instanceof ApiResponseError) {
+          if (err.status === 409 || err.code === "email_taken") {
+            setLoginError("An account with that email already exists. Try signing in instead.");
+          } else {
+            setLoginError(err.message);
+          }
+        } else {
+          setLoginError("An unexpected error occurred. Please try again.");
+        }
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
   const completeMfaLogin = useCallback(
     async (pendingToken: string, code: string) => {
       setLoginError(null);
@@ -162,5 +201,5 @@ export function useAuth(): UseAuthReturn {
     router.replace("/login");
   }, [router]);
 
-  return { status, user, login, completeMfaLogin, logout, loginError, isLoading };
+  return { status, user, login, register, completeMfaLogin, logout, loginError, isLoading };
 }
