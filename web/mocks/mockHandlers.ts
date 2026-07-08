@@ -330,9 +330,18 @@ export const mockHandlers = [
     const total = lines.reduce((s, l) => s + l.line_cost_cents, 0);
     return HttpResponse.json({ id: "po_new", tenant_id: "tnt_demo", supplier_id: b.supplierId, status: "ordered", total_cost_cents: total, created_at: Date.now(), received_at: null, lines }, { status: 201 });
   }),
-  http.post(`${V1}/purchasing/orders/:id/receive`, async ({ params }) => {
+  http.post(`${V1}/purchasing/orders/:id/receive`, async ({ params, request }) => {
     await lat();
-    return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", total_cost_cents: 24000, created_at: Date.now() - 3600000, received_at: Date.now(), lines: [] });
+    // Echo the received lines (incl. the receive-time expiry/lot actuals) so the
+    // mock matches the real contract that now persists them onto the PO line.
+    const body = (await request.json().catch(() => ({}))) as {
+      lines?: Array<{ lineId: string; qty?: number; expiryDate?: number; lotCode?: string }>;
+    };
+    const lines = (body.lines ?? []).map((l) => ({
+      id: l.lineId, received_qty: l.qty ?? 0,
+      expiry_date: l.expiryDate ?? null, lot_code: l.lotCode ?? null,
+    }));
+    return HttpResponse.json({ id: String(params.id), tenant_id: "tnt_demo", supplier_id: "sup_acme", status: "received", receive_status: "received", total_cost_cents: 24000, created_at: Date.now() - 3600000, received_at: Date.now(), lines });
   }),
 
   // ── Inventory: near-expiry report ─────────────────────────────────────────

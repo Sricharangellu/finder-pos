@@ -8,7 +8,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
-import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes } from "./_components/receiveStockTypes";
+import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines } from "./_components/receiveStockTypes";
 import type { PendingPO, ReceiveEntry, PODocument, SortMode } from "./_components/receiveStockTypes";
 import { ReceiveLinesCard } from "./_components/ReceiveLinesCard";
 import { PendingPOsTable } from "./_components/PendingPOsTable";
@@ -139,7 +139,7 @@ export default function ReceiveStockPage() {
 
   const submit = async () => {
     if (!selectedPOId || entries.length === 0) return;
-    const lines = entries.filter((e) => e.totalQty > 0).map((e) => ({ lineId: e.lineId, qty: e.totalQty }));
+    const lines = buildReceiveLines(entries);
     if (lines.length === 0) { setError("No quantities entered."); return; }
     setBusy(true); setError(null); setSuccess(null);
     try {

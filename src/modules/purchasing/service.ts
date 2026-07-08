@@ -23,6 +23,16 @@ export type POStatus = "ordered" | "partially_received" | "received" | "cancelle
 export type VendorCreditType = "chargeback" | "credit_memo";
 export type ReturnReason = "damaged" | "expired" | "other";
 
+/** One line being received. `qty` is required; the rest are the receive-time
+ *  actuals captured at the desk (only known when goods physically arrive). */
+export interface ReceiveLineInput {
+  lineId: string;
+  qty: number;
+  expiryDate?: number;      // epoch ms — drives the inventory lot's shelf-life
+  lotCode?: string;
+  unitCostCents?: number;   // actual cost on the invoice, if it differs from PO
+}
+
 export interface VendorReturn {
   id: string;
   tenant_id: string;
@@ -694,7 +704,7 @@ export class PurchasingService {
   async receive(
     id: string,
     tenantId: string,
-    receiveLines: Array<{ lineId: string; qty: number }>,
+    receiveLines: ReceiveLineInput[],
   ): Promise<PurchaseOrderWithLines> {
     const po = await this.getOrder(id, tenantId);
     if (po.status === "received") throw new HttpError(409, "already_received", "purchase order already fully received");
@@ -716,9 +726,15 @@ export class PurchasingService {
     // Apply the increments and compute new PO status.
     await this.db.withTenant(tenantId).tx(async (tdb) => {
       for (const rl of receiveLines) {
+        // Persist the receive-time actuals onto the line so the PO reflects what
+        // actually arrived; COALESCE keeps prior values when a field is omitted.
         await tdb.query(
-          "UPDATE purchase_order_lines SET received_qty = received_qty + @qty WHERE id = @lid AND tenant_id = @tenantId",
-          { qty: rl.qty, lid: rl.lineId, tenantId },
+          `UPDATE purchase_order_lines
+              SET received_qty = received_qty + @qty,
+                  expiry_date  = COALESCE(@expiryDate, expiry_date),
+                  lot_code     = COALESCE(@lotCode, lot_code)
+            WHERE id = @lid AND tenant_id = @tenantId`,
+          { qty: rl.qty, expiryDate: rl.expiryDate ?? null, lotCode: rl.lotCode ?? null, lid: rl.lineId, tenantId },
         );
         const line = lineMap.get(rl.lineId)!;
         // True unit cost = (goods cost + landed cost share) / quantity.
@@ -752,12 +768,14 @@ export class PurchasingService {
     // increment stock immediately (partial receives are cumulative).
     const receivedLineDetails = receiveLines.map((rl) => {
       const line = lineMap.get(rl.lineId)!;
+      // Prefer the actuals entered at the receiving desk; fall back to whatever
+      // was planned on the PO line. This is what drives the inventory lot.
       return {
         productId: line.product_id,
         quantity: rl.qty,
-        unitCostCents: line.unit_cost_cents,
-        expiryDate: line.expiry_date ?? undefined,
-        lotCode: line.lot_code ?? undefined,
+        unitCostCents: rl.unitCostCents ?? line.unit_cost_cents,
+        expiryDate: rl.expiryDate ?? line.expiry_date ?? undefined,
+        lotCode: rl.lotCode ?? line.lot_code ?? undefined,
       };
     });
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { handler, parseBody, notFound } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
-import type { PurchasingService } from "./service.js";
+import type { PurchasingService, ReceiveLineInput } from "./service.js";
 
 function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
@@ -187,6 +187,12 @@ export function registerRoutes(router: Router, service: PurchasingService): void
       lineId: z.string().min(1),
       qty: z.number().int().positive().optional(),
       quantity: z.number().int().positive().optional(),
+      // Actuals captured at the receiving desk when the goods physically arrive —
+      // expiry and lot are only known now, not at PO time. When present these
+      // drive the inventory lot that receiving creates (FEFO / shelf-life).
+      expiryDate: z.number().int().positive().optional(),
+      lotCode: z.string().min(1).max(120).optional(),
+      unitCostCents: z.number().int().nonnegative().optional(),
     })).optional(),
   });
 
@@ -194,10 +200,17 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     const id = String(req.params.id);
     const tid = tenantId(res);
     const b = parseBody(receiveSchema, req.body ?? {});
-    let lines: Array<{ lineId: string; qty: number }>;
+    let lines: ReceiveLineInput[];
     if (b.lines && b.lines.length > 0) {
-      // Explicit lines provided — support both `qty` and `quantity` field names.
-      lines = b.lines.map((l) => ({ lineId: l.lineId, qty: l.qty ?? l.quantity ?? 1 }));
+      // Explicit lines provided — support both `qty` and `quantity` field names,
+      // and carry the receive-time actuals through to the service.
+      lines = b.lines.map((l) => ({
+        lineId: l.lineId,
+        qty: l.qty ?? l.quantity ?? 1,
+        ...(l.expiryDate !== undefined ? { expiryDate: l.expiryDate } : {}),
+        ...(l.lotCode !== undefined ? { lotCode: l.lotCode } : {}),
+        ...(l.unitCostCents !== undefined ? { unitCostCents: l.unitCostCents } : {}),
+      }));
     } else {
       // No lines specified: receive all open lines at full remaining quantity ("receive all" button).
       const po = await service.getOrder(id, tid);

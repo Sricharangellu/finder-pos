@@ -55,6 +55,33 @@ export function computeTotal(cases: string, upc: string): number {
   return c * u;
 }
 
+/** One received line as sent to `POST /purchasing/orders/:id/receive`. */
+export interface ReceiveLinePayload {
+  lineId: string;
+  qty: number;
+  expiryDate?: number; // epoch ms
+  lotCode?: string;
+}
+
+/**
+ * Build the receive payload from the desk entries: only lines with a positive
+ * qty, carrying the receive-time expiry (date → epoch ms) and lot code when the
+ * operator entered them. Keeping this pure makes the seam that used to silently
+ * drop expiry/lot directly testable.
+ */
+export function buildReceiveLines(entries: ReceiveEntry[]): ReceiveLinePayload[] {
+  return entries
+    .filter((e) => e.totalQty > 0)
+    .map((e) => {
+      const line: ReceiveLinePayload = { lineId: e.lineId, qty: e.totalQty };
+      const expiryMs = e.expiryDate ? new Date(e.expiryDate).getTime() : NaN;
+      if (Number.isFinite(expiryMs)) line.expiryDate = expiryMs;
+      const lot = e.lotCode.trim();
+      if (lot) line.lotCode = lot;
+      return line;
+    });
+}
+
 export function receiveStatusBadge(s?: string): "green" | "yellow" | "gray" {
   if (s === "received") return "green";
   if (s === "partial") return "yellow";

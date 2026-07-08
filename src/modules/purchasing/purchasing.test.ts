@@ -82,6 +82,29 @@ test("partial receive transitions PO to partially_received", async () => {
   assert.equal(rJson.lines[0].received_qty, 3);
 });
 
+test("receive captures desk-entered expiry and lot onto the line (FEFO source)", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "PERISH-A", 400);
+
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    lines: [{ productId, quantity: 6, unitCostCents: 250 }],
+  })).json;
+  const lineId = po.lines[0].id;
+  // Expiry is unknown at PO time — only captured when the goods physically arrive.
+  assert.equal(po.lines[0].expiry_date ?? null, null);
+
+  const expiry = Date.UTC(2027, 5, 30);
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId, qty: 6, expiryDate: expiry, lotCode: "LOT-RCV-9" }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+  assert.equal(r.json.status, "received");
+  assert.equal(r.json.lines[0].expiry_date, expiry, "receive-time expiry persisted onto the line");
+  assert.equal(r.json.lines[0].lot_code, "LOT-RCV-9", "receive-time lot persisted onto the line");
+});
+
 test("full receive transitions PO to received", async () => {
   const app = await freshApp();
   const supplierId = await makeSupplier(app);
