@@ -220,3 +220,106 @@ test("GET /purchasing/orders/:id returns PO with lines", async () => {
   assert.ok(Array.isArray(json.lines));
   assert.equal(json.lines[0].product_id, productId);
 });
+
+// ── Price intelligence (#41) ──────────────────────────────────────────────────
+
+const TEST_TENANT = "tnt_demo";
+
+/** Create a PO for one product, fully receive it, and optionally backdate the
+ *  received_at so date-range filters can be exercised. Returns the PO id. */
+async function makeReceivedPO(
+  app: App, supplierId: string, productId: string,
+  qty: number, unitCostCents: number, receivedAtMs?: number,
+): Promise<string> {
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: qty, unitCostCents }],
+  })).json;
+  const lines = po.lines.map((l: any) => ({ lineId: l.id, qty: l.quantity }));
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, { lines });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+  if (receivedAtMs != null) {
+    await app.db.withTenant(TEST_TENANT).query(
+      "UPDATE purchase_orders SET received_at = @r WHERE id = @id AND tenant_id = @t",
+      { r: receivedAtMs, id: po.id, t: TEST_TENANT },
+    );
+  }
+  return po.id as string;
+}
+
+async function makeOrderedPO(app: App, supplierId: string, productId: string, qty: number, unitCostCents: number) {
+  return (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: qty, unitCostCents }],
+  })).json;
+}
+
+test("price intelligence surfaces invoiced, last-from-supplier and best-across-suppliers", async () => {
+  const app = await freshApp();
+  const supA = await makeSupplier(app, "Supplier A");
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-1", 1000);
+
+  await makeReceivedPO(app, supB, p, 10, 75); // cheapest, different supplier
+  await makeReceivedPO(app, supA, p, 10, 90); // last paid to supplier A
+
+  const cur = await makeOrderedPO(app, supA, p, 5, 100); // current PO, from A
+
+  const { status, json } = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  assert.equal(status, 200);
+  const item = json.items.find((i: any) => i.product_id === p);
+  assert.ok(item, "expected a price-intelligence item for the product");
+  assert.equal(item.invoiced_cents, 100);
+  assert.equal(item.ordered_qty, 5);
+  assert.equal(item.last_from_supplier.unit_cost_cents, 90);
+  assert.equal(item.best_across_suppliers.unit_cost_cents, 75);
+  assert.equal(item.best_across_suppliers.supplier_name, "Supplier B");
+});
+
+test("qty-break filter excludes small-lot history from best price", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-2", 1000);
+
+  await makeReceivedPO(app, supB, p, 10, 75); // full case
+  await makeReceivedPO(app, supB, p, 2, 60);  // odd-lot, cheaper per-unit
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+
+  const noFilter = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  assert.equal(noFilter.json.items.find((i: any) => i.product_id === p).best_across_suppliers.unit_cost_cents, 60);
+
+  const filtered = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history?qtyBreak=5`);
+  assert.equal(filtered.json.items.find((i: any) => i.product_id === p).best_across_suppliers.unit_cost_cents, 75);
+});
+
+test("date-range filter narrows price history by received date", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-3", 1000);
+  const D = 86_400_000, now = Date.now();
+
+  await makeReceivedPO(app, supB, p, 10, 50, now - 200 * D); // old & cheap
+  await makeReceivedPO(app, supB, p, 10, 90, now - 5 * D);   // recent
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+
+  const r = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history?from=${now - 30 * D}`);
+  const item = r.json.items.find((i: any) => i.product_id === p);
+  assert.equal(item.history.length, 1, "only the recent receipt should remain");
+  assert.equal(item.best_across_suppliers.unit_cost_cents, 90);
+});
+
+test("suggested qty reflects reorder point when stock and velocity are zero", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-4", 1000);
+
+  await app.db.withTenant(TEST_TENANT).query(
+    "UPDATE products SET reorder_point = @rp WHERE id = @id AND tenant_id = @t",
+    { rp: 40, id: p, t: TEST_TENANT },
+  );
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+  const r = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  const item = r.json.items.find((i: any) => i.product_id === p);
+  assert.equal(item.suggested_qty, 40); // reorder_point 40, stock 0, no velocity
+});
