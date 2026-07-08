@@ -13,11 +13,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
-import { setSession } from "@/lib/auth";
+import { useAuth } from "@/lib/useAuth";
 import { apiPost } from "@/api-client/client";
-import type { LoginResponse } from "@/api-client/types";
-
-type RegisterResponse = LoginResponse;
 
 // ── Business types ────────────────────────────────────────────────────────────
 
@@ -123,6 +120,7 @@ function Field({
 
 export default function SignupPage() {
   const router = useRouter();
+  const { register, loginError, isLoading } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
 
   // Step 1 state
@@ -134,8 +132,10 @@ export default function SignupPage() {
 
   // Step 2 state
   const [selectedType, setSelectedType]   = useState<BizKey | null>(null);
-  const [loading, setLoading]             = useState(false);
-  const [error, setError]                 = useState<string | null>(null);
+  // Covers the whole finish flow (register → set business type → redirect) so
+  // the button stays disabled through the post-register window, not just while
+  // the hook's isLoading is true during the register call itself.
+  const [finishing, setFinishing]         = useState(false);
 
   // ── Validation ────────────────────────────────────────────────────────────
 
@@ -176,29 +176,22 @@ export default function SignupPage() {
   }
 
   async function handleFinish() {
-    if (!selectedType) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/identity/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeName: storeName.trim(), email: email.trim(), password }),
-      });
-      const data = (await res.json()) as RegisterResponse & { error?: { message?: string } };
-      if (!res.ok) throw new Error(data.error?.message ?? `Registration failed (${res.status})`);
+    if (!selectedType || finishing) return;
+    setFinishing(true);
 
-      setSession(data.accessToken, data.expiresIn, data.refreshToken, data.user);
-
-      // Set and lock the business type — drives the entire nav and module set.
-      await apiPost("/api/v1/settings/business-profile", { businessType: selectedType, lock: true })
-        .catch(() => {}); // non-fatal — will default to retail
-
-      router.replace("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-      setLoading(false);
+    // Same auth pathway as /login: apiPost + typed errors + session/status.
+    const ok = await register(storeName.trim(), email.trim(), password);
+    if (!ok) {
+      setFinishing(false);
+      return; // reason surfaced via loginError, rendered below
     }
+
+    // Set and lock the business type — drives the entire nav and module set.
+    await apiPost("/api/v1/settings/business-profile", { businessType: selectedType, lock: true })
+      .catch(() => {}); // non-fatal — will default to retail
+
+    router.replace("/dashboard");
+    // Leave `finishing` true — we are navigating away; keeps the button locked.
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -324,9 +317,9 @@ export default function SignupPage() {
               })}
             </div>
 
-            {error && (
+            {loginError && (
               <div role="alert" className="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                {error}
+                {loginError}
               </div>
             )}
 
@@ -343,11 +336,11 @@ export default function SignupPage() {
                 variant="primary"
                 size="lg"
                 fullWidth
-                disabled={!selectedType || loading}
-                loading={loading}
+                disabled={!selectedType || finishing || isLoading}
+                loading={finishing || isLoading}
                 onClick={() => void handleFinish()}
               >
-                {loading ? "Setting up your workspace…" : "Launch my workspace"}
+                {finishing || isLoading ? "Setting up your workspace…" : "Launch my workspace"}
               </Button>
             </div>
           </div>
