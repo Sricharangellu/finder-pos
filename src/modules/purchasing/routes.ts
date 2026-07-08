@@ -366,9 +366,19 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     ));
   }));
 
-  // PO price history
+  // PO price intelligence (invoiced / last-from-supplier / best-across-suppliers
+  // + suggested qty). Optional filters: from,to (received-at epoch ms), qtyBreak.
   router.get("/orders/:id/price-history", handler(async (req, res) => {
-    res.json({ items: await service.priceHistory(String(req.params.id), tenantId(res)) });
+    const num = (v: unknown): number | undefined => {
+      const n = Number(v);
+      return typeof v === "string" && v !== "" && Number.isFinite(n) ? n : undefined;
+    };
+    const opts = {
+      from: num(req.query["from"]),
+      to: num(req.query["to"]),
+      qtyBreak: num(req.query["qtyBreak"]),
+    };
+    res.json({ items: await service.priceHistory(String(req.params.id), tenantId(res), opts) });
   }));
 
   // PO documents

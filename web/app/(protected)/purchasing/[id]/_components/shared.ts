@@ -38,6 +38,23 @@ export interface PriceHistoryItem {
   product_id: string;
   product_name: string;
   sku: string;
+  /** Quantity ordered on the current PO line. */
+  ordered_qty: number;
+  /** Current cost being paid on this PO line. */
+  invoiced_cents: number;
+  /** Last cost paid to the PO's own supplier (any date within filters). */
+  last_from_supplier: { unit_cost_cents: number; received_at: number } | null;
+  /** Lowest cost paid across all suppliers, with who + when. */
+  best_across_suppliers: {
+    unit_cost_cents: number;
+    received_at: number;
+    supplier_id: string | null;
+    supplier_name: string | null;
+  } | null;
+  /** Suggested purchase qty from reorder point + recent sales velocity. */
+  suggested_qty: number;
+  velocity_per_day: number;
+  current_stock: number;
   history: Array<{ unit_cost_cents: number; received_at: number; po_id: string }>;
 }
 

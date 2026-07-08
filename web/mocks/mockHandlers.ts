@@ -3233,22 +3233,45 @@ let vcrSeq = 10;
 
 mockHandlers.push(
   // Price history: last 3 received costs for this vendor × product
-  http.get(`${V1}/purchasing/orders/:id/price-history`, async ({ params }) => {
+  http.get(`${V1}/purchasing/orders/:id/price-history`, async ({ request }) => {
     await lat();
     const D = 86400000, now = Date.now();
+    const url = new URL(request.url);
+    const from = Number(url.searchParams.get("from")) || 0;
+    const to = Number(url.searchParams.get("to")) || Number.MAX_SAFE_INTEGER;
+    type Hist = { unit_cost_cents: number; received_at: number; po_id: string; supplier_id: string; supplier_name: string };
+    const build = (
+      product_id: string, product_name: string, sku: string,
+      invoiced_cents: number, ordered_qty: number,
+      suggested_qty: number, current_stock: number, velocity_per_day: number,
+      raw: Hist[],
+    ) => {
+      const hist = raw.filter((h) => h.received_at >= from && h.received_at <= to);
+      const last = hist.find((h) => h.supplier_id === "sup_self") ?? null;
+      const best = hist.reduce<Hist | null>((b, h) => (!b || h.unit_cost_cents < b.unit_cost_cents ? h : b), null);
+      return {
+        product_id, product_name, sku, ordered_qty, invoiced_cents,
+        last_from_supplier: last ? { unit_cost_cents: last.unit_cost_cents, received_at: last.received_at } : null,
+        best_across_suppliers: best
+          ? { unit_cost_cents: best.unit_cost_cents, received_at: best.received_at, supplier_id: best.supplier_id, supplier_name: best.supplier_name }
+          : null,
+        suggested_qty, velocity_per_day, current_stock,
+        history: hist.slice(0, 5).map((h) => ({ unit_cost_cents: h.unit_cost_cents, received_at: h.received_at, po_id: h.po_id })),
+      };
+    };
     return HttpResponse.json({ items: [
-      { product_id: "prod_1", product_name: "Spring Water 500ml", sku: "BEV-001", history: [
-        { unit_cost_cents: 80, received_at: now - 30*D, po_id: "po_1" },
-        { unit_cost_cents: 78, received_at: now - 60*D, po_id: "po_hist_a" },
-        { unit_cost_cents: 75, received_at: now - 90*D, po_id: "po_hist_b" },
-      ]},
-      { product_id: "prod_2", product_name: "Orange Juice 1L", sku: "BEV-002", history: [
-        { unit_cost_cents: 140, received_at: now - 30*D, po_id: "po_1" },
-        { unit_cost_cents: 135, received_at: now - 60*D, po_id: "po_hist_a" },
-      ]},
-      { product_id: "prod_3", product_name: "Potato Chips 150g", sku: "SNK-001", history: [
-        { unit_cost_cents: 110, received_at: now - 45*D, po_id: "po_hist_c" },
-      ]},
+      build("prod_1", "Spring Water 500ml", "BEV-001", 80, 48, 72, 12, 1.4, [
+        { unit_cost_cents: 80, received_at: now - 30*D, po_id: "po_1", supplier_id: "sup_self", supplier_name: "Acme Distribution" },
+        { unit_cost_cents: 75, received_at: now - 60*D, po_id: "po_hist_a", supplier_id: "sup_b", supplier_name: "BevSource Co" },
+        { unit_cost_cents: 78, received_at: now - 90*D, po_id: "po_hist_b", supplier_id: "sup_self", supplier_name: "Acme Distribution" },
+      ]),
+      build("prod_2", "Orange Juice 1L", "BEV-002", 140, 24, 0, 60, 0.3, [
+        { unit_cost_cents: 140, received_at: now - 30*D, po_id: "po_1", supplier_id: "sup_self", supplier_name: "Acme Distribution" },
+        { unit_cost_cents: 135, received_at: now - 60*D, po_id: "po_hist_a", supplier_id: "sup_b", supplier_name: "BevSource Co" },
+      ]),
+      build("prod_3", "Potato Chips 150g", "SNK-001", 110, 36, 36, 4, 0.8, [
+        { unit_cost_cents: 110, received_at: now - 45*D, po_id: "po_hist_c", supplier_id: "sup_c", supplier_name: "Snack Partners" },
+      ]),
     ]});
   }),
 
