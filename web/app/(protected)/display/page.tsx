@@ -77,7 +77,7 @@ export default function CustomerDisplayPage() {
               <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
             </svg>
           </div>
-          <span className="text-sm font-semibold text-white/70">Finder POS</span>
+          <span className="text-sm font-semibold text-white/70">Ascend</span>
         </div>
         <span className="text-xs text-white/30">Customer Display</span>
       </div>

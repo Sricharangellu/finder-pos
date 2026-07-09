@@ -25,7 +25,7 @@ Three new tenant-scoped bounded contexts. The backend now serves **10 modules**.
 | **giftcards** | `POST /giftcards`, `GET /giftcards/:code`, `POST /giftcards/:code/redeem` | Stored value; atomic `FOR UPDATE` draw-down, never negative |
 | **webhooks** | `POST/GET /webhooks`, `GET /webhooks/deliveries`, `DELETE /webhooks/:id` | HMAC-SHA256 signed delivery on domain events; `X-Finder-Signature: sha256=…` |
 
-## Finder MVP — backend endpoints for your pages (all live)
+## Ascend MVP — backend endpoints for your pages (all live)
 Added to support your enterprise shell pages. Same-origin via the Next proxy, Bearer auth.
 
 - **`/inventory` page** → `GET /api/v1/inventory/overview` → `{ items: [{ id, sku, name, price_cents, category, status, stock_qty, reorder_pt, low_stock }] }`. One call renders the whole inventory grid (products joined with stock). Receive stock: `POST /api/v1/inventory/:productId/receive {quantity}`; adjust: `POST /api/v1/inventory/:productId/adjust {delta, reason}`.
@@ -59,7 +59,7 @@ Your reports dashboard hardcodes top-products + the range selector; your CRM pag
 - MSW mocks for all four added to `mockHandlers.ts`. **The entire Reports dashboard is now backed by real endpoints** — swap the three hardcoded arrays (`topProducts`, `hourlySales`, and any static summary) for `apiGet` calls passing the selected `range`.
 
 ## Purchasing (suppliers + POs + receiving) — LIVE
-Finder restock flow. Receiving emits `purchase_order.received`; inventory listens and increments stock (decoupled), and unit costs are captured → **`/inventory/levels` now returns real `costCents`** (was null).
+Ascend restock flow. Receiving emits `purchase_order.received`; inventory listens and increments stock (decoupled), and unit costs are captured → **`/inventory/levels` now returns real `costCents`** (was null).
 - `GET/POST /api/v1/purchasing/suppliers` → `{ items:[{ id, name, email }] }` / create.
 - `POST /api/v1/purchasing/orders {supplierId, lines:[{productId, quantity, unitCostCents}]}` → PO (status `ordered`, computed `total_cost_cents`, nested `lines`).
 - `GET /api/v1/purchasing/orders` (list) · `GET /api/v1/purchasing/orders/:id` (with lines).

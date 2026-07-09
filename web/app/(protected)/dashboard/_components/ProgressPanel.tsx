@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * ProgressPanel — the operating surface for Finder's truth-tracking model
+ * ProgressPanel — the operating surface for Ascend's truth-tracking model
  * (Hypothesis → Task → Evidence → Verified Result → Decision), backed by the
  * live `/api/v1/progress` module. It lets an operator see how much work is
  * merely self-reported vs. evidence-backed vs. system-verified, create and
- * advance tasks, attach evidence, and ask Finder to verify a task from real
+ * advance tasks, attach evidence, and ask Ascend to verify a task from real
  * tenant data.
  *
  * Split for testability: `ProgressPanelView` is presentational (data + callbacks
@@ -67,7 +67,7 @@ const SUMMARY_BUCKETS: ProgressStatus[] = [
   "invalidated",
 ];
 
-/** Verification sources Finder can prove from internal data, with friendly labels. */
+/** Verification sources Ascend can prove from internal data, with friendly labels. */
 export const VERIFICATION_SOURCES: { value: string; label: string }[] = [
   { value: "retail.first_product", label: "First product added" },
   { value: "retail.first_receiving", label: "First stock received" },
@@ -82,7 +82,7 @@ function verificationLabel(source: string | null): string | null {
 }
 
 /** System verification is only offered once the task is anchored to a source
- *  Finder can check, and it hasn't already been proven or decided. */
+ *  Ascend can check, and it hasn't already been proven or decided. */
 function canSystemVerify(task: ProgressTask): boolean {
   return (
     Boolean(task.verification_source) &&
@@ -175,7 +175,7 @@ export function ProgressPanelView({
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Progress &amp; verification</h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            Track work from self-reported to evidence-backed to system-verified — Finder only
+            Track work from self-reported to evidence-backed to system-verified — Ascend only
             marks a task verified when it can prove it from your real data.
           </p>
         </div>
@@ -316,7 +316,7 @@ export function ProgressPanelView({
                         disabled={busy || !verifiable}
                         title={
                           verifiable
-                            ? "Ask Finder to verify this task from your real data"
+                            ? "Ask Ascend to verify this task from your real data"
                             : "Add a verification source to enable system verification"
                         }
                         onClick={() => onSystemVerify(task.id)}

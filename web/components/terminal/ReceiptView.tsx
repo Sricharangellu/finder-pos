@@ -246,7 +246,7 @@ export function ReceiptView({ order, payment, onNewSale, role }: ReceiptViewProp
           {/* Hidden thermal receipt — revealed by print CSS */}
           <div className="mt-4 hidden print:block">
             <ThermalReceipt
-              storeName="FinderPOS Demo Store"
+              storeName="Ascend Demo Store"
               receiptNumber={currentOrder.orderNumber}
               dateTime={fmtDateTime(currentOrder.createdAt)}
               lineItems={currentOrder.lines.map((l) => ({

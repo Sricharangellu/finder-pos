@@ -84,7 +84,7 @@ export default function OnboardingPage() {
       <div className="mb-8 flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-bold text-white shadow-lg">F</div>
         <div>
-          <p className="text-xl font-bold text-white leading-none">Finder POS</p>
+          <p className="text-xl font-bold text-white leading-none">Ascend</p>
           <p className="text-xs text-white/40">Enterprise Platform</p>
         </div>
       </div>
@@ -103,7 +103,7 @@ export default function OnboardingPage() {
       {step === "welcome" && (
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl text-center">
           <div className="mb-5 text-5xl">👋</div>
-          <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">Welcome to Finder POS</h1>
+          <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">Welcome to Ascend</h1>
           <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
             The enterprise POS that adapts to your business — retail, restaurant, wholesale, healthcare, automotive, and more. Let's set you up in under a minute.
           </p>

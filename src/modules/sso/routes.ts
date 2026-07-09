@@ -83,7 +83,7 @@ export function registerRoutes(router: Router, service: SsoService): void {
   );
 
   // POST /api/v1/sso/callback — public (called by frontend after IdP redirect)
-  // Exchanges authorization code for FinderPOS JWT.
+  // Exchanges authorization code for Ascend JWT.
   router.post(
     "/callback",
     handler(async (req, res) => {

@@ -116,7 +116,7 @@ export class SsoService {
 
   /**
    * Exchange an authorization code for an access token, validate the ID token,
-   * and issue a FinderPOS JWT for the authenticated user. The user record is
+   * and issue a Ascend JWT for the authenticated user. The user record is
    * created on first SSO login (just-in-time provisioning).
    */
   async handleCallback(

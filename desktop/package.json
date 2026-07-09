@@ -1,7 +1,7 @@
 {
   "name": "finder-pos-desktop",
   "version": "1.0.0",
-  "description": "Finder POS — desktop app (wraps the production web app)",
+  "description": "Ascend — desktop app (wraps the production web app)",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.finderpos.desktop",
-    "productName": "Finder POS",
+    "productName": "Ascend",
     "directories": {
       "output": "release"
     },

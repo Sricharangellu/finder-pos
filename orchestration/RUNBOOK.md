@@ -1,4 +1,4 @@
-# FinderPOS Operations Runbook
+# Ascend Operations Runbook
 
 Production URLs: https://finder-pos-backend.vercel.app · https://finder-pos-frontend.vercel.app
 Health endpoints: `/healthz` (liveness) · `/readyz` (readiness + pool stats) · `/metrics` (Prometheus, bearer-gated)

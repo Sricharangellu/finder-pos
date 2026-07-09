@@ -1,4 +1,4 @@
-# Finder Forward Plan (authoritative)
+# Ascend Forward Plan (authoritative)
 
 Last reviewed: 2026-07-05
 Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
@@ -14,7 +14,7 @@ Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
 
 ## Executive summary
 
-Finder is moving in a reasonable technical direction, but it is not deployment-ready as a serious production SaaS product yet.
+Ascend is moving in a reasonable technical direction, but it is not deployment-ready as a serious production SaaS product yet.
 
 The project has a strong amount of work completed: a real TypeScript/Express backend, PostgreSQL schema/migrations, modular business domains, a large Next.js frontend, API contracts, documentation, Docker setup, CI definitions, e2e test files, and many enterprise workflows. This is not an empty prototype.
 
@@ -24,7 +24,7 @@ The right move is not to keep adding more pages. The right move is to harden the
 
 ## Product scope correction
 
-Finder is **not only a retail POS**. Finder is a modular business operating platform
+Ascend is **not only a retail POS**. Ascend is a modular business operating platform
 for product-based businesses. Retail POS is one business pack, not the whole product.
 
 The shared operating model is:
@@ -266,7 +266,7 @@ Non-retail business types can remain in the registry and demo preview, but they 
 
 ## Required setup, auth, settings, and demo UX
 
-The product must teach users that Finder is one platform with configurable business
+The product must teach users that Ascend is one platform with configurable business
 packs. This should be visible in the first-run and admin flows.
 
 ### Signup and setup
@@ -318,7 +318,7 @@ their actual implementation.
 
 ## Current state in plain language
 
-Finder is a modular business operating platform for product-based businesses. It has:
+Ascend is a modular business operating platform for product-based businesses. It has:
 
 - A backend API that stores and processes business data.
 - A frontend web app for owners, managers, cashiers, and staff.
@@ -409,7 +409,7 @@ The documentation is useful, but it is too optimistic in places. Some docs descr
 
 ### Current architecture
 
-Finder is currently a modular monolith:
+Ascend is currently a modular monolith:
 
 - Frontend: Next.js 14, React, TypeScript, Tailwind.
 - Backend: Express, TypeScript, PostgreSQL.
@@ -785,13 +785,13 @@ Use these labels in docs:
 Use this prompt with a coding agent when you want a fresh project audit:
 
 ```text
-Audit the Finder POS project end-to-end.
+Audit the Ascend project end-to-end.
 
 Work from the repository, not from assumptions. Inspect the backend, frontend, database migrations, contracts, docs, tests, CI/CD, deployment scripts, environment examples, and mock/demo layers.
 
 Write a plain-English report that answers:
 
-1. What is the current state of the Finder application?
+1. What is the current state of the Ascend application?
 2. What is genuinely implemented?
 3. What is only mocked, partial, static, or documented but not built?
 4. What is the architecture and schema direction?
@@ -815,7 +815,7 @@ Do not overwrite existing work-state docs. Write the audit as a new dated file a
 
 ## Release gate checklist
 
-Finder should not be considered production-ready until all of these are true:
+Ascend should not be considered production-ready until all of these are true:
 
 - Backend typecheck passes.
 - Backend tests pass.
@@ -840,7 +840,7 @@ Finder should not be considered production-ready until all of these are true:
 
 ## Final honest assessment
 
-Finder has strong bones. The project is ambitious and technically serious. The stack choice is reasonable and the modular monolith direction is correct.
+Ascend has strong bones. The project is ambitious and technically serious. The stack choice is reasonable and the modular monolith direction is correct.
 
 But the app is not ready for real production use yet. The current risk is not lack of features. The current risk is too many features without enough proof. For POS software, correctness, security, auditability, and operational reliability matter more than breadth.
 

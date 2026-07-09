@@ -9,7 +9,7 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 600,
-    title: "Finder POS",
+    title: "Ascend",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -50,7 +50,7 @@ function createWindow() {
 
 const menuTemplate = [
   {
-    label: "Finder POS",
+    label: "Ascend",
     submenu: [
       { role: "reload" },
       { role: "forceReload" },

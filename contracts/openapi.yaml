@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Finder POS API
+  title: Ascend API
   version: 2.0.0
   description: |
-    Finder POS modular-monolith REST API. All business endpoints require
+    Ascend modular-monolith REST API. All business endpoints require
     Bearer authentication (JWT issued by POST /api/identity/login).
 
     ## Authentication
@@ -37,7 +37,7 @@ info:
 
 servers:
   - url: /
-    description: Finder POS backend
+    description: Ascend backend
 
 # ── Security ──────────────────────────────────────────────────────────────────
 components:

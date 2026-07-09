@@ -28,7 +28,7 @@
 ## Network requirements
 
 - Minimum: 10 Mbps down / 2 Mbps up per register
-- Finder POS works fully offline — network is only required for card payments and cloud sync
+- Ascend works fully offline — network is only required for card payments and cloud sync
 - Recommended: wired ethernet for the register; Wi-Fi for tablets
 
 ## Mobile / tablet

@@ -1,4 +1,4 @@
-# Database Review — Finder ERP
+# Database Review — Ascend ERP
 
 Dedicated schema review across all 19 modules (45 tables). Date: 2026-06-13. Reviewer: backend agent.
 

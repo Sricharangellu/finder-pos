@@ -79,7 +79,7 @@ Location: `/restaurant/reservations`
 - View by day (timeline) or list
 - Create a reservation: name, party size, date/time, notes
 - Status: Pending → Confirmed → Seated → Completed / No-show
-- Finder POS does not yet integrate with third-party booking platforms (on roadmap)
+- Ascend does not yet integrate with third-party booking platforms (on roadmap)
 
 ## Reporting
 

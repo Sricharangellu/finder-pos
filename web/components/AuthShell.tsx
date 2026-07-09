@@ -53,7 +53,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           >
             F
           </div>
-          <span className="text-xl font-semibold text-white">Finder POS</span>
+          <span className="text-xl font-semibold text-white">Ascend</span>
         </div>
 
         <div className="relative z-10 max-w-lg">
@@ -105,7 +105,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             >
               F
             </div>
-            <span className="text-base font-semibold text-slate-900 dark:text-white">Finder POS</span>
+            <span className="text-base font-semibold text-slate-900 dark:text-white">Ascend</span>
           </div>
 
           <button
@@ -165,8 +165,8 @@ function AuthFooter() {
       </div>
 
       <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-        This site is protected by reCAPTCHA and is subject to the Finder Privacy Policy and Terms of Service.
-        &copy; {new Date().getFullYear()} Finder POS.
+        This site is protected by reCAPTCHA and is subject to the Ascend Privacy Policy and Terms of Service.
+        &copy; {new Date().getFullYear()} Ascend.
       </p>
     </footer>
   );

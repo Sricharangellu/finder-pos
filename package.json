@@ -1,7 +1,7 @@
 {
-  "name": "finder-pos",
+  "name": "ascend",
   "version": "2.0.0",
-  "description": "Finder POS - Year 1 Foundation (modular monolith). Offline-first POS backend on Postgres.",
+  "description": "Ascend - Year 1 Foundation (modular monolith). Offline-first POS backend on Postgres.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",

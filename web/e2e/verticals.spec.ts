@@ -1,7 +1,7 @@
 /**
  * E2E - retail-first business-pack coverage.
  *
- * Finder is a modular business operating platform, but the current release
+ * Ascend is a modular business operating platform, but the current release
  * target is retail end-to-end. Non-retail packs are Preview until retail is
  * fully proven. These tests therefore verify that preview routes and setup
  * surfaces render without crashing; they do not pretend every vertical workflow

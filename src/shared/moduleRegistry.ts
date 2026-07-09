@@ -1,5 +1,5 @@
 /**
- * FinderPOS Module Registry — defines every optional module across all 12
+ * Ascend Module Registry — defines every optional module across all 12
  * business verticals. One platform, unlocked by business type.
  *
  * Verticals: Retail, Wholesale/B2B, Restaurant, Hospitality, Services,
@@ -37,7 +37,7 @@ export type ModuleGroup =
   | "golf"
   | "enterprise";
 
-/** All modules available in FinderPOS — 12 verticals + enterprise add-ons. */
+/** All modules available in Ascend — 12 verticals + enterprise add-ons. */
 export const MODULE_REGISTRY: ModuleDefinition[] = [
 
   // ── Core (always on — not user-selectable) ──────────────────────────────

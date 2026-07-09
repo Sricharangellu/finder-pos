@@ -1,4 +1,4 @@
-# FinderPOS — System Design Reference
+# Ascend — System Design Reference
 
 Last updated: 2026-06-22. Living document — update each section when the
 implementation changes. This is design intent + rationale, not a spec

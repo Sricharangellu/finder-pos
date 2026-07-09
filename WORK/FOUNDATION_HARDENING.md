@@ -1,4 +1,4 @@
-# FinderPOS — Foundation Hardening, Cleanup & End-to-End Wiring (queued initiative)
+# Ascend — Foundation Hardening, Cleanup & End-to-End Wiring (queued initiative)
 
 > **Status: QUEUED — not started.** Authored by Sri 2026-07-05. This is a whole-repo
 > restructure. **Run it as a SINGLE EXCLUSIVE claim when `WORK/LOCK.md` shows no other
@@ -12,7 +12,7 @@
 
 ---
 
-You are working in the finder-pos repository (GitHub Sricharangellu/finder-pos,
+You are working in the finder-pos repository (GitHub Sricharangellu/Ascend,
 branch master). Your job is to give this project a SOLID FOUNDATION: clean it up,
 restructure it, consolidate its governance files, and prove the backend and frontend
 are wired together end-to-end and fully functional. Work autonomously — Sri grants

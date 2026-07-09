@@ -65,7 +65,7 @@ through a short-lived branch + PR, so conflicts surface *before* landing. Enable
 once (GitHub Settings → Branches → `master`), or via API:
 
 ```bash
-gh api -X PUT repos/Sricharangellu/finder-pos/branches/master/protection \
+gh api -X PUT repos/Sricharangellu/Ascend/branches/master/protection \
   -F required_pull_request_reviews.required_approving_review_count=0 \
   -F 'required_status_checks.contexts[]=Backend' \
   -F 'required_status_checks.contexts[]=Frontend' \

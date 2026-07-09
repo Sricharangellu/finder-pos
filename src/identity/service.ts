@@ -630,7 +630,7 @@ export class IdentityService {
     const user = await this.db.one<{ email: string }>("SELECT email FROM users WHERE id = @id AND tenant_id = @t", { id: userId, t: tenantId });
     if (!user) throw new HttpError(404, "not_found", "User not found");
     const secret = new OTPAuth.Secret({ size: 20 });
-    const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", label: user.email, algorithm: "SHA1", digits: 6, period: 30, secret });
+    const totp = new OTPAuth.TOTP({ issuer: "Ascend", label: user.email, algorithm: "SHA1", digits: 6, period: 30, secret });
     const now = Date.now();
     await this.db.query(
       `INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, created_at, updated_at)
@@ -645,7 +645,7 @@ export class IdentityService {
     const OTPAuth = await import("otpauth");
     const row = await this.db.one<{ totp_secret: string }>("SELECT totp_secret FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
     if (!row) throw new HttpError(404, "not_found", "MFA not set up");
-    const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
+    const totp = new OTPAuth.TOTP({ issuer: "Ascend", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
     const delta = totp.validate({ token: code, window: 1 });
     if (delta === null) throw new HttpError(400, "invalid_code", "Invalid or expired TOTP code");
     const now = Date.now();
@@ -663,7 +663,7 @@ export class IdentityService {
     const OTPAuth = await import("otpauth");
     const row = await this.db.one<{ totp_secret: string; enabled: boolean }>("SELECT totp_secret, enabled FROM user_mfa WHERE user_id = @uid AND tenant_id = @t", { uid: userId, t: tenantId });
     if (!row || !row.enabled) return false;
-    const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
+    const totp = new OTPAuth.TOTP({ issuer: "Ascend", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(row.totp_secret) });
     return totp.validate({ token: code, window: 1 }) !== null;
   }
 
@@ -757,7 +757,7 @@ export class IdentityService {
     await sendEmail({
       to: email,
       from: process.env["EMAIL_FROM"] ?? "noreply@finder-pos.app",
-      subject: "Reset your Finder POS password",
+      subject: "Reset your Ascend password",
       text: `You requested a password reset.\n\nClick the link below to set a new password (expires in 1 hour):\n${resetLink}\n\nIf you did not request this, you can safely ignore this email.`,
       html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Reset my password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
     }).catch(() => { /* email failure must not surface to user */ });

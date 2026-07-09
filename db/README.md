@@ -1,4 +1,4 @@
-# Finder POS — Database Layer
+# Ascend — Database Layer
 
 Owner: **DATABASE agent**
 Wave: 1 — Core commerce (Wave 0 foundation complete)

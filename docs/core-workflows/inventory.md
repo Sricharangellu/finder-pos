@@ -27,7 +27,7 @@ For spot corrections (count discrepancy, damaged goods removal):
 1. **Inventory → Stocktake → Start count**
 2. Select a category or location subset (full store or section)
 3. Count each item and enter quantities (or scan barcodes)
-4. **Finalize count** — Finder POS calculates the variance and posts adjustments
+4. **Finalize count** — Ascend calculates the variance and posts adjustments
 
 Stocktake locks inventory edits for the scoped products until finalized.
 
@@ -50,7 +50,7 @@ For perishable or batch-tracked products (pharmacy, food):
 
 - Enable **Expiry tracking** on the product
 - When receiving, enter the batch number and expiry date
-- Finder POS warns at checkout if an item in the batch has expired
+- Ascend warns at checkout if an item in the batch has expired
 - **Inventory → Expiring soon** shows items expiring within 30 days
 
 ## Movement history

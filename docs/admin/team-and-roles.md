@@ -2,7 +2,7 @@
 
 ## Role overview
 
-Finder POS uses role-based access control (RBAC). Every user has one system role:
+Ascend uses role-based access control (RBAC). Every user has one system role:
 
 | Role | Access level |
 |---|---|

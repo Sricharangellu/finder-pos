@@ -7,7 +7,7 @@ assessment's Modules 11–12 (Settings, Employee/RBAC) plus its cross-cutting
 
 Updated: 2026-06-15.
 
-## Where Finder's settings/team/RBAC stand today
+## Where Ascend's settings/team/RBAC stand today
 
 - Roles: `owner` > `manager` > `cashier` (`src/identity/types.ts`),
   enforced via `requireRole()` (`src/gateway/auth.ts`). BE-1 (in progress)
@@ -22,14 +22,14 @@ Updated: 2026-06-15.
   report is the only mechanism" undersells this: it's an append-only table,
   not just a report.
 
-## Curated gaps (assessment → verdict for Finder)
+## Curated gaps (assessment → verdict for Ascend)
 
 | Gap | Verdict |
 |---|---|
-| RBAC granularity beyond owner/manager/cashier | **BE-1 (in progress) is the right-sized answer** — three roles with a strict hierarchy covers Finder's target tenants (small/mid wholesale). A full permission-matrix engine (per-route, per-role, configurable) is enterprise-RBAC scope creep; revisit only if a tenant explicitly needs a 4th role. |
+| RBAC granularity beyond owner/manager/cashier | **BE-1 (in progress) is the right-sized answer** — three roles with a strict hierarchy covers Ascend's target tenants (small/mid wholesale). A full permission-matrix engine (per-route, per-role, configurable) is enterprise-RBAC scope creep; revisit only if a tenant explicitly needs a 4th role. |
 | Approval workflows / approval chains | **Already exist where it matters**: SO approval (`sales-orders/:id/approve`), batch deposit approve/reject (`accounting/deposits/:id/approve`). A generic approval-chain *engine* for arbitrary entities is out of scope — add approval gates to specific workflows as needed, following the existing pattern. |
 | Age verification enforcement (tobacco/alcohol) | **Worth a minimal, generic version**: add an optional `age_restricted` boolean to `products` (catalog) and, at checkout (`POST /api/v1/orders` or sales-order creation), if any line item is age-restricted, require a `customerDobVerified: true` flag in the request (the frontend collects it from the cashier). This is a generic compliance primitive — not tobacco/MSA-specific fields. |
-| MSA / regulatory filing automation, cigarette/tobacco schedule reports | **Out of scope** — Finder is explicitly not chasing tobacco-distributor parity (per `ERP_BENCHMARK.md`'s framing); the age-restriction flag above covers the generic case without the regulatory-reporting machinery. |
+| MSA / regulatory filing automation, cigarette/tobacco schedule reports | **Out of scope** — Ascend is explicitly not chasing tobacco-distributor parity (per `ERP_BENCHMARK.md`'s framing); the age-restriction flag above covers the generic case without the regulatory-reporting machinery. |
 | Store opening/closing workflow, safe drops, till audits, cash variance | **Worth a minimal version**: a `register_sessions` concept (open with starting cash float, close with counted cash, variance = counted − (float + cash sales)) under a new or existing module (likely `outlets`, since registers live there). This is the most concrete "operations" gap and doesn't depend on anything else. |
 | Segregation of duties / SOX-style controls, immutable audit log guarantees | **Audit log already append-only** at the application layer; DB-level immutability (e.g. revoke UPDATE/DELETE grants on `audit_log`) is a `DB-1`-adjacent hardening item — fold into `DB-1` (Postgres RLS) rather than a new item. |
 | API key management, webhook config UI, SSO/SAML, multi-company | **Out of scope** — `webhooks` module exists for outbound notifications already; SSO/SAML and multi-company are large auth/org-model changes with no current tenant request. |

@@ -349,7 +349,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               open
             </span>
           </div>
-          <span className="text-[11px] text-slate-400">Finder POS Search</span>
+          <span className="text-[11px] text-slate-400">Ascend Search</span>
         </div>
       </div>
     </div>

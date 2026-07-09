@@ -1,6 +1,6 @@
 # Product segmentation — hybrid retail / wholesale / enterprise
 
-**Source:** 2026-06-15 direction from the product owner: Finder should be
+**Source:** 2026-06-15 direction from the product owner: Ascend should be
 sellable as a single hybrid codebase to three buyer profiles — small
 **retail** shops (single till, walk-in customers), **wholesale/B2B**
 distributors (quotes, sales orders, AR/AP, purchasing), and **enterprise**

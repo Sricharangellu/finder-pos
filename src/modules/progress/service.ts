@@ -303,7 +303,7 @@ export class ProgressService {
       evidenceType: "system_verification",
       title: `Verified by ${task.verification_source}`,
       source: "system",
-      notes: "Finder verified this from tenant-scoped operating data.",
+      notes: "Ascend verified this from tenant-scoped operating data.",
     }, tenantId, actorId);
     await this.db.query(
       "UPDATE progress_tasks SET status = 'system_verified', completed_at = @now, updated_at = @now WHERE id = @id AND tenant_id = @tenantId",

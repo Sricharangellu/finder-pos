@@ -3,7 +3,7 @@
 /**
  * /login/mfa — multi-factor authentication verification screen.
  *
- * Finder POS's auth backend does not issue an MFA challenge yet (login
+ * Ascend's auth backend does not issue an MFA challenge yet (login
  * succeeds directly from email/password). This screen is built ahead of
  * that backend work so the UI is ready: it renders the verification UI
  * against a mocked 6-digit code ("123456" always succeeds) and is not yet

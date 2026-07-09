@@ -51,7 +51,7 @@ For stores selling tobacco or vape products:
 
 ## Inventory tips
 
-- Set **reorder points** on fast-moving items — Finder POS surfaces them in Low Stock automatically
+- Set **reorder points** on fast-moving items — Ascend surfaces them in Low Stock automatically
 - Use **cycle counts** weekly for high-value sections; full stocktake quarterly
 - Enable **expiry tracking** for perishable or dated products (food, supplements, medication)
 - Use **store locations** (Aisle / Shelf / Bin) to speed up stocktakes and picking

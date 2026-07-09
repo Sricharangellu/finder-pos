@@ -54,7 +54,7 @@ function StoreHeader() {
               <path d="M16 10a4 4 0 01-8 0"/>
             </svg>
           </div>
-          <span className="text-base font-bold text-[#111]">FinderPOS Store</span>
+          <span className="text-base font-bold text-[#111]">Ascend Store</span>
         </a>
 
         {/* Nav */}
@@ -115,7 +115,7 @@ function StoreLayoutInner({ children }: { children: React.ReactNode }) {
         <StoreGuard>{children}</StoreGuard>
       </main>
       <footer className="mt-16 border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-400">
-        Powered by FinderPOS · Private store — members only
+        Powered by Ascend · Private store — members only
       </footer>
     </div>
   );

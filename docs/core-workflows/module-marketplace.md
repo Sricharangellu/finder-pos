@@ -2,7 +2,7 @@
 
 ## What is the module marketplace?
 
-Finder POS ships with 60+ modules across 14 verticals. Your base bundle activates the modules most relevant to your business type. The Module Marketplace lets you toggle individual modules on or off beyond the base bundle.
+Ascend ships with 60+ modules across 14 verticals. Your base bundle activates the modules most relevant to your business type. The Module Marketplace lets you toggle individual modules on or off beyond the base bundle.
 
 Location: **Settings → Module Marketplace**
 

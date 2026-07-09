@@ -18,7 +18,7 @@ import { DashboardRecommendations, type RecommendationReport, type DashboardReco
 import ProgressPanel from "./_components/ProgressPanel";
 
 // Map each actionable recommendation signal to the progress verification source
-// Finder can prove it from — so a recommendation-born task can later be
+// Ascend can prove it from — so a recommendation-born task can later be
 // system-verified against real data. Signals without a data check stay manual.
 const SIGNAL_TO_VERIFICATION: Record<string, string> = {
   no_products: "retail.first_product",

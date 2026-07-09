@@ -36,7 +36,7 @@ Changing the business type activates or deactivates module bundles. Individual m
 
 ## Outlets
 
-Finder POS supports multiple physical locations (outlets). Each outlet has:
+Ascend supports multiple physical locations (outlets). Each outlet has:
 - Name
 - Address and timezone
 - One or more registers

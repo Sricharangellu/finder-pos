@@ -25,7 +25,7 @@
 INSERT INTO tenants (id, name, slug, tier, status, region, settings, created_at, updated_at)
 VALUES (
     'tnt_01j0000000000000000000demo',   -- fixed ID so seeds are reproducible
-    'Finder Demo Cafe',
+    'Ascend Demo Cafe',
     'finder-demo-cafe',
     'professional',
     'active',

@@ -1,5 +1,5 @@
 /**
- * End-to-end smoke test for the assembled Finder POS monolith.
+ * End-to-end smoke test for the assembled Ascend monolith.
  * Boots the real app (on Postgres) on an ephemeral port and drives the full POS
  * lifecycle over HTTP: catalog -> inventory -> order (tax engine) -> payment ->
  * sync, including the offline-first outbox story. Run: npm run smoke
@@ -42,7 +42,7 @@ let step = 0;
 const ok = (msg: string) => console.log(`  ✓ [${++step}] ${msg}`);
 
 async function main() {
-  console.log("\nFinder POS — end-to-end smoke test (Postgres)\n");
+  console.log("\nAscend — end-to-end smoke test (Postgres)\n");
 
   let r = await api("GET", "/health");
   assert.equal(r.status, 200);
@@ -66,7 +66,7 @@ async function main() {
   ok(`logged in as ${r.json.user.email} (tenant ${r.json.user.tenantId}, role ${r.json.user.role})`);
 
   r = await api("POST", "/api/v1/catalog", {
-    sku: "TSHIRT-001", name: "Finder Tee", price_cents: 2000, category: "apparel",
+    sku: "TSHIRT-001", name: "Ascend Tee", price_cents: 2000, category: "apparel",
   });
   assert.equal(r.status, 201);
   const teeId = r.json.id;

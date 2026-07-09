@@ -754,7 +754,7 @@ export class CatalogService {
     const demo: CreateProductInput[] = [
       { sku: "GRO-COFFEE-001", name: "Organic Dark Roast Beans", price_cents: 1499, category: "groceries", barcode: "0123456789012" },
       { sku: "GRO-HONEY-001", name: "Wildflower Honey", price_cents: 899, category: "groceries", barcode: "0123456789029" },
-      { sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", price_cents: 2200, category: "apparel", barcode: "0123456789036" },
+      { sku: "APP-TSHIRT-001", name: "Ascend Logo T-Shirt", price_cents: 2200, category: "apparel", barcode: "0123456789036" },
       { sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", price_cents: 1200, category: "home", barcode: "0123456789043" },
     ];
     for (const p of demo) {

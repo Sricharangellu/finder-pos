@@ -1,4 +1,4 @@
-# Finder POS — Project Status (as of 2026-06-14)
+# Ascend — Project Status (as of 2026-06-14)
 
 This document summarizes what has been done so far, in both plain-language
 and technical terms, and what happens next. It's meant to be readable by
@@ -8,7 +8,7 @@ both a non-technical stakeholder and a developer picking up the project.
 
 ## 1. Plain-language summary (non-technical)
 
-**What Finder is:** A standalone point-of-sale / business-management app
+**What Ascend is:** A standalone point-of-sale / business-management app
 (a custom enterprise point-of-sale and business-management platform). It has a
 backend (the "engine" that stores data and runs the business logic) and a
 frontend (the website/app screens staff and owners use).
@@ -43,10 +43,10 @@ frontend (the website/app screens staff and owners use).
 5. Did a trial "preview" deployment to Vercel of both the backend and
    frontend — confirmed everything builds and runs correctly. This was a
    test deployment, not the live production site.
-6. Clarified an important framing point: Finder is its **own product**. An
+6. Clarified an important framing point: Ascend is its **own product**. An
    ERP feature-list document we'd been using for inspiration is just
    that — inspiration. We are not trying to copy or "catch up" to it
-   feature-for-feature; we build what's useful for Finder's users.
+   feature-for-feature; we build what's useful for Ascend's users.
 
 **What's coming next:**
 - The two automated agents will keep chipping away at the roadmap daily —
@@ -107,15 +107,15 @@ frontend (the website/app screens staff and owners use).
     `INTEGRATION_LOG.md`. Hard stops: dirty tree, failing checks, anything
     needing the other lane/other branches/`--prod`/secrets.
 
-- **GitHub repo**: created `https://github.com/Sricharangellu/finder-pos`
+- **GitHub repo**: created `https://github.com/Sricharangellu/Ascend`
   (private), pushed `master`, `backend-cycle3`, `dev`, `testing`, `prod`.
   Required because cloud-scheduled agents can't see the local filesystem.
 
 - **Scheduled cloud agents** (via `/schedule`, CCR cron routines, both on
   `master`, preview-deploy-only, never `--prod`):
-  - `trig_01BHMDD24e45xUxjrLXqsJV8` — "Finder Backend Dev Cycle", daily
+  - `trig_01BHMDD24e45xUxjrLXqsJV8` — "Ascend Backend Dev Cycle", daily
     `0 3 * * *` UTC, follows `AGENT_BACKEND_CYCLE.md`.
-  - `trig_018Riha7cTs7qfnwpEx7yCFA` — "Finder Frontend Dev Cycle", daily
+  - `trig_018Riha7cTs7qfnwpEx7yCFA` — "Ascend Frontend Dev Cycle", daily
     `0 6 * * *` UTC, follows `AGENT_FRONTEND_CYCLE.md`.
 
 - **Vercel preview deploy** (testing env, `DEPLOY_ENV=testing`, no
@@ -186,7 +186,7 @@ frontend (the website/app screens staff and owners use).
   findings were outdated — e.g. discounts already support volume/BOGO/tier
   rules, purchasing already has receiving + AP posting) from genuinely
   useful gaps, with explicit **out-of-scope** calls (GL/ledger, carrier
-  integrations, multi-channel ecommerce, EDI) per Finder's "inspiration
+  integrations, multi-channel ecommerce, EDI) per Ascend's "inspiration
   only" framing.
 - **Roadmap additions**: appended **BE-9..BE-17** and **FE-10..FE-12** to
   `ROADMAP.md`, each linking to its source gap file. Highest-value items:

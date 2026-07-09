@@ -66,7 +66,7 @@ async function main() {
     const products = [
       { id: "prd_demo_001", sku: "GRO-COFFEE-001", name: "Organic Dark Roast Coffee Beans", price_cents: 1499, category: "groceries", barcode: "0123456789012" },
       { id: "prd_demo_002", sku: "GRO-HONEY-001",  name: "Wildflower Honey",                 price_cents:  899, category: "groceries", barcode: "0123456789029" },
-      { id: "prd_demo_003", sku: "APP-SHIRT-001",  name: "Finder Logo T-Shirt",              price_cents: 2200, category: "apparel",   barcode: "0123456789036" },
+      { id: "prd_demo_003", sku: "APP-SHIRT-001",  name: "Ascend Logo T-Shirt",              price_cents: 2200, category: "apparel",   barcode: "0123456789036" },
       { id: "prd_demo_004", sku: "HOME-MUG-001",   name: "Ceramic Coffee Mug",               price_cents: 1200, category: "home",      barcode: "0123456789043" },
     ];
     for (const p of products) {

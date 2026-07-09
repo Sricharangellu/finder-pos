@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# db/backup/restore.sh — pg_restore wrapper for Finder POS
+# db/backup/restore.sh — pg_restore wrapper for Ascend
 # Wave: 0 — Platform foundation
 #
 # RTO TARGET: ≤ 30 minutes from backup selection to database online.

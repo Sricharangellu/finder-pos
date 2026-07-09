@@ -2,7 +2,7 @@
 
 ## How it works
 
-Finder POS uses short-lived JWT access tokens (15 minutes) and long-lived refresh tokens (7 days). Access tokens are passed in the `Authorization` header; refresh tokens are stored in an `httpOnly` cookie.
+Ascend uses short-lived JWT access tokens (15 minutes) and long-lived refresh tokens (7 days). Access tokens are passed in the `Authorization` header; refresh tokens are stored in an `httpOnly` cookie.
 
 ## Login
 

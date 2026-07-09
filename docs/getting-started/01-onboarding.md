@@ -1,8 +1,8 @@
-# Getting started with Finder POS
+# Getting started with Ascend
 
 ## What you need before you begin
 
-- A Finder POS account (owner credentials)
+- A Ascend account (owner credentials)
 - Your business type (retail, restaurant, hotel, etc.)
 - Hardware: receipt printer, barcode scanner, card reader (optional at first)
 
@@ -69,7 +69,7 @@ See [Checkout & payments](../core-workflows/checkout.md).
 
 ## Offline mode
 
-Finder POS works without internet. When your connection drops:
+Ascend works without internet. When your connection drops:
 
 - An **Offline** banner appears at the top of the register
 - Sales are queued locally (IndexedDB)

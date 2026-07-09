@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# db/backup/backup.sh — pg_dump wrapper for Finder POS
+# db/backup/backup.sh — pg_dump wrapper for Ascend
 # Wave: 0 — Platform foundation
 #
 # DESIGN GOALS

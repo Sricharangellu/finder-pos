@@ -7,7 +7,7 @@
  * - On success, stores the token in memory + sessionStorage (refresh token)
  *   and redirects to the terminal
  * - SSO/SAML providers are presented per the enterprise login spec but are
- *   not wired to a backend yet (Finder POS only supports email/password
+ *   not wired to a backend yet (Ascend only supports email/password
  *   today) — they render as disabled "coming soon" actions.
  */
 

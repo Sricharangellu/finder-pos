@@ -1,11 +1,11 @@
-# Finder — Coordination Prompt for AI Agents
+# Ascend — Coordination Prompt for AI Agents
 
 Paste this to any AI agent/session (Claude, Codex, etc.) joining **finder-pos**. Multiple
 sessions work this repo at once; duplicate files and duplicate *work* (two sessions building
 the same thing) have wasted real effort. The board below prevents it. Follow exactly.
 
 ## The board = GitHub Issues (free, git-native)
-The queue and coordination live in **GitHub Issues** on `Sricharangellu/finder-pos`, not in a
+The queue and coordination live in **GitHub Issues** on `Sricharangellu/Ascend`, not in a
 file. Lanes are labels: `lane:ready` → `lane:in-progress` → `lane:in-review` → (closed = done),
 plus `lane:blocked`. Kinds: `kind:retail-core`, `kind:security`, `kind:infra`, `sri-only`.
 "Update the board" and "check the git commits" are the same system: issues ↔ branches ↔ PRs ↔
@@ -15,16 +15,16 @@ scope — the process below works with plain Issues today.)
 ## 1. Orient (check the board + git before doing anything)
 ```bash
 git pull --ff-only origin master                 # never force-push, never rebase master
-gh issue list --repo Sricharangellu/finder-pos --label lane:ready         # what's pickable
-gh issue list --repo Sricharangellu/finder-pos --label lane:in-progress   # what's already claimed
-gh pr list  --repo Sricharangellu/finder-pos                              # what's mid-review
+gh issue list --repo Sricharangellu/Ascend --label lane:ready         # what's pickable
+gh issue list --repo Sricharangellu/Ascend --label lane:in-progress   # what's already claimed
+gh pr list  --repo Sricharangellu/Ascend                              # what's mid-review
 ```
 Read `AGENTS.md` (operating prompt) and `WORK/FORWARD_PLAN.md` for the deeper rules/spec.
 
 ## 2. Pick + CLAIM a card (atomic — this replaces WORK/LOCK.md)
 Choose the top `lane:ready` issue with **no assignee**, then claim it in one step:
 ```bash
-gh issue edit <n> --repo Sricharangellu/finder-pos \
+gh issue edit <n> --repo Sricharangellu/Ascend \
   --add-assignee @me --remove-label lane:ready --add-label lane:in-progress
 gh issue comment <n> --body "Claimed. Files/area: <list>. Starting now."
 ```
@@ -33,7 +33,7 @@ claimed one in parallel.
 
 ## 3. Prove it doesn't already exist (before building)
 ```bash
-gh issue list --repo Sricharangellu/finder-pos --search "<keywords>" --state all
+gh issue list --repo Sricharangellu/Ascend --search "<keywords>" --state all
 git grep -ni "<feature-or-route-name>" origin/master ; ls src/modules/
 ```
 If it exists, EXTEND it — never build a parallel version. (e.g. `retail-proof` already lives

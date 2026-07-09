@@ -1,12 +1,12 @@
-# Finder POS — Enterprise System Design, Architecture & Backend Schema
+# Ascend — Enterprise System Design, Architecture & Backend Schema
 
-> **Authoritative reference** — This document defines the target architecture, schema, API design, and build roadmap for Finder POS. All backend and frontend decisions should align with this spec.
+> **Authoritative reference** — This document defines the target architecture, schema, API design, and build roadmap for Ascend. All backend and frontend decisions should align with this spec.
 
 ---
 
 ## 1. Target Architecture
 
-Finder POS is built as an **enterprise modular monolith**, designed to later split into services.
+Ascend is built as an **enterprise modular monolith**, designed to later split into services.
 
 ```
 Apps
@@ -795,7 +795,7 @@ webhooks.manage
 
 ## 13. Final Architecture Rule
 
-Finder POS must be designed as:
+Ascend must be designed as:
 - **Inventory ledger system** — not simple stock counts
 - **Financial transaction system** — immutable records, audit trails
 - **Multi-tenant SaaS platform** — tenant_id on every table

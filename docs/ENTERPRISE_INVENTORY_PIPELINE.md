@@ -1,4 +1,4 @@
-# Finder POS — Enterprise Inventory Pipeline, Supplier Reorder, EDI & Error Safeguards
+# Ascend — Enterprise Inventory Pipeline, Supplier Reorder, EDI & Error Safeguards
 
 > Authoritative spec for the Inventory Pipeline domain. Consult before any work on
 > reorder suggestions, purchase orders, supplier price history, EDI imports, or error handling.

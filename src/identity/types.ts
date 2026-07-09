@@ -1,5 +1,5 @@
 /**
- * RBAC roles for the Finder POS platform.
+ * RBAC roles for the Ascend platform.
  * owner > manager > cashier in terms of privilege.
  */
 export type Role = "owner" | "manager" | "cashier";

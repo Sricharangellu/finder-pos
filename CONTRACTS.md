@@ -1,4 +1,4 @@
-# Finder POS — Module Contracts (Year 1 Foundation)
+# Ascend — Module Contracts (Year 1 Foundation)
 
 This is the **single source of truth** that every bounded-context module builds
 against. Modules are isolated: they never import each other's TypeScript. They

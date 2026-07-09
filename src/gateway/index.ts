@@ -1,5 +1,5 @@
 /**
- * Gateway seam — all cross-cutting middleware for the Finder POS modular monolith.
+ * Gateway seam — all cross-cutting middleware for the Ascend modular monolith.
  *
  * Mounting order in app.ts:
  *   1. requestIdMiddleware       — assign requestId + W3C traceparent

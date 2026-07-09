@@ -56,7 +56,7 @@ test("progress: hypothesis/task/evidence keep self-reported work separate from p
   assert.equal(r.json.decision, "validated");
 });
 
-test("progress: system verification only passes when Finder can prove it from tenant data", async () => {
+test("progress: system verification only passes when Ascend can prove it from tenant data", async () => {
   const app = await freshApp();
 
   let r = await request(app, "POST", "/api/progress/tasks", "manager", {

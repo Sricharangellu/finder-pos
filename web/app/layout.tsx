@@ -9,17 +9,17 @@ import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 
 export const metadata: Metadata = {
   title: {
-    default: "Finder POS",
-    template: "%s | Finder POS",
+    default: "Ascend",
+    template: "%s | Ascend",
   },
-  description: "Point-of-sale terminal for Finder",
+  description: "Ascend — commerce operating platform",
   manifest: "/manifest.webmanifest",
   // Prevent indexing in non-prod environments
   robots: process.env.NODE_ENV === "production" ? "index,follow" : "noindex",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Finder POS",
+    title: "Ascend",
   },
 };
 

@@ -1,5 +1,5 @@
 /**
- * Demo data seed — populates a live FinderPOS tenant with realistic retail data.
+ * Demo data seed — populates a live Ascend tenant with realistic retail data.
  *
  * Seeds: 12 products · 3 categories · 8 customers · 25 orders · payments
  *

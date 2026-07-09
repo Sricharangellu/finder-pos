@@ -1,4 +1,4 @@
-// Vercel serverless entry for the Finder POS modular monolith (Postgres-backed).
+// Vercel serverless entry for the Ascend modular monolith (Postgres-backed).
 // buildApp is async (migrations + seed run once per cold start against the
 // DATABASE_URL Postgres); we cache the promise so a warm instance reuses the
 // same Express app + connection pool. Redirects/rewrites in vercel.json route

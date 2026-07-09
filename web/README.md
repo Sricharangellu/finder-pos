@@ -1,4 +1,4 @@
-# Finder POS — Web (Frontend)
+# Ascend — Web (Frontend)
 
 Next.js 14 App Router · TypeScript · Tailwind CSS · MSW mocks · openapi-typescript
 

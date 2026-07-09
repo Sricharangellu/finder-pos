@@ -1825,7 +1825,7 @@ export interface CapabilitiesImpactResponse {
 
 /**
  * A task/hypothesis truth-status. Ordered loosely from "not done" to "proven".
- * `system_verified` is reserved for statuses Finder can prove from real tenant
+ * `system_verified` is reserved for statuses Ascend can prove from real tenant
  * data; `validated`/`invalidated` come only from a hypothesis decision.
  */
 export type ProgressStatus =
@@ -1851,7 +1851,7 @@ export const MANUAL_PROGRESS_STATUSES: readonly ProgressStatus[] = [
   "skipped",
 ];
 
-/** Verification sources Finder can prove from internal data (backend enum). */
+/** Verification sources Ascend can prove from internal data (backend enum). */
 export type ProgressVerificationSource =
   | "retail.first_product"
   | "retail.first_receiving"

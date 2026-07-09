@@ -45,7 +45,7 @@ Each prescription record holds:
 
 When a prescription needs renewal:
 1. Contact the prescriber for a new Rx
-2. Create a new prescription record in Finder POS (previous one stays in history)
+2. Create a new prescription record in Ascend (previous one stays in history)
 
 ## Allergy alerts
 
@@ -56,9 +56,9 @@ Allergy data is stored on the patient record. During dispense, if the drug match
 All medication inventory uses batch tracking:
 - Enable **Expiry tracking** on the product in Catalog
 - When receiving, enter batch number and expiry date
-- Finder POS warns at dispense if the batch is within 30 days of expiry or already expired
+- Ascend warns at dispense if the batch is within 30 days of expiry or already expired
 - **Inventory → Expiring soon** shows medications expiring within 30 days
 
 ## Compliance notes
 
-Finder POS is a business management tool, not a certified pharmacy management system (PMS). For DEA Schedule II–V controlled substances, consult your jurisdiction's requirements. A certified PMS with DEA integration may be required in addition to Finder POS for controlled substance management.
+Ascend is a business management tool, not a certified pharmacy management system (PMS). For DEA Schedule II–V controlled substances, consult your jurisdiction's requirements. A certified PMS with DEA integration may be required in addition to Ascend for controlled substance management.

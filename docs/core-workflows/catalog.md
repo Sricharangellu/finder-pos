@@ -59,6 +59,6 @@ Compliance fields are manager-only.
 
 ## Barcodes
 
-- Finder POS generates EAN-13 barcodes for products without one
+- Ascend generates EAN-13 barcodes for products without one
 - **Inventory → Catalog → Barcodes** — select products and print a label sheet (PDF)
 - Barcode label format: 2.25 × 1.25 inch (Dymo / Zebra compatible)

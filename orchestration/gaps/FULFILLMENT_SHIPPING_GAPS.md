@@ -5,7 +5,7 @@ Inspiration only — see `ROADMAP.md`'s framing note.
 
 Updated: 2026-06-15.
 
-## Where Finder's fulfillment/shipping stands today
+## Where Ascend's fulfillment/shipping stands today
 
 - `src/modules/fulfillment`: locations (bins), assign products to
   locations, pick lists (create, pick line, pack).
@@ -13,18 +13,18 @@ Updated: 2026-06-15.
   cancel lifecycle.
 - This is already a working pick → pack → ship → deliver pipeline — the
   assessment's "shipping module exists as a list with no fulfillment
-  workflow" finding does **not** apply to Finder. FE-4 (locations grid +
+  workflow" finding does **not** apply to Ascend. FE-4 (locations grid +
   pick & pack queue UI) is already on the roadmap to surface this.
 
-## Curated gaps (assessment → verdict for Finder)
+## Curated gaps (assessment → verdict for Ascend)
 
 | Gap | Verdict |
 |---|---|
-| Carrier integration (UPS/FedEx/USPS/DHL), real-time rates, label printing | **Out of scope.** Each carrier is a paid API integration with credentials/contracts Finder doesn't have; building a generic carrier abstraction speculatively is exactly the kind of premature design this roadmap avoids. Revisit if a tenant requests a *specific* carrier. |
+| Carrier integration (UPS/FedEx/USPS/DHL), real-time rates, label printing | **Out of scope.** Each carrier is a paid API integration with credentials/contracts Ascend doesn't have; building a generic carrier abstraction speculatively is exactly the kind of premature design this roadmap avoids. Revisit if a tenant requests a *specific* carrier. |
 | Tracking number auto-capture + carrier status webhooks | **Worth a minimal version once a carrier is chosen** — `shipping` already has a `ship`/`deliver` transition; add an optional `tracking_number` + `carrier` string field now (free), defer webhook ingestion until carrier integration above is justified. |
 | Pick list / pack list / packing slip generation (PDF) | **Pick lists already exist** as data. A printable packing slip is a frontend rendering concern (HTML→print), not a new backend feature — if pursued, it's a frontend item consuming the existing pick-list/shipping-order data. |
 | Wave picking, zone-based shipping rules, dimensional weight, freight management | **Out of scope** — multi-warehouse/3PL complexity with no current tenant. |
-| Driver/route assignment, last-mile routing, proof of delivery, signature capture | **Out of scope** — Finder doesn't operate a delivery fleet; this is a separate logistics product. |
+| Driver/route assignment, last-mile routing, proof of delivery, signature capture | **Out of scope** — Ascend doesn't operate a delivery fleet; this is a separate logistics product. |
 | Return shipping labels, shipment insurance, dangerous-goods handling | **Out of scope**, same reasons as carrier integration. |
 
 ## What this turns into on the roadmap

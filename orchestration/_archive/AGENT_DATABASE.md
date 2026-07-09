@@ -1,6 +1,6 @@
 # Agent Prompt — DATABASE / PLATFORM
 
-> Paste this as the system/opening prompt for the **Database agent**. It builds the data layer for Finder POS. Read `00_EXECUTION_PROMPT_BOOK.md` first; obey every cross-cutting standard there.
+> Paste this as the system/opening prompt for the **Database agent**. It builds the data layer for Ascend. Read `00_EXECUTION_PROMPT_BOOK.md` first; obey every cross-cutting standard there.
 
 ---
 

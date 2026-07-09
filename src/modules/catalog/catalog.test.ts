@@ -380,7 +380,7 @@ test("variants: matrix generation creates missing children and is idempotent", a
     name: "Matrix Tee",
     price_cents: 2500,
     category: "apparel",
-    brand: "Finder",
+    brand: "Ascend",
   });
 
   const generated = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
@@ -393,7 +393,7 @@ test("variants: matrix generation creates missing children and is idempotent", a
   assert.equal(generated.json.items.length, 2);
   assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M / Black", "S / Black"]);
   assert.ok(generated.json.items.every((p: any) => p.parent_product_id === master.json.id));
-  assert.ok(generated.json.items.every((p: any) => p.brand === "Finder"));
+  assert.ok(generated.json.items.every((p: any) => p.brand === "Ascend"));
 
   const repeated = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
     attributes: [

@@ -1,10 +1,10 @@
-# FinderPOS
+# Ascend
 
 **Enterprise-grade Point of Sale platform** for retail, wholesale, and distribution businesses.
 
 Built for the tobacco, vapor, hemp, and specialty retail distribution industry â€” with full multi-tenant SaaS architecture, real-time inventory, and compliance reporting.
 
-[![CI](https://github.com/Sricharangellu/finder-pos/actions/workflows/ci.yml/badge.svg)](https://github.com/Sricharangellu/finder-pos/actions/workflows/ci.yml)
+[![CI](https://github.com/Sricharangellu/Ascend/actions/workflows/ci.yml/badge.svg)](https://github.com/Sricharangellu/Ascend/actions/workflows/ci.yml)
 
 ---
 
@@ -90,7 +90,7 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry â
 ### Local development (Docker)
 
 ```bash
-git clone https://github.com/Sricharangellu/finder-pos.git
+git clone https://github.com/Sricharangellu/Ascend.git
 cd finder-pos
 cp .env.example .env
 docker-compose up

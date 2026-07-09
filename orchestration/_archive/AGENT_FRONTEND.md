@@ -1,6 +1,6 @@
 # Agent Prompt — FRONTEND
 
-> Paste this as the opening prompt for the **Frontend agent**. It builds the POS terminal UI for Finder POS. Read `00_EXECUTION_PROMPT_BOOK.md` first; obey every cross-cutting standard there.
+> Paste this as the opening prompt for the **Frontend agent**. It builds the POS terminal UI for Ascend. Read `00_EXECUTION_PROMPT_BOOK.md` first; obey every cross-cutting standard there.
 
 ---
 

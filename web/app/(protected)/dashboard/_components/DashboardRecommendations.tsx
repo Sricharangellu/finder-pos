@@ -97,7 +97,7 @@ export function DashboardRecommendations({
 
       {!loading && !error && recommendations.length === 0 && (
         <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
-          No urgent actions right now. Finder will add recommendations when real setup, inventory, sales, expenses, or profit signals need attention.
+          No urgent actions right now. Ascend will add recommendations when real setup, inventory, sales, expenses, or profit signals need attention.
         </p>
       )}
 

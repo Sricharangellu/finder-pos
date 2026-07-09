@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command Vercel deploy for Finder POS (backend + frontend) from the current
+# One-command Vercel deploy for Ascend (backend + frontend) from the current
 # working tree. These Vercel projects are NOT git-connected, so deploys are
 # manual CLI uploads — this script codifies the full, finicky recipe so the live
 # site never drifts behind the repo again.

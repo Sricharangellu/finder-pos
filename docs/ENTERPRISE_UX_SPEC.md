@@ -1,13 +1,13 @@
-# Finder POS — Enterprise UI/UX, Page Connections, Tabs, RBAC & User Controls
+# Ascend — Enterprise UI/UX, Page Connections, Tabs, RBAC & User Controls
 
-> Authoritative design spec for Finder POS enterprise UI. Every new page, component, and
+> Authoritative design spec for Ascend enterprise UI. Every new page, component, and
 > RBAC implementation must conform to these standards.
 
 ---
 
 ## 1. Global UI/UX Principles
 
-Finder POS UI must be:
+Ascend UI must be:
 - Modern enterprise-grade
 - Fast, responsive, accessible
 - Role-aware and permission-aware

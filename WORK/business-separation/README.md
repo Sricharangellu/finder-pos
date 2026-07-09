@@ -1,6 +1,6 @@
-# Finder Business Separation Work Packages
+# Ascend Business Separation Work Packages
 
-These work packages convert the retail, wholesale, ecommerce, warehouse, and shared-platform separation prompts into implementation tickets for the existing Finder codebase.
+These work packages convert the retail, wholesale, ecommerce, warehouse, and shared-platform separation prompts into implementation tickets for the existing Ascend codebase.
 
 Use them as sequenced work, not as one giant build. Each package defines the user-facing separation, data ownership, connection points, endpoints, frontend surfaces, tests, acceptance criteria, and an implementation checklist. Content is expanded from Sri's detailed per-domain prompts (2026-07-07).
 
@@ -38,7 +38,7 @@ For every package:
 6. Frontend tests.
 7. Reports, events, and integrations.
 
-## Existing Finder Anchors
+## Existing Ascend Anchors
 
 - Module registry: `src/modules/index.ts`
 - Module contract: `src/modules/types.ts`

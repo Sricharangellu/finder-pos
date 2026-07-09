@@ -6,7 +6,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 const { express: app, db, cleanup } = await buildApp({ connectionString: process.env.DATABASE_URL });
 
 const server = app.listen(PORT, () => {
-  logger.info({ port: PORT }, "Finder POS started");
+  logger.info({ port: PORT }, "Ascend started");
 });
 
 // Drain in-flight requests on deploy or container stop.

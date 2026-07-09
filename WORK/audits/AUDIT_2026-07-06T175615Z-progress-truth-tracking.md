@@ -6,7 +6,7 @@ Status: built_verified
 
 ## Summary
 
-Implemented the backend "Tracking Reality" slice for Finder's retail-first operating platform.
+Implemented the backend "Tracking Reality" slice for Ascend's retail-first operating platform.
 The new `progress` module tracks hypotheses, tasks, evidence, decisions, and honest status
 transitions without duplicating the existing `reports/retail-proof` or `expenses` modules.
 

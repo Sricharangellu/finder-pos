@@ -5,7 +5,7 @@ Inspiration only — see `ROADMAP.md`'s framing note.
 
 Updated: 2026-06-15.
 
-## Where Finder's purchasing stands today
+## Where Ascend's purchasing stands today
 
 - `src/modules/purchasing`: suppliers/vendors, POs with lot/expiry lines,
   `POST /orders/:id/receive` (posts `inventory_movements`, creates lots,
@@ -15,13 +15,13 @@ Updated: 2026-06-15.
   findings do **not** apply — both exist and are wired to inventory +
   billing.
 
-## Curated gaps (assessment → verdict for Finder)
+## Curated gaps (assessment → verdict for Ascend)
 
 | Gap | Verdict |
 |---|---|
 | Partial receiving / partial PO closure | **Worth building.** Today `receive` likely assumes full-line receipt. Add a `quantity` per line to `receive` so a PO can be received in multiple shipments; PO status becomes `partially_received` until all lines are fully received. |
 | Three-way match (PO qty vs received qty vs vendor invoice) | **Worth a light version**, building on partial receiving: when the auto-drafted bill's total differs from `sum(receivedQty * unitCost)`, flag the bill `variance` (boolean + amount) instead of silently accepting it. Full approval workflow is out of scope. |
-| Purchase Requisition + PO approval routing | **Defer.** Finder has one role above cashier (`manager`/`owner`); a requisition→approval chain is multi-level-org complexity most tenants won't need yet. If requested, start with a single `requireRole("manager")` gate on PO creation (already a 1-line addition under BE-1's RBAC pass). |
+| Purchase Requisition + PO approval routing | **Defer.** Ascend has one role above cashier (`manager`/`owner`); a requisition→approval chain is multi-level-org complexity most tenants won't need yet. If requested, start with a single `requireRole("manager")` gate on PO creation (already a 1-line addition under BE-1's RBAC pass). |
 | Vendor price list management, lead-time tracking, vendor performance scoring | **Defer** — `purchasing.suppliers` would need a price-list sub-resource; revisit once a tenant has >1 vendor per SKU (ties to catalog's `preferred_vendor_id`, already shipped in BE-6). |
 | Return to vendor (RTV) workflow | **Already covered** — `vendor_returns` exists. |
 | Blanket POs, drop-ship routing, EDI 850/855/856 | **Out of scope** — EDI in particular is a large integration surface with no current tenant need. |

@@ -1,5 +1,5 @@
 -- =============================================================================
--- contracts/schema.sql — Canonical DDL, Finder POS
+-- contracts/schema.sql — Canonical DDL, Ascend
 -- Owner:   DATABASE agent  (sole editor of this file)
 -- Readers: Backend agent (codes against this), Frontend agent (type-gen)
 --

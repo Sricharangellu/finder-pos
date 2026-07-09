@@ -1082,7 +1082,7 @@ export const handlers = [
       }),
       http.post("*/api/identity/mfa/setup", async () => {
         await latency();
-        return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/FinderPOS:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=FinderPOS" });
+        return HttpResponse.json({ secret: "JBSWY3DPEHPK3PXP", otpauthUrl: "otpauth://totp/Ascend:demo@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Ascend" });
       }),
       http.post("*/api/identity/mfa/verify", async () => {
         await latency();

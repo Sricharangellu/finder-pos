@@ -1,5 +1,5 @@
 /**
- * Finder POS — Enterprise Orchestration Layer
+ * Ascend — Enterprise Orchestration Layer
  *
  * This module wires together all workflows, sagas, handlers, and
  * infrastructure into a single bootstrap function.

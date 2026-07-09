@@ -1,4 +1,4 @@
-# Finder ERP — Benchmark & Parity Matrix
+# Ascend ERP — Benchmark & Parity Matrix
 
 **Benchmark source:** `ERP-Prompt-Guide.html` (analysis of erp.fairtradetx.com) — an 18-prompt
 spec for a **wholesale / distribution ERP**. This supersedes the earlier POS-only

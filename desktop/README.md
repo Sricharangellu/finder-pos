@@ -1,6 +1,6 @@
-# Finder POS — Desktop App
+# Ascend — Desktop App
 
-A minimal desktop wrapper around the live Finder POS web app
+A minimal desktop wrapper around the live Ascend web app
 (`https://finder-pos-frontend.vercel.app`). It's a standard Electron app —
 opening it gives you the same product in its own window (no browser tabs/UI
 chrome), with your data stored on the live backend exactly as it is on the
@@ -14,8 +14,8 @@ web.
    npm install
    npm run dist:mac
    ```
-2. Open `desktop/release/Finder POS-1.0.0-arm64.dmg`.
-3. Drag **Finder POS** into Applications.
+2. Open `desktop/release/Ascend-1.0.0-arm64.dmg`.
+3. Drag **Ascend** into Applications.
 4. Launch it. First run: macOS Gatekeeper will warn the app is from an
    unidentified developer (it isn't code-signed/notarized). Right-click the
    app → **Open** to bypass this once.
@@ -59,7 +59,7 @@ The desktop app itself:
   background for more than 10 minutes (avoids interrupting an active
   checkout).
 - Reloads every 6 hours in the background as a safety net.
-- You can always force a manual refresh: **Finder POS menu → Reload**
+- You can always force a manual refresh: **Ascend menu → Reload**
   (or Cmd+R).
 
 ## Notes

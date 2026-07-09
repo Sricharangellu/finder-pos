@@ -1,4 +1,4 @@
-<!-- FinderPOS PR checklist — aligned with WORK/RULES.md. Delete lines that don't apply. -->
+<!-- Ascend PR checklist — aligned with WORK/RULES.md. Delete lines that don't apply. -->
 
 ## What & why
 

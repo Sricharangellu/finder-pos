@@ -1,4 +1,4 @@
-# FinderPOS — Multi-Agent Work Lock
+# Ascend — Multi-Agent Work Lock
 
 Status: IDLE — no active claim
 

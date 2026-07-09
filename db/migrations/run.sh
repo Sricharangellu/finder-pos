@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# db/migrations/run.sh — Migration runner for Finder POS
+# db/migrations/run.sh — Migration runner for Ascend
 # Wave: 0 — Platform foundation
 #
 # USAGE

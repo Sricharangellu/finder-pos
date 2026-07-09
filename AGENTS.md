@@ -1,4 +1,4 @@
-# FinderPOS — Agent Instructions
+# Ascend — Agent Instructions
 
 This is the ONE agent instruction file. It applies to EVERY agent, workflow, and AI
 session working in this repo (Claude Code, subagents, background agents, any other tool).
@@ -11,9 +11,9 @@ contract, the contract wins.
 
 ---
 
-# Finder Agent Operating Prompt
+# Ascend Agent Operating Prompt
 
-You are working on Finder, a retail-first POS and business operating platform.
+You are working on Ascend, a retail-first POS and business operating platform.
 
 ## Source Of Truth
 
@@ -45,7 +45,7 @@ If duplicate or obsolete files appear, remove them only when they are clearly re
 
 ## Product Direction
 
-Finder is retail-first.
+Ascend is retail-first.
 
 Priority order:
 
@@ -56,7 +56,7 @@ Priority order:
 
 Do not add broad vertical depth before the retail flow is complete and verified.
 
-The first production-ready Finder release must prove this flow with real backend data:
+The first production-ready Ascend release must prove this flow with real backend data:
 
 ```text
 Create business
@@ -69,7 +69,7 @@ Create business
 -> Complete tasks with evidence
 ```
 
-Finder must help a retailer answer:
+Ascend must help a retailer answer:
 
 - What products do I sell?
 - What is in stock?
@@ -153,7 +153,7 @@ Every frontend change must follow these rules:
 - Frontend production calls must hit real backend routes.
 - Add loading, empty, error, and success states.
 - Sensitive actions must be hidden or disabled when the user lacks access.
-- Keep the UI practical, dense, and operational. Finder is not a marketing site.
+- Keep the UI practical, dense, and operational. Ascend is not a marketing site.
 - Do not add decorative complexity that distracts from POS, inventory, reporting, and workflow tasks.
 
 ## AI / Recommendations Rules
@@ -193,7 +193,7 @@ Allowed task states:
 - `blocked`
 - `skipped`
 
-Use `system_verified` only when Finder can prove completion from internal data, such as:
+Use `system_verified` only when Ascend can prove completion from internal data, such as:
 
 - Sales records
 - Inventory movements
@@ -324,7 +324,7 @@ server/process. Treat unexplained failures as possible coordination conflicts un
 
 ## Git: where and how (trunk-based, staged toward PR gating)
 
-- **Remote:** `origin` = https://github.com/Sricharangellu/finder-pos.git · **trunk:** `master`
+- **Remote:** `origin` = https://github.com/Sricharangellu/Ascend.git · **trunk:** `master`
   (protected: force-pushes and deletion are blocked). `staging` exists for preview deploys.
 - **Session start:** `git pull --ff-only origin master`. If it refuses, stop and reconcile —
   never rebase/force-push master.

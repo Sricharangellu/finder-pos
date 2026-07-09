@@ -1,4 +1,4 @@
-# FinderPOS — E2E Tests (Playwright)
+# Ascend — E2E Tests (Playwright)
 
 Three golden paths: **login**, **POS checkout**, **inventory receive / invoice pay**.
 

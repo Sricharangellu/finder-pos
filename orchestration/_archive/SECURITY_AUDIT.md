@@ -1,4 +1,4 @@
-# Security Audit — Finder ERP
+# Security Audit — Ascend ERP
 
 Dedicated security pass across the gateway + 19 modules. Date: 2026-06-13. Reviewer: backend agent.
 

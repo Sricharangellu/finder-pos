@@ -1,4 +1,4 @@
-# Finder POS — Enterprise Domain Roadmap
+# Ascend — Enterprise Domain Roadmap
 
 > Strategic design document. Defines all remaining enterprise domains in dependency order.
 > Build in this sequence: domains higher in the list are prerequisites for domains below.
@@ -12,7 +12,7 @@
 Stop adding isolated features. Design remaining enterprise domains so the entire platform
 fits together before implementation. Build in **dependency order**, not feature order.
 
-Target end state: Finder POS transitions from a POS application into a complete enterprise
+Target end state: Ascend transitions from a POS application into a complete enterprise
 retail operations platform, scalable from single-store to multi-brand, multi-country,
 franchise, wholesale, and omnichannel deployments.
 
@@ -392,7 +392,7 @@ Once all 13 domains are implemented, the final enterprise layer adds cross-cutti
 | AI Recommendation Engine | ML-powered suggestions across all domains |
 | Administration & System Settings | Tenant config, feature flags, health monitoring |
 
-At that point, Finder POS is a complete enterprise retail operations platform.
+At that point, Ascend is a complete enterprise retail operations platform.
 
 ---
 

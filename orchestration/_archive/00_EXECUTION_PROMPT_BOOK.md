@@ -1,6 +1,6 @@
-# Finder POS — Enterprise Execution Prompt Book
+# Ascend — Enterprise Execution Prompt Book
 
-**Purpose.** Drive three Claude agents — **Database/Platform**, **Backend**, **Frontend** — to build the Finder POS platform **in parallel** as an enterprise-grade, scalable system, without colliding with each other. This book is the orchestrator's script: it defines the architecture, the contract that lets the three work simultaneously, the phase plan, the coordination rules, and the gates every increment must pass.
+**Purpose.** Drive three Claude agents — **Database/Platform**, **Backend**, **Frontend** — to build the Ascend platform **in parallel** as an enterprise-grade, scalable system, without colliding with each other. This book is the orchestrator's script: it defines the architecture, the contract that lets the three work simultaneously, the phase plan, the coordination rules, and the gates every increment must pass.
 
 > Anchor decision: keep the existing `finder-pos/` **modular monolith** as the spine, enforce strict service boundaries so modules can be extracted into microservices later (Level 2 → Level 3 on the maturity model), and close the enterprise gaps that Year 1 was missing: **multi-tenancy, auth/RBAC, CI/CD, observability, backups/DR, feature flags.**
 

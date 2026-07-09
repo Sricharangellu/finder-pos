@@ -151,7 +151,7 @@ export function registerRoutes(router: Router, service: OrdersService): void {
       );
       if (!to) throw badRequest("provide an email address or attach a customer with an email");
 
-      const storeName = body.storeName ?? process.env["STORE_NAME"] ?? "FinderPOS";
+      const storeName = body.storeName ?? process.env["STORE_NAME"] ?? "Ascend";
       const date = new Date(Number(order.created_at)).toLocaleString("en-US", { timeZone: "UTC" });
       const linesHtml = order.lines.map((l) =>
         `<tr><td style="padding:4px 8px">${l.name}</td><td style="padding:4px 8px;text-align:right">×${l.quantity}</td><td style="padding:4px 8px;text-align:right">$${Money.toDollars(Number(l.line_cents))}</td></tr>`

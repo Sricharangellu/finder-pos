@@ -2,7 +2,7 @@
 
 ## What are webhooks?
 
-Webhooks let external systems receive real-time notifications when events happen in Finder POS. Instead of polling the API, your system receives a POST request the moment an event fires.
+Webhooks let external systems receive real-time notifications when events happen in Ascend. Instead of polling the API, your system receives a POST request the moment an event fires.
 
 ## Setting up a webhook
 
@@ -10,7 +10,7 @@ Webhooks let external systems receive real-time notifications when events happen
 1. Enter your endpoint URL (must be HTTPS)
 2. Select the event types to subscribe to
 3. Optionally enter a secret for signature verification
-4. Save — Finder POS starts delivering events immediately
+4. Save — Ascend starts delivering events immediately
 
 ## Event types
 
@@ -50,7 +50,7 @@ All events follow the same envelope:
 
 ## Signature verification
 
-If you set a secret when creating the webhook, Finder POS signs each delivery:
+If you set a secret when creating the webhook, Ascend signs each delivery:
 
 ```
 X-Finder-Signature: sha256=<hmac-sha256 of raw body using your secret>
@@ -87,4 +87,4 @@ Toggle the webhook off in **Settings → Webhooks → [webhook] → Disable**. D
 
 ## SSE (server-sent events)
 
-In addition to webhooks, Finder POS exposes a real-time SSE stream at `/api/v1/stream` for in-app UI subscriptions. This is used internally by the Finder POS frontend (notifications bell, loyalty tier upgrade toasts, low-stock alerts). External clients can also subscribe with a valid JWT.
+In addition to webhooks, Ascend exposes a real-time SSE stream at `/api/v1/stream` for in-app UI subscriptions. This is used internally by the Ascend frontend (notifications bell, loyalty tier upgrade toasts, low-stock alerts). External clients can also subscribe with a valid JWT.

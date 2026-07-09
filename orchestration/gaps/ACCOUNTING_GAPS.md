@@ -5,7 +5,7 @@ Inspiration only — see `ROADMAP.md`'s framing note.
 
 Updated: 2026-06-15.
 
-## Where Finder's accounting stands today
+## Where Ascend's accounting stands today
 
 - `src/modules/accounting`: Chart of Accounts (tree, seedable), batch
   deposits with approve/reject.
@@ -17,7 +17,7 @@ Updated: 2026-06-15.
   module's table (bills, invoices, deposits, vendor/store credits) and the
   COA is currently a labeling tree, not a ledger.
 
-## Curated gaps (assessment → verdict for Finder)
+## Curated gaps (assessment → verdict for Ascend)
 
 | Gap | Verdict |
 |---|---|

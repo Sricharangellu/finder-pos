@@ -1,5 +1,5 @@
 -- =============================================================================
--- Row-Level Security Policies — Finder POS
+-- Row-Level Security Policies — Ascend
 -- Wave:  0 — Platform foundation
 --         1 — Core commerce (appended 2026-06-12)
 -- Owner: DATABASE agent

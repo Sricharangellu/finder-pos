@@ -1,4 +1,4 @@
-# Finder POS — Enterprise Product (PIM + Inventory + Supply Chain) Spec
+# Ascend — Enterprise Product (PIM + Inventory + Supply Chain) Spec
 
 > Authoritative design spec for the Product domain. Products are the **central business entity** —
 > every other module (purchasing, inventory, sales, accounting, reporting, analytics) references them.
@@ -8,7 +8,7 @@
 
 ## 1. Architecture Philosophy
 
-Finder POS treats the Product module as a **PIM + Inventory + Supply Chain** system, not a simple CRUD form. This mirrors how enterprise platforms structure the product domain: a 360° workspace where every downstream process references authoritative product data.
+Ascend treats the Product module as a **PIM + Inventory + Supply Chain** system, not a simple CRUD form. This mirrors how enterprise platforms structure the product domain: a 360° workspace where every downstream process references authoritative product data.
 
 ---
 

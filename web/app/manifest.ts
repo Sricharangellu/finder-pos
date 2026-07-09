@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Finder POS",
-    short_name: "Finder",
+    name: "Ascend",
+    short_name: "Ascend",
     description: "Point-of-sale and business management platform",
     start_url: "/terminal",
     display: "standalone",

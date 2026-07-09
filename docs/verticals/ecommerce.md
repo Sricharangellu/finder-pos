@@ -53,7 +53,7 @@ Configure available shipping options in **Settings → Shipping Methods**:
 
 ## Inventory synchronization
 
-Finder POS maintains a single inventory across in-store and online:
+Ascend maintains a single inventory across in-store and online:
 - An online sale decrements inventory just like an in-store sale
 - A return (from either channel) restocks inventory
 - Low stock alerts fire regardless of which channel caused the depletion

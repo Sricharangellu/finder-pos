@@ -35,7 +35,7 @@ Each event record holds:
 
 ### Oversell protection
 
-Finder POS uses a database transaction to check capacity before selling. If `sold + quantity > capacity`, the sale is rejected with a `insufficient_capacity` error. This prevents double-selling even under concurrent load.
+Ascend uses a database transaction to check capacity before selling. If `sold + quantity > capacity`, the sale is rejected with a `insufficient_capacity` error. This prevents double-selling even under concurrent load.
 
 ### After sale
 

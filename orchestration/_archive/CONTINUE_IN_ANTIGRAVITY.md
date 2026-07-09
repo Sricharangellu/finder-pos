@@ -1,4 +1,4 @@
-# Continue Finder ERP in Google Antigravity
+# Continue Ascend ERP in Google Antigravity
 
 Onboarding for the next agent/developer picking this project up in Antigravity.
 
@@ -60,7 +60,7 @@ harness (`scripts/pg-harness.js` — see any recent module's verify pattern). Ke
    tail of the 60+ named reports.
 
 ## 7. Starter prompt to paste into the Antigravity agent
-> You're continuing the Finder ERP project. Read `orchestration/CONTINUE_IN_ANTIGRAVITY.md`,
+> You're continuing the Ascend ERP project. Read `orchestration/CONTINUE_IN_ANTIGRAVITY.md`,
 > `ERP_BENCHMARK.md`, and `BACKEND_HANDOFF.md` first. Follow the module conventions exactly. Pick up
 > follow-up #1 (finish the RBAC matrix): add `requireRole` guards to the remaining sensitive mutations,
 > typecheck, write a standalone verify, and report a diff. Don't deploy until I confirm.

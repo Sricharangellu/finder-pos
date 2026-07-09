@@ -1,4 +1,4 @@
-# Finder POS — Product Detail Suggested Tabs
+# Ascend — Product Detail Suggested Tabs
 
 > Authoritative tab layout for `/products/[id]` (catalog/[id]). Consult before adding or
 > reordering tabs on the product detail page.

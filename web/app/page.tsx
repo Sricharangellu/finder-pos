@@ -53,7 +53,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="border-b border-slate-800 px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
         <span className="text-xl font-bold tracking-tight text-white">
-          Finder<span className="text-indigo-400">POS</span>
+          Asc<span className="text-indigo-400">end</span>
         </span>
         <div className="flex items-center gap-3">
           <Link
@@ -122,7 +122,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-slate-800 px-6 py-6 text-center text-slate-500 text-sm">
-        &copy; 2026 FinderPOS &mdash; MIT License
+        &copy; 2026 Ascend &mdash; MIT License
       </footer>
     </div>
   );

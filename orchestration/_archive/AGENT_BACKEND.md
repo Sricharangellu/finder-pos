@@ -1,6 +1,6 @@
 # Agent Prompt — BACKEND
 
-> Paste this as the opening prompt for the **Backend agent**. It builds the API + domain modules for Finder POS. Read `00_EXECUTION_PROMPT_BOOK.md` first; obey every cross-cutting standard there.
+> Paste this as the opening prompt for the **Backend agent**. It builds the API + domain modules for Ascend. Read `00_EXECUTION_PROMPT_BOOK.md` first; obey every cross-cutting standard there.
 
 ---
 

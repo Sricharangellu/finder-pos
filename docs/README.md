@@ -1,6 +1,6 @@
-# Finder POS — Documentation
+# Ascend — Documentation
 
-Finder POS is a modular, multi-vertical point-of-sale platform. One codebase powers retail, restaurant, hospitality, healthcare, automotive, manufacturing, rental, entertainment, and education businesses. You enable only the modules your business needs.
+Ascend is a modular, multi-vertical point-of-sale platform. One codebase powers retail, restaurant, hospitality, healthcare, automotive, manufacturing, rental, entertainment, and education businesses. You enable only the modules your business needs.
 
 ## Quick links
 

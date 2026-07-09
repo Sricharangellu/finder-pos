@@ -124,7 +124,7 @@ test("login MFA endpoint exchanges a valid TOTP challenge for auth cookies", asy
     email: "totp-owner@example.com",
     password: "secret123",
   });
-  const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret });
+  const totp = new OTPAuth.TOTP({ issuer: "Ascend", algorithm: "SHA1", digits: 6, period: 30, secret });
   const code = totp.generate();
 
   const { status, json, headers } = await request(app.express, "POST", "/api/identity/login/mfa", {
@@ -160,7 +160,7 @@ test("MFA backup code can complete login once and is then consumed", async () =>
     VALUES ('mfa_${Date.now()}', '${tenantId}', '${userId}', '${secret.base32}', false, '[]', ${Date.now()}, ${Date.now()})
   `);
 
-  const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret });
+  const totp = new OTPAuth.TOTP({ issuer: "Ascend", algorithm: "SHA1", digits: 6, period: 30, secret });
   const { backupCodes } = await svc.verifyAndEnableMfa(userId, tenantId, totp.generate());
   const login = await request(app.express, "POST", "/api/identity/login", {
     email: "backup-owner@example.com",
@@ -429,7 +429,7 @@ async function seedMfaUser(
     INSERT INTO user_mfa (id, tenant_id, user_id, totp_secret, enabled, backup_codes, created_at, updated_at)
     VALUES ('mfa_${stamp}', '${tenantId}', '${userId}', '${secret.base32}', false, '[]', ${now}, ${now})
   `);
-  const totp = new OTPAuth.TOTP({ issuer: "FinderPOS", algorithm: "SHA1", digits: 6, period: 30, secret });
+  const totp = new OTPAuth.TOTP({ issuer: "Ascend", algorithm: "SHA1", digits: 6, period: 30, secret });
   const { backupCodes } = await svc.verifyAndEnableMfa(userId, tenantId, totp.generate());
   return { svc, tenantId, userId, email, backupCodes };
 }

@@ -111,7 +111,7 @@ let storeCustomers: StoreCustomer[] = [
 ];
 const storeTokens = new Map<string, string>(); // token → customerId
 let scSeq = 10;
-const storeSettings = { visibility: "private" as "public" | "private", store_name: "FinderPOS Store" };
+const storeSettings = { visibility: "private" as "public" | "private", store_name: "Ascend Store" };
 // Settings dev stores
 let shippingMethods: any[] = [];
 let paymentTerms: any[] = [];
@@ -282,7 +282,7 @@ export const mockHandlers = [
     const items = [
       { id: "prod_1", sku: "GRO-COFFEE-001", name: "Organic Dark Roast Beans", price_cents: 1499, category: "groceries", status: "active", stock_qty: 42, reorder_pt: 10, low_stock: false },
       { id: "prod_2", sku: "GRO-HONEY-001", name: "Wildflower Honey", price_cents: 899, category: "groceries", status: "active", stock_qty: 6, reorder_pt: 8, low_stock: true },
-      { id: "prod_3", sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", price_cents: 2200, category: "apparel", status: "active", stock_qty: 17, reorder_pt: 5, low_stock: false },
+      { id: "prod_3", sku: "APP-TSHIRT-001", name: "Ascend Logo T-Shirt", price_cents: 2200, category: "apparel", status: "active", stock_qty: 17, reorder_pt: 5, low_stock: false },
       { id: "prod_4", sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", price_cents: 1200, category: "home", status: "active", stock_qty: 0, reorder_pt: 4, low_stock: true },
     ];
     return HttpResponse.json({ items });
@@ -671,7 +671,7 @@ export const mockHandlers = [
     const rows = [
       { productId: "prod_demo_a", name: "Organic Dark Roast Beans", stockQty: 95, costCents: 600, retailCents: 1000, costValueCents: 57000, retailValueCents: 95000 },
       { productId: "prod_demo_b", name: "Wildflower Honey", stockQty: 90, costCents: 300, retailCents: 500, costValueCents: 27000, retailValueCents: 45000 },
-      { productId: "prod_demo_c", name: "Finder Logo T-Shirt", stockQty: 42, costCents: 900, retailCents: 2200, costValueCents: 37800, retailValueCents: 92400 },
+      { productId: "prod_demo_c", name: "Ascend Logo T-Shirt", stockQty: 42, costCents: 900, retailCents: 2200, costValueCents: 37800, retailValueCents: 92400 },
       { productId: "prod_demo_d", name: "Ceramic Coffee Mug", stockQty: 30, costCents: 450, retailCents: 1200, costValueCents: 13500, retailValueCents: 36000 },
       { productId: "prod_demo_e", name: "Whole Bean Coffee 1lb", stockQty: 68, costCents: 700, retailCents: 1499, costValueCents: 47600, retailValueCents: 101932 },
     ];
@@ -727,7 +727,7 @@ export const mockHandlers = [
       items: [
         mk("prod_1", "GRO-COFFEE-001", "Organic Dark Roast Beans", "groceries", 1499, 42, 10),
         mk("prod_2", "GRO-HONEY-001", "Wildflower Honey", "groceries", 899, 6, 8),
-        mk("prod_3", "APP-TSHIRT-001", "Finder Logo T-Shirt", "apparel", 2200, 17, 5),
+        mk("prod_3", "APP-TSHIRT-001", "Ascend Logo T-Shirt", "apparel", 2200, 17, 5),
         mk("prod_4", "HOME-MUG-001", "Ceramic Coffee Mug", "home", 1200, 0, 4),
       ],
     });
@@ -3158,7 +3158,7 @@ mockHandlers.push(
     return HttpResponse.json({ items: [
       { productId: "prod_2", sku: "GRO-HONEY-001", name: "Wildflower Honey", currentStock: 6, reorderPoint: 8, reorderQuantity: 24, leadTimeDays: 5, velocityPerDay: 1.2, daysOfStock: 5, belowReorderPoint: true, supplierId: null },
       { productId: "prod_4", sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", currentStock: 0, reorderPoint: 4, reorderQuantity: 12, leadTimeDays: 7, velocityPerDay: 0.8, daysOfStock: 0, belowReorderPoint: true, supplierId: null },
-      { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", currentStock: 17, reorderPoint: 5, reorderQuantity: 20, leadTimeDays: 14, velocityPerDay: 1.5, daysOfStock: 11, belowReorderPoint: false, supplierId: null },
+      { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Ascend Logo T-Shirt", currentStock: 17, reorderPoint: 5, reorderQuantity: 20, leadTimeDays: 14, velocityPerDay: 1.5, daysOfStock: 11, belowReorderPoint: false, supplierId: null },
     ]});
   }),
   http.get(`${V1}/insights/order-recommendations`, async () => {
@@ -3166,7 +3166,7 @@ mockHandlers.push(
     return HttpResponse.json({ items: [
       { productId: "prod_1", sku: "GRO-COFFEE-001", name: "Organic Dark Roast Beans", totalUnitsSold: 186, revenueGrossCents: 278814, rank: 1, belowReorderPoint: false },
       { productId: "prod_2", sku: "GRO-HONEY-001", name: "Wildflower Honey", totalUnitsSold: 102, revenueGrossCents: 91698, rank: 2, belowReorderPoint: true },
-      { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Finder Logo T-Shirt", totalUnitsSold: 87, revenueGrossCents: 191400, rank: 3, belowReorderPoint: false },
+      { productId: "prod_3", sku: "APP-TSHIRT-001", name: "Ascend Logo T-Shirt", totalUnitsSold: 87, revenueGrossCents: 191400, rank: 3, belowReorderPoint: false },
       { productId: "prod_4", sku: "HOME-MUG-001", name: "Ceramic Coffee Mug", totalUnitsSold: 64, revenueGrossCents: 76800, rank: 4, belowReorderPoint: true },
     ]});
   }),

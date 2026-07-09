@@ -3,7 +3,7 @@ import pino from "pino";
 const isDev = process.env["NODE_ENV"] !== "production";
 
 /**
- * Structured logger for the FinderPOS backend.
+ * Structured logger for the Ascend backend.
  *
  * In development: outputs human-readable text (no pino-pretty required —
  * pipe output through `npx pino-pretty` locally if desired).

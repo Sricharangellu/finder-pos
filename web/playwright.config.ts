@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * FinderPOS — Playwright E2E configuration.
+ * Ascend — Playwright E2E configuration.
  *
  * Tests run against a locally started Next.js dev server pointing at a real
  * backend (DATABASE_URL + JWT_SECRET must be set). In CI the backend is

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Extend Finder identity so access is separated not only by tenant, but also by
+Extend Ascend identity so access is separated not only by tenant, but also by
 business unit, channel, location, and module capability. Tenants, users, JWT
 auth, custom roles, and permissions already exist — build on them.
 

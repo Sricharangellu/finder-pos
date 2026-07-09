@@ -1,4 +1,4 @@
-// Finder POS — offline shell service worker.
+// Ascend — offline shell service worker.
 // INF-8: adds Background Sync for checkout outbox replay.
 //
 // Strategies:

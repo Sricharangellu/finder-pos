@@ -182,7 +182,7 @@ async function runCheck(name: string, fn: () => Promise<void>): Promise<void> {
   }
 }
 
-console.log(`Finder backend operational readiness check`);
+console.log(`Ascend backend operational readiness check`);
 console.log(`Backend: ${backendUrl}`);
 console.log("");
 

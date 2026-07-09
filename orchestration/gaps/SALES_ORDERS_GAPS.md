@@ -5,7 +5,7 @@ Inspiration only — see `ROADMAP.md`'s framing note.
 
 Updated: 2026-06-15.
 
-## Where Finder's sales workflow stands today
+## Where Ascend's sales workflow stands today
 
 - `src/modules/sales`: full Quote → Sales Order (approval, picker
   assignment) → Invoice flow (`/quotations/*`, `/sales-orders/*`), plus
@@ -17,7 +17,7 @@ Updated: 2026-06-15.
 - `src/modules/billing`: AP/AR bills/invoices with aging (BE-3 in progress
   adds sales-by-rep/vendor pivots + P&L).
 
-## Curated gaps (assessment → verdict for Finder)
+## Curated gaps (assessment → verdict for Ascend)
 
 | Gap | Verdict |
 |---|---|

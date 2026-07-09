@@ -296,13 +296,13 @@ export function ImportWizard({ onImportDone }: { onImportDone: () => void }) {
         {step === "map" && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Map your CSV columns to FinderPOS fields. Matches were auto-detected where possible.
+              Map your CSV columns to Ascend fields. Matches were auto-detected where possible.
             </p>
             <div className="overflow-x-auto rounded-md border border-slate-200">
               <table className="w-full text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">FinderPOS Field</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Ascend Field</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">CSV Column</th>
                   </tr>
                 </thead>

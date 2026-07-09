@@ -1,6 +1,6 @@
-# Finder POS — Enterprise Orchestration Layer
+# Ascend — Enterprise Orchestration Layer
 
-This directory contains the orchestration layer that coordinates multi-step business processes across Finder POS modules. It implements the **saga pattern** — each workflow is a sequence of steps with compensating transactions that run in reverse on failure.
+This directory contains the orchestration layer that coordinates multi-step business processes across Ascend modules. It implements the **saga pattern** — each workflow is a sequence of steps with compensating transactions that run in reverse on failure.
 
 ## Architecture
 
