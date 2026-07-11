@@ -164,3 +164,116 @@ test("GET /business-units/:id enforces access for non-owners", async () => {
 
   await app.db.close();
 });
+
+test("owner can patch a business unit and replace channels", async () => {
+  const app = await freshApp();
+  const svc = new BusinessService(app.db);
+  const t = uniq("tnt_patch");
+  const bu = await svc.createBusinessUnit({ name: "Online", kind: "ecommerce", channels: ["ecommerce"] }, t);
+
+  const patched = await call(
+    app,
+    "PATCH",
+    `/api/v1/business-units/${bu.id}`,
+    { name: "Online Plus", kind: "mixed", channels: ["ecommerce", "manual_invoice"], modules: ["ecommerce", "billing"], defaultRoute: "/dashboard/online" },
+    { sub: uniq("usr_owner"), tenantId: t, role: "owner" },
+  );
+  assert.equal(patched.status, 200);
+  assert.equal(patched.json.name, "Online Plus");
+  assert.equal(patched.json.kind, "mixed");
+  assert.deepEqual(patched.json.channels, ["ecommerce", "manual_invoice"]);
+  assert.deepEqual(patched.json.modules, ["ecommerce", "billing"]);
+  assert.equal(patched.json.defaultRoute, "/dashboard/online");
+
+  await app.db.close();
+});
+
+test("switch-business-unit persists the selected active unit", async () => {
+  const app = await freshApp();
+  const svc = new BusinessService(app.db);
+  const t = uniq("tnt_switch");
+  const retail = await svc.createBusinessUnit({ name: "R", kind: "retail", channels: ["retail_pos"] }, t);
+  const wholesale = await svc.createBusinessUnit({ name: "W", kind: "wholesale", channels: ["wholesale_b2b"] }, t);
+  const uid = uniq("usr_switch");
+  await svc.grantAccess(t, uid, retail.id);
+  await svc.grantAccess(t, uid, wholesale.id);
+
+  const switched = await call(
+    app,
+    "POST",
+    "/api/v1/me/switch-business-unit",
+    { businessUnitId: wholesale.id },
+    { sub: uid, tenantId: t, role: "manager" },
+  );
+  assert.equal(switched.status, 200);
+  assert.equal(switched.json.activeBusinessUnitId, wholesale.id);
+
+  const context = await call(app, "GET", "/api/v1/me/context", undefined, { sub: uid, tenantId: t, role: "manager" });
+  assert.equal(context.json.activeBusinessUnitId, wholesale.id);
+
+  await app.db.close();
+});
+
+test("business capability upsert updates the matrix and influences context modules", async () => {
+  const app = await freshApp();
+  const svc = new BusinessService(app.db);
+  const t = uniq("tnt_cap");
+  const bu = await svc.createBusinessUnit({ name: "R", kind: "retail", channels: ["retail_pos"], modules: ["pos"] }, t);
+  const uid = uniq("usr_cap");
+  await svc.grantAccess(t, uid, bu.id);
+
+  const first = await call(
+    app,
+    "PUT",
+    "/api/v1/capabilities/retail_reports",
+    { businessUnitId: bu.id, moduleKey: "reports", featureKey: "retail_summary", enabled: true, config: { level: "daily" } },
+    { sub: uniq("usr_owner"), tenantId: t, role: "owner" },
+  );
+  assert.equal(first.status, 200);
+  assert.equal(first.json.module_key, "reports");
+  assert.equal(first.json.feature_key, "retail_summary");
+  assert.equal(first.json.enabled, true);
+
+  const context = await call(app, "GET", "/api/v1/me/context", undefined, { sub: uid, tenantId: t, role: "manager" });
+  assert.ok(context.json.businessUnits[0].modules.includes("reports"));
+
+  const second = await call(
+    app,
+    "PUT",
+    "/api/v1/capabilities/retail_reports",
+    { businessUnitId: bu.id, moduleKey: "reports", featureKey: "retail_summary", enabled: false },
+    { sub: uniq("usr_owner2"), tenantId: t, role: "owner" },
+  );
+  assert.equal(second.status, 200);
+  assert.equal(second.json.id, first.json.id);
+  assert.equal(second.json.enabled, false);
+
+  const list = await call(app, "GET", `/api/v1/business-capabilities?businessUnitId=${bu.id}`, undefined, { sub: uid, tenantId: t, role: "manager" });
+  const matches = list.json.items.filter((cap: any) => cap.module_key === "reports" && cap.feature_key === "retail_summary");
+  assert.equal(matches.length, 1);
+
+  await app.db.close();
+});
+
+test("module visibility hides a module from me/context", async () => {
+  const app = await freshApp();
+  const svc = new BusinessService(app.db);
+  const t = uniq("tnt_vis");
+  const bu = await svc.createBusinessUnit({ name: "R", kind: "retail", channels: ["retail_pos"], modules: ["pos", "reports"] }, t);
+  const uid = uniq("usr_vis");
+  await svc.grantAccess(t, uid, bu.id);
+
+  const hidden = await call(
+    app,
+    "PUT",
+    "/api/v1/module-visibility",
+    { businessUnitId: bu.id, moduleKey: "reports", visible: false },
+    { sub: uniq("usr_owner"), tenantId: t, role: "owner" },
+  );
+  assert.equal(hidden.status, 200);
+
+  const context = await call(app, "GET", "/api/v1/me/context", undefined, { sub: uid, tenantId: t, role: "manager" });
+  assert.deepEqual(context.json.businessUnits[0].modules, ["pos"]);
+
+  await app.db.close();
+});
