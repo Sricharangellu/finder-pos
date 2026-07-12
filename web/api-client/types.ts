@@ -597,6 +597,7 @@ export interface Invoice {
   id: string;
   customer_id: string;
   order_id: string | null;
+  sales_order_id?: string | null;
   invoice_number: string;
   status: BillingStatus;
   total_cents: number;

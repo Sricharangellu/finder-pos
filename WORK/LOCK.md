@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — link AR invoice to sales order + surface in delivery)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, "next" → complete invoices part of the pipeline) |
+| Queue item | Link the auto-raised AR invoice back to its sales order: add `invoices.sales_order_id`, set it when billing raises an invoice from `sales_order.invoiced`, add a `?salesOrderId=` list filter. Surface invoice status on the `/delivery` panel and add a "Create invoice" action when the SO is approved but not yet invoiced. Extend billing + sales + web; no new module. |
+| Files/areas expected | `src/modules/billing/{index,service,routes}.ts`, billing test; `web/app/(protected)/delivery/page.tsx`, `web/api-client/types.ts`; WORK audit + this LOCK. NO db canonical DDL rewrite beyond idempotent ALTERs. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified (backend), built-not-verified (web panel). AR invoice raised from a sales order is now linked (`invoices.sales_order_id`) and surfaced on the `/delivery` panel with a Create-invoice action. Gates: backend typecheck / test 388/388 / smoke 20/20 / hygiene; web typecheck / lint / build (/delivery emitted). Audit: `WORK/audits/AUDIT_2026-07-12T064225Z-invoice-sales-order-link.md`. Committed on `feat/delivery-pipeline`. |
+| Blockers | none |
+
 ## Released Claim (Claude session A — delivery pipeline connect-the-seams)
 
 | Field | Value |

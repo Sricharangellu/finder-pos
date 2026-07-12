@@ -14,6 +14,7 @@ import type {
   PickList,
   Shipment,
   ShipmentsResponse,
+  Invoice,
 } from "@/api-client/types";
 
 // The five pipeline stages, in order. `fulfillment_status` on a sales order
@@ -68,6 +69,7 @@ export default function DeliveryPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickList, setPickList] = useState<PickList | null>(null);
   const [shipment, setShipment] = useState<Shipment | null>(null);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const canManage = hasRole("manager");
@@ -90,14 +92,17 @@ export default function DeliveryPage() {
   const loadDetail = useCallback(async (order: SalesOrder) => {
     setPickList(null);
     setShipment(null);
+    setInvoice(null);
     try {
-      const [pls, ships] = await Promise.all([
+      const [pls, ships, invoices] = await Promise.all([
         apiGet<{ items: PickList[] }>("/api/v1/fulfillment/pick-lists"),
         apiGet<ShipmentsResponse>("/api/v1/shipping/"),
+        apiGet<{ items: Invoice[] }>(`/api/v1/billing/invoices?salesOrderId=${order.id}`),
       ]);
       const pl = (pls.items ?? []).find((p) => p.order_id === order.id && p.source_type === "sales_order") ?? null;
       if (pl) setPickList(await apiGet<PickList>(`/api/v1/fulfillment/pick-lists/${pl.id}`));
       setShipment((ships.items ?? []).find((s) => s.sales_order_id === order.id) ?? null);
+      setInvoice((invoices.items ?? [])[0] ?? null);
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not load pipeline detail.");
     }
@@ -129,6 +134,9 @@ export default function DeliveryPage() {
   const pack = () => act(() => apiPost(`/api/v1/fulfillment/pick-lists/${pickList!.id}/pack`, {}));
   const ship = () => act(() => apiPost(`/api/v1/shipping/${shipment!.id}/ship`, {}));
   const deliver = () => act(() => apiPost(`/api/v1/shipping/${shipment!.id}/deliver`, {}));
+  // Billing runs parallel to fulfilment: an approved order can be invoiced, which
+  // raises the AR invoice (linked back to this order) that we surface below.
+  const createInvoice = () => act(() => apiPost(`/api/v1/sales/sales-orders/${selected!.id}/invoice`, {}));
 
   const allPicked = pickList?.lines?.every((l) => l.status === "picked") ?? false;
 
@@ -255,6 +263,34 @@ export default function DeliveryPage() {
                     <p className="text-sm font-medium text-green-700 dark:text-green-300">
                       Delivered{shipment?.tracking_number ? ` — ${shipment.tracking_number}` : ""}. Pipeline complete.
                     </p>
+                  )}
+                </div>
+
+                {/* Billing — parallel to fulfilment. Show the linked AR invoice, or
+                    offer to raise one once the order is approved. */}
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                  {invoice ? (
+                    <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+                      Invoice <span className="font-medium">{invoice.invoice_number}</span> — {formatMoney(invoice.total_cents)}
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          invoice.status === "paid"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        }`}
+                      >
+                        {invoice.status}
+                      </span>
+                    </p>
+                  ) : selected.status === "invoiced" ? (
+                    <p className="text-sm text-neutral-500">Invoiced.</p>
+                  ) : selected.status === "approved" ? (
+                    <>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Not invoiced yet.</p>
+                      <Button variant="secondary" onClick={createInvoice} disabled={busy || !canManage}>Create invoice</Button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-neutral-500">Approve the order to raise an invoice.</p>
                   )}
                 </div>
               </div>

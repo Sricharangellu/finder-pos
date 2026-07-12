@@ -102,6 +102,22 @@ test("shipment from a sales order is idempotent (auto + manual converge)", async
   assert.equal(shipments.filter((s) => s.sales_order_id === so.id).length, 1);
 });
 
+test("invoicing a sales order raises an AR invoice linked back to it", async () => {
+  const app = await freshApp();
+  const so = await mkSalesOrder(app);
+
+  // Approve → invoice. Billing listens to sales_order.invoiced and raises the AR
+  // invoice with sales_order_id set, so it is discoverable from the order.
+  await call(app, "POST", `/api/sales/sales-orders/${so.id}/approve`, {});
+  const invoiced = await call(app, "POST", `/api/sales/sales-orders/${so.id}/invoice`, {});
+  assert.equal(invoiced.json.status, "invoiced");
+
+  const linked = (await call(app, "GET", `/api/billing/invoices?salesOrderId=${so.id}`)).json.items as Array<{ id: string; sales_order_id: string | null; total_cents: number }>;
+  assert.equal(linked.length, 1, "exactly one AR invoice linked to the sales order");
+  assert.equal(linked[0]!.sales_order_id, so.id);
+  assert.ok(linked[0]!.total_cents > 0);
+});
+
 test("fulfillment status cannot skip stages", async () => {
   const app = await freshApp();
   const so = await mkSalesOrder(app);

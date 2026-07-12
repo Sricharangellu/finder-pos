@@ -60,6 +60,13 @@ const ALTER_INVOICES_DUNNING = `
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dunning_level INTEGER NOT NULL DEFAULT 0;
 `;
 
+// Delivery pipeline — link an AR invoice back to the sales order it was raised
+// from, so the sales order / delivery views can show its billing status.
+const ALTER_INVOICES_SALES_ORDER = `
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sales_order_id TEXT;
+CREATE INDEX IF NOT EXISTS invoices_tenant_so_idx ON invoices (tenant_id, sales_order_id) WHERE sales_order_id IS NOT NULL;
+`;
+
 // BE-30: early payment discount on bills.
 const ALTER_BILLS_DISCOUNT = `
 ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_pct     NUMERIC(5,2);
@@ -96,18 +103,19 @@ $$;
  *  auto-drafts a bill (via the purchase_order.received event). */
 export const billingModule: PosModule = {
   name: "billing",
-  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE],
+  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_INVOICES_SALES_ORDER, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE],
   async register({ db, events, router }) {
     const service = new BillingService(db, events);
     events.on("purchase_order.received", async (event) => {
       const p = event.payload as { tenantId?: string; poId?: string };
       if (p.tenantId && p.poId) await service.billFromPO(p.poId, p.tenantId);
     });
-    // A sales order converted to an invoice raises the matching AR invoice.
+    // A sales order converted to an invoice raises the matching AR invoice,
+    // linked back to the sales order so delivery/sales views can show it.
     events.on("sales_order.invoiced", async (event) => {
-      const p = event.payload as { tenantId?: string; customerId?: string; totalCents?: number };
+      const p = event.payload as { tenantId?: string; customerId?: string; totalCents?: number; salesOrderId?: string };
       if (p.tenantId && p.customerId && p.totalCents && p.totalCents > 0) {
-        await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents }, p.tenantId);
+        await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents, salesOrderId: p.salesOrderId }, p.tenantId);
       }
     });
     registerRoutes(router, service);

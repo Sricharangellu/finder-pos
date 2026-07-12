@@ -38,6 +38,7 @@ export interface Invoice {
   tenant_id: string;
   customer_id: string;
   order_id: string | null;
+  sales_order_id: string | null;
   invoice_number: string;
   status: DocStatus;
   total_cents: number;
@@ -176,7 +177,7 @@ export class BillingService {
 
   // ── Invoices (AR) ─────────────────────────────────────────────────────────────
   async createInvoice(
-    input: { customerId: string; orderId?: string; totalCents?: number; dueDate?: number },
+    input: { customerId: string; orderId?: string; salesOrderId?: string; totalCents?: number; dueDate?: number },
     tenantId: string,
   ): Promise<Invoice> {
     let total = input.totalCents;
@@ -220,13 +221,14 @@ export class BillingService {
     const now = Date.now();
     const inv: Invoice = {
       id: `inv_${uuidv7()}`, tenant_id: tenantId, customer_id: input.customerId, order_id: input.orderId ?? null,
+      sales_order_id: input.salesOrderId ?? null,
       invoice_number: await this.nextNumber("invoices", "INV", tenantId), status: "open",
       total_cents: total, paid_cents: 0, due_date: input.dueDate ?? now + 30 * DAY, issued_at: now,
       dunning_level: 0,
     };
     await this.db.query(
-      `INSERT INTO invoices (id, tenant_id, customer_id, order_id, invoice_number, status, total_cents, paid_cents, due_date, issued_at)
-       VALUES (@id,@tenant_id,@customer_id,@order_id,@invoice_number,@status,@total_cents,@paid_cents,@due_date,@issued_at)`,
+      `INSERT INTO invoices (id, tenant_id, customer_id, order_id, sales_order_id, invoice_number, status, total_cents, paid_cents, due_date, issued_at)
+       VALUES (@id,@tenant_id,@customer_id,@order_id,@sales_order_id,@invoice_number,@status,@total_cents,@paid_cents,@due_date,@issued_at)`,
       inv as unknown as Record<string, unknown>,
     );
     return inv;
@@ -234,13 +236,14 @@ export class BillingService {
 
   async listInvoices(
     tenantId: string,
-    opts: { status?: string; cursor?: string; limit?: number } = {},
+    opts: { status?: string; salesOrderId?: string; cursor?: string; limit?: number } = {},
   ): Promise<{ items: Invoice[]; nextCursor: string | null; limit: number }> {
     const limit = Math.min(opts.limit ?? 50, 200);
     const where: string[] = ["tenant_id = @t"];
     const params: Record<string, unknown> = { t: tenantId };
 
     if (opts.status) { where.push("status = @s"); params.s = opts.status; }
+    if (opts.salesOrderId) { where.push("sales_order_id = @so"); params.so = opts.salesOrderId; }
 
     if (opts.cursor) {
       const cur = JSON.parse(Buffer.from(opts.cursor, "base64url").toString()) as { at: number; id: string };
