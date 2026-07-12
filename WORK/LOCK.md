@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — local dev quickstart + honest status)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, docs/planning gap: local Postgres quickstart) |
+| Queue item | Create a correct local-dev quickstart for running the backend against a real Postgres (the current README manual path is broken — no .env auto-load). Add honest status framing (retail proven E2E; other verticals Partial/Planned; tenant isolation = gateway context + RLS backstop). Docs only — no code changes. |
+| Files/areas expected | NEW `docs/getting-started/local-development.md`; edits to `README.md`, `db/README.md`; WORK audit + this LOCK. NO src/web/db code changes. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — docs only. NEW docs/getting-started/local-development.md (backend-on-own-Postgres quickstart); README project-status + fixed-broken-manual-dev + stale counts; docs/README maturity note + dev link; db/README startup-vs-run.sh note. All links/files verified; hygiene pass (914). Audit: WORK/audits/AUDIT_2026-07-12T223507Z-local-dev-quickstart.md. |
+| Blockers | none |
+
 ## Released Claim (Claude session A — replace fetch-all-then-filter in /delivery)
 
 | Field | Value |
