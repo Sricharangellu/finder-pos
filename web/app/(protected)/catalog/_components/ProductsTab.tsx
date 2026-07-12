@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
@@ -101,6 +101,7 @@ function ProductListCard({ product, onEdit, onArchive }: {
 
 export function ProductsTab({ categories }: { categories: Category[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [products, setProducts]     = useState<Product[]>([]);
   const [total, setTotal]           = useState(0);
   const [loading, setLoading]       = useState(true);
@@ -218,7 +219,16 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const handleCreate = async (body: Record<string, unknown>) => { await apiPost("/api/v1/catalog", body); await load(); };
+  useEffect(() => {
+    if (searchParams.get("new") === "product") {
+      setShowCreate(true);
+    }
+  }, [searchParams]);
+
+  const handleCreate = async (body: Record<string, unknown>) => {
+    const created = await apiPost<Product>("/api/v1/catalog", body);
+    router.push(`/catalog/${created.id}`);
+  };
 
   const handleArchive = async () => {
     if (!archiveTarget) return;

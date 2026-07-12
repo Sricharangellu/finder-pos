@@ -161,7 +161,7 @@ export function CatalogTab() {
               </div>
             )}
           </div>
-          <Button variant="primary" size="sm" onClick={() => router.push("/inventory/products/new")}>
+          <Button variant="primary" size="sm" onClick={() => router.push("/catalog?new=product")}>
             New product
           </Button>
         </div>
@@ -249,7 +249,7 @@ export function CatalogTab() {
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <Link
-                      href={`/inventory/products/${product.id}`}
+                      href={`/catalog/${product.id}`}
                       className="font-mono text-xs font-semibold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-950"
                     >
                       {product.sku}

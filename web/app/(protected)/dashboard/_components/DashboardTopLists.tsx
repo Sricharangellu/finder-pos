@@ -57,7 +57,7 @@ export function DashboardTopLists({
                 {topProducts.map((p) => (
                   <tr key={p.id} className="transition-colors hover:bg-slate-50">
                     <td className="px-5 py-3">
-                      <Link href={`/inventory/products/${p.id}`} className="font-medium text-slate-900 hover:text-brand-700 hover:underline">
+                      <Link href={`/catalog/${p.id}`} className="font-medium text-slate-900 hover:text-brand-700 hover:underline">
                         {p.name}
                       </Link>
                       {p.category && <span className="ml-2 text-xs text-slate-400">{p.category}</span>}

@@ -437,7 +437,7 @@ function ProductTable({ items }: { items: ProductItem[] }) {
               <td className="py-2.5 pr-4 font-mono text-xs text-slate-500">{item.sku}</td>
               <td className="py-2.5 pr-4">
                 <Link
-                  href={`/inventory/products/${item.id}`}
+                  href={`/catalog/${item.id}`}
                   className="font-medium text-slate-950 hover:text-slate-700 hover:underline"
                 >
                   {item.name}
