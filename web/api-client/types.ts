@@ -914,11 +914,15 @@ export interface QuotationsResponse {
 
 export type SalesOrderStatus = "pending_approve" | "approved" | "fulfilled" | "cancelled";
 
+/** Delivery-pipeline status, independent of the order-to-cash `status`. */
+export type SOFulfillmentStatus = "unfulfilled" | "picking" | "packed" | "shipped" | "delivered";
+
 export interface SalesOrder {
   id: string;
   so_number: string;
   customer_id: string;
   status: SalesOrderStatus | string;
+  fulfillment_status: SOFulfillmentStatus | string;
   total_cents: number;
   store_id: string | null;
   created_at: number;
@@ -935,7 +939,8 @@ export type ShipmentStatus = "pending" | "shipped" | "delivered" | "cancelled";
 export interface Shipment {
   id: string;
   ship_number: string;
-  invoice_id: string;
+  invoice_id: string | null;
+  sales_order_id: string | null;
   status: ShipmentStatus | string;
   method: string;
   carrier: string | null;
@@ -974,6 +979,8 @@ export type PickListStatus = "picking" | "picked" | "packed";
 export interface PickList {
   id: string;
   pick_number?: string;
+  order_id?: string;
+  source_type?: "order" | "sales_order" | string;
   status: PickListStatus | string;
   assigned_to?: string;
   created_at: number;

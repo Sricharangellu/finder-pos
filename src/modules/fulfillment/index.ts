@@ -1,5 +1,6 @@
 import type { PosModule } from "../types.js";
 import { FulfillmentService } from "./service.js";
+import { SalesService } from "../sales/service.js";
 import { registerRoutes } from "./routes.js";
 
 const CREATE_LOCATIONS = `
@@ -50,12 +51,20 @@ CREATE INDEX IF NOT EXISTS pick_lists_tenant_idx ON pick_lists (tenant_id, creat
 CREATE UNIQUE INDEX IF NOT EXISTS pick_lists_order_uidx ON pick_lists (tenant_id, order_id);
 CREATE INDEX IF NOT EXISTS pick_lines_list_idx ON pick_list_lines (tenant_id, pick_list_id);`;
 
+// Delivery pipeline — a pick list can be raised from a retail order (`order`) or
+// a sales/ecommerce order (`sales_order`). `order_id` holds the source id either
+// way; `source_type` says which table it points at so pack can notify the sales
+// order when a sales-order pick list is packed. Existing rows are retail orders.
+const ADD_PICK_LIST_SOURCE = `ALTER TABLE pick_lists ADD COLUMN IF NOT EXISTS source_type TEXT NOT NULL DEFAULT 'order';`;
+
 /** Fulfillment / WMS — locations, product placement, and pick/pack of orders. */
 export const fulfillmentModule: PosModule = {
   name: "fulfillment",
-  migrations: [CREATE_LOCATIONS, CREATE_PRODUCT_LOCATIONS, CREATE_PICK_LISTS, CREATE_PICK_LINES, INDEXES],
-  async register({ db, router }) {
-    registerRoutes(router, new FulfillmentService(db));
+  migrations: [CREATE_LOCATIONS, CREATE_PRODUCT_LOCATIONS, CREATE_PICK_LISTS, CREATE_PICK_LINES, INDEXES, ADD_PICK_LIST_SOURCE],
+  async register({ db, events, router }) {
+    // Compose SalesService so a sales-order pick list can advance the order's
+    // delivery status (mirrors how ecommerce composes sales).
+    registerRoutes(router, new FulfillmentService(db, new SalesService(db, events)));
   },
 };
 

@@ -73,6 +73,14 @@ CREATE INDEX IF NOT EXISTS sales_orders_customer_idx ON sales_orders (tenant_id,
 CREATE UNIQUE INDEX IF NOT EXISTS sales_orders_quote_uidx ON sales_orders (tenant_id, quotation_id) WHERE quotation_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS so_lines_parent_idx ON sales_order_lines (tenant_id, sales_order_id);`;
 
+// Delivery pipeline — fulfillment/delivery status distinct from the order-to-cash
+// `status`. A sales order moves unfulfilled → picking → packed → shipped → delivered
+// as it flows through the fulfillment and shipping modules. Defaults keep existing
+// rows valid.
+const ADD_SO_FULFILLMENT = `
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NULL DEFAULT 'unfulfilled';
+CREATE INDEX IF NOT EXISTS sales_orders_fulfillment_idx ON sales_orders (tenant_id, fulfillment_status);`;
+
 // Tier (1=best price .. 5=list) added here so the sales module can resolve
 // tier-aware pricing without a hard dependency on the customers module's DDL.
 const ADD_CUSTOMER_TIER = `ALTER TABLE customers ADD COLUMN IF NOT EXISTS tier INTEGER NOT NULL DEFAULT 5;`;
@@ -106,11 +114,11 @@ CREATE INDEX IF NOT EXISTS sales_reps_tenant_idx ON sales_reps (tenant_id, activ
 /** Sales — quotations + sales orders (B2B order-to-cash front half). */
 export const salesModule: PosModule = {
   name: "sales",
-  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES, CREATE_SALES_REPS],
+  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_SO_FULFILLMENT, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES, CREATE_SALES_REPS],
   register({ db, events, router }) {
     registerRoutes(router, new SalesService(db, events), db);
   },
 };
 
 export { SalesService } from "./service.js";
-export type { Quotation, SalesOrder, SalesLine, QuoteStatus, SOStatus, SalesRep, SalesRepPerformance } from "./service.js";
+export type { Quotation, SalesOrder, SalesLine, QuoteStatus, SOStatus, SOFulfillmentStatus, SalesRep, SalesRepPerformance } from "./service.js";

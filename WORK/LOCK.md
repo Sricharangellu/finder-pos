@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — delivery pipeline connect-the-seams)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, user feature: retail order / invoices / sales orders (ecommerce) / delivery pipelines) |
+| Queue item | Connect the delivery pipeline for sales orders (incl. ecommerce): add `sales_orders.fulfillment_status`; make fulfillment build pick-lists from sales orders and, on pack, flip SO→packed + emit `sales_order.packed`; make shipping sales-order-aware (nullable invoice_id + sales_order_id), auto-create a shipment on `sales_order.packed`, and propagate ship/deliver back to the SO. Add a web delivery-pipeline page. Extend existing modules; split across commits (backend then frontend). |
+| Files/areas expected | `src/modules/sales/{index,service,routes}.ts`, `src/modules/fulfillment/{index,service,routes}.ts`, `src/modules/shipping/{index,service,routes}.ts`, tests in those modules; `web/app/(protected)/**` delivery pipeline page + api-client; WORK audit + this LOCK. NO db/ canonical DDL rewrite beyond idempotent ALTERs, NO unrelated modules. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified (backend), built-not-verified (web page). Sales/ecommerce orders now flow order → pick → pack → ship → deliver with fulfillment_status propagation; `/delivery` web page drives it. Gates: backend typecheck / test 389/389 / smoke 20/20 / hygiene; web typecheck / lint / build. Audit: `WORK/audits/AUDIT_2026-07-12T062801Z-delivery-pipeline.md`. |
+| Blockers | none |
+
 ## Released Claim (Codex session P — retail progress truth tracking)
 
 | Field | Value |

@@ -18,6 +18,7 @@ const locationSchema = z.object({
 });
 const assignSchema = z.object({ productId: z.string().min(1), locationId: z.string().min(1) });
 const pickListSchema = z.object({ orderId: z.string().min(1) });
+const soPickListSchema = z.object({ salesOrderId: z.string().min(1) });
 const pickSchema = z.object({ quantity: z.number().int().positive().optional() });
 
 export function registerRoutes(router: Router, service: FulfillmentService): void {
@@ -39,6 +40,10 @@ export function registerRoutes(router: Router, service: FulfillmentService): voi
   router.post("/pick-lists", handler(async (req, res) => {
     const b = parseBody(pickListSchema, req.body);
     res.status(201).json(await service.createPickList(b.orderId, tenantId(res)));
+  }));
+  router.post("/pick-lists/from-sales-order", handler(async (req, res) => {
+    const b = parseBody(soPickListSchema, req.body);
+    res.status(201).json(await service.createPickListForSalesOrder(b.salesOrderId, tenantId(res)));
   }));
   router.get("/pick-lists", handler(async (_req, res) => {
     res.json({ items: await service.listPickLists(tenantId(res)) });

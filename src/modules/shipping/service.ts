@@ -1,14 +1,17 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { notFound, conflict } from "../../shared/http.js";
+import type { SalesService } from "../sales/service.js";
 
 /**
- * Shipping module — shipping orders generated from invoices (ERP benchmark #8).
+ * Shipping module — shipping orders generated from invoices (ERP benchmark #8)
+ * or directly from a sales order (delivery pipeline, B2B/ecommerce).
  *
- * A shipping order is created from an invoice; its lines are resolved from the
- * invoice's linked order (if any). It moves pending_shipment → shipped →
+ * A shipping order is created from an invoice or a sales order; its lines are
+ * resolved from the source's line table. It moves pending_shipment → shipped →
  * delivered, carrying carrier + tracking, and individual lines can be marked
- * packed (packing slip). Tenant-scoped.
+ * packed (packing slip). When it originates from a sales order, shipping/
+ * delivering it advances that order's fulfillment_status. Tenant-scoped.
  */
 
 export type ShipStatus = "pending_shipment" | "shipped" | "delivered" | "cancelled";
@@ -18,7 +21,8 @@ export interface ShippingOrder {
   id: string;
   tenant_id: string;
   ship_number: string;
-  invoice_id: string;
+  invoice_id: string | null;
+  sales_order_id: string | null;
   customer_id: string;
   status: ShipStatus;
   method: ShipMethod;
@@ -51,11 +55,37 @@ export interface CreateShipmentInput {
 }
 
 export class ShippingService {
-  constructor(private readonly db: DB) {}
+  /** `sales` is optional so invoice-only callers (and unit tests) can construct
+   *  the service without wiring the sales module. When present, shipping/
+   *  delivering a sales-order shipment advances the order's delivery status. */
+  constructor(private readonly db: DB, private readonly sales?: SalesService) {}
 
   private async nextNumber(tenantId: string): Promise<string> {
     const row = await this.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM shipping_orders WHERE tenant_id = @t", { t: tenantId });
     return `SHP-${String(Number(row?.n ?? 0) + 1).padStart(5, "0")}`;
+  }
+
+  /** Insert a shipping order + its lines in one transaction. Shared by the
+   *  invoice and sales-order create paths. */
+  private async persist(so: ShippingOrder, srcLines: Array<{ product_id: string; name: string; quantity: number }>, tenantId: string): Promise<ShippingOrder & { lines: ShippingLine[] }> {
+    const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO shipping_orders (id, tenant_id, ship_number, invoice_id, sales_order_id, customer_id, status, method, carrier, tracking_number, expected_date, shipped_date, delivered_date, notes, created_at, updated_at)
+         VALUES (@id,@tenant_id,@ship_number,@invoice_id,@sales_order_id,@customer_id,@status,@method,@carrier,@tracking_number,@expected_date,@shipped_date,@delivered_date,@notes,@created_at,@updated_at)`,
+        so as unknown as Record<string, unknown>,
+      );
+      const out: ShippingLine[] = [];
+      for (const l of srcLines) {
+        const line: ShippingLine = { id: `shl_${uuidv7()}`, tenant_id: tenantId, shipping_order_id: so.id, product_id: l.product_id, name: l.name, quantity: Number(l.quantity), packed: 0 };
+        await tdb.query(
+          "INSERT INTO shipping_order_lines (id, tenant_id, shipping_order_id, product_id, name, quantity, packed) VALUES (@id,@tenant_id,@shipping_order_id,@product_id,@name,@quantity,0)",
+          line as unknown as Record<string, unknown>,
+        );
+        out.push(line);
+      }
+      return out;
+    });
+    return { ...so, lines };
   }
 
   /** Create a shipping order from an invoice. Idempotent per invoice. Lines come
@@ -83,29 +113,40 @@ export class ShippingService {
     const now = Date.now();
     const so: ShippingOrder = {
       id: `shp_${uuidv7()}`, tenant_id: tenantId, ship_number: await this.nextNumber(tenantId),
-      invoice_id: input.invoiceId, customer_id: inv.customer_id, status: "pending_shipment",
+      invoice_id: input.invoiceId, sales_order_id: null, customer_id: inv.customer_id, status: "pending_shipment",
       method: input.method ?? "delivery", carrier: null, tracking_number: null,
       expected_date: input.expectedDate ?? null, shipped_date: null, delivered_date: null,
       notes: input.notes ?? null, created_at: now, updated_at: now,
     };
-    const lines = await this.db.withTenant(tenantId).tx(async (tdb) => {
-      await tdb.query(
-        `INSERT INTO shipping_orders (id, tenant_id, ship_number, invoice_id, customer_id, status, method, carrier, tracking_number, expected_date, shipped_date, delivered_date, notes, created_at, updated_at)
-         VALUES (@id,@tenant_id,@ship_number,@invoice_id,@customer_id,@status,@method,@carrier,@tracking_number,@expected_date,@shipped_date,@delivered_date,@notes,@created_at,@updated_at)`,
-        so as unknown as Record<string, unknown>,
-      );
-      const out: ShippingLine[] = [];
-      for (const l of srcLines) {
-        const line: ShippingLine = { id: `shl_${uuidv7()}`, tenant_id: tenantId, shipping_order_id: so.id, product_id: l.product_id, name: l.name, quantity: Number(l.quantity), packed: 0 };
-        await tdb.query(
-          "INSERT INTO shipping_order_lines (id, tenant_id, shipping_order_id, product_id, name, quantity, packed) VALUES (@id,@tenant_id,@shipping_order_id,@product_id,@name,@quantity,0)",
-          line as unknown as Record<string, unknown>,
-        );
-        out.push(line);
-      }
-      return out;
-    });
-    return { ...so, lines };
+    return this.persist(so, srcLines, tenantId);
+  }
+
+  /** Create a shipping order directly from a sales order (delivery pipeline).
+   *  Idempotent per sales order. Lines come from sales_order_lines. Invoked
+   *  automatically when a sales order is packed. */
+  async createFromSalesOrder(salesOrderId: string, opts: { method?: ShipMethod; expectedDate?: number; notes?: string }, tenantId: string): Promise<ShippingOrder & { lines: ShippingLine[] }> {
+    const so = await this.db.one<{ id: string; customer_id: string }>(
+      "SELECT id, customer_id FROM sales_orders WHERE id = @i AND tenant_id = @t",
+      { i: salesOrderId, t: tenantId },
+    );
+    if (!so) throw notFound(`sales order '${salesOrderId}' not found`);
+
+    const existing = await this.db.one<ShippingOrder>("SELECT * FROM shipping_orders WHERE sales_order_id = @i AND tenant_id = @t", { i: salesOrderId, t: tenantId });
+    if (existing) return { ...existing, lines: await this.linesFor(existing.id, tenantId) };
+
+    const srcLines = await this.db.query<{ product_id: string; name: string; quantity: number }>(
+      "SELECT product_id, name, quantity FROM sales_order_lines WHERE sales_order_id = @o AND tenant_id = @t",
+      { o: salesOrderId, t: tenantId },
+    );
+    const now = Date.now();
+    const shipment: ShippingOrder = {
+      id: `shp_${uuidv7()}`, tenant_id: tenantId, ship_number: await this.nextNumber(tenantId),
+      invoice_id: null, sales_order_id: salesOrderId, customer_id: so.customer_id, status: "pending_shipment",
+      method: opts.method ?? "delivery", carrier: null, tracking_number: null,
+      expected_date: opts.expectedDate ?? null, shipped_date: null, delivered_date: null,
+      notes: opts.notes ?? null, created_at: now, updated_at: now,
+    };
+    return this.persist(shipment, srcLines, tenantId);
   }
 
   private linesFor(id: string, tenantId: string): Promise<ShippingLine[]> {
@@ -137,6 +178,9 @@ export class ShippingService {
     if (so.status === "delivered") throw conflict("shipping order already delivered");
     const now = Date.now();
     const shippedDate = opts.shippedDate ?? now;
+    // Advance the sales order first: an illegal transition (e.g. the SO was never
+    // packed) throws here and leaves the shipment untouched, so the two never drift.
+    if (so.sales_order_id && this.sales) await this.sales.setFulfillmentStatus(so.sales_order_id, "shipped", tenantId);
     await this.db.query(
       "UPDATE shipping_orders SET status = 'shipped', carrier = @c, tracking_number = @tn, shipped_date = @sd, updated_at = @now WHERE id = @id AND tenant_id = @t",
       { c: opts.carrier ?? so.carrier, tn: opts.trackingNumber ?? so.tracking_number, sd: shippedDate, now, id, t: tenantId },
@@ -149,6 +193,7 @@ export class ShippingService {
     if (!so) throw notFound(`shipping order '${id}' not found`);
     if (so.status !== "shipped") throw conflict(`cannot deliver a ${so.status} shipping order`);
     const now = Date.now();
+    if (so.sales_order_id && this.sales) await this.sales.setFulfillmentStatus(so.sales_order_id, "delivered", tenantId);
     await this.db.query("UPDATE shipping_orders SET status = 'delivered', delivered_date = @now, updated_at = @now WHERE id = @id AND tenant_id = @t", { now, id, t: tenantId });
     return { ...so, status: "delivered", delivered_date: now };
   }

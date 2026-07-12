@@ -15,6 +15,12 @@ const createSchema = z.object({
   notes: z.string().optional(),
   lines: z.array(z.object({ productId: z.string().min(1), name: z.string().optional(), quantity: z.number().int().positive() })).optional(),
 });
+const fromSalesOrderSchema = z.object({
+  salesOrderId: z.string().min(1),
+  method: z.enum(["delivery", "pickup"]).optional(),
+  expectedDate: z.number().int().positive().optional(),
+  notes: z.string().optional(),
+});
 const shipSchema = z.object({
   carrier: z.string().min(1).optional(),
   trackingNumber: z.string().min(1).optional(),
@@ -24,6 +30,10 @@ const shipSchema = z.object({
 export function registerRoutes(router: Router, service: ShippingService): void {
   router.post("/", handler(async (req, res) => {
     res.status(201).json(await service.createFromInvoice(parseBody(createSchema, req.body), tenantId(res)));
+  }));
+  router.post("/from-sales-order", handler(async (req, res) => {
+    const b = parseBody(fromSalesOrderSchema, req.body);
+    res.status(201).json(await service.createFromSalesOrder(b.salesOrderId, { method: b.method, expectedDate: b.expectedDate, notes: b.notes }, tenantId(res)));
   }));
   router.get("/", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? (req.query.status as ShipStatus) : undefined;
