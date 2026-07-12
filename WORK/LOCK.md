@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — replace fetch-all-then-filter in /delivery)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, persistent-agent: continue + improve) |
+| Queue item | Robustness/perf: the /delivery panel fetched ALL pick-lists (≤200) and ALL shipments (≤500) then filtered client-side for the selected order — breaks past those limits. Add server-side `salesOrderId`/`orderId` filters to shipping.list and fulfillment.listPickLists (matching the invoice `?salesOrderId=` pattern) and have the page query only what it needs. Extend existing modules only. |
+| Files/areas expected | `src/modules/shipping/{service,routes}.ts`, `src/modules/fulfillment/{service,routes}.ts`, `src/modules/shipping/delivery-pipeline.test.ts`, `web/app/(protected)/delivery/page.tsx`; WORK audit + this LOCK. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified. /delivery detail now queries pick-lists/shipments by order (server-side filters) instead of fetch-all-then-filter. Gates: backend typecheck / test 389/389 / smoke 20/20 / hygiene 913; web typecheck / lint / build. Audit: `WORK/audits/AUDIT_2026-07-12T213543Z-delivery-targeted-queries.md`. Committed on `feat/delivery-pipeline`. |
+| Blockers | none |
+
 ## Released Claim (Claude session A — link AR invoice to sales order + surface in delivery)
 
 | Field | Value |

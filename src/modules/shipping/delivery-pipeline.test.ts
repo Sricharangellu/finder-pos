@@ -102,6 +102,28 @@ test("shipment from a sales order is idempotent (auto + manual converge)", async
   assert.equal(shipments.filter((s) => s.sales_order_id === so.id).length, 1);
 });
 
+test("pick-lists and shipments are queryable by sales order (no full-table scan)", async () => {
+  const app = await freshApp();
+  const so = await mkSalesOrder(app);
+  const pl = (await call(app, "POST", "/api/fulfillment/pick-lists/from-sales-order", { salesOrderId: so.id })).json as { id: string; lines: Array<{ id: string }> };
+  for (const line of pl.lines) await call(app, "POST", `/api/fulfillment/pick-lists/${pl.id}/lines/${line.id}/pick`, {});
+  await call(app, "POST", `/api/fulfillment/pick-lists/${pl.id}/pack`, {}); // auto-creates the shipment
+
+  const byOrder = (await call(app, "GET", `/api/fulfillment/pick-lists?orderId=${so.id}`)).json.items as Array<{ id: string; order_id: string }>;
+  assert.equal(byOrder.length, 1);
+  assert.equal(byOrder[0]!.id, pl.id);
+  assert.equal(byOrder[0]!.order_id, so.id);
+
+  const ships = (await call(app, "GET", `/api/shipping/?salesOrderId=${so.id}`)).json.items as Array<{ sales_order_id: string | null }>;
+  assert.equal(ships.length, 1);
+  assert.equal(ships[0]!.sales_order_id, so.id);
+
+  // A different sales order returns nothing from either filter.
+  const other = await mkSalesOrder(app);
+  assert.equal((await call(app, "GET", `/api/fulfillment/pick-lists?orderId=${other.id}`)).json.items.length, 0);
+  assert.equal((await call(app, "GET", `/api/shipping/?salesOrderId=${other.id}`)).json.items.length, 0);
+});
+
 test("invoicing a sales order raises an AR invoice linked back to it", async () => {
   const app = await freshApp();
   const so = await mkSalesOrder(app);

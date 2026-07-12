@@ -153,9 +153,15 @@ export class ShippingService {
     return this.db.query<ShippingLine>("SELECT * FROM shipping_order_lines WHERE shipping_order_id = @id AND tenant_id = @t", { id, t: tenantId });
   }
 
-  async list(tenantId: string, status?: ShipStatus): Promise<ShippingOrder[]> {
-    if (status) return this.db.query<ShippingOrder>("SELECT * FROM shipping_orders WHERE tenant_id = @t AND status = @s ORDER BY created_at DESC LIMIT 500", { t: tenantId, s: status });
-    return this.db.query<ShippingOrder>("SELECT * FROM shipping_orders WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  async list(tenantId: string, filter: { status?: ShipStatus; salesOrderId?: string } = {}): Promise<ShippingOrder[]> {
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId };
+    if (filter.status) { where.push("status = @s"); params.s = filter.status; }
+    if (filter.salesOrderId) { where.push("sales_order_id = @so"); params.so = filter.salesOrderId; }
+    return this.db.query<ShippingOrder>(
+      `SELECT * FROM shipping_orders WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT 500`,
+      params,
+    );
   }
 
   async get(id: string, tenantId: string): Promise<ShippingOrder & { lines: ShippingLine[] }> {

@@ -45,8 +45,9 @@ export function registerRoutes(router: Router, service: FulfillmentService): voi
     const b = parseBody(soPickListSchema, req.body);
     res.status(201).json(await service.createPickListForSalesOrder(b.salesOrderId, tenantId(res)));
   }));
-  router.get("/pick-lists", handler(async (_req, res) => {
-    res.json({ items: await service.listPickLists(tenantId(res)) });
+  router.get("/pick-lists", handler(async (req, res) => {
+    const orderId = typeof req.query.orderId === "string" ? req.query.orderId : undefined;
+    res.json({ items: await service.listPickLists(tenantId(res), orderId) });
   }));
   router.get("/pick-lists/:id", handler(async (req, res) => {
     res.json(await service.getPickList(String(req.params.id), tenantId(res)));

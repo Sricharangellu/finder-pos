@@ -37,7 +37,8 @@ export function registerRoutes(router: Router, service: ShippingService): void {
   }));
   router.get("/", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? (req.query.status as ShipStatus) : undefined;
-    res.json({ items: await service.list(tenantId(res), status) });
+    const salesOrderId = typeof req.query.salesOrderId === "string" ? req.query.salesOrderId : undefined;
+    res.json({ items: await service.list(tenantId(res), { status, salesOrderId }) });
   }));
   router.get("/:id", handler(async (req, res) => {
     res.json(await service.get(String(req.params.id), tenantId(res)));

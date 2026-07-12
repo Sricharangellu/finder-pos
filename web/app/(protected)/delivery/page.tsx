@@ -94,14 +94,16 @@ export default function DeliveryPage() {
     setShipment(null);
     setInvoice(null);
     try {
+      // Query each resource by this order directly — no full-table fetch + client
+      // filter, so it stays correct and cheap regardless of tenant volume.
       const [pls, ships, invoices] = await Promise.all([
-        apiGet<{ items: PickList[] }>("/api/v1/fulfillment/pick-lists"),
-        apiGet<ShipmentsResponse>("/api/v1/shipping/"),
+        apiGet<{ items: PickList[] }>(`/api/v1/fulfillment/pick-lists?orderId=${order.id}`),
+        apiGet<ShipmentsResponse>(`/api/v1/shipping/?salesOrderId=${order.id}`),
         apiGet<{ items: Invoice[] }>(`/api/v1/billing/invoices?salesOrderId=${order.id}`),
       ]);
-      const pl = (pls.items ?? []).find((p) => p.order_id === order.id && p.source_type === "sales_order") ?? null;
+      const pl = (pls.items ?? [])[0] ?? null;
       if (pl) setPickList(await apiGet<PickList>(`/api/v1/fulfillment/pick-lists/${pl.id}`));
-      setShipment((ships.items ?? []).find((s) => s.sales_order_id === order.id) ?? null);
+      setShipment((ships.items ?? [])[0] ?? null);
       setInvoice((invoices.items ?? [])[0] ?? null);
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Could not load pipeline detail.");

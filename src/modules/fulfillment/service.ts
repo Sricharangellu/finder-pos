@@ -155,7 +155,13 @@ export class FulfillmentService {
     return { ...pl, lines: await this.lines(id, tenantId) };
   }
 
-  async listPickLists(tenantId: string): Promise<PickList[]> {
+  /** List pick lists, optionally narrowed to one source order (`order_id` holds
+   *  the retail order or sales order id). Passing `orderId` returns the single
+   *  pick list for that order without scanning the whole tenant. */
+  async listPickLists(tenantId: string, orderId?: string): Promise<PickList[]> {
+    if (orderId) {
+      return this.db.query<PickList>("SELECT * FROM pick_lists WHERE tenant_id = @t AND order_id = @o ORDER BY created_at DESC", { t: tenantId, o: orderId });
+    }
     return this.db.query<PickList>("SELECT * FROM pick_lists WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 200", { t: tenantId });
   }
 
