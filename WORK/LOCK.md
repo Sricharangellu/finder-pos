@@ -1,6 +1,9 @@
 # Ascend — Multi-Agent Work Lock
 
 Status: IDLE — no active claim
+<!-- test-coverage pass (Claude session A): delivery-pipeline.test.ts +5 focused tests
+     (refactor regression, pack-before-picked 409, deliver-before-ship 409, missing-SO 404s,
+     fulfillment_status filter) + fixed mkSalesOrder SKU collision. Test-only; released on commit. -->
 
 ## Released Claim (Claude session A — behavior-preserving pipeline cleanup)
 
