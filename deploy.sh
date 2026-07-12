@@ -1,3 +1,6 @@
 #!/bin/bash
 cd "$(dirname "$0")"
-VERCEL_TOKEN=vcp_210z2tschKiEaj52IwAqqhjDD7hFXlrYAxSghWOQlsifeLuIan0zwqgI npx vercel --prod --yes
+# Never hardcode the token. Pass it in from the environment:
+#   VERCEL_TOKEN=xxx ./deploy.sh
+: "${VERCEL_TOKEN:?Set VERCEL_TOKEN (a Vercel token with team access). Never commit it.}"
+npx vercel --prod --yes --token "$VERCEL_TOKEN"
