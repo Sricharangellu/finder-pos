@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
@@ -53,11 +55,11 @@ function CatalogMetric({ label, value, helper, tone = "neutral", active = false 
   tone?: MetricTone; active?: boolean;
 }) {
   return (
-    <div className={clsx("rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
+    <div className={clsx("h-full min-w-0 rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-xl font-semibold tabular-nums text-slate-950">{value}</span>
-        <span className="text-xs text-slate-500">{helper}</span>
+        <span className="truncate text-xs text-slate-500">{helper}</span>
       </div>
     </div>
   );
@@ -310,40 +312,43 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     <>
       <Card className="overflow-hidden p-0">
         {/* ── Spec: header row — Import + Add product ─────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-3">
-          <span className="text-sm font-semibold text-[#111]">Products</span>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 border-b border-[#E8E8E8] px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-[#111]">Products</span>
+            <span className="text-xs text-slate-500">Manage retail catalog items, master products, and variants.</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setShowImport(true)}
-              className="flex items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] hover:bg-gray-50 transition-colors">
+              className="flex min-h-9 items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] transition-colors hover:bg-gray-50">
               ↑ Import
             </button>
             <button type="button" onClick={openCreate}
-              className="rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+              className="min-h-9 rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
               + Add product
             </button>
           </div>
         </div>
 
         <div className="grid gap-3 border-b border-[#E8E8E8] bg-slate-50 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <button type="button" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); }}>
+          <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); }}>
             <CatalogMetric label="Total" value={total} helper={`${products.length} loaded`} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
           </button>
-          <button type="button" onClick={() => setFilterStatus("active")}>
+          <button type="button" aria-pressed={filterStatus === "active"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("active")}>
             <CatalogMetric label="Active" value={activeCount} helper="sellable" tone="success" active={filterStatus === "active"} />
           </button>
-          <button type="button" onClick={() => setFilterStatus("draft")}>
+          <button type="button" aria-pressed={filterStatus === "draft"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("draft")}>
             <CatalogMetric label="Draft" value={draftCount} helper="needs review" tone="warning" active={filterStatus === "draft"} />
           </button>
-          <button type="button" onClick={() => setFilterStatus("archived")}>
+          <button type="button" aria-pressed={filterStatus === "archived"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("archived")}>
             <CatalogMetric label="Archived" value={archivedCount} helper="hidden" tone="muted" active={filterStatus === "archived"} />
           </button>
-          <button type="button" onClick={() => setFilterProductType("master")}>
+          <button type="button" aria-pressed={filterProductType === "master"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterProductType("master")}>
             <CatalogMetric label="Masters" value={masterCount} helper="variant groups" active={filterProductType === "master"} />
           </button>
-          <button type="button" onClick={() => setFilterProductType("variant")}>
+          <button type="button" aria-pressed={filterProductType === "variant"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterProductType("variant")}>
             <CatalogMetric label="Variants" value={variantCount} helper="sellable SKUs" active={filterProductType === "variant"} />
           </button>
-          <button type="button" onClick={() => setFilterAgeRestricted((v) => !v)}>
+          <button type="button" aria-pressed={filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterAgeRestricted((v) => !v)}>
             <CatalogMetric label="Restricted" value={restrictedCount} helper="ID required" tone="restricted" active={filterAgeRestricted} />
           </button>
         </div>
@@ -356,13 +361,13 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               <label htmlFor="catalog-search" className="text-xs font-medium text-[#555]">Name or SKU</label>
               <input id="catalog-search" type="search" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search…"
-                className="h-8 w-44 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]" />
+                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF] sm:w-44" />
             </div>
             {/* Category */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Category</label>
               <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                 <option value="">All categories</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
@@ -371,7 +376,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Product type</label>
               <select value={filterProductType} onChange={e => setFilterProductType(e.target.value as typeof filterProductType)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                 <option value="all">All types</option>
                 <option value="standalone">Standalone</option>
                 <option value="master">Master</option>
@@ -382,13 +387,13 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Brand</label>
               <input type="text" value={filterBrand} onChange={e => setFilterBrand(e.target.value)} placeholder="Brand…"
-                className="h-8 w-28 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none sm:w-32" />
             </div>
             {/* Channel (ecommerce status) */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Channel</label>
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                 <option value="">All</option>
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
@@ -401,7 +406,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-[#555]">Tax class</label>
                   <select value={filterTaxClass} onChange={e => setFilterTaxClass(e.target.value)}
-                    className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                     <option value="">All</option>
                     <option value="standard">Standard</option>
                     <option value="exempt">Exempt</option>
@@ -410,7 +415,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-[#555]">Age restricted</label>
                   <select value={filterAgeRestricted ? "1" : "0"} onChange={e => setFilterAgeRestricted(e.target.value === "1")}
-                    className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                     <option value="0">All</option>
                     <option value="1">18+ only</option>
                   </select>
@@ -418,13 +423,13 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               </>
             )}
             {/* Actions */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button type="button" onClick={clearFilters} className="text-sm text-[#5D5FEF] hover:underline">Clear filters</button>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+              <button type="button" onClick={clearFilters} disabled={!hasFilters} className="text-sm text-[#5D5FEF] hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline">Clear filters</button>
               <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="text-sm text-[#5D5FEF] hover:underline">
                 {showMoreFilters ? "Fewer filters" : "More filters"}
               </button>
               <button type="button" onClick={() => void load()}
-                className="h-8 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+                className="h-9 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
                 Search
               </button>
             </div>
@@ -458,13 +463,24 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
 
         {loading ? (
-          <TableSkeleton headers={["", "Product", "SKU", "Category", "Price", "Status", ""]} rows={8} />
+          <TableSkeleton headers={["", "Product", "Type", "Brand", "Supplier", "Available", "Retail price", "Channels", "Created", ""]} rows={8} />
         ) : error ? (
-          <div className="px-4 py-6"><p role="alert" className="text-sm text-red-700">{error}</p></div>
+          <div className="px-4 py-10">
+            <EmptyState
+              title="Products could not load"
+              description={error}
+              action={<Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>}
+            />
+          </div>
         ) : visibleProducts.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">No products found.</p>
-            {hasFilters && <button type="button" onClick={clearFilters} className="mt-2 text-xs text-brand-600 hover:underline">Clear filters</button>}
+          <div className="px-4 py-10">
+            <EmptyState
+              title={hasFilters ? "No products match these filters" : "No products yet"}
+              description={hasFilters ? "Clear filters or adjust the search to see more catalog items." : "Create your first product to start building the catalog."}
+              action={hasFilters
+                ? <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>
+                : <Button size="sm" variant="primary" onClick={openCreate}>Add product</Button>}
+            />
           </div>
         ) : (
           <>
