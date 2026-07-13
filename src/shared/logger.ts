@@ -21,6 +21,20 @@ export const logger = pino({
     level: (label) => ({ level: label }),
   },
   timestamp: pino.stdTimeFunctions.isoTime,
+  // Defense-in-depth: if a request, header, or body is ever passed to the logger,
+  // never let credentials or secrets reach the log sink. pino censors these paths.
+  // No current call site logs these, but this guarantees future ones can't leak.
+  redact: {
+    paths: [
+      "req.headers.authorization", "req.headers.cookie",
+      "headers.authorization", "headers.cookie",
+      "authorization", "cookie",
+      "password", "*.password", "password_hash", "*.password_hash",
+      "token", "*.token", "accessToken", "refreshToken", "*.accessToken", "*.refreshToken",
+      "secret", "*.secret", "apiKey", "*.apiKey",
+    ],
+    censor: "[redacted]",
+  },
   ...(isDev
     ? {
         transport: {

@@ -100,25 +100,28 @@ Every business table carries `tenant_id NOT NULL`.
 
 The backend sets the session variable as TEXT: `SET LOCAL app.tenant_id = 'tnt_demo'`.
 
-### RLS: design target vs. Wave 1 enablement
+### RLS: how tenant isolation actually works today
 
-RLS is the **design target** and provides defense-in-depth. In Wave 1, tenant
-isolation is enforced at the **application layer** (every query includes
-`WHERE tenant_id = $tenantId` from the verified JWT). RLS is defined and
-tables have it enabled (`ENABLE ROW LEVEL SECURITY`) but is not yet wired into
-the backend's connection path because the pre-auth tenant lookup (login) runs
-before the JWT tenant is known.
+Tenant isolation is enforced **primarily at the application layer**: handlers
+scope every query by the tenant in the verified JWT. PostgreSQL RLS is a
+**defense-in-depth backstop**, and it *is* now wired into the backend's
+connection path — the gateway enters an `AsyncLocalStorage` tenant scope per
+authenticated request and `src/shared/db.ts` runs each query in a transaction
+that sets `app.tenant_id` (`src/shared/tenant-context.ts`). Both layers are
+proven by `src/gateway/tenant-isolation.test.ts`, kept as a CI regression.
 
-**Future enablement path:**
-1. Introduce a privileged "auth service" DB role with BYPASSRLS on `tenants`
-   and `users` only (used for login/token-issue).
-2. All other app queries use `app_user` (no BYPASSRLS).
-3. `SET LOCAL app.tenant_id = 'tnt_...'` per transaction from JWT.
-4. Enable RLS globally; run the tenancy test suite in CI.
+**RLS is permissive when `app.tenant_id` is unset — it is NOT fail-closed.**
+The isolation test asserts that a query run with *no* tenant context still
+returns rows ("no context → permissive (backwards compatible)"). So RLS does
+**not** protect a query that runs without the gateway's per-request context
+(background jobs, bootstrap, or any code path that forgets to set it). The real
+guarantee is the **gateway setting tenant context on every authenticated
+request**; RLS only adds a second line of defense once that context is set — and
+only when the application DB role lacks `BYPASSRLS`/superuser.
 
-### How RLS works (once fully enabled)
+### How RLS evaluates a query (when context is set)
 
-1. Backend resolves tenant from verified JWT on every request.
+1. Backend resolves tenant from the verified JWT on every request.
 2. Executes `SET LOCAL app.tenant_id = 'tnt_demo'` inside the transaction.
 3. Wave 0 policies evaluate:
    ```sql
@@ -128,8 +131,14 @@ before the JWT tenant is known.
    ```sql
    USING (tenant_id = current_setting('app.tenant_id'))
    ```
-5. If `app.tenant_id` is not set, `current_setting()` raises an error
-   (fail-closed — no rows, no leak, visible bug).
+5. With `app.tenant_id` unset, the policies the app actually applies on boot are
+   permissive (see the isolation test) — do not rely on RLS to fail-closed.
+
+> The fail-closed wording in `db/rls/policies.sql` (one-arg `current_setting`,
+> "raises an ERROR when unset") describes the canonical SQL-of-record; the
+> policies the running app applies on boot behave permissively-when-unset per the
+> test above. Reconciling the two so the applied policies are genuinely
+> fail-closed is open hardening work.
 
 ### Application role vs. service role
 
@@ -202,6 +211,12 @@ which means B-tree inserts are sequential (no page splits at scale).
 ---
 
 ## Backup & Disaster Recovery
+
+> **Status:** the RPO/RTO targets and drill steps below are the **designed** plan.
+> Automated backup/restore **drills are not yet verified** — `WORK/FORWARD_PLAN.md`
+> Phase 4 lists backup/restore, monitoring/alerting, and production Redis as open
+> operational work. Treat this as the target runbook, not proof of a tested DR
+> capability.
 
 ### RPO ≤ 5 minutes
 

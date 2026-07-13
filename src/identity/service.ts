@@ -18,6 +18,12 @@ const MFA_BACKUP_CODE_COUNT = 8;
 const MAX_FAILED_ATTEMPTS = 10;           // lock after 10 consecutive failures
 const LOCKOUT_DURATION_MS = 30 * 60_000; // 30 minutes
 
+// Fixed bcrypt hash (cost 10) used only to equalize login response time when the
+// email is unknown: without a dummy compare, a missing email returns before any
+// bcrypt work while a real email pays for bcrypt.compare, letting an attacker
+// enumerate accounts by timing. This value never matches any real password.
+const DUMMY_PASSWORD_HASH = "$2a$10$cKdFg3vuImkr2kidVqPeyOnlY/HYqGRLN3VbmuJkbEpZ1FVFpIFEW";
+
 export interface LoginInput {
   email: string;
   password: string;
@@ -140,6 +146,9 @@ export class IdentityService {
     );
 
     if (!user) {
+      // Burn an equivalent bcrypt compare so a missing email is not distinguishable
+      // from a wrong password by response time (user-enumeration side-channel).
+      await this.verifyPassword(input.password, DUMMY_PASSWORD_HASH);
       await this.logLoginAttempt({ email: input.email, success: false, reason: "invalid_credentials", userId: null, tenantId: null, ip });
       throw new HttpError(401, "invalid_credentials", "Invalid email or password.");
     }
@@ -462,7 +471,7 @@ export class IdentityService {
     const secret = this.getSecret();
     let claims: TokenClaims;
     try {
-      claims = jwt.verify(refreshToken, secret + ":refresh") as TokenClaims;
+      claims = jwt.verify(refreshToken, secret + ":refresh", { algorithms: ["HS256"] }) as TokenClaims;
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         throw new HttpError(401, "token_expired", "Refresh token has expired.");
@@ -552,7 +561,7 @@ export class IdentityService {
   verifyAccessToken(token: string): TokenClaims {
     const secret = this.getSecret();
     try {
-      return jwt.verify(token, secret) as TokenClaims;
+      return jwt.verify(token, secret, { algorithms: ["HS256"] }) as TokenClaims;
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         throw new HttpError(401, "token_expired", "Access token has expired.");
@@ -796,7 +805,7 @@ export class IdentityService {
 
   private verifyMfaPendingToken(token: string): TokenClaims & { purpose: string } {
     try {
-      const claims = jwt.verify(token, this.getSecret() + ":mfa") as TokenClaims & { purpose?: string };
+      const claims = jwt.verify(token, this.getSecret() + ":mfa", { algorithms: ["HS256"] }) as TokenClaims & { purpose?: string };
       if (claims.purpose !== "mfa_login") {
         throw new HttpError(401, "invalid_mfa_token", "The MFA challenge is invalid.");
       }

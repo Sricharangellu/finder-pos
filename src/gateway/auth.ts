@@ -98,7 +98,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return;
   }
   try {
-    const payload = jwt.verify(token, secret) as jwt.JwtPayload;
+    const payload = jwt.verify(token, secret, { algorithms: ["HS256"] }) as jwt.JwtPayload;
     const auth: AuthPayload = {
       tenantId: String(payload["tenantId"] ?? ""),
       userId: String(payload["sub"] ?? ""),
@@ -188,7 +188,7 @@ export function makeAuthMiddleware(db: DB): RequestHandler {
     const secret = process.env.JWT_SECRET;
     if (!secret) { next(new HttpError(500, "misconfigured", "JWT_SECRET environment variable is not set.")); return; }
     try {
-      const payload = jwt.verify(token, secret) as jwt.JwtPayload;
+      const payload = jwt.verify(token, secret, { algorithms: ["HS256"] }) as jwt.JwtPayload;
       const auth: AuthPayload = {
         tenantId: String(payload["tenantId"] ?? ""),
         userId: String(payload["sub"] ?? ""),

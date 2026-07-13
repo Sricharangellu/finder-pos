@@ -1,4 +1,4 @@
-<!-- Ascend PR checklist — aligned with WORK/RULES.md. Delete lines that don't apply. -->
+<!-- Ascend PR checklist — aligned with AGENTS.md (canonical rules) + WORK/FORWARD_PLAN.md. Delete lines that don't apply. -->
 
 ## What & why
 
@@ -8,7 +8,7 @@
 
 - WORK/LOCK.md claim: <!-- item name; link the WORK/AUDIT_*.md if one was produced -->
 
-## Status label (required — RULES.md vocabulary)
+## Status label (required — WORK/FORWARD_PLAN.md vocabulary)
 
 <!-- Built and verified / Built but not verified / UI-only / Mocked / Partial / Planned -->
 
