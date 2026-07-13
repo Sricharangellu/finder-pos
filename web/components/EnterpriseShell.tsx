@@ -231,7 +231,10 @@ export function EnterpriseShell({
   contentClassName,
 }: EnterpriseShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [compactViewport, setCompactViewport] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth >= 768
+  );
 
   const handleGlobalKey = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "/")) {
@@ -245,6 +248,17 @@ export function EnterpriseShell({
     return () => window.removeEventListener("keydown", handleGlobalKey);
   }, [handleGlobalKey]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => {
+      setCompactViewport(media.matches);
+      setSidebarExpanded((expanded) => (media.matches ? false : expanded || true));
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
   const sidebarW = sidebarExpanded ? 220 : 52;
 
   return (
@@ -257,19 +271,28 @@ export function EnterpriseShell({
       />
 
       <div className="flex flex-1 pt-12">
+        {compactViewport && sidebarExpanded && (
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="fixed inset-x-0 bottom-0 top-12 z-30 bg-black/30"
+            onClick={() => setSidebarExpanded(false)}
+          />
+        )}
         <LeftRail
           active={active}
           expanded={sidebarExpanded}
+          compact={compactViewport}
           onCollapseToggle={() => setSidebarExpanded((e) => !e)}
         />
 
         <main
           id="main-content"
           className={[
-            "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out",
+            "flex flex-1 flex-col min-w-0 transition-[margin-left] duration-200 ease-in-out md:ml-[var(--sidebar-w)]",
             contentClassName ?? "overflow-y-auto",
           ].join(" ")}
-          style={{ marginLeft: sidebarW }}
+          style={{ "--sidebar-w": `${sidebarW}px` } as React.CSSProperties}
         >
           {/* Visually hidden page heading — gives every page an accessible
               h1 (screen readers, tests) without altering the visual design. */}
@@ -398,10 +421,12 @@ function TopBar({
 function LeftRail({
   active,
   expanded,
+  compact,
   onCollapseToggle,
 }: {
   active: NavKey;
   expanded: boolean;
+  compact: boolean;
   onCollapseToggle: () => void;
 }) {
   const pathname = usePathname();
@@ -454,7 +479,7 @@ function LeftRail({
       aria-label="Primary navigation"
       className="fixed left-0 top-12 bottom-0 z-40 flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
       style={{
-        width: expanded ? 220 : 52,
+        width: compact && !expanded ? 0 : expanded ? 220 : 52,
         backgroundColor: "var(--color-sidebar-bg)",
       }}
     >

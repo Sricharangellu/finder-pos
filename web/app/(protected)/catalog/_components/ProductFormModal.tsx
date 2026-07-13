@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ApiResponseError } from "@/api-client/client";
+import { Button } from "@/components/Button";
 import type { Product, Category, ProductStatus, TaxClass } from "@/api-client/types";
 import {
   buildProductCreateBody,
@@ -44,6 +45,28 @@ export function productToForm(p: Product): ProductFormState {
 
 export function formToBody(f: ProductFormState): Record<string, unknown> {
   return buildProductCreateBody(f);
+}
+
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <fieldset className="rounded-lg border border-slate-200 bg-white p-4">
+      <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {title}
+      </legend>
+      {description && <p className="mb-4 mt-1 text-xs text-slate-500">{description}</p>}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {children}
+      </div>
+    </fieldset>
+  );
 }
 
 export function ProductFormModal({
@@ -103,12 +126,15 @@ export function ProductFormModal({
           <button type="button" onClick={onClose} aria-label="Close product form" className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600">&times;</button>
         </div>
 
-        <form id="product-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4">
+        <form id="product-form" onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto bg-slate-50 px-5 py-4">
           {err && (
             <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormSection
+            title="Retail identity"
+            description="Visible catalog fields used by cashiers, search, labels, and online listings."
+          >
             {!initial && (
               <div className="sm:col-span-2">
                 <label className={labelCls}>Product type</label>
@@ -148,7 +174,12 @@ export function ProductFormModal({
               <label className={labelCls}>UPC / Barcode</label>
               <input type="text" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} placeholder="012345678901" className={inputCls} />
             </div>
+          </FormSection>
 
+          <FormSection
+            title="Pricing"
+            description="Retail price is customer-facing. Cost, MSRP, wholesale, and vendor UPC stay internal."
+          >
             <div>
               <label className={labelCls}>Sell price ($) {form.productKind !== "master" && <span className="text-red-500">*</span>}</label>
               <input type="number" step="0.01" min="0" value={form.priceInput} onChange={(e) => set("priceInput", e.target.value)} placeholder={form.productKind === "master" ? "0.00" : "9.99"} className={inputCls} required={form.productKind !== "master"} />
@@ -172,7 +203,12 @@ export function ProductFormModal({
               <input type="number" step="0.01" min="0" value={form.wholesaleInput} onChange={(e) => set("wholesaleInput", e.target.value)} placeholder="0.00" className={inputCls} />
               {fieldErrors.wholesaleInput && <p className="mt-1 text-xs text-red-600">{fieldErrors.wholesaleInput}</p>}
             </div>
+          </FormSection>
 
+          <FormSection
+            title="Classification"
+            description="Organize reporting, tax behavior, brand browsing, and supplier matching."
+          >
             <div>
               <label className={labelCls}>Category</label>
               {categories.length > 0 ? (
@@ -221,7 +257,12 @@ export function ProductFormModal({
               <label className={labelCls}>Description</label>
               <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={2} placeholder="Short product description" className={`${inputCls} resize-none`} />
             </div>
+          </FormSection>
 
+          <FormSection
+            title="Selling rules"
+            description="Control quantity limits, inventory behavior, and channel availability."
+          >
             <div>
               <label className={labelCls}>Min qty to sell</label>
               <input type="number" min="1" step="1" value={form.minQtyToSell} onChange={(e) => set("minQtyToSell", e.target.value)} className={inputCls} />
@@ -262,14 +303,14 @@ export function ProductFormModal({
                 Online
               </label>
             </div>
-          </div>
+          </FormSection>
         </form>
 
         <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" onClick={onClose} className="min-h-[40px] rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-          <button type="submit" form="product-form" disabled={saving} className="min-h-[40px] rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
-            {saving ? "Saving..." : initial ? "Save changes" : "Create product"}
-          </button>
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" form="product-form" loading={saving}>
+            {initial ? "Save changes" : "Create product"}
+          </Button>
         </div>
       </div>
     </div>
