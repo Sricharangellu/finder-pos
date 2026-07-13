@@ -52,9 +52,12 @@ Architecture & UX Redesign" PRD.
    lists all 13 (Purchases, Cash Movement, Register Closures, Time Cards added —
    they were URL-only dead ends) with canonical hrefs and alias-aware active
    matching; the four moved pages plus End of Day now render the sub-nav.
-5. **`/pricing` ("Pricing Engine", 691 lines) vs `/catalog/price-book` (188).**
-   Overlapping price-management surfaces; price-book is not in the nav
-   (orphan-ish). Decide: fold price-book into Pricing as a tab.
+5. **FIXED — `/catalog/price-book` folded into the Pricing Engine.** The page
+   was a complete orphan (zero inbound links) holding customer-specific price
+   overrides under a name that collided with the engine's price books. Now a
+   "Customer Overrides" tab on `/pricing` (same `/customers/:id/product-prices`
+   backend, pricing.manage-gated edit); the old URL redirects to
+   `/pricing?tab=customer-overrides` (the page supports `?tab=` deep links).
 6. **POS surfaces**: `/terminal` (canonical, aliased by `/sell`), plus
    `/display` (customer display?) and `/store/*` (public storefront) — verify
    purpose labels; no action yet.
