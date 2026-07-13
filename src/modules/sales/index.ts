@@ -89,6 +89,19 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END;
 $$;`;
 
+// Seed the race-free document counters (shared/docnumber.ts) from the current
+// MAX numeric suffix so existing quote/SO numbering continues without collision.
+// Fresh databases have no rows → no counter seeded → first number is 00001.
+const SEED_SALES_COUNTERS = `
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'sales_orders', COALESCE(MAX(CAST(SUBSTRING(so_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM sales_orders GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'quotations', COALESCE(MAX(CAST(SUBSTRING(quote_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM quotations GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;`;
+
 // Tier (1=best price .. 5=list) added here so the sales module can resolve
 // tier-aware pricing without a hard dependency on the customers module's DDL.
 const ADD_CUSTOMER_TIER = `ALTER TABLE customers ADD COLUMN IF NOT EXISTS tier INTEGER NOT NULL DEFAULT 5;`;
@@ -122,7 +135,7 @@ CREATE INDEX IF NOT EXISTS sales_reps_tenant_idx ON sales_reps (tenant_id, activ
 /** Sales — quotations + sales orders (B2B order-to-cash front half). */
 export const salesModule: PosModule = {
   name: "sales",
-  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_SO_FULFILLMENT, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES, CREATE_SALES_REPS],
+  migrations: [CREATE_QUOTATIONS, CREATE_QUOTATION_LINES, CREATE_SALES_ORDERS, CREATE_SO_LINES, INDEXES, ADD_SO_FULFILLMENT, ADD_CUSTOMER_TIER, CREATE_TIER_PRICES, CREATE_SALES_REPS, SEED_SALES_COUNTERS],
   register({ db, events, router }) {
     registerRoutes(router, new SalesService(db, events), db);
   },

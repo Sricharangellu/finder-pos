@@ -50,10 +50,18 @@ DROP INDEX IF EXISTS shipping_orders_invoice_uidx;
 CREATE UNIQUE INDEX IF NOT EXISTS shipping_orders_invoice_uidx ON shipping_orders (tenant_id, invoice_id) WHERE invoice_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS shipping_orders_so_uidx ON shipping_orders (tenant_id, sales_order_id) WHERE sales_order_id IS NOT NULL;`;
 
+// Seed the race-free ship_number counter (shared/docnumber.ts) from the current
+// MAX suffix so existing numbering continues without collision.
+const SEED_SHIPPING_COUNTER = `
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'shipping_orders', COALESCE(MAX(CAST(SUBSTRING(ship_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM shipping_orders GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;`;
+
 /** Shipping — shipping orders generated from invoices (ERP benchmark #8). */
 export const shippingModule: PosModule = {
   name: "shipping",
-  migrations: [CREATE_SHIPPING_ORDERS, CREATE_SHIPPING_LINES, INDEXES, ADD_SHIPMENT_SALES_ORDER],
+  migrations: [CREATE_SHIPPING_ORDERS, CREATE_SHIPPING_LINES, INDEXES, ADD_SHIPMENT_SALES_ORDER, SEED_SHIPPING_COUNTER],
   register({ db, events, router }) {
     // The shipment for a packed sales order is created directly by the fulfillment
     // module's pack() (idempotent + re-pack-recoverable) rather than via a

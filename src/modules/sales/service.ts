@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { nextDocNumber } from "../../shared/docnumber.js";
 
 /**
  * Sales module — the B2B order-to-cash front half of the ERP benchmark:
@@ -158,13 +159,9 @@ export class SalesService {
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  private async nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
-    const row = await this.db.one<{ n: number }>(
-      `SELECT COUNT(*)::int AS n FROM ${table} WHERE tenant_id = @t`,
-      { t: tenantId },
-    );
-    const seq = Number(row?.n ?? 0) + 1;
-    return `${prefix}-${String(seq).padStart(5, "0")}`;
+  /** Race-free document number; `table` doubles as the counter kind. */
+  private nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
+    return nextDocNumber(this.db, tenantId, table, prefix);
   }
 
   private async customerTier(customerId: string, tenantId: string): Promise<number> {

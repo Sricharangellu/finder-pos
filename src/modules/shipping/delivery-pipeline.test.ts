@@ -263,6 +263,19 @@ test("re-packing recovers a shipment whose creation was skipped on a prior pack"
   assert.equal((await call(app, "GET", `/api/shipping/?salesOrderId=${so.id}`)).json.items.length, 1, "re-pack created the missing shipment");
 });
 
+test("ship numbers are distinct and monotonic via the shared document counter", async () => {
+  const app = await freshApp();
+  const soA = await mkSalesOrder(app);
+  const soB = await mkSalesOrder(app);
+  const a = (await call(app, "POST", "/api/shipping/from-sales-order", { salesOrderId: soA.id })).json as { ship_number: string };
+  const b = (await call(app, "POST", "/api/shipping/from-sales-order", { salesOrderId: soB.id })).json as { ship_number: string };
+  // Format preserved (first is 00001), numbers monotonic and never colliding —
+  // the atomic counter replaces the racy COUNT(*)-derived number.
+  assert.equal(a.ship_number, "SHP-00001");
+  assert.equal(b.ship_number, "SHP-00002");
+  assert.notEqual(a.ship_number, b.ship_number);
+});
+
 test("sales orders are filterable by fulfillment_status", async () => {
   const app = await freshApp();
   const picking = await mkSalesOrder(app);
