@@ -2,6 +2,18 @@
 
 Status: IDLE — no active claim
 
+## Released Claim (Claude session A — variant integrity backend)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, Matrix Builder PRD backend slices) |
+| Queue item | #8 drop the hyphen in generated variant names (`master.name label`); #1 category inheritance — assign forces child category=master; update coerces a child's category to its master's (can't set independently); changing a master's category cascades to all children. catalog module only. |
+| Files/areas expected | `src/modules/catalog/service.ts`; `src/modules/catalog/catalog.test.ts`; WORK audit + LOCK. NO web, NO schema. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — built_verified. #8 variant naming drops the hyphen; #1 category inheritance (assign forces child cat, update coerces child cat to master's, master category change cascades to children). Gates: typecheck / test 401/401 / smoke 20/20 / hygiene 926. Audit: AUDIT_2026-07-13T031942Z-variant-category-inheritance-naming.md. |
+| Blockers | none |
+
 ## Released Claim (Claude session A — Matrix Builder workspace v1)
 
 | Field | Value |

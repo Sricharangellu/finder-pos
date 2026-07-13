@@ -549,3 +549,45 @@ test("category mutations are manager/owner-gated", async () => {
   assert.equal(status, 403);
   assert.equal(json.error.code, "forbidden");
 });
+
+test("generated variant name has no hyphen between master and label (#8)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "COKE", name: "Coca-Cola", price_cents: 0, category: "beverages" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["330ml"] }],
+  });
+  assert.equal(gen.status, 200);
+  const v = gen.json.items.find((p: any) => p.variant_label === "330ml");
+  assert.equal(v.name, "Coca-Cola 330ml"); // not "Coca-Cola - 330ml"
+});
+
+test("assigning a product as a variant inherits the master's category (#1)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "BEV-M", name: "Soda", price_cents: 0, category: "beverages" });
+  const child = await call(app, "POST", "/api/catalog/", { sku: "BEV-C1", name: "Soda 1L", price_cents: 299, category: "general" });
+  assert.equal(child.json.category, "general");
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [child.json.id] });
+  const after = await call(app, "GET", `/api/catalog/${child.json.id}`);
+  assert.equal(after.json.category, "beverages"); // inherited from master
+});
+
+test("a child variant's category cannot be changed independently (#1)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "BEV-M2", name: "Juice", price_cents: 0, category: "beverages" });
+  const child = await call(app, "POST", "/api/catalog/", { sku: "BEV-C2", name: "Juice S", price_cents: 199, category: "beverages" });
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [child.json.id] });
+  // Attempt to move just the child to another category — must be coerced back to the master's.
+  const patched = await call(app, "PATCH", `/api/catalog/${child.json.id}`, { category: "electronics" });
+  assert.equal(patched.json.category, "beverages");
+});
+
+test("changing a master's category cascades to all its variants (#1)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "BEV-M3", name: "Water", price_cents: 0, category: "beverages" });
+  const c1 = await call(app, "POST", "/api/catalog/", { sku: "BEV-C3A", name: "Water 500ml", price_cents: 99, category: "beverages" });
+  const c2 = await call(app, "POST", "/api/catalog/", { sku: "BEV-C3B", name: "Water 1L", price_cents: 149, category: "beverages" });
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [c1.json.id, c2.json.id] });
+  await call(app, "PATCH", `/api/catalog/${master.json.id}`, { category: "groceries" });
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.ok(variants.json.items.length === 2 && variants.json.items.every((v: any) => v.category === "groceries"));
+});

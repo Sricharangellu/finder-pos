@@ -572,10 +572,21 @@ export class CatalogService {
       changed.status = input.status;
     }
 
-    const nextCategory = input.category ?? current.category;
-    if (input.category !== undefined && input.category !== current.category) {
-      next.category = input.category;
-      changed.category = input.category;
+    // Category. A child variant always inherits its master's category and cannot be
+    // set to a different one — so if this product is (or is becoming) a variant,
+    // coerce the category to the master's regardless of the requested value.
+    const parentId = input.parent_product_id !== undefined ? (input.parent_product_id ?? null) : current.parent_product_id;
+    let nextCategory = input.category ?? current.category;
+    if (parentId) {
+      const master = await this.db.one<{ category: string }>(
+        "SELECT category FROM products WHERE id = @p AND tenant_id = @t",
+        { p: parentId, t: tenantId },
+      );
+      if (master) nextCategory = master.category;
+    }
+    if (nextCategory !== current.category) {
+      next.category = nextCategory;
+      changed.category = nextCategory;
     }
     const resolvedTax = resolveTaxClass(nextCategory, input.tax_class ?? current.tax_class);
     if (resolvedTax !== current.tax_class) {
@@ -676,6 +687,17 @@ export class CatalogService {
 
     if (options.publishEvent !== false) {
       await this.publishProductUpdated(next, changed);
+    }
+
+    // Cascade a master product's category change to all its child variants, which
+    // inherit it. Children have no children, so this recurses at most one level.
+    if (changed.category !== undefined) {
+      const children = await this.listVariants(id, tenantId);
+      for (const child of children) {
+        if (child.category !== next.category) {
+          await this.update(child.id, { category: next.category }, tenantId, { publishEvent: options.publishEvent });
+        }
+      }
     }
 
     return next;
@@ -862,7 +884,7 @@ export class CatalogService {
     const updatedProducts = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const catalog = new CatalogService(tdb, this.events);
       const updated: Product[] = [];
-      await catalog.assertCanBeMaster(masterId, tenantId);
+      const master = await catalog.assertCanBeMaster(masterId, tenantId);
       for (const productId of [...new Set(productIds)]) {
         if (productId === masterId) throw conflict("a product cannot be its own variant parent");
         updated.push(
@@ -870,6 +892,8 @@ export class CatalogService {
             productId,
             {
               parent_product_id: masterId,
+              // A variant always belongs to its master's category (also enforced in update()).
+              category: master.category,
               ...(variantLabel !== undefined ? { variant_label: variantLabel } : {}),
             },
             tenantId,
@@ -931,7 +955,8 @@ export class CatalogService {
           await catalog.create(
             {
               sku: await catalog.nextVariantSku(master.sku, label, tenantId),
-              name: `${master.name} - ${label}`,
+              // Variant name reads naturally: "Coca-Cola 330ml", not "Coca-Cola - 330ml".
+              name: `${master.name} ${label}`,
               price_cents: master.price_cents,
               category: master.category,
               tax_class: master.tax_class,
