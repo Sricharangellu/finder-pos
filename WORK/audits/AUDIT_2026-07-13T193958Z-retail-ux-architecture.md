@@ -44,25 +44,24 @@ Architecture & UX Redesign" PRD.
 3. **Promotions vs Discounts split.** `/catalog/promotions` ("Promotion Engine",
    1090 lines, `/api/v1/promotions` + coupons) and `/discounts` ("Discounts",
    167 lines, `/api/v1/discounts`) are separate engines with separate backends.
-   `/ecommerce/promotions` aliases discounts (not promotions!) — at minimum the
-   alias should point at the promotion engine, or the two engines need a merge
-   decision. Needs product decision before code.
-4. **Reports tree split.** Real pages live in BOTH `/reports/*` (sales, p-l,
-   ar-aging, inventory, expiry, end-of-day, sales-by-rep, sales-by-vendor) and
-   `/reporting/*` (purchases, cash-movement, register-closures, time-cards) with
-   aliases crossing between them. Consolidate on ONE physical tree (keep
-   aliases for old URLs) and one sub-nav (`ReportsSubNav` currently lists only 9
-   of the 12 reports — purchases/cash-movement/register-closures/time-cards are
-   reachable only by URL → near-dead-ends).
+   PARTIAL FIX shipped: `/ecommerce/promotions` now aliases the promotion engine
+   (it pointed at plain discounts). The engine merge itself still needs a
+   product decision before code.
+4. **FIXED — Reports tree split.** All 13 report pages now physically live under
+   `/reports/*`; every `/reporting/*` route is a one-line alias. `ReportsSubNav`
+   lists all 13 (Purchases, Cash Movement, Register Closures, Time Cards added —
+   they were URL-only dead ends) with canonical hrefs and alias-aware active
+   matching; the four moved pages plus End of Day now render the sub-nav.
 5. **`/pricing` ("Pricing Engine", 691 lines) vs `/catalog/price-book` (188).**
    Overlapping price-management surfaces; price-book is not in the nav
    (orphan-ish). Decide: fold price-book into Pricing as a tab.
 6. **POS surfaces**: `/terminal` (canonical, aliased by `/sell`), plus
    `/display` (customer display?) and `/store/*` (public storefront) — verify
    purpose labels; no action yet.
-7. **`/bills` (69 lines) vs `/finance` hub** — `/finance/bills` aliases
-   `/finance`, while a separate thin `/bills` page exists. Consolidate on the
-   richer surface.
+7. **RESOLVED — `/bills` is not a duplicate.** It's the purposeful AP Bill List
+   (supplier/status filters, auto-drafted on PO receive) linked from the Finance
+   nav. FIX shipped: `/finance/bills` alias now points at `/bills` (it pointed
+   at the `/finance` hub — wrong target).
 8. **Breadcrumbs/back-nav** are inconsistent across detail pages (catalog has
    them; purchasing/[id], orders/[id], customers/[id] vary). Standardize via a
    shared header component.

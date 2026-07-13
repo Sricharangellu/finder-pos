@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
+import { ReportsSubNav } from "@/components/reports/ReportsSubNav";
 import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
 import { apiGet } from "@/api-client/client";
@@ -91,6 +92,7 @@ export default function EndOfDayPage() {
       contentClassName="overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:px-6">
+        <ReportsSubNav />
         {/* Date picker header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

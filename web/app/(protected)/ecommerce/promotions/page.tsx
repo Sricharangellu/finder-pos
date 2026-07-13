@@ -1,1 +1,1 @@
-export { default } from "../../discounts/page";
+export { default } from "../../catalog/promotions/page";
