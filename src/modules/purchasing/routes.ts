@@ -9,6 +9,12 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+/** Actor identity for the approval audit trail. */
+function actor(res: Response): { id: string | null; role: string } {
+  const a = res.locals["auth"] as AuthPayload;
+  return { id: a.userId ?? null, role: a.role };
+}
+
 // All editable vendor profile fields — shared by create and update schemas.
 const supplierProfileSchema = {
   email: z.string().email().nullable().optional(),
@@ -168,7 +174,40 @@ export function registerRoutes(router: Router, service: PurchasingService): void
 
   router.post("/orders", mgr, handler(async (req, res) => {
     const b = parseBody(poSchema, req.body);
-    res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res)));
+    res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res), actor(res)));
+  }));
+
+  // ── PO approval workflow ─────────────────────────────────────────────────────
+  // Config: absent = approvals disabled (all POs auto-approve). Owner-only to change.
+  router.get("/approval-config", handler(async (_req, res) => {
+    res.json({ config: await service.getApprovalConfig(tenantId(res)) });
+  }));
+
+  router.put("/approval-config", requireRole("owner"), handler(async (req, res) => {
+    const b = parseBody(
+      z.object({
+        autoLimitCents: z.number().int().nonnegative(),
+        managerLimitCents: z.number().int().nonnegative(),
+        enabled: z.boolean().optional(),
+      }),
+      req.body,
+    );
+    res.json({ config: await service.setApprovalConfig(b, tenantId(res)) });
+  }));
+
+  // Approve/reject a pending PO. Manager may approve mid-tier amounts; the service
+  // enforces the owner tier for large POs. History is append-only (no delete route).
+  router.post("/orders/:id/approve", mgr, handler(async (req, res) => {
+    res.json(await service.approveOrder(String(req.params.id), actor(res), tenantId(res)));
+  }));
+
+  router.post("/orders/:id/reject", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ note: z.string().max(500).optional() }), req.body ?? {});
+    res.json(await service.rejectOrder(String(req.params.id), actor(res), tenantId(res), b.note));
+  }));
+
+  router.get("/orders/:id/approvals", handler(async (req, res) => {
+    res.json({ items: await service.listApprovals(String(req.params.id), tenantId(res)) });
   }));
 
   router.get("/orders", handler(async (req, res) => {

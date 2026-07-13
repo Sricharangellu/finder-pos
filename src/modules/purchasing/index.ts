@@ -306,11 +306,43 @@ END;
 $$;
 `;
 
+// PO approval workflow (enterprise procurement). `approval_status` is orthogonal
+// to the fulfillment `status` so existing lifecycle queries are unaffected:
+//   approved (default — legacy rows and auto-approved POs) | pending | rejected.
+// po_approvals is an APPEND-ONLY audit trail — no code path may update or delete
+// rows. po_approval_config holds per-tenant amount tiers; absent row = approvals
+// disabled (every PO auto-approves), so enabling the workflow is an explicit act.
+const CREATE_PO_APPROVALS = `
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approved_at BIGINT;
+
+CREATE TABLE IF NOT EXISTS po_approvals (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  po_id        TEXT NOT NULL,
+  action       TEXT NOT NULL,
+  actor_id     TEXT,
+  actor_role   TEXT,
+  amount_cents BIGINT NOT NULL DEFAULT 0,
+  note         TEXT,
+  created_at   BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_approvals_po_idx ON po_approvals (tenant_id, po_id, created_at);
+
+CREATE TABLE IF NOT EXISTS po_approval_config (
+  tenant_id           TEXT PRIMARY KEY,
+  auto_limit_cents    BIGINT NOT NULL,
+  manager_limit_cents BIGINT NOT NULL,
+  enabled             BOOLEAN NOT NULL DEFAULT true,
+  updated_at          BIGINT NOT NULL
+);
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

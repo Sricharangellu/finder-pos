@@ -158,12 +158,42 @@ export interface PurchaseOrder {
   po_number: number | null;
   status: POStatus;
   receive_status: string;
+  approval_status: POApprovalStatus;
+  approved_at: number | null;
   total_cost_cents: number;
   freight_cost_cents: number;
   other_charges_cents: number;
   notes: string | null;
   created_at: number;
   received_at: number | null;
+}
+
+/** Approval state, orthogonal to the fulfillment status. Legacy rows default to 'approved'. */
+export type POApprovalStatus = "approved" | "pending" | "rejected";
+
+/** Who acted — passed from the route's auth payload into approval methods. */
+export interface Actor {
+  id: string | null;
+  role: string;
+}
+
+/** Per-tenant approval tiers. Absent config = approvals disabled (auto-approve all). */
+export interface POApprovalConfig {
+  auto_limit_cents: number;    // total <  this → auto-approved
+  manager_limit_cents: number; // total <  this → manager may approve; >= → owner only
+  enabled: boolean;
+}
+
+export interface POApprovalEntry {
+  id: string;
+  tenant_id: string;
+  po_id: string;
+  action: "auto_approved" | "submitted" | "approved" | "rejected";
+  actor_id: string | null;
+  actor_role: string | null;
+  amount_cents: number;
+  note: string | null;
+  created_at: number;
 }
 
 export interface PurchaseOrderWithLines extends PurchaseOrder {
@@ -555,7 +585,92 @@ export class PurchasingService {
     return this.db.query<VendorReturn>("SELECT * FROM vendor_returns WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
   }
 
-  async createOrder(supplierId: string, lines: POLineInput[], tenantId: string): Promise<PurchaseOrderWithLines> {
+  // ── PO approval workflow ─────────────────────────────────────────────────────
+
+  async getApprovalConfig(tenantId: string): Promise<POApprovalConfig | null> {
+    const row = await this.db.one<POApprovalConfig & { enabled: boolean }>(
+      "SELECT auto_limit_cents::bigint::int8 AS auto_limit_cents, manager_limit_cents, enabled FROM po_approval_config WHERE tenant_id = @t",
+      { t: tenantId },
+    );
+    if (!row) return null;
+    return { auto_limit_cents: Number(row.auto_limit_cents), manager_limit_cents: Number(row.manager_limit_cents), enabled: row.enabled };
+  }
+
+  async setApprovalConfig(cfg: { autoLimitCents: number; managerLimitCents: number; enabled?: boolean }, tenantId: string): Promise<POApprovalConfig> {
+    if (cfg.autoLimitCents < 0 || cfg.managerLimitCents < cfg.autoLimitCents) {
+      throw new HttpError(400, "bad_request", "managerLimitCents must be >= autoLimitCents >= 0");
+    }
+    await this.db.query(
+      `INSERT INTO po_approval_config (tenant_id, auto_limit_cents, manager_limit_cents, enabled, updated_at)
+       VALUES (@t, @auto, @mgr, @enabled, @now)
+       ON CONFLICT (tenant_id) DO UPDATE SET auto_limit_cents = @auto, manager_limit_cents = @mgr, enabled = @enabled, updated_at = @now`,
+      { t: tenantId, auto: cfg.autoLimitCents, mgr: cfg.managerLimitCents, enabled: cfg.enabled ?? true, now: Date.now() },
+    );
+    return { auto_limit_cents: cfg.autoLimitCents, manager_limit_cents: cfg.managerLimitCents, enabled: cfg.enabled ?? true };
+  }
+
+  /** The role tier required to approve a PO of this amount under the given config. */
+  private requiredTier(totalCents: number, cfg: POApprovalConfig | null): "auto" | "manager" | "owner" {
+    if (!cfg || !cfg.enabled || totalCents < cfg.auto_limit_cents) return "auto";
+    return totalCents < cfg.manager_limit_cents ? "manager" : "owner";
+  }
+
+  /** Append-only audit write. Nothing in the codebase updates or deletes these rows. */
+  private async logApproval(
+    poId: string, tenantId: string,
+    action: POApprovalEntry["action"], actor: Actor | null, amountCents: number, note?: string | null,
+  ): Promise<void> {
+    await this.db.query(
+      `INSERT INTO po_approvals (id, tenant_id, po_id, action, actor_id, actor_role, amount_cents, note, created_at)
+       VALUES (@id, @t, @po, @action, @actorId, @actorRole, @amount, @note, @now)`,
+      { id: `poa_${uuidv7()}`, t: tenantId, po: poId, action, actorId: actor?.id ?? null, actorRole: actor?.role ?? null, amount: amountCents, note: note ?? null, now: Date.now() },
+    );
+  }
+
+  async listApprovals(poId: string, tenantId: string): Promise<POApprovalEntry[]> {
+    await this.getOrder(poId, tenantId); // 404 if the PO doesn't exist
+    return this.db.query<POApprovalEntry>(
+      "SELECT * FROM po_approvals WHERE tenant_id = @t AND po_id = @po ORDER BY created_at ASC, id ASC",
+      { t: tenantId, po: poId },
+    );
+  }
+
+  async approveOrder(poId: string, actor: Actor, tenantId: string): Promise<PurchaseOrderWithLines> {
+    const po = await this.getOrder(poId, tenantId);
+    if (po.approval_status === "approved") throw new HttpError(409, "already_approved", "purchase order is already approved");
+    if (po.approval_status === "rejected") throw new HttpError(409, "rejected", "a rejected purchase order cannot be approved; create a new PO");
+    const cfg = await this.getApprovalConfig(tenantId);
+    const tier = this.requiredTier(po.total_cost_cents, cfg);
+    if (tier === "owner" && actor.role !== "owner") {
+      throw new HttpError(403, "approval_tier", "this purchase order amount requires owner approval");
+    }
+    const now = Date.now();
+    await this.db.query(
+      "UPDATE purchase_orders SET approval_status = 'approved', approved_at = @now WHERE id = @id AND tenant_id = @t",
+      { now, id: poId, t: tenantId },
+    );
+    await this.logApproval(poId, tenantId, "approved", actor, po.total_cost_cents);
+    return this.getOrder(poId, tenantId);
+  }
+
+  async rejectOrder(poId: string, actor: Actor, tenantId: string, note?: string): Promise<PurchaseOrderWithLines> {
+    const po = await this.getOrder(poId, tenantId);
+    if (po.approval_status !== "pending") throw new HttpError(409, "not_pending", "only a pending purchase order can be rejected");
+    await this.db.query(
+      "UPDATE purchase_orders SET approval_status = 'rejected' WHERE id = @id AND tenant_id = @t",
+      { id: poId, t: tenantId },
+    );
+    await this.logApproval(poId, tenantId, "rejected", actor, po.total_cost_cents, note);
+    return this.getOrder(poId, tenantId);
+  }
+
+  /** Guard used by receiving: goods cannot be received against an unapproved PO. */
+  private assertApproved(po: PurchaseOrder): void {
+    if (po.approval_status === "pending") throw new HttpError(409, "approval_pending", "purchase order is awaiting approval and cannot be received");
+    if (po.approval_status === "rejected") throw new HttpError(409, "rejected", "a rejected purchase order cannot be received");
+  }
+
+  async createOrder(supplierId: string, lines: POLineInput[], tenantId: string, actor?: Actor): Promise<PurchaseOrderWithLines> {
     if (lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
     const supplier = await this.db.one("SELECT id FROM suppliers WHERE id = @supplierId AND tenant_id = @tenantId", { supplierId, tenantId });
     if (!supplier) throw new HttpError(404, "not_found", `supplier '${supplierId}' not found`);
@@ -587,11 +702,16 @@ export class PurchasingService {
       billed_qty: null,
     }));
     const total = poLines.reduce((s, l) => s + l.line_cost_cents, 0);
+    // Amount-tier approval gate. No config (or below the auto limit) → auto-approved,
+    // preserving the pre-workflow behavior; otherwise the PO waits in 'pending'.
+    const cfg = await this.getApprovalConfig(tenantId);
+    const tier = this.requiredTier(total, cfg);
+    const approvalStatus: POApprovalStatus = tier === "auto" ? "approved" : "pending";
     await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
-        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, total_cost_cents, po_number, created_at, received_at)
-         VALUES (@id,@tenant_id,@supplier_id,'ordered',@total,@po_number,@created_at,NULL)`,
-        { id: poId, tenant_id: tenantId, supplier_id: supplierId, total, po_number: poNumber, created_at: now },
+        `INSERT INTO purchase_orders (id, tenant_id, supplier_id, status, approval_status, approved_at, total_cost_cents, po_number, created_at, received_at)
+         VALUES (@id,@tenant_id,@supplier_id,'ordered',@approval_status,@approved_at,@total,@po_number,@created_at,NULL)`,
+        { id: poId, tenant_id: tenantId, supplier_id: supplierId, approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null, total, po_number: poNumber, created_at: now },
       );
       for (const l of poLines) {
         await tdb.query(
@@ -607,9 +727,12 @@ export class PurchasingService {
         );
       }
     });
+    await this.logApproval(poId, tenantId, approvalStatus === "approved" ? "auto_approved" : "submitted", actor ?? null, total);
     return {
       id: poId, tenant_id: tenantId, supplier_id: supplierId, po_number: poNumber,
-      status: "ordered", receive_status: "pending", total_cost_cents: total,
+      status: "ordered", receive_status: "pending",
+      approval_status: approvalStatus, approved_at: approvalStatus === "approved" ? now : null,
+      total_cost_cents: total,
       freight_cost_cents: 0, other_charges_cents: 0, notes: null,
       created_at: now, received_at: null, lines: poLines,
     };
@@ -709,6 +832,7 @@ export class PurchasingService {
     const po = await this.getOrder(id, tenantId);
     if (po.status === "received") throw new HttpError(409, "already_received", "purchase order already fully received");
     if (po.status === "cancelled") throw new HttpError(409, "cancelled", "purchase order is cancelled");
+    this.assertApproved(po);
     if (receiveLines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
 
     // Validate each line: must belong to this PO, qty must be ≤ remaining.
