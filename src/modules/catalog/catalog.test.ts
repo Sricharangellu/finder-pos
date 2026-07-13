@@ -638,3 +638,49 @@ test("variant sort/reorder require manager role (#3, #11)", async () => {
   const r = await request(app.express, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v3, v1, v2] }, "cashier");
   assert.equal(r.status, 403);
 });
+
+test("bulk-price: increase selling price by percent (#4)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-A", name: "A", price_cents: 100 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BP-B", name: "B", price_cents: 250 });
+  const r = await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id, b.json.id], target: "selling", op: "inc_pct", value: 10 });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.updated, 2);
+  const pa = await call(app, "GET", `/api/catalog/${a.json.id}`);
+  const pb = await call(app, "GET", `/api/catalog/${b.json.id}`);
+  assert.equal(pa.json.price_cents, 110);
+  assert.equal(pb.json.price_cents, 275);
+});
+
+test("bulk-price: set exact cost across products (#4)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-C", name: "C", price_cents: 100, raw_cost_price_cents: 40 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BP-D", name: "D", price_cents: 100 });
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id, b.json.id], target: "cost", op: "set", value: 55 });
+  const pa = await call(app, "GET", `/api/catalog/${a.json.id}`);
+  const pb = await call(app, "GET", `/api/catalog/${b.json.id}`);
+  assert.equal(pa.json.raw_cost_price_cents, 55);
+  assert.equal(pb.json.raw_cost_price_cents, 55);
+});
+
+test("bulk-price: round to .99 and clamp at zero (#4)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-E", name: "E", price_cents: 149 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BP-F", name: "F", price_cents: 300 });
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id, b.json.id], target: "selling", op: "round_99" });
+  assert.equal((await call(app, "GET", `/api/catalog/${a.json.id}`)).json.price_cents, 199); // 1.49 -> 1.99
+  assert.equal((await call(app, "GET", `/api/catalog/${b.json.id}`)).json.price_cents, 399); // 3.00 -> 3.99
+  // Decrease by a fixed amount larger than the price clamps to 0, never negative.
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "dec_amount", value: 100000 });
+  assert.equal((await call(app, "GET", `/api/catalog/${a.json.id}`)).json.price_cents, 0);
+});
+
+test("bulk-price requires a value for non-round ops and manager role (#4, #11)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-G", name: "G", price_cents: 100 });
+  const missing = await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "inc_pct" });
+  assert.equal(missing.status, 400);
+  const { default: request } = await import("./test-request.js");
+  const denied = await request(app.express, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "set", value: 10 }, "cashier");
+  assert.equal(denied.status, 403);
+});

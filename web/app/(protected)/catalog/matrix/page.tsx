@@ -83,6 +83,7 @@ export default function ProductMatrixPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pct, setPct] = useState("");
+  const [priceTarget, setPriceTarget] = useState<"selling" | "cost">("selling");
   const canManage = hasRole("manager");
 
   const load = useCallback(async () => {
@@ -137,19 +138,16 @@ export default function ProductMatrixPage() {
   const selectedIds = useMemo(() => [...selected], [selected]);
   const applyBulk = (update: Record<string, unknown>) => { if (selectedIds.length) void bulkUpdate(selectedIds, update).then(() => setSelected(new Set())); };
 
-  // Per-item price adjustment (bulk-update can't do a per-row %). Sequential PATCH.
-  const adjustPricePct = () => {
+  // Bulk price/cost ops computed server-side (per product) via /catalog/bulk-price.
+  const bulkPrice = (op: string, value?: number) => {
+    if (!selectedIds.length) return;
+    void act(() => apiPost("/api/v1/catalog/bulk-price", { ids: selectedIds, target: priceTarget, op, value }))
+      .then(() => { setSelected(new Set()); setPct(""); });
+  };
+  const applyPct = () => {
     const p = Number(pct);
-    if (!Number.isFinite(p) || p === 0 || !selectedIds.length) return;
-    const factor = 1 + p / 100;
-    void act(async () => {
-      for (const id of selectedIds) {
-        const prod = products.find((x) => x.id === id);
-        if (!prod) continue;
-        const next = Math.max(0, Math.round(prod.price_cents * factor));
-        if (next !== prod.price_cents) await apiPatch(`/api/v1/catalog/${id}`, { price_cents: next });
-      }
-    }).then(() => { setSelected(new Set()); setPct(""); });
+    if (!Number.isFinite(p) || p === 0) return;
+    bulkPrice(p >= 0 ? "inc_pct" : "dec_pct", Math.abs(p));
   };
 
   // ── selection helpers ────────────────────────────────────────────────────────
@@ -301,9 +299,18 @@ export default function ProductMatrixPage() {
             <Button size="sm" variant="secondary" disabled={busy || !canManage} onClick={() => applyBulk({ ecommerce: false })}>Disable online</Button>
             <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700" />
             <div className="flex items-center gap-1">
-              <label className="text-xs text-neutral-500" htmlFor="pct">Sell price</label>
-              <input id="pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="±%" className="w-16 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-900" />
-              <Button size="sm" disabled={busy || !canManage || !pct} onClick={adjustPricePct}>Apply %</Button>
+              <select
+                aria-label="Price target"
+                value={priceTarget}
+                onChange={(e) => setPriceTarget(e.target.value as "selling" | "cost")}
+                className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-900"
+              >
+                <option value="selling">Sell</option>
+                <option value="cost">Cost</option>
+              </select>
+              <input id="pct" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="±%" aria-label="Percent change" className="w-16 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-900" />
+              <Button size="sm" disabled={busy || !canManage || !pct} onClick={applyPct}>Apply %</Button>
+              <Button size="sm" variant="secondary" disabled={busy || !canManage} onClick={() => bulkPrice("round_99")}>Round .99</Button>
             </div>
             <Button size="sm" variant="link" disabled={busy} onClick={() => setSelected(new Set())} className="ml-auto">Clear</Button>
           </div>

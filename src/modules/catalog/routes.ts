@@ -1,8 +1,8 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
-import type { CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode } from "./service.js";
-import { VARIANT_SORT_MODES } from "./service.js";
+import type { CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode, PriceTarget, PriceOp } from "./service.js";
+import { VARIANT_SORT_MODES, PRICE_OPS } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
@@ -121,6 +121,16 @@ const bulkUpdateSchema = z.object({
     message: "at least one field is required",
   }),
 });
+const bulkPriceSchema = z
+  .object({
+    ids: z.array(z.string().min(1)).min(1).max(500),
+    target: z.enum(["selling", "cost"]),
+    op: z.enum(PRICE_OPS as unknown as [string, ...string[]]),
+    value: z.number().nonnegative().optional(),
+  })
+  .refine((o) => o.op === "round_99" || o.op === "round_95" || o.value !== undefined, {
+    message: "value is required for this operation",
+  });
 
 const importCsvSchema = z.object({
   csv: z.string().min(1),
@@ -250,6 +260,18 @@ export function registerRoutes(router: Router, service: CatalogService): void {
         status: body.update.status as ProductStatus | undefined,
       };
       const items = await service.bulkUpdate(body.ids, update, tenantId(res));
+      res.json({ updated: items.length, items });
+    }),
+  );
+
+  // Bulk price/cost adjustment computed per product (increase/decrease by % or fixed
+  // amount, set exact, round to .99/.95) — for the Matrix Builder bulk toolbar.
+  router.post(
+    "/bulk-price",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const b = parseBody(bulkPriceSchema, req.body);
+      const items = await service.bulkAdjustPrice(b.ids, b.target as PriceTarget, b.op as PriceOp, b.value ?? 0, tenantId(res));
       res.json({ updated: items.length, items });
     }),
   );

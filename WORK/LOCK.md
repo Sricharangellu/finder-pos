@@ -1,6 +1,18 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: IDLE — no active claim
+Status: RELEASED — bulk price/cost engine (PRD #4) shipped; see AUDIT_2026-07-13T051053Z-bulk-price-engine.md
+
+## Active Claim (Claude session A — catalog bulk-price)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, Matrix Builder PRD) |
+| Queue item | Backend bulk price/cost engine: POST /catalog/bulk-price computes per-item (inc/dec %, inc/dec fixed, set exact, round .99/.95) for selling or cost across many ids; wire the Matrix Builder toolbar to it (selling + cost). |
+| Files/areas expected | `src/modules/catalog/{service,routes,catalog.test}.ts`; `web/app/(protected)/catalog/matrix/page.tsx`; WORK audit + LOCK. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — shipped. POST /catalog/bulk-price (manager-gated, ids ≤500, value required unless round op) + adjustPrice/bulkAdjustPrice; Matrix toolbar now one bulk call w/ Sell/Cost target + Round .99. catalog 43/43 isolated, smoke 20/20, hygiene clean, web typecheck/lint/build pass. Audit: AUDIT_2026-07-13T051053Z-bulk-price-engine.md |
+| Blockers | none |
 
 ## Released Claim (Claude session A — variant integrity backend)
 

@@ -37,6 +37,28 @@ export type VariantSortMode = "default" | "manual" | "price_asc" | "price_desc" 
 
 export const VARIANT_SORT_MODES: readonly VariantSortMode[] = ["default", "manual", "price_asc", "price_desc", "name_asc", "name_desc"];
 
+/** Which money field a bulk price adjustment targets. */
+export type PriceTarget = "selling" | "cost";
+/** Bulk price adjustment operation. `value` is a percent (pct ops), cents (amount/set), or unused (round). */
+export type PriceOp = "inc_pct" | "dec_pct" | "inc_amount" | "dec_amount" | "set" | "round_99" | "round_95";
+export const PRICE_OPS: readonly PriceOp[] = ["inc_pct", "dec_pct", "inc_amount", "dec_amount", "set", "round_99", "round_95"];
+
+/** Compute a new price (cents), clamped to >= 0. Percent ops round to the nearest cent. */
+function adjustPrice(current: number, op: PriceOp, value: number): number {
+  let next: number;
+  switch (op) {
+    case "inc_pct": next = Math.round(current * (1 + value / 100)); break;
+    case "dec_pct": next = Math.round(current * (1 - value / 100)); break;
+    case "inc_amount": next = current + value; break;
+    case "dec_amount": next = current - value; break;
+    case "set": next = value; break;
+    case "round_99": next = Math.floor(current / 100) * 100 + 99; break;
+    case "round_95": next = Math.floor(current / 100) * 100 + 95; break;
+    default: next = current;
+  }
+  return Math.max(0, Math.round(next));
+}
+
 /** SQL ORDER BY clause for each sort mode. `manual` uses the channel's sort_order column. */
 function variantOrderBy(mode: VariantSortMode, orderCol: string): string {
   switch (mode) {
@@ -823,6 +845,21 @@ export class CatalogService {
     const updated: Product[] = [];
     for (const id of ids) {
       updated.push(await this.update(id, input, tenantId));
+    }
+    return updated;
+  }
+
+  /** Bulk price/cost adjustment computed per product (bulkUpdate can only set one
+   *  value for all). `target` is the selling price or the raw cost; each result is
+   *  clamped to >= 0. Reuses update() so events/validation still fire. */
+  async bulkAdjustPrice(ids: string[], target: PriceTarget, op: PriceOp, value: number, tenantId: string): Promise<Product[]> {
+    const field = target === "cost" ? "raw_cost_price_cents" : "price_cents";
+    const updated: Product[] = [];
+    for (const id of [...new Set(ids)]) {
+      const p = await this.getOrThrow(id, tenantId);
+      const current = target === "cost" ? (p.raw_cost_price_cents ?? 0) : p.price_cents;
+      const next = adjustPrice(current, op, value);
+      updated.push(await this.update(id, { [field]: next }, tenantId));
     }
     return updated;
   }
