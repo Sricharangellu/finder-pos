@@ -109,6 +109,15 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS online_variant_sort  TEXT NOT NULL
 ALTER TABLE products ADD COLUMN IF NOT EXISTS offline_variant_sort TEXT NOT NULL DEFAULT 'default';
 `;
 
+// Structured variant attributes. `variant_options` holds a JSON object mapping
+// attribute name -> value (e.g. {"Size":"S","Color":"Red"}) so a variant has a
+// stable identity independent of its display label. This is what lets matrix
+// regeneration match an existing variant by attribute signature and update it in
+// place — preserving id/sku/upc/inventory/pricing — instead of recreating it.
+const ALTER_PRODUCTS_VARIANT_OPTIONS = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_options TEXT;
+`;
+
 // BE-16: age-restricted flag — must be verified at register before sale.
 const ALTER_PRODUCTS_AGE = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
@@ -195,6 +204,7 @@ export const catalogModule: PosModule = {
     CREATE_PRODUCT_CATEGORIES,
     ALTER_PRODUCTS_VARIANTS,
     ALTER_PRODUCTS_VARIANT_SORT,
+    ALTER_PRODUCTS_VARIANT_OPTIONS,
     ALTER_PRODUCTS_AGE,
     ALTER_PRODUCTS_COMPLIANCE,
     ALTER_PRODUCTS_EXPIRY,

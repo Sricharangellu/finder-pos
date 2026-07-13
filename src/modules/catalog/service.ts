@@ -136,6 +136,7 @@ export interface Product {
   // Variant / master
   parent_product_id: string | null;
   variant_label: string | null;
+  variant_options: string | null; // canonical JSON of the attribute map, e.g. {"Size":"S"}
   // BE-22: regulated product compliance
   tobacco_type: string | null;
   flavored: number;        // 1|0
@@ -223,6 +224,7 @@ export interface CreateProductInput {
   // Variant
   parent_product_id?: string | null;
   variant_label?: string | null;
+  variant_options?: string | null;
   // Flags
   age_restricted?: boolean;
   returnable?: boolean;
@@ -292,6 +294,62 @@ function variantCombinations(groups: string[][]): string[][] {
     (acc, group) => acc.flatMap((combo) => group.map((value) => [...combo, value])),
     [[]],
   );
+}
+
+/**
+ * The one separator used between variant attribute values everywhere in the app
+ * (labels and generated names). Never insert "/" — that was the old behavior this
+ * replaces. A variant's display name is `${master.name}${SEP}${values.join(SEP)}`,
+ * e.g. "Tee - Small - Red".
+ */
+export const VARIANT_SEPARATOR = " - ";
+
+/** Ordered attribute name -> value map that identifies a variant (e.g. {Size:"S"}). */
+export type VariantOptions = Record<string, string>;
+
+/** Build the display label for an attribute-value combination, in attribute order. */
+function variantLabelFrom(values: string[]): string {
+  return values.join(VARIANT_SEPARATOR);
+}
+
+/** Full variant name: master name joined to the value label by the shared separator. */
+function variantNameFrom(masterName: string, values: string[]): string {
+  return values.length ? `${masterName}${VARIANT_SEPARATOR}${variantLabelFrom(values)}` : masterName;
+}
+
+/**
+ * Order-independent identity for a variant: the sorted (name,value) pairs as JSON.
+ * Two combos with the same attribute→value mapping share a signature regardless of
+ * attribute order, so re-ordering attributes never spawns a duplicate variant.
+ */
+function optionsSignature(options: VariantOptions): string {
+  const entries = Object.entries(options)
+    .map(([k, v]) => [k.trim().toLowerCase(), String(v).trim().toLowerCase()] as const)
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return JSON.stringify(entries);
+}
+
+/** Fallback identity for legacy variants that predate `variant_options`: the sorted,
+ *  lowercased set of values parsed from the display label (old separators included). */
+function valuesKey(values: string[]): string {
+  return JSON.stringify(values.map((v) => v.trim().toLowerCase()).sort());
+}
+
+/** Parse a legacy variant_label ("S / Red", "S - Red", "S | Red") into its values. */
+function parseLegacyLabel(label: string | null): string[] {
+  if (!label) return [];
+  return label.split(/\s*[/|\-]\s*/).map((s) => s.trim()).filter(Boolean);
+}
+
+function parseVariantOptions(raw: string | null): VariantOptions | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as VariantOptions;
+    }
+  } catch { /* malformed — treat as absent */ }
+  return null;
 }
 
 function skuToken(value: string): string {
@@ -386,6 +444,7 @@ export class CatalogService {
       // Variant
       parent_product_id: input.parent_product_id ?? null,
       variant_label: input.variant_label ?? null,
+      variant_options: input.variant_options ?? null,
       online_sort_order: 0,
       offline_sort_order: 0,
       online_variant_sort: "default",
@@ -422,7 +481,7 @@ export class CatalogService {
             meta_title, meta_keywords, meta_description,
             preferred_vendor_id, preferred_vendor_name, primary_vendor, vendor_upc, drop_shipment, reorder_quantity,
             min_qty_to_sell, max_qty_to_sell, qty_increment,
-            parent_product_id, variant_label,
+            parent_product_id, variant_label, variant_options,
             age_restricted, returnable, service_product, customer_specific, exclude_from_po, composite_product, track_inventory, track_inventory_by_imei, ecommerce,
             tobacco_type, flavored, menthol, msa_reportable, restricted_states)
          VALUES
@@ -435,7 +494,7 @@ export class CatalogService {
             @meta_title, @meta_keywords, @meta_description,
             @preferred_vendor_id, @preferred_vendor_name, @primary_vendor, @vendor_upc, @drop_shipment, @reorder_quantity,
             @min_qty_to_sell, @max_qty_to_sell, @qty_increment,
-            @parent_product_id, @variant_label,
+            @parent_product_id, @variant_label, @variant_options,
             @age_restricted, @returnable, @service_product, @customer_specific, @exclude_from_po, @composite_product, @track_inventory, @track_inventory_by_imei, @ecommerce,
             @tobacco_type, @flavored, @menthol, @msa_reportable, @restricted_states)`,
         product as unknown as Record<string, unknown>,
@@ -687,13 +746,34 @@ export class CatalogService {
       "preferred_vendor_id", "preferred_vendor_name", "primary_vendor",
       "vendor_upc", "reorder_quantity",
       "min_qty_to_sell", "max_qty_to_sell", "qty_increment",
-      "parent_product_id", "variant_label",
+      "parent_product_id", "variant_label", "variant_options",
     ] as const;
     for (const field of detailFields) {
       const value = (input as Record<string, unknown>)[field];
       if (value !== undefined && value !== (current as unknown as Record<string, unknown>)[field]) {
         (next as unknown as Record<string, unknown>)[field] = value;
         (changed as unknown as Record<string, unknown>)[field] = value;
+      }
+    }
+
+    // #4: when a variant's attribute values change (variant_options), refresh its
+    // display label + name from the master, unless the caller set them explicitly.
+    // Everything else (id, sku, upc, inventory, pricing, images) is preserved — the
+    // variant is edited in place, never recreated.
+    if (input.variant_options !== undefined && input.name === undefined && input.variant_label === undefined && parentId) {
+      const opts = parseVariantOptions(next.variant_options);
+      if (opts) {
+        const values = Object.values(opts).map((v) => String(v)).filter(Boolean);
+        const master = await this.db.one<{ name: string }>(
+          "SELECT name FROM products WHERE id = @p AND tenant_id = @t",
+          { p: parentId, t: tenantId },
+        );
+        if (master) {
+          const label = variantLabelFrom(values);
+          const name = variantNameFrom(master.name, values);
+          if (label !== current.variant_label) { next.variant_label = label; changed.variant_label = label; }
+          if (name !== current.name) { next.name = name; changed.name = name; }
+        }
       }
     }
 
@@ -724,7 +804,7 @@ export class CatalogService {
          primary_vendor = @primary_vendor, vendor_upc = @vendor_upc,
          drop_shipment = @drop_shipment, reorder_quantity = @reorder_quantity,
          min_qty_to_sell = @min_qty_to_sell, max_qty_to_sell = @max_qty_to_sell, qty_increment = @qty_increment,
-         parent_product_id = @parent_product_id, variant_label = @variant_label,
+         parent_product_id = @parent_product_id, variant_label = @variant_label, variant_options = @variant_options,
          age_restricted = @age_restricted, returnable = @returnable, service_product = @service_product,
          customer_specific = @customer_specific, exclude_from_po = @exclude_from_po,
          composite_product = @composite_product, track_inventory = @track_inventory,
@@ -1025,10 +1105,22 @@ export class CatalogService {
     return this.update(childId, { parent_product_id: null, variant_label: null }, tenantId);
   }
 
+  /**
+   * Non-destructive matrix generation. For each attribute-value combination the
+   * caller requests, we match against the master's current variants by attribute
+   * signature (order-independent) and:
+   *   - update the matched variant in place — refreshing its options, label and
+   *     name while preserving id, sku, upc, inventory, pricing and images;
+   *   - or create a new variant when no combination matches.
+   * Combinations the caller no longer lists are left untouched — variants are never
+   * deleted, unlinked, or duplicated. Legacy variants without stored options are
+   * matched by their parsed label so a first re-generate backfills them cleanly.
+   */
   async generateVariants(masterId: string, attributes: VariantAttributeInput[], tenantId: string): Promise<Product[]> {
-    const createdProducts = await this.db.withTenant(tenantId).tx(async (tdb) => {
+    const touched = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const catalog = new CatalogService(tdb, this.events);
       const created: Product[] = [];
+      const updated: Product[] = [];
       const master = await catalog.assertCanBeMaster(masterId, tenantId);
       const normalized = attributes
         .map((attr) => ({
@@ -1046,46 +1138,77 @@ export class CatalogService {
         throw conflict("variant generation is limited to 200 combinations");
       }
 
+      // Index existing variants by both their structured signature and (for legacy
+      // rows without options) their parsed value set, so we match and never dup.
       const existing = await catalog.listVariants(masterId, tenantId);
-      const existingLabels = new Set(existing.map((variant) => variant.variant_label).filter(Boolean));
+      const bySignature = new Map<string, Product>();
+      const byValues = new Map<string, Product>();
+      for (const variant of existing) {
+        const opts = parseVariantOptions(variant.variant_options);
+        if (opts) {
+          bySignature.set(optionsSignature(opts), variant);
+          byValues.set(valuesKey(Object.values(opts).map(String)), variant);
+        } else {
+          byValues.set(valuesKey(parseLegacyLabel(variant.variant_label)), variant);
+        }
+      }
+      const claimed = new Set<string>();
 
       for (const combo of combinations) {
-        const label = combo.join(" / ");
-        if (existingLabels.has(label)) continue;
-        existingLabels.add(label);
-        created.push(
-          await catalog.create(
-            {
-              sku: await catalog.nextVariantSku(master.sku, label, tenantId),
-              // Variant name reads naturally: "Coca-Cola 330ml", not "Coca-Cola - 330ml".
-              name: `${master.name} ${label}`,
-              price_cents: master.price_cents,
-              category: master.category,
-              tax_class: master.tax_class,
-              status: master.status,
-              description: master.description,
-              brand: master.brand,
-              image_url: master.image_url,
-              parent_product_id: masterId,
-              variant_label: label,
-              age_restricted: master.age_restricted === 1,
-              returnable: master.returnable === 1,
-              service_product: master.service_product === 1,
-              track_inventory: master.track_inventory === 1,
-              ecommerce: master.ecommerce === 1,
-            },
-            tenantId,
-            { publishEvent: false },
-          ),
-        );
+        const options: VariantOptions = {};
+        normalized.forEach((attr, i) => { options[attr.name] = combo[i]; });
+        const label = variantLabelFrom(combo);
+        const name = variantNameFrom(master.name, combo);
+        const optionsJson = JSON.stringify(options);
+        const sig = optionsSignature(options);
+        const vKey = valuesKey(combo);
+
+        const match = bySignature.get(sig) ?? byValues.get(vKey);
+        if (match && !claimed.has(match.id)) {
+          claimed.add(match.id);
+          // Update in place — only label/name/options; everything else is preserved.
+          const changedNeeded = match.variant_label !== label || match.name !== name || match.variant_options !== optionsJson;
+          if (changedNeeded) {
+            updated.push(await catalog.update(
+              match.id,
+              { name, variant_label: label, variant_options: optionsJson },
+              tenantId,
+              { publishEvent: false },
+            ));
+          }
+          continue;
+        }
+
+        created.push(await catalog.create(
+          {
+            sku: await catalog.nextVariantSku(master.sku, label, tenantId),
+            name,
+            price_cents: master.price_cents,
+            category: master.category,
+            tax_class: master.tax_class,
+            status: master.status,
+            description: master.description,
+            brand: master.brand,
+            image_url: master.image_url,
+            parent_product_id: masterId,
+            variant_label: label,
+            variant_options: optionsJson,
+            age_restricted: master.age_restricted === 1,
+            returnable: master.returnable === 1,
+            service_product: master.service_product === 1,
+            track_inventory: master.track_inventory === 1,
+            ecommerce: master.ecommerce === 1,
+          },
+          tenantId,
+          { publishEvent: false },
+        ));
       }
 
-      return created;
+      return { created, updated };
     });
 
-    for (const product of createdProducts) {
-      await this.publishProductCreated(product);
-    }
+    for (const product of touched.created) await this.publishProductCreated(product);
+    for (const product of touched.updated) await this.publishProductUpdated(product, { name: product.name, variant_label: product.variant_label });
 
     return this.listVariants(masterId, tenantId);
   }

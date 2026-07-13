@@ -77,6 +77,18 @@ const detailFieldsSchema = {
   // Variant (BE-8)
   parent_product_id: z.string().min(1).nullable().optional(),
   variant_label: z.string().min(1).nullable().optional(),
+  // Structured attribute map, JSON object of attribute name -> value.
+  variant_options: z
+    .string()
+    .refine((s) => {
+      try {
+        const o = JSON.parse(s) as unknown;
+        return Boolean(o) && typeof o === "object" && !Array.isArray(o) &&
+          Object.values(o as Record<string, unknown>).every((v) => typeof v === "string");
+      } catch { return false; }
+    }, { message: "variant_options must be a JSON object mapping attribute name to value" })
+    .nullable()
+    .optional(),
   // Operational flags
   age_restricted: z.boolean().optional(),
   returnable: z.boolean().optional(),

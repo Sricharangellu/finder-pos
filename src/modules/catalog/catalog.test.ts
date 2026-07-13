@@ -391,7 +391,9 @@ test("variants: matrix generation creates missing children and is idempotent", a
   });
   assert.equal(generated.status, 200);
   assert.equal(generated.json.items.length, 2);
-  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M / Black", "S / Black"]);
+  // Standardized separator (" - "), never "/".
+  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M - Black", "S - Black"]);
+  assert.ok(generated.json.items.every((p: any) => !String(p.variant_label).includes("/")));
   assert.ok(generated.json.items.every((p: any) => p.parent_product_id === master.json.id));
   assert.ok(generated.json.items.every((p: any) => p.brand === "Ascend"));
 
@@ -550,15 +552,17 @@ test("category mutations are manager/owner-gated", async () => {
   assert.equal(json.error.code, "forbidden");
 });
 
-test("generated variant name has no hyphen between master and label (#8)", async () => {
+test("generated variant name uses the standardized separator, never '/' (#3)", async () => {
   const app = await freshApp();
   const master = await call(app, "POST", "/api/catalog/", { sku: "COKE", name: "Coca-Cola", price_cents: 0, category: "beverages" });
   const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
-    attributes: [{ name: "Size", values: ["330ml"] }],
+    attributes: [{ name: "Size", values: ["330ml"] }, { name: "Pack", values: ["6ct"] }],
   });
   assert.equal(gen.status, 200);
-  const v = gen.json.items.find((p: any) => p.variant_label === "330ml");
-  assert.equal(v.name, "Coca-Cola 330ml"); // not "Coca-Cola - 330ml"
+  const v = gen.json.items[0];
+  assert.equal(v.variant_label, "330ml - 6ct");     // one separator between values
+  assert.equal(v.name, "Coca-Cola - 330ml - 6ct");  // master joined by the same separator
+  assert.ok(!v.name.includes("/"));                 // never a slash
 });
 
 test("assigning a product as a variant inherits the master's category (#1)", async () => {
@@ -683,4 +687,70 @@ test("bulk-price requires a value for non-round ops and manager role (#4, #11)",
   const { default: request } = await import("./test-request.js");
   const denied = await request(app.express, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "set", value: 10 }, "cashier");
   assert.equal(denied.status, 403);
+});
+
+// ── Variant engine foundation: structured options + non-destructive regen ──────
+
+test("generate stores structured variant_options per child (#1/#8)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "OPT-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S"] }, { name: "Color", values: ["Red"] }],
+  });
+  const v = gen.json.items[0];
+  assert.deepEqual(JSON.parse(v.variant_options), { Size: "S", Color: "Red" });
+  assert.equal(v.variant_label, "S - Red");
+  assert.equal(v.name, "Tee - S - Red");
+});
+
+test("re-generating with an added value keeps existing variants (same id/sku) and only adds the new one (#6)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "REG-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const first = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M"] }],
+  });
+  const sVar = first.json.items.find((p: any) => p.variant_label === "S");
+  // Give the existing S variant a distinct SKU/price/upc/inventory-ish marker to prove preservation.
+  await call(app, "PATCH", `/api/catalog/${sVar.id}`, { price_cents: 9999, barcode: "111222333" });
+
+  const second = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M", "L"] }],
+  });
+  assert.equal(second.json.items.length, 3); // S, M preserved + L added — never duplicated
+  const sAfter = second.json.items.find((p: any) => p.variant_label === "S");
+  assert.equal(sAfter.id, sVar.id);          // same variant, updated in place
+  assert.equal(sAfter.sku, sVar.sku);        // SKU preserved
+  assert.equal(sAfter.price_cents, 9999);    // pricing preserved
+  assert.equal(sAfter.barcode, "111222333"); // upc/barcode preserved
+});
+
+test("re-generating with a changed attribute order does not duplicate (order-independent identity) (#4/#6)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "ORD-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const first = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S"] }, { name: "Color", values: ["Red"] }],
+  });
+  const id1 = first.json.items[0].id;
+  // Same combo, attributes listed in the opposite order → naming flips but identity holds.
+  const second = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Color", values: ["Red"] }, { name: "Size", values: ["S"] }],
+  });
+  assert.equal(second.json.items.length, 1);      // not duplicated
+  assert.equal(second.json.items[0].id, id1);     // same variant
+  assert.equal(second.json.items[0].variant_label, "Red - S"); // name follows new order
+});
+
+test("editing a variant's options updates its name/label in place, preserving id and sku (#4)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "EDIT-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S"] }],
+  });
+  const v = gen.json.items[0];
+  const patched = await call(app, "PATCH", `/api/catalog/${v.id}`, { variant_options: JSON.stringify({ Size: "M" }) });
+  assert.equal(patched.status, 200);
+  assert.equal(patched.json.id, v.id);              // never recreated
+  assert.equal(patched.json.sku, v.sku);            // sku preserved
+  assert.equal(patched.json.variant_label, "M");    // label recomputed
+  assert.equal(patched.json.name, "Tee - M");       // name recomputed
 });
