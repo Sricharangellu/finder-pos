@@ -29,7 +29,7 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills" | "delivery" | "catalog-matrix";
+  | "inventory-errors" | "bills" | "delivery";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -45,7 +45,6 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   reports: "reporting", insights: "reporting", "tax-compliance": "reporting",
   catalog: "catalog", discounts: "catalog", "gift-cards": "catalog",
   loyalty: "catalog", promotions: "catalog", pricing: "catalog",
-  "catalog-matrix": "catalog",
   inventory: "inventory", operations: "inventory", purchasing: "inventory",
   "edi-imports": "inventory",
   vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
@@ -148,7 +147,6 @@ const NAV_TREE: NavSection[] = [
     icon: <CatalogIcon />,
     children: [
       { label: "Products",       href: "/catalog",             featureGate: "catalog" },
-      { label: "Matrix Builder", href: "/catalog/matrix",      featureGate: "catalog" },
       { label: "Pricing",        href: "/pricing",             featureGate: "catalog", partial: true },
       { label: "Promotions",  href: "/catalog/promotions",  featureGate: "catalog", partial: true },
       { label: "Discounts",   href: "/discounts",           featureGate: "discounts" },
