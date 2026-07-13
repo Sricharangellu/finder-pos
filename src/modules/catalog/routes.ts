@@ -1,7 +1,8 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
-import type { CatalogService, ProductStatus, TaxClass } from "./service.js";
+import type { CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode } from "./service.js";
+import { VARIANT_SORT_MODES } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
@@ -172,6 +173,15 @@ const generateVariantsSchema = z.object({
     )
     .min(1)
     .max(5),
+});
+const channelSchema = z.enum(["online", "offline"]);
+const reorderVariantsSchema = z.object({
+  channel: channelSchema,
+  orderedIds: z.array(z.string().min(1)).min(1).max(500),
+});
+const variantSortSchema = z.object({
+  channel: channelSchema,
+  mode: z.enum(VARIANT_SORT_MODES as unknown as [string, ...string[]]),
 });
 
 function parseInt0(value: unknown): number | undefined {
@@ -443,7 +453,31 @@ export function registerRoutes(router: Router, service: CatalogService): void {
   router.get(
     "/:id/variants",
     handler(async (req, res) => {
-      res.json({ items: await service.listVariants(String(req.params.id), tenantId(res)) });
+      const channel = req.query.channel === "online" || req.query.channel === "offline" ? (req.query.channel as VariantChannel) : undefined;
+      res.json({ items: await service.listVariants(String(req.params.id), tenantId(res), channel) });
+    }),
+  );
+
+  // Persist a manual drag order of a master's variants for one channel (independent
+  // online vs offline). Switches that channel's sort mode to 'manual'.
+  router.post(
+    "/:id/variants/reorder",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(reorderVariantsSchema, req.body);
+      const items = await service.reorderVariants(String(req.params.id), body.channel, body.orderedIds, tenantId(res));
+      res.json({ items });
+    }),
+  );
+
+  // Set the sort mode for a master's variants on one channel.
+  router.patch(
+    "/:id/variants/sort",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(variantSortSchema, req.body);
+      const items = await service.setVariantSort(String(req.params.id), body.channel, body.mode as VariantSortMode, tenantId(res));
+      res.json({ items });
     }),
   );
 

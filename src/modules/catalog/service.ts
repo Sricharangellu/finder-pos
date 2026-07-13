@@ -3,7 +3,7 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import type { Cents } from "../../shared/money.js";
 import type { Page } from "../../shared/types.js";
-import { notFound, conflict } from "../../shared/http.js";
+import { notFound, conflict, badRequest } from "../../shared/http.js";
 
 export type TaxClass = "standard" | "exempt";
 export type ProductStatus = "active" | "draft" | "archived";
@@ -28,6 +28,25 @@ export interface ProductAttribute {
   is_variant_option: boolean;
   created_at: number;
   updated_at: number;
+}
+
+/** Sales channel a variant order applies to (independent online vs offline order). */
+export type VariantChannel = "online" | "offline";
+/** How a master's variants are ordered for a channel. */
+export type VariantSortMode = "default" | "manual" | "price_asc" | "price_desc" | "name_asc" | "name_desc";
+
+export const VARIANT_SORT_MODES: readonly VariantSortMode[] = ["default", "manual", "price_asc", "price_desc", "name_asc", "name_desc"];
+
+/** SQL ORDER BY clause for each sort mode. `manual` uses the channel's sort_order column. */
+function variantOrderBy(mode: VariantSortMode, orderCol: string): string {
+  switch (mode) {
+    case "manual": return `${orderCol} ASC, variant_label ASC, sku ASC`;
+    case "price_asc": return "price_cents ASC, variant_label ASC";
+    case "price_desc": return "price_cents DESC, variant_label ASC";
+    case "name_asc": return "name ASC, sku ASC";
+    case "name_desc": return "name DESC, sku ASC";
+    default: return "variant_label ASC, sku ASC";
+  }
 }
 
 export interface Product {
@@ -112,6 +131,11 @@ export interface Product {
   track_inventory_by_imei: number;
   // Ecommerce visibility (owned by ecommerce module, stored on products)
   ecommerce: number;
+  // Variant sorting — manual drag order per channel; sort mode lives on the master.
+  online_sort_order: number;
+  offline_sort_order: number;
+  online_variant_sort: VariantSortMode;
+  offline_variant_sort: VariantSortMode;
   // Expiry — denormalized MIN(lot.expiry_date) written by InventoryService.syncProductExpiry()
   expiry_date: number | null;
 }
@@ -340,6 +364,10 @@ export class CatalogService {
       // Variant
       parent_product_id: input.parent_product_id ?? null,
       variant_label: input.variant_label ?? null,
+      online_sort_order: 0,
+      offline_sort_order: 0,
+      online_variant_sort: "default",
+      offline_variant_sort: "default",
       // BE-22: regulated compliance
       tobacco_type: null,
       flavored: 0,
@@ -866,12 +894,49 @@ export class CatalogService {
   }
 
   /** Child products (variants) assigned to a master product. */
-  async listVariants(masterId: string, tenantId: string): Promise<Product[]> {
-    await this.getOrThrow(masterId, tenantId);
+  /** List a master's variants. With `channel`, order them by that channel's stored
+   *  sort mode (default | manual | price | name); without it, the default order. */
+  async listVariants(masterId: string, tenantId: string, channel?: VariantChannel): Promise<Product[]> {
+    const master = await this.getOrThrow(masterId, tenantId);
+    const mode: VariantSortMode = channel === "online" ? master.online_variant_sort : channel === "offline" ? master.offline_variant_sort : "default";
+    const orderCol = channel === "online" ? "online_sort_order" : "offline_sort_order";
     return this.db.query<Product>(
-      "SELECT * FROM products WHERE tenant_id = @tenantId AND parent_product_id = @masterId ORDER BY variant_label, sku",
+      `SELECT * FROM products WHERE tenant_id = @tenantId AND parent_product_id = @masterId ORDER BY ${variantOrderBy(mode, orderCol)}`,
       { tenantId, masterId },
     );
+  }
+
+  /** Persist a manual drag order of a master's variants for one channel (online or
+   *  offline), independently of the other. Switches that channel's sort mode to
+   *  `manual`. `orderedIds` must be exactly the master's current variants. */
+  async reorderVariants(masterId: string, channel: VariantChannel, orderedIds: string[], tenantId: string): Promise<Product[]> {
+    await this.getOrThrow(masterId, tenantId);
+    const orderCol = channel === "online" ? "online_sort_order" : "offline_sort_order";
+    const modeCol = channel === "online" ? "online_variant_sort" : "offline_variant_sort";
+    const current = await this.db.query<{ id: string }>(
+      "SELECT id FROM products WHERE tenant_id = @t AND parent_product_id = @m",
+      { t: tenantId, m: masterId },
+    );
+    const currentIds = new Set(current.map((r) => r.id));
+    const uniqueOrdered = [...new Set(orderedIds)];
+    if (uniqueOrdered.length !== currentIds.size || uniqueOrdered.some((id) => !currentIds.has(id))) {
+      throw badRequest("orderedIds must be exactly the master's current variant ids");
+    }
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      for (let i = 0; i < uniqueOrdered.length; i++) {
+        await tdb.query(`UPDATE products SET ${orderCol} = @pos, updated_at = @now WHERE id = @id AND tenant_id = @t`, { pos: i, now: Date.now(), id: uniqueOrdered[i], t: tenantId });
+      }
+      await tdb.query(`UPDATE products SET ${modeCol} = 'manual', updated_at = @now WHERE id = @m AND tenant_id = @t`, { now: Date.now(), m: masterId, t: tenantId });
+    });
+    return this.listVariants(masterId, tenantId, channel);
+  }
+
+  /** Set the sort mode for a master's variants on one channel. */
+  async setVariantSort(masterId: string, channel: VariantChannel, mode: VariantSortMode, tenantId: string): Promise<Product[]> {
+    await this.getOrThrow(masterId, tenantId);
+    const modeCol = channel === "online" ? "online_variant_sort" : "offline_variant_sort";
+    await this.db.query(`UPDATE products SET ${modeCol} = @mode, updated_at = @now WHERE id = @m AND tenant_id = @t`, { mode, now: Date.now(), m: masterId, t: tenantId });
+    return this.listVariants(masterId, tenantId, channel);
   }
 
   /** Bulk-assign the given products as children (variants) of a master product. */

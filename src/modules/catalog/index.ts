@@ -98,6 +98,17 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_label TEXT;
 CREATE INDEX IF NOT EXISTS products_tenant_parent_idx ON products (tenant_id, parent_product_id);
 `;
 
+// Variant sorting — a master's variants can be ordered independently for the
+// online store and the offline/POS view. `*_sort_order` holds the manual
+// drag-order per channel; `*_variant_sort` (on the master) selects the sort mode
+// (default | manual | price_asc | price_desc | name_asc | name_desc).
+const ALTER_PRODUCTS_VARIANT_SORT = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS online_sort_order  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS offline_sort_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS online_variant_sort  TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS offline_variant_sort TEXT NOT NULL DEFAULT 'default';
+`;
+
 // BE-16: age-restricted flag — must be verified at register before sale.
 const ALTER_PRODUCTS_AGE = `
 ALTER TABLE products ADD COLUMN IF NOT EXISTS age_restricted INTEGER NOT NULL DEFAULT 0;
@@ -183,6 +194,7 @@ export const catalogModule: PosModule = {
     CREATE_CATEGORIES_TABLE,
     CREATE_PRODUCT_CATEGORIES,
     ALTER_PRODUCTS_VARIANTS,
+    ALTER_PRODUCTS_VARIANT_SORT,
     ALTER_PRODUCTS_AGE,
     ALTER_PRODUCTS_COMPLIANCE,
     ALTER_PRODUCTS_EXPIRY,

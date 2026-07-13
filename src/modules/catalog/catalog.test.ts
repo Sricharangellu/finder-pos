@@ -591,3 +591,50 @@ test("changing a master's category cascades to all its variants (#1)", async () 
   const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
   assert.ok(variants.json.items.length === 2 && variants.json.items.every((v: any) => v.category === "groceries"));
 });
+
+async function mkMasterWith3Variants(app: App) {
+  const master = await call(app, "POST", "/api/catalog/", { sku: "TEE", name: "Tee", price_cents: 0, category: "apparel" });
+  const v1 = await call(app, "POST", "/api/catalog/", { sku: "TEE-S", name: "S", price_cents: 100 });
+  const v2 = await call(app, "POST", "/api/catalog/", { sku: "TEE-M", name: "M", price_cents: 300 });
+  const v3 = await call(app, "POST", "/api/catalog/", { sku: "TEE-L", name: "L", price_cents: 200 });
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [v1.json.id, v2.json.id, v3.json.id] });
+  return { master: master.json.id, v1: v1.json.id, v2: v2.json.id, v3: v3.json.id };
+}
+
+test("variant manual reorder is per-channel and independent (#3)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2, v3 } = await mkMasterWith3Variants(app);
+  const reordered = await call(app, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v3, v1, v2] });
+  assert.equal(reordered.status, 200);
+
+  const online = await call(app, "GET", `/api/catalog/${master}/variants?channel=online`);
+  assert.deepEqual(online.json.items.map((p: any) => p.id), [v3, v1, v2]); // manual order
+
+  // Offline is untouched — still the default (sku) order, proving independence.
+  const offline = await call(app, "GET", `/api/catalog/${master}/variants?channel=offline`);
+  assert.deepEqual(offline.json.items.map((p: any) => p.id), [v3, v2, v1]); // TEE-L, TEE-M, TEE-S
+});
+
+test("variant sort mode price_asc orders by price (#3)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2, v3 } = await mkMasterWith3Variants(app);
+  const set = await call(app, "PATCH", `/api/catalog/${master}/variants/sort`, { channel: "online", mode: "price_asc" });
+  assert.equal(set.status, 200);
+  const online = await call(app, "GET", `/api/catalog/${master}/variants?channel=online`);
+  assert.deepEqual(online.json.items.map((p: any) => p.id), [v1, v3, v2]); // 100, 200, 300
+});
+
+test("reorder rejects ids that are not the master's variants (#3)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2 } = await mkMasterWith3Variants(app);
+  const bad = await call(app, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v1, v2] }); // missing one
+  assert.equal(bad.status, 400);
+});
+
+test("variant sort/reorder require manager role (#3, #11)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2, v3 } = await mkMasterWith3Variants(app);
+  const { default: request } = await import("./test-request.js");
+  const r = await request(app.express, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v3, v1, v2] }, "cashier");
+  assert.equal(r.status, 403);
+});
