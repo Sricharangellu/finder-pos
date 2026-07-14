@@ -3,6 +3,7 @@ import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 import { nextDocNumber } from "../../shared/docnumber.js";
+import { clampLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 
 /** Billing — supplier bills (AP) and customer invoices (AR). Tenant-scoped.
  *  Bills can be auto-drafted from a received PO; invoices from an order.
@@ -129,23 +130,29 @@ export class BillingService {
    * enriched with the supplier's name/company so the Bill List can show and group
    * by supplier without a second round-trip (the "by supplier" filter option).
    */
+  /** Cursor-paginated (keyset on issued_at,id) — the old LIMIT 500 silently hid
+   *  a busy tenant's older bills. Default page size unchanged (500). */
   async listBills(
     tenantId: string,
-    opts: { status?: string; supplierId?: string } = {},
-  ): Promise<BillWithSupplier[]> {
+    opts: { status?: string; supplierId?: string; cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<BillWithSupplier>> {
+    const limit = clampLimit(opts.limit, 500, 500);
+    const cur = decodeCursor(opts.cursor);
     const where = ["b.tenant_id = @t"];
-    const params: Record<string, unknown> = { t: tenantId };
+    const params: Record<string, unknown> = { t: tenantId, limit };
     if (opts.status) { where.push("b.status = @s"); params["s"] = opts.status; }
     if (opts.supplierId) { where.push("b.supplier_id = @sid"); params["sid"] = opts.supplierId; }
-    return this.db.query<BillWithSupplier>(
+    if (cur) { where.push("(b.issued_at, b.id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<BillWithSupplier>(
       `SELECT b.*, s.name AS supplier_name, s.company AS supplier_company
          FROM bills b
          LEFT JOIN suppliers s ON s.tenant_id = b.tenant_id AND s.id = b.supplier_id
         WHERE ${where.join(" AND ")}
-        ORDER BY b.issued_at DESC
-        LIMIT 500`,
+        ORDER BY b.issued_at DESC, b.id DESC
+        LIMIT @limit`,
       params,
     );
+    return toPage(items as unknown as Array<BillWithSupplier & Record<string, unknown>>, limit, "issued_at") as CursorPage<BillWithSupplier>;
   }
 
   async payBill(id: string, amountCents: number, method: string, tenantId: string): Promise<Bill> {

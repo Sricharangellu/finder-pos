@@ -26,20 +26,26 @@ export default function BillsPage() {
       .catch(() => { /* filter still works with the names embedded on each bill */ });
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const load = useCallback(async (cursor?: string) => {
+    cursor ? setLoadingMore(true) : setLoading(true);
     setError(null);
     try {
       const qs = new URLSearchParams();
       if (supplierFilter) qs.set("supplierId", supplierFilter);
       if (statusFilter) qs.set("status", statusFilter);
+      if (cursor) qs.set("cursor", cursor);
       const q = qs.toString();
-      const data = await apiGet<{ items: Bill[] }>(`/api/v1/billing/bills${q ? `?${q}` : ""}`);
-      setBills(data.items ?? []);
+      const data = await apiGet<{ items: Bill[]; nextCursor?: string | null }>(`/api/v1/billing/bills${q ? `?${q}` : ""}`);
+      // Cursor pages append; a fresh load (filter change) replaces.
+      setBills((prev) => (cursor ? [...prev, ...(data.items ?? [])] : (data.items ?? [])));
+      setNextCursor(data.nextCursor ?? null);
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load bills.");
     } finally {
-      setLoading(false);
+      cursor ? setLoadingMore(false) : setLoading(false);
     }
   }, [supplierFilter, statusFilter]);
 
@@ -63,6 +69,18 @@ export default function BillsPage() {
           onSupplierChange={setSupplierFilter}
           onStatusChange={setStatusFilter}
         />
+        {nextCursor && !loading && (
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => void load(nextCursor)}
+              className="rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load more bills"}
+            </button>
+          </div>
+        )}
       </div>
     </EnterpriseShell>
   );

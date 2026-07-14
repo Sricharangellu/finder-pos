@@ -185,3 +185,47 @@ test("concurrent bill creates mint distinct bill_numbers (race-free counter)", a
   const numbers = results.map((r) => r.json.bill_number);
   assert.equal(new Set(numbers).size, 5, `expected 5 distinct bill_numbers, got ${numbers.join(",")}`);
 });
+
+test("bills cursor pagination walks all pages with no overlap or loss", async () => {
+  const app = await freshApp();
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Pager Supply" });
+
+  // 5 bills; page size 2 → pages of 2/2/1. The old flat LIMIT hid nothing at
+  // this size, but the cursor walk proves ordering + completeness.
+  for (let i = 0; i < 5; i++) {
+    const r = await call(app, "POST", "/api/billing/bills", { supplierId: sup.json.id, totalCents: 1000 + i });
+    assert.equal(r.status, 201);
+  }
+
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const url = `/api/billing/bills?limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const page = await call(app, "GET", url);
+    assert.equal(page.status, 200);
+    assert.ok(page.json.items.length <= 2);
+    for (const b of page.json.items) {
+      assert.ok(!seen.has(b.id), `bill ${b.id} appeared on two pages`);
+      seen.add(b.id);
+    }
+    cursor = page.json.nextCursor ?? undefined;
+    pages++;
+    assert.ok(pages < 10, "cursor loop did not terminate");
+  } while (cursor);
+
+  assert.equal(seen.size, 5, "cursor walk must reach every bill");
+});
+
+test("bills list keeps the supplier filter working with pagination fields present", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/purchasing/suppliers", { name: "Filter A" });
+  const b = await call(app, "POST", "/api/purchasing/suppliers", { name: "Filter B" });
+  await call(app, "POST", "/api/billing/bills", { supplierId: a.json.id, totalCents: 100 });
+  await call(app, "POST", "/api/billing/bills", { supplierId: b.json.id, totalCents: 200 });
+
+  const filtered = await call(app, "GET", `/api/billing/bills?supplierId=${a.json.id}`);
+  assert.equal(filtered.json.items.length, 1);
+  assert.equal(filtered.json.items[0].supplier_id, a.json.id);
+  assert.equal(filtered.json.nextCursor, null); // page not full
+});

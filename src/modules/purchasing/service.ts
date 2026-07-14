@@ -4,16 +4,9 @@ import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
 import { nextDocSeq } from "../../shared/docnumber.js";
 
-export interface CursorPage<T> {
-  items: T[];
-  nextCursor: string | null;
-  limit: number;
-}
-
-function clampLimit(limit?: number): number {
-  if (!limit || limit <= 0) return 50;
-  return Math.min(Math.floor(limit), 200);
-}
+import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
+export type { CursorPage } from "../../shared/pagination.js";
+import type { CursorPage } from "../../shared/pagination.js";
 
 /** Purchasing — suppliers + purchase orders + receiving. Tenant-scoped.
  *  Receiving publishes `purchase_order.received`; the inventory module listens
@@ -514,14 +507,24 @@ export class PurchasingService {
     return vc;
   }
 
-  async listVendorCredits(tenantId: string, supplierId?: string): Promise<VendorCredit[]> {
-    if (supplierId) {
-      return this.db.query<VendorCredit>(
-        "SELECT * FROM vendor_credits WHERE tenant_id = @t AND supplier_id = @s ORDER BY created_at DESC",
-        { t: tenantId, s: supplierId },
-      );
-    }
-    return this.db.query<VendorCredit>("SELECT * FROM vendor_credits WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  /** Cursor-paginated (keyset) — the old LIMIT 500 silently hid older credits,
+   *  and the by-supplier branch had no LIMIT at all. */
+  async listVendorCredits(
+    tenantId: string,
+    supplierId?: string,
+    query: { cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<VendorCredit>> {
+    const limit = clampLimit(query.limit, 500, 500);
+    const cur = decodeCursor(query.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (supplierId) { where.push("supplier_id = @s"); params["s"] = supplierId; }
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<VendorCredit>(
+      `SELECT * FROM vendor_credits WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(items as unknown as Array<VendorCredit & Record<string, unknown>>, limit, "created_at") as CursorPage<VendorCredit>;
   }
 
   async voidVendorCredit(id: string, tenantId: string): Promise<VendorCredit> {
@@ -582,8 +585,18 @@ export class PurchasingService {
     return { id, tenant_id: tenantId, supplier_id: input.supplierId ?? null, reason: input.reason, total_cost_cents: total, credit_id: creditId, status: "recorded", created_at: now };
   }
 
-  async listReturns(tenantId: string): Promise<VendorReturn[]> {
-    return this.db.query<VendorReturn>("SELECT * FROM vendor_returns WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  /** Cursor-paginated (keyset) — replaces the silent LIMIT 500 cap. */
+  async listReturns(tenantId: string, query: { cursor?: string; limit?: number } = {}): Promise<CursorPage<VendorReturn>> {
+    const limit = clampLimit(query.limit, 500, 500);
+    const cur = decodeCursor(query.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<VendorReturn>(
+      `SELECT * FROM vendor_returns WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(items as unknown as Array<VendorReturn & Record<string, unknown>>, limit, "created_at") as CursorPage<VendorReturn>;
   }
 
   // ── PO approval workflow ─────────────────────────────────────────────────────

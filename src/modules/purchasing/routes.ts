@@ -155,7 +155,14 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   router.get("/vendor-credits", handler(async (req, res) => {
     const supplierId = typeof req.query.supplierId === "string" ? req.query.supplierId : undefined;
     const poId = typeof req.query.poId === "string" ? req.query.poId : undefined;
-    res.json({ items: await service.listVendorCreditsFiltered(tenantId(res), { supplierId, poId }) });
+    if (poId) {
+      // Per-PO credits are naturally bounded — no pagination needed.
+      res.json({ items: await service.listVendorCreditsFiltered(tenantId(res), { supplierId, poId }) });
+      return;
+    }
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listVendorCredits(tenantId(res), supplierId, { cursor, limit }));
   }));
 
   router.post("/vendor-credits/:id/void", mgr, handler(async (req, res) => {
@@ -168,8 +175,10 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.status(201).json(await service.createReturn(b, tenantId(res)));
   }));
 
-  router.get("/returns", handler(async (_req, res) => {
-    res.json({ items: await service.listReturns(tenantId(res)) });
+  router.get("/returns", handler(async (req, res) => {
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listReturns(tenantId(res), { cursor, limit }));
   }));
 
   router.post("/orders", mgr, handler(async (req, res) => {
