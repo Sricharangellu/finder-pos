@@ -26,7 +26,7 @@ interface BadgeProps {
   outlined?: boolean;
 }
 
-// Solid fills (default — matches SalesGent ERP status tags)
+// Solid fills (default — matches Ascend ERP status tags)
 const solidClass: Record<BadgeVariant, string> = {
   blue:   "bg-[#1890FF] text-white",          // Billed
   orange: "bg-[#FA8C16] text-white",          // Not Billed / Pending
