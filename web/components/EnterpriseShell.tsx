@@ -383,7 +383,7 @@ function TopBar({
             onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5D5FEF] text-[11px] font-bold text-white">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white">
               {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
             </div>
             <span className="hidden sm:block max-w-[120px] truncate">{user?.name ?? "User"}</span>
@@ -526,7 +526,7 @@ function LeftRail({
                 >
                   {/* Active indicator (expanded mode) */}
                   {expanded && isActive && (
-                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-[#5D5FEF]" />
+                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-brand-600" />
                   )}
 
                   {/* Icon */}
@@ -569,7 +569,7 @@ function LeftRail({
                   }}
                 >
                   {expanded && isActive && (
-                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-[#5D5FEF]" />
+                    <span className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-brand-600" />
                   )}
                   <span className="shrink-0">{item.icon}</span>
                   {expanded && (
@@ -621,7 +621,7 @@ function LeftRail({
                         }`}
                       >
                         {isCurrent && (
-                          <span className="h-1 w-1 shrink-0 rounded-full bg-[#5D5FEF]" />
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-brand-600" />
                         )}
                         <span className={isCurrent ? "" : "ml-3"}>{child.label}</span>
                       </Link>

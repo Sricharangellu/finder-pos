@@ -26,7 +26,7 @@ function Sparkline({ data }: { data: number[] }) {
     .map((v, i) => `${(i / (data.length - 1)) * 100},${28 - ((v - min) / rng) * 24}`)
     .join(" ");
   return (
-    <svg viewBox="0 0 100 28" preserveAspectRatio="none" className="h-8 w-full text-[#5D5FEF]" aria-hidden="true">
+    <svg viewBox="0 0 100 28" preserveAspectRatio="none" className="h-8 w-full text-brand-600" aria-hidden="true">
       <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -63,7 +63,7 @@ function MetricCard({
 
       {/* View report link */}
       {href && (
-        <a href={href} className="text-[11px] font-medium text-[#5D5FEF] hover:underline mt-auto">
+        <a href={href} className="text-[11px] font-medium text-brand-600 hover:underline mt-auto">
           View report →
         </a>
       )}
@@ -154,7 +154,7 @@ export function ReportsDashboard({
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#888] capitalize">{method}</p>
                 <p className="text-lg font-bold text-[#111] tabular-nums mt-1">{formatMoney(cents)}</p>
                 <div className="mt-2 h-1.5 rounded-full bg-[#F0F0F0]">
-                  <div className="h-1.5 rounded-full bg-[#5D5FEF]" style={{ width: `${pct}%` }} />
+                  <div className="h-1.5 rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
                 </div>
                 <p className="text-[11px] text-[#aaa] mt-1">{pct}% of total</p>
               </div>

@@ -122,7 +122,7 @@ function AddProductsModal({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by name or SKU..."
-            className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+            className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
           />
         </div>
 
@@ -145,7 +145,7 @@ function AddProductsModal({
                       type="checkbox"
                       checked={selected.has(p.id)}
                       onChange={() => toggle(p.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-900">{p.name}</p>
@@ -179,7 +179,7 @@ function AddProductsModal({
               type="button"
               onClick={() => void handleAdd()}
               disabled={selected.size === 0 || adding}
-              className="rounded-xl bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
+              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
             >
               {adding ? "Adding…" : `Add ${selected.size > 0 ? selected.size : ""} Products`}
             </button>
@@ -273,7 +273,7 @@ export default function CategoryDetailPage() {
         <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
           <p className="text-sm text-red-700">{catError ?? "Category not found."}</p>
           <button type="button" onClick={() => router.push("/catalog")}
-            className="mt-4 text-sm font-medium text-[#5D5FEF] hover:underline">← Back to Catalog</button>
+            className="mt-4 text-sm font-medium text-brand-600 hover:underline">← Back to Catalog</button>
         </div>
       </EnterpriseShell>
     );
@@ -290,9 +290,9 @@ export default function CategoryDetailPage() {
 
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-slate-400">
-          <button type="button" onClick={() => router.push("/catalog")} className="hover:text-[#5D5FEF] transition-colors">Catalog</button>
+          <button type="button" onClick={() => router.push("/catalog")} className="hover:text-brand-600 transition-colors">Catalog</button>
           <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          <button type="button" onClick={() => router.push("/catalog")} className="hover:text-[#5D5FEF] transition-colors">Categories</button>
+          <button type="button" onClick={() => router.push("/catalog")} className="hover:text-brand-600 transition-colors">Categories</button>
           <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           <span className="font-medium text-slate-700">{category.name}</span>
         </nav>
@@ -300,7 +300,7 @@ export default function CategoryDetailPage() {
         {/* Category header */}
         <div className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#5D5FEF]/10 text-2xl font-bold text-[#5D5FEF]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600/10 text-2xl font-bold text-brand-600">
               {category.name.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -312,10 +312,10 @@ export default function CategoryDetailPage() {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") void handleEditSave(); if (e.key === "Escape") setEditing(false); }}
-                    className="rounded-xl border border-slate-300 px-3 py-1.5 text-lg font-bold text-slate-900 focus:border-[#5D5FEF] focus:outline-none"
+                    className="rounded-xl border border-slate-300 px-3 py-1.5 text-lg font-bold text-slate-900 focus:border-brand-600 focus:outline-none"
                   />
                   <button type="button" onClick={() => void handleEditSave()} disabled={editSaving}
-                    className="rounded-lg bg-[#5D5FEF] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
                     {editSaving ? "Saving…" : "Save"}
                   </button>
                   <button type="button" onClick={() => { setEditing(false); setEditName(category.name); }}
@@ -395,7 +395,7 @@ export default function CategoryDetailPage() {
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-[#5D5FEF] px-3 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] transition-colors"
+              className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] transition-colors"
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -416,7 +416,7 @@ export default function CategoryDetailPage() {
                 value={prodQ}
                 onChange={(e) => setProdQ(e.target.value)}
                 placeholder="Search products in this category..."
-                className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-4 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+                className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-4 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
               />
             </div>
           </div>
@@ -439,7 +439,7 @@ export default function CategoryDetailPage() {
               </p>
               {!prodQ.trim() && (
                 <button type="button" onClick={() => setShowAddModal(true)}
-                  className="mt-3 text-sm font-medium text-[#5D5FEF] hover:underline">
+                  className="mt-3 text-sm font-medium text-brand-600 hover:underline">
                   Add products →
                 </button>
               )}
@@ -464,7 +464,7 @@ export default function CategoryDetailPage() {
                       onClick={() => router.push(`/catalog/${p.id}`)}
                     >
                       <td className="px-5 py-3.5">
-                        <p className="font-medium text-slate-900 group-hover:text-[#5D5FEF] transition-colors">{p.name}</p>
+                        <p className="font-medium text-slate-900 group-hover:text-brand-600 transition-colors">{p.name}</p>
                       </td>
                       <td className="px-4 py-3.5">
                         <span className="font-mono text-xs text-slate-400">{p.sku}</span>

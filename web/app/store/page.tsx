@@ -65,7 +65,7 @@ function ProductCard({ group }: { group: ProductGroup }) {
         )}
         {/* Variant count badge */}
         {variants.length > 0 && (
-          <div className="absolute top-2 right-2 rounded-full bg-[#5D5FEF] px-2 py-0.5 text-[11px] font-bold text-white shadow">
+          <div className="absolute top-2 right-2 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white shadow">
             {variants.length} variants
           </div>
         )}
@@ -76,7 +76,7 @@ function ProductCard({ group }: { group: ProductGroup }) {
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wide">{master.category}</p>
           <h2
-            className="mt-0.5 text-sm font-semibold text-[#111] leading-snug cursor-pointer hover:text-[#5D5FEF] transition-colors line-clamp-2"
+            className="mt-0.5 text-sm font-semibold text-[#111] leading-snug cursor-pointer hover:text-brand-600 transition-colors line-clamp-2"
             onClick={() => router.push(`/store/${master.id}`)}
           >
             {master.name}
@@ -92,7 +92,7 @@ function ProductCard({ group }: { group: ProductGroup }) {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="flex items-center gap-1 text-xs font-medium text-[#5D5FEF] hover:underline"
+              className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
             >
               {expanded ? "Hide" : "Show"} variants
               <svg className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +106,7 @@ function ProductCard({ group }: { group: ProductGroup }) {
                     key={v.id}
                     type="button"
                     onClick={() => router.push(`/store/${v.id}`)}
-                    className="rounded-full border border-[#5D5FEF]/30 bg-[#5D5FEF]/5 px-2.5 py-0.5 text-xs font-medium text-[#5D5FEF] hover:bg-[#5D5FEF] hover:text-white transition-colors"
+                    className="rounded-full border border-brand-600/30 bg-brand-600/5 px-2.5 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-600 hover:text-white transition-colors"
                     title={v.name}
                   >
                     {v.variant_label ?? v.name}
@@ -122,7 +122,7 @@ function ProductCard({ group }: { group: ProductGroup }) {
           <button
             type="button"
             onClick={() => router.push(`/store/${master.id}`)}
-            className="w-full rounded-xl bg-[#5D5FEF] py-2 text-sm font-semibold text-white hover:bg-[#4849d0] transition-colors"
+            className="w-full rounded-xl bg-brand-600 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] transition-colors"
           >
             {isStandalone ? "View product" : "Select variant"}
           </button>
@@ -178,7 +178,7 @@ export default function StorePage() {
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
             </svg>
             <input
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm shadow-sm focus:border-[#5D5FEF] focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm shadow-sm focus:border-brand-600 focus:outline-none"
               placeholder="Search products…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -196,8 +196,8 @@ export default function StorePage() {
             onClick={() => setCategory(cat)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors capitalize ${
               category === cat
-                ? "bg-[#5D5FEF] text-white"
-                : "bg-white border border-slate-200 text-slate-600 hover:border-[#5D5FEF] hover:text-[#5D5FEF]"
+                ? "bg-brand-600 text-white"
+                : "bg-white border border-slate-200 text-slate-600 hover:border-brand-600 hover:text-brand-600"
             }`}
           >
             {cat === "all" ? "All" : cat}

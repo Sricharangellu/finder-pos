@@ -132,11 +132,11 @@ export function CategoriesTab() {
                           onClick={() => router.push(`/catalog/categories/${root.id}`)}
                           className="flex flex-1 items-center gap-3 text-left"
                         >
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#5D5FEF]/10 text-sm font-bold text-[#5D5FEF]">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600/10 text-sm font-bold text-brand-600">
                             {root.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-900 hover:text-[#5D5FEF] transition-colors">{root.name}</p>
+                            <p className="truncate text-sm font-semibold text-slate-900 hover:text-brand-600 transition-colors">{root.name}</p>
                             {subs.length > 0 && (
                               <p className="text-[11px] text-slate-400">{subs.length} sub-{subs.length === 1 ? "category" : "categories"}</p>
                             )}
@@ -187,7 +187,7 @@ export function CategoriesTab() {
                               <path d="M2 4h4v8H2V4z" fill="currentColor" opacity=".3"/>
                               <path d="M7 8h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                             </svg>
-                            <span className="flex-1 text-sm text-slate-700 hover:text-[#5D5FEF] transition-colors">{sub.name}</span>
+                            <span className="flex-1 text-sm text-slate-700 hover:text-brand-600 transition-colors">{sub.name}</span>
                             <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500 border border-slate-200">
                               {sub.product_count ?? 0} products
                             </span>

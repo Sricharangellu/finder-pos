@@ -180,7 +180,7 @@ export default function ReportsPage() {
                 {(["7d", "30d", "90d"] as Range[]).map((r, i) => (
                   <button key={r} type="button" onClick={() => applyRange(r)}
                     className={`px-4 py-1.5 text-sm font-medium transition-colors border-r border-[#D9D9D9] last:border-r-0 ${
-                      range === r ? "bg-[#5D5FEF] text-white" : "text-[#555] hover:bg-gray-50"
+                      range === r ? "bg-brand-600 text-white" : "text-[#555] hover:bg-gray-50"
                     }`}
                     aria-pressed={range === r}>
                     {["Day", "Week", "Month"][i]}
@@ -202,7 +202,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Outlet dropdown */}
-              <select className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] bg-white focus:border-[#5D5FEF] focus:outline-none">
+              <select className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] bg-white focus:border-brand-600 focus:outline-none">
                 <option>All outlets</option>
                 <option>Main Outlet</option>
               </select>

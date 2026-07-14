@@ -138,7 +138,7 @@ export default function TeamPage() {
           <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
             {FILTERS.map(({ key, label }) => (
               <button key={key} type="button" onClick={() => setFilter(key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${filter === key ? "bg-[#5D5FEF] text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${filter === key ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
                 {label}
               </button>
             ))}
@@ -149,12 +149,12 @@ export default function TeamPage() {
               placeholder="Search name or email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-[#5D5FEF] focus:outline-none"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand-600 focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setShowAdd(true)}
-              className="rounded-lg bg-[#5D5FEF] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0]"
+              className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0]"
             >
               + Add Employee
             </button>

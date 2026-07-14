@@ -258,7 +258,7 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
-                className="flex items-center gap-1 text-xs font-medium text-[#5D5FEF] hover:underline"
+                className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
               >
                 ↑ Part of master product
               </button>
@@ -368,7 +368,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveTab(key)}
                     className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                       activeTab === key
-                        ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                        ? "border-b-2 border-brand-600 text-brand-600"
                         : "border-b-2 border-transparent text-slate-500 hover:text-[#111]"
                     }`}
                   >

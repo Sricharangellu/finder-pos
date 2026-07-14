@@ -31,7 +31,7 @@ const TONE_SPARK: Record<string, string> = {
   green:   "#52C41A",
   amber:   "#FAAD14",
   red:     "#FF4D4F",
-  neutral: "#0137FC",
+  neutral: "#5D5FEF",
 };
 
 function Sparkline({ points, color }: { points: SparklinePoint[]; color: string }) {
@@ -75,7 +75,7 @@ export function KpiCard({
           </div>
         ) : <div />}
         {sparkline && !loading && (
-          <Sparkline points={sparkline} color={TONE_SPARK[tone] ?? "#0137FC"} />
+          <Sparkline points={sparkline} color={TONE_SPARK[tone] ?? "#5D5FEF"} />
         )}
       </div>
 

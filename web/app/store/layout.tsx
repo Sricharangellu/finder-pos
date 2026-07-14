@@ -25,7 +25,7 @@ function StoreGuard({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#5D5FEF] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
       </div>
     );
   }
@@ -46,7 +46,7 @@ function StoreHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         {/* Brand */}
         <a href="/store" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#5D5FEF]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600">
             <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
@@ -71,7 +71,7 @@ function StoreHeader() {
                   onClick={() => router.push("/store/account")}
                   className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                 >
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#5D5FEF] text-[11px] font-bold text-white">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white">
                     {customer.name.charAt(0).toUpperCase()}
                   </div>
                   <span className="hidden sm:inline">{customer.name.split(" ")[0]}</span>
@@ -89,7 +89,7 @@ function StoreHeader() {
               </div>
             </>
           ) : (
-            <a href="/store/login" className="rounded-xl bg-[#5D5FEF] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0] transition-colors">
+            <a href="/store/login" className="rounded-xl bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#4849d0] transition-colors">
               Sign in
             </a>
           )}

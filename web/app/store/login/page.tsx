@@ -41,7 +41,7 @@ export default function StoreLoginPage() {
     } finally { setSubmitting(false); }
   };
 
-  const FLD = "w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF] transition-colors";
+  const FLD = "w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-colors";
 
   return (
     <div className="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-12">
@@ -49,7 +49,7 @@ export default function StoreLoginPage() {
 
         {/* Logo / title */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#5D5FEF]">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600">
             <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
@@ -69,7 +69,7 @@ export default function StoreLoginPage() {
 
         {/* Demo hint */}
         {mode === "login" && (
-          <div className="mb-5 rounded-xl border border-[#5D5FEF]/20 bg-[#5D5FEF]/5 px-4 py-3 text-xs text-[#5D5FEF]">
+          <div className="mb-5 rounded-xl border border-brand-600/20 bg-brand-600/5 px-4 py-3 text-xs text-brand-600">
             <span className="font-semibold">Demo accounts:</span><br />
             alice@demo.com / demo1234<br />
             bob@demo.com / demo1234
@@ -141,7 +141,7 @@ export default function StoreLoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-1 w-full rounded-xl bg-[#5D5FEF] py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50 transition-colors"
+            className="mt-1 w-full rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50 transition-colors"
           >
             {submitting
               ? (mode === "login" ? "Signing in…" : "Creating account…")
@@ -154,14 +154,14 @@ export default function StoreLoginPage() {
           {mode === "login" ? (
             <>Don&apos;t have an account?{" "}
               <button type="button" onClick={() => { setMode("register"); setError(null); }}
-                className="font-semibold text-[#5D5FEF] hover:underline">
+                className="font-semibold text-brand-600 hover:underline">
                 Register
               </button>
             </>
           ) : (
             <>Already have an account?{" "}
               <button type="button" onClick={() => { setMode("login"); setError(null); }}
-                className="font-semibold text-[#5D5FEF] hover:underline">
+                className="font-semibold text-brand-600 hover:underline">
                 Sign in
               </button>
             </>

@@ -67,7 +67,7 @@ export function OrdersTab() {
           <div className="w-36">
             <label className="mb-1 block text-xs font-medium text-slate-500">Show</label>
             <select value={show} onChange={(e) => setShow(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]">
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
               <option value="All">All orders</option>
               <option value="ordered">Ordered</option>
               <option value="received">Received</option>
@@ -78,12 +78,12 @@ export function OrdersTab() {
             <label className="mb-1 block text-xs font-medium text-slate-500">Search</label>
             <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="PO number or supplier…"
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]" />
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
           </div>
           <div className="w-40">
             <label className="mb-1 block text-xs font-medium text-slate-500">Outlet</label>
             <select value={outlet} onChange={(e) => setOutlet(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]">
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
               <option value="All">All outlets</option>
               <option value="Main Store">Main Store</option>
               <option value="Downtown">Downtown</option>
@@ -91,10 +91,10 @@ export function OrdersTab() {
           </div>
           <div className="ml-auto flex items-center gap-4 pb-0.5">
             <button type="button" onClick={() => { setShow("All"); setSearch(""); setOutlet("All"); }}
-              className="text-sm text-[#5D5FEF] hover:underline">Clear filters</button>
+              className="text-sm text-brand-600 hover:underline">Clear filters</button>
             <button type="button" className="text-sm text-slate-500 hover:text-slate-700">More filters</button>
             <button type="button"
-              className="rounded-md bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]">
+              className="rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]">
               Search
             </button>
           </div>
@@ -108,7 +108,7 @@ export function OrdersTab() {
             Displaying {orders.length} orders · {formatMoney(totalCost)} total cost
           </span>
           <button type="button"
-            className="rounded-md border border-[#5D5FEF] px-3 py-1.5 text-xs font-semibold text-[#5D5FEF] transition-colors hover:bg-[#5D5FEF]/5">
+            className="rounded-md border border-brand-600 px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-600/5">
             New order
           </button>
         </div>

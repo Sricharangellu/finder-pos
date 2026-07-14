@@ -44,7 +44,7 @@ function RegisterClosedCard({ onOpen }: { onOpen: (floatCents: number, note: str
       <div className="w-full max-w-sm rounded-2xl border border-[#E8E8E8] bg-white p-8 shadow-sm">
         {/* Spec: illustration */}
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-[#5D5FEF]/10">
+          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-brand-600/10">
             <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#5D5FEF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="2" y="5" width="20" height="14" rx="2" />
               <path d="M2 10h20" />
@@ -71,7 +71,7 @@ function RegisterClosedCard({ onOpen }: { onOpen: (floatCents: number, note: str
               type="number" min="0" step="0.01"
               value={openFloat} onChange={e => setOpenFloat(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2.5 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2.5 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
             />
           </div>
 
@@ -84,13 +84,13 @@ function RegisterClosedCard({ onOpen }: { onOpen: (floatCents: number, note: str
               id="register-open-note"
               rows={2} value={note} onChange={e => setNote(e.target.value)}
               placeholder="e.g. Morning shift, float counted by manager…"
-              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm resize-none focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+              className="w-full rounded-lg border border-[#D9D9D9] px-3 py-2 text-sm resize-none focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
             />
           </div>
 
           {/* Spec: "Open Register" full-width blue CTA */}
           <button type="button" disabled={working} onClick={() => void handleOpen()}
-            className="w-full rounded-lg bg-[#5D5FEF] py-3 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-60 transition-colors">
+            className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-60 transition-colors">
             {working ? "Opening…" : "Open Register"}
           </button>
         </div>
@@ -170,7 +170,7 @@ function CloseRegisterModal({
                   <td className="py-2.5 text-right">
                     <input type="number" min="0" step="0.01" value={counted} onChange={e => setCounted(e.target.value)}
                       placeholder="0.00"
-                      className="w-24 rounded border border-[#D9D9D9] px-2 py-1 text-sm text-right focus:border-[#5D5FEF] focus:outline-none" />
+                      className="w-24 rounded border border-[#D9D9D9] px-2 py-1 text-sm text-right focus:border-brand-600 focus:outline-none" />
                   </td>
                   <td className={`py-2.5 text-right font-semibold tabular-nums ${diffCents < 0 ? "text-red-600" : diffCents > 0 ? "text-emerald-600" : "text-[#888]"}`}>
                     {counted ? (diffCents >= 0 ? "+" : "") + formatMoney(diffCents) : "—"}
@@ -206,7 +206,7 @@ function CloseRegisterModal({
                   <label className="text-xs font-medium text-[#555]">Closing float ($)</label>
                   <input type="number" min="0" step="0.01" value={closing} onChange={e => setClosing(e.target.value)}
                     placeholder="0.00"
-                    className="w-24 rounded border border-[#D9D9D9] px-2 py-1 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                    className="w-24 rounded border border-[#D9D9D9] px-2 py-1 text-sm focus:border-brand-600 focus:outline-none" />
                 </div>
                 <span className="tabular-nums text-[#555]">{closing ? formatMoney(closingCents) : "—"}</span>
               </div>
@@ -225,7 +225,7 @@ function CloseRegisterModal({
           <button type="button" onClick={onCancel}
             className="rounded border border-[#D9D9D9] px-4 py-2 text-sm text-[#555] hover:bg-[#F5F5F5]">Cancel</button>
           <button type="button" disabled={!counted || working} onClick={() => void handleConfirm()}
-            className="rounded bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50">
+            className="rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50">
             {working ? "Closing…" : "Confirm close"}
           </button>
         </div>
@@ -304,7 +304,7 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
   if (session === "loading") {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#5D5FEF]/30 border-t-[#5D5FEF]" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600/30 border-t-brand-600" />
       </div>
     );
   }
@@ -321,7 +321,7 @@ export function RegisterSessionGuard({ registerId, children }: RegisterSessionGu
           Register open · Float: <strong>{formatMoney(session.opening_float_cents)}</strong>
         </span>
         <button type="button" onClick={() => setShowClose(true)}
-          className="text-xs text-[#5D5FEF] hover:underline">
+          className="text-xs text-brand-600 hover:underline">
           Close register
         </button>
       </div>

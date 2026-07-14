@@ -168,7 +168,7 @@ export function ReorderSuggestionsTab({ productId }: { productId: string }) {
                 type="button"
                 onClick={() => setSupplier(s)}
                 className={`relative rounded-xl border-2 p-4 text-left transition-all ${
-                  supplier === s ? "border-[#5D5FEF] bg-[#5D5FEF]/5" : "border-slate-200 hover:border-slate-300"
+                  supplier === s ? "border-brand-600 bg-brand-600/5" : "border-slate-200 hover:border-slate-300"
                 }`}
               >
                 {s === "best_price" && data.savings_per_unit_cents > 0 && (
@@ -198,7 +198,7 @@ export function ReorderSuggestionsTab({ productId }: { productId: string }) {
               min="1"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
             />
             <p className="mt-1 text-[11px] text-slate-400">Suggested: {data.suggested_qty} units</p>
           </div>
@@ -213,7 +213,7 @@ export function ReorderSuggestionsTab({ productId }: { productId: string }) {
           <button
             type="button"
             onClick={() => router.push(`/purchasing/new?product=${productId}&supplier=${supplier === "preferred" ? data.preferred_supplier_id : data.best_price_supplier_id}&qty=${qtyNum}`)}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
           >
             Create Purchase Order
           </button>

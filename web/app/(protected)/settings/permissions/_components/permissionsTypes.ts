@@ -22,7 +22,7 @@ export interface RoleEntry {
 
 export const BUILT_IN: Record<BuiltInRoleId, Omit<RoleEntry, "id">> = {
   owner:      { name: "Owner",       description: "Business owner — full unrestricted access", color: "bg-violet-600", immutable: true },
-  admin:      { name: "Admin",       description: "System administrator — full access",         color: "bg-[#5D5FEF]",  immutable: true },
+  admin:      { name: "Admin",       description: "System administrator — full access",         color: "bg-brand-600",  immutable: true },
   manager:    { name: "Manager",     description: "Operations and team management",             color: "bg-blue-500"   },
   sales:      { name: "Sales",       description: "Customer sales and quote management",        color: "bg-emerald-500" },
   cashier:    { name: "Cashier",     description: "POS checkout and payment processing",        color: "bg-cyan-500"   },

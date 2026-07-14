@@ -45,8 +45,8 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF] focus-visible:ring-offset-2 ${
-        checked ? "bg-[#5D5FEF]" : "bg-slate-200"
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
+        checked ? "bg-brand-600" : "bg-slate-200"
       }`}
     >
       <span
@@ -183,7 +183,7 @@ export default function B2BSettingsPage() {
                             onChange={(e) =>
                               updateGroup(group.id, "discountPct", Number(e.target.value))
                             }
-                            className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm focus:border-[#5D5FEF] focus:outline-none"
+                            className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm focus:border-brand-600 focus:outline-none"
                           />
                           <span className="text-slate-400">%</span>
                         </div>
@@ -203,7 +203,7 @@ export default function B2BSettingsPage() {
                                 Math.round(Number(e.target.value) * 100),
                               )
                             }
-                            className="w-20 rounded border border-slate-200 px-2 py-1 text-right text-sm focus:border-[#5D5FEF] focus:outline-none"
+                            className="w-20 rounded border border-slate-200 px-2 py-1 text-right text-sm focus:border-brand-600 focus:outline-none"
                           />
                         </div>
                       </td>
@@ -226,7 +226,7 @@ export default function B2BSettingsPage() {
                     onClick={() => setPaymentTerm(t)}
                     className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                       paymentTerm === t
-                        ? "bg-[#5D5FEF] text-white"
+                        ? "bg-brand-600 text-white"
                         : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -249,7 +249,7 @@ export default function B2BSettingsPage() {
                     onClick={() => setApproval(mode)}
                     className={`flex-1 rounded-lg border py-2.5 text-sm font-medium transition-colors ${
                       approval === mode
-                        ? "border-[#5D5FEF] bg-[#5D5FEF]/5 text-[#5D5FEF]"
+                        ? "border-brand-600 bg-brand-600/5 text-brand-600"
                         : "border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -298,7 +298,7 @@ export default function B2BSettingsPage() {
               </svg>
               <p>
                 B2B mode must also be enabled in{" "}
-                <Link href="/settings/modes" className="font-medium text-[#5D5FEF] hover:underline">
+                <Link href="/settings/modes" className="font-medium text-brand-600 hover:underline">
                   Business Modes
                 </Link>{" "}
                 to activate wholesale features for your team.
@@ -316,7 +316,7 @@ export default function B2BSettingsPage() {
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
           >
             {saving ? "Saving…" : "Save settings"}
           </button>

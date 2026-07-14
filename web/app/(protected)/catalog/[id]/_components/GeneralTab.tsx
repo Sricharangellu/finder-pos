@@ -7,7 +7,7 @@ import type { CatalogProduct } from "@/api-client/types";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
+const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
 
 function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
@@ -68,18 +68,18 @@ function TagInput({
   }
 
   return (
-    <div className="flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 focus-within:border-[#5D5FEF] focus-within:ring-1 focus-within:ring-[#5D5FEF]">
+    <div className="flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 focus-within:border-brand-600 focus-within:ring-1 focus-within:ring-brand-600">
       {tags.map((t) => (
         <span
           key={t}
-          className="flex items-center gap-1 rounded-full bg-[#5D5FEF]/10 px-2.5 py-0.5 text-xs font-medium text-[#5D5FEF]"
+          className="flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-medium text-brand-600"
         >
           {t}
           <button
             type="button"
             aria-label={`Remove tag ${t}`}
             onClick={() => onChange(tags.filter((x) => x !== t))}
-            className="text-[#5D5FEF]/60 hover:text-[#5D5FEF]"
+            className="text-brand-600/60 hover:text-brand-600"
           >
             ×
           </button>
@@ -152,7 +152,7 @@ function ImageUploadArea({
         }}
         className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
           dragging
-            ? "border-[#5D5FEF] bg-[#5D5FEF]/5"
+            ? "border-brand-600 bg-brand-600/5"
             : "border-slate-200 bg-slate-50 hover:border-slate-300"
         }`}
       >
@@ -166,7 +166,7 @@ function ImageUploadArea({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="mt-1 text-xs font-medium text-[#5D5FEF] hover:underline"
+            className="mt-1 text-xs font-medium text-brand-600 hover:underline"
           >
             Choose images
           </button>
@@ -237,7 +237,7 @@ function CustomerInputFields() {
           <label className="flex items-center gap-1.5 text-xs text-slate-500">
             <input
               type="checkbox"
-              className="h-3.5 w-3.5 rounded border-slate-300 text-[#5D5FEF]"
+              className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600"
               checked={f.required}
               onChange={(e) => setFields((prev) => prev.map((x) => x.id === f.id ? { ...x, required: e.target.checked } : x))}
             />
@@ -255,7 +255,7 @@ function CustomerInputFields() {
       ))}
 
       {adding ? (
-        <div className="space-y-2 rounded-lg border border-[#5D5FEF]/20 bg-[#5D5FEF]/5 p-3">
+        <div className="space-y-2 rounded-lg border border-brand-600/20 bg-brand-600/5 p-3">
           <div className="grid grid-cols-2 gap-2">
             <input
               autoFocus
@@ -279,7 +279,7 @@ function CustomerInputFields() {
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1.5 text-sm font-medium text-[#5D5FEF] hover:underline"
+          className="flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
         >
           <span className="text-base leading-none">+</span> Add an input field
         </button>
@@ -486,7 +486,7 @@ export function GeneralTab({
             <label className="flex cursor-pointer items-center gap-2.5">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                 checked={form.sell_pos}
                 onChange={(e) => set("sell_pos", e.target.checked)}
               />
@@ -495,7 +495,7 @@ export function GeneralTab({
             <label className="flex cursor-pointer items-center gap-2.5">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                 checked={form.sell_online}
                 onChange={(e) => set("sell_online", e.target.checked)}
               />
@@ -535,7 +535,7 @@ export function GeneralTab({
                     <span className="text-slate-400 text-xs">$</span>
                     <input
                       type="number" step="0.01" min="0"
-                      className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-[#5D5FEF]"
+                      className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-brand-600"
                       value={form.cost}
                       onChange={(e) => onCostChange(e.target.value)}
                     />
@@ -545,7 +545,7 @@ export function GeneralTab({
                   <div className="flex items-center justify-end gap-1">
                     <input
                       type="number" step="0.01" min="0"
-                      className="w-20 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-[#5D5FEF]"
+                      className="w-20 rounded border border-slate-200 px-2 py-1.5 text-right text-sm outline-none focus:border-brand-600"
                       value={form.markup}
                       onChange={(e) => onMarkupChange(e.target.value)}
                       placeholder="0.00"
@@ -571,7 +571,7 @@ export function GeneralTab({
                     <span className="text-slate-400 text-xs">$</span>
                     <input
                       type="number" step="0.01" min="0"
-                      className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm font-semibold outline-none focus:border-[#5D5FEF]"
+                      className="w-24 rounded border border-slate-200 px-2 py-1.5 text-right text-sm font-semibold outline-none focus:border-brand-600"
                       value={form.retail}
                       onChange={(e) => onRetailChange(e.target.value)}
                     />
@@ -602,7 +602,7 @@ export function GeneralTab({
                     <td className="px-4 py-3 text-sm text-slate-700">Main Outlet</td>
                     <td className="px-4 py-3">
                       <select
-                        className="rounded-md border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-[#5D5FEF]"
+                        className="rounded-md border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600"
                         value={form.tax_class}
                         onChange={(e) => set("tax_class", e.target.value as "standard" | "exempt")}
                       >
@@ -622,7 +622,7 @@ export function GeneralTab({
             <p className="mb-2 text-[11px] text-slate-400">
               If a product has no tax category assigned, it is subject to the default tax rate of the destination.
             </p>
-            <select className="w-64 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#5D5FEF]">
+            <select className="w-64 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-600">
               <option value="">No tax category</option>
               <option value="standard">Standard tax rate</option>
               <option value="reduced">Reduced rate</option>

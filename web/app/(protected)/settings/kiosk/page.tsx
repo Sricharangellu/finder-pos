@@ -54,8 +54,8 @@ function ToggleRow({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF] focus-visible:ring-offset-2 ${
-          checked ? "bg-[#5D5FEF]" : "bg-slate-200"
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
+          checked ? "bg-brand-600" : "bg-slate-200"
         }`}
       >
         <span
@@ -173,7 +173,7 @@ export default function KioskSettingsPage() {
                   maxLength={8}
                   value={pin}
                   onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                  className="w-32 rounded-lg border border-slate-200 px-3 py-2 font-mono text-lg tracking-widest focus:border-[#5D5FEF] focus:outline-none"
+                  className="w-32 rounded-lg border border-slate-200 px-3 py-2 font-mono text-lg tracking-widest focus:border-brand-600 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -200,7 +200,7 @@ export default function KioskSettingsPage() {
                 id="kiosk-timeout"
                 value={idleTimeout}
                 onChange={(e) => setIdleTimeout(e.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
+                className="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
               >
                 {TIMEOUT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -236,7 +236,7 @@ export default function KioskSettingsPage() {
                       onClick={() => toggleMethod(m)}
                       className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                         active
-                          ? "bg-[#5D5FEF] text-white"
+                          ? "bg-brand-600 text-white"
                           : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                       }`}
                     >
@@ -254,7 +254,7 @@ export default function KioskSettingsPage() {
               </svg>
               <p>
                 Kiosk mode must also be enabled in{" "}
-                <Link href="/settings/modes" className="font-medium text-[#5D5FEF] hover:underline">
+                <Link href="/settings/modes" className="font-medium text-brand-600 hover:underline">
                   Business Modes
                 </Link>{" "}
                 for it to appear in the navigation.
@@ -274,7 +274,7 @@ export default function KioskSettingsPage() {
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
           >
             {saving ? "Saving…" : "Save settings"}
           </button>

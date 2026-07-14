@@ -146,7 +146,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
           <div>
@@ -165,7 +165,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+1 (555) 000-0000"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
           <div>
@@ -173,7 +173,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
             <select
               value={dept}
               onChange={(e) => setDept(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             >
               <option value="">No department</option>
               {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -185,7 +185,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
               type="date"
               value={hireDate}
               onChange={(e) => setHireDate(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
         </div>
@@ -199,7 +199,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as RoleId)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -211,7 +211,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
             <select
               value={empType}
               onChange={(e) => setEmpType(e.target.value as Employee["employment_type"])}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             >
               <option value="full_time">Full-time</option>
               <option value="part_time">Part-time</option>
@@ -229,7 +229,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 placeholder="0.00"
-                className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+                className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
               />
             </div>
           </div>
@@ -242,7 +242,7 @@ function ProfileTab({ emp, onSaved }: { emp: Employee; onSaved: (e: Employee) =>
         <button
           type="submit"
           disabled={saving}
-          className="min-h-[40px] rounded-md bg-[#5D5FEF] px-5 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-60"
+          className="min-h-[40px] rounded-md bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-60"
         >
           {saving ? "Saving..." : "Save changes"}
         </button>
@@ -480,7 +480,7 @@ function PermissionsTab({ emp, onRequestClick }: { emp: Employee; onRequestClick
           <button
             type="button"
             onClick={onRequestClick}
-            className="rounded-md bg-[#5D5FEF] px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
           >
             Request Permission
           </button>
@@ -653,7 +653,7 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               value={permCode}
               onChange={(e) => setPermCode(e.target.value)}
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             >
               <option value="">Select a permission…</option>
               {FEATURE_GROUPS.map((g) => (
@@ -674,7 +674,7 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               required
               rows={2}
               placeholder="Why is this permission needed?"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
 
@@ -685,7 +685,7 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               onChange={(e) => setJustification(e.target.value)}
               rows={2}
               placeholder="How will this benefit the business?"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
 
@@ -699,7 +699,7 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
                     type="button"
                     onClick={() => setAccessType(t)}
                     className={`flex-1 rounded py-1.5 text-xs font-medium transition-colors ${
-                      accessType === t ? "bg-[#5D5FEF] text-white" : "text-slate-600 hover:bg-slate-50"
+                      accessType === t ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     {t === "temporary" ? "Temporary" : "Permanent"}
@@ -712,7 +712,7 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               <select
                 value={urgency}
                 onChange={(e) => setUrgency(e.target.value as Urgency)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
               >
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
@@ -727,12 +727,12 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">Start date</label>
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]" />
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-600">End date</label>
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]" />
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600" />
               </div>
             </div>
           )}
@@ -745,7 +745,7 @@ function RequestPermissionModal({ emp, onClose, onSubmitted }: {
               Cancel
             </button>
             <button type="submit" disabled={submitting}
-              className="rounded-md bg-[#5D5FEF] px-5 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-60">
+              className="rounded-md bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-60">
               {submitting ? "Submitting…" : "Submit request"}
             </button>
           </div>
@@ -788,7 +788,7 @@ function PermissionRequestsTab({ emp }: { emp: Employee }) {
         <button
           type="button"
           onClick={() => setShowModal(true)}
-          className="rounded-md bg-[#5D5FEF] px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
         >
           Request Permission
         </button>
@@ -981,12 +981,12 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
             placeholder="4-6 digits"
-            className="w-40 rounded-md border border-slate-300 px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+            className="w-40 rounded-md border border-slate-300 px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-600"
           />
           <button
             type="submit"
             disabled={saving}
-            className="rounded-md bg-[#5D5FEF] px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-60"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-60"
           >
             {saving ? "Saving..." : "Update PIN"}
           </button>
@@ -1019,7 +1019,7 @@ function SecurityTab({ emp, onUpdated }: { emp: Employee; onUpdated: (e: Employe
                     value={suspendReason}
                     onChange={(e) => setSuspendReason(e.target.value)}
                     placeholder="Policy violation, leave of absence..."
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
                   />
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
@@ -1102,7 +1102,7 @@ export default function UserDetailPage() {
     return (
       <EnterpriseShell active="team" title="Team" subtitle="Loading...">
         <div className="flex flex-1 items-center justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#5D5FEF] border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" />
         </div>
       </EnterpriseShell>
     );
@@ -1177,7 +1177,7 @@ export default function UserDetailPage() {
                 className={[
                   "flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors",
                   tab === t.id
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-b-2 border-brand-600 text-brand-600"
                     : "text-slate-500 hover:text-slate-700",
                 ].join(" ")}
               >

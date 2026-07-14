@@ -177,7 +177,7 @@ function PriceBooksTab() {
         title={`${books.length} price books`}
         action={
           <Can permission="pricing.manage">
-            <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+            <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
               + New Price Book
             </button>
           </Can>
@@ -239,7 +239,7 @@ function TierPricingTab() {
         title={`${rules.length} tier rules`}
         action={
           <Can permission="pricing.manage">
-            <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+            <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
               + New Tier Rule
             </button>
           </Can>
@@ -274,7 +274,7 @@ function TierPricingTab() {
                   <span className="text-xs text-slate-500">Qty ≥</span>
                   <span className="font-bold text-slate-900">{t.minQty}</span>
                   <span className="text-xs text-slate-400">→</span>
-                  <span className="font-bold text-[#5D5FEF]">{t.discountPct}% off</span>
+                  <span className="font-bold text-brand-600">{t.discountPct}% off</span>
                 </div>
               ))}
             </div>
@@ -316,10 +316,10 @@ function ContractPricesTab() {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search contracts..."
-          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20"
+          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
         />
         <Can permission="pricing.manage">
-          <button className="ml-auto rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Contract
           </button>
         </Can>
@@ -333,13 +333,13 @@ function ContractPricesTab() {
           const discountPct = Math.round((1 - c.contractCents / c.retailCents) * 100);
           return (
             <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-              <td className="px-5 py-3.5 font-semibold text-[#5D5FEF]">{c.contractNumber}</td>
+              <td className="px-5 py-3.5 font-semibold text-brand-600">{c.contractNumber}</td>
               <td className="px-5 py-3.5 text-slate-900">{c.customerName}</td>
               <td className="px-5 py-3.5 text-slate-900">{c.productName}</td>
               <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{c.sku}</td>
               <td className="px-5 py-3.5 text-slate-500 line-through">{formatMoney(c.retailCents)}</td>
               <td className="px-5 py-3.5 font-semibold text-emerald-700">{formatMoney(c.contractCents)}</td>
-              <td className="px-5 py-3.5 text-[#5D5FEF] font-semibold">{discountPct}%</td>
+              <td className="px-5 py-3.5 text-brand-600 font-semibold">{discountPct}%</td>
               <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(c.effectiveDate)}</td>
               <td className="px-5 py-3.5 text-xs text-slate-500">{fmtDate(c.expiryDate)}</td>
               <td className="px-5 py-3.5">
@@ -392,14 +392,14 @@ function ScheduledTab() {
             key={s}
             onClick={() => setFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${
-              filter === s ? "bg-[#5D5FEF] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              filter === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             {s === "all" ? "All" : s}
           </button>
         ))}
         <Can permission="pricing.manage">
-          <button className="ml-auto rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + Schedule Price Change
           </button>
         </Can>
@@ -476,7 +476,7 @@ function MarginRulesTab() {
         title={`${rules.length} margin rules`}
         action={
           <Can permission="pricing.manage">
-            <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+            <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
               + New Rule
             </button>
           </Can>
@@ -565,14 +565,14 @@ function SimulatorTab() {
             <input
               value={productSku} onChange={e => setProductSku(e.target.value)}
               placeholder="e.g. SKU-001"
-              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20"
+              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-500">Quantity</label>
             <input
               type="number" min={1} value={qty} onChange={e => setQty(Number(e.target.value))}
-              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20"
+              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
           </div>
           <div>
@@ -580,14 +580,14 @@ function SimulatorTab() {
             <input
               value={customerId} onChange={e => setCustomerId(e.target.value)}
               placeholder="e.g. cust_001"
-              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20"
+              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
           </div>
         </div>
         <button
           onClick={() => void runSim()}
           disabled={loading || !productSku}
-          className="mt-4 rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50"
+          className="mt-4 rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50"
         >
           {loading ? "Resolving…" : "Resolve Price"}
         </button>
@@ -600,7 +600,7 @@ function SimulatorTab() {
             <h3 className="text-sm font-semibold text-slate-900">Resolution Result</h3>
             <div className="text-right">
               <p className="text-xs text-slate-400">Final Price</p>
-              <p className="text-2xl font-bold text-[#5D5FEF]">{formatMoney(result.finalCents)}</p>
+              <p className="text-2xl font-bold text-brand-600">{formatMoney(result.finalCents)}</p>
               <p className="text-xs text-slate-500">via {result.source}</p>
             </div>
           </div>
@@ -611,14 +611,14 @@ function SimulatorTab() {
               const applied = step?.applied ?? false;
               return (
                 <li key={i} className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm ${applied ? "bg-indigo-50 border border-indigo-200" : "bg-slate-50"}`}>
-                  <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${applied ? "bg-[#5D5FEF] text-white" : "bg-slate-200 text-slate-500"}`}>
+                  <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${applied ? "bg-brand-600 text-white" : "bg-slate-200 text-slate-500"}`}>
                     {i + 1}
                   </span>
                   <span className={`flex-1 ${applied ? "font-semibold text-slate-900" : "text-slate-400 line-through"}`}>
                     {ruleName}
                   </span>
                   {step && (
-                    <span className={`font-semibold ${applied ? "text-[#5D5FEF]" : "text-slate-400"}`}>
+                    <span className={`font-semibold ${applied ? "text-brand-600" : "text-slate-400"}`}>
                       {formatMoney(step.price)}
                     </span>
                   )}
@@ -669,7 +669,7 @@ export default function PricingPage() {
                 onClick={() => setActiveTab(t.key)}
                 className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
                   activeTab === t.key
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-b-2 border-brand-600 text-brand-600"
                     : "text-slate-500 hover:text-slate-900"
                 }`}
               >

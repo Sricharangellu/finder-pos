@@ -30,19 +30,19 @@ export function EditRoleModal({
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none" />
           </div>
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none" />
           </div>
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</label>
             <div className="flex flex-wrap gap-2">
               {COLOR_OPTIONS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full ${c} ${color === c ? "scale-110 ring-2 ring-[#5D5FEF] ring-offset-2" : "hover:scale-105"}`}
+                  className={`h-7 w-7 rounded-full ${c} ${color === c ? "scale-110 ring-2 ring-brand-600 ring-offset-2" : "hover:scale-105"}`}
                   aria-label={c} />
               ))}
             </div>
@@ -54,7 +54,7 @@ export function EditRoleModal({
             Cancel
           </button>
           <button type="button" onClick={() => { onSave({ name, description, color }); onClose(); }}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0]">
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0]">
             Save
           </button>
         </div>

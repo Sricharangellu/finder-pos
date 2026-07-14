@@ -142,7 +142,7 @@ export default function SalesHistoryPage() {
                 type="date"
                 value={filterDate}
                 onChange={e => setFilterDate(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]"
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
               />
             </div>
 
@@ -154,7 +154,7 @@ export default function SalesHistoryPage() {
                 placeholder="Search customer"
                 value={filterCustomer}
                 onChange={e => setFilterCustomer(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF] w-36"
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 w-36"
               />
             </div>
 
@@ -166,7 +166,7 @@ export default function SalesHistoryPage() {
                 placeholder="Receipt #, note…"
                 value={filterReceipt}
                 onChange={e => setFilterReceipt(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF] w-36"
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 w-36"
               />
             </div>
 
@@ -177,7 +177,7 @@ export default function SalesHistoryPage() {
                 <select
                   value={filterStatus}
                   onChange={e => setFilterStatus(e.target.value)}
-                  className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none"
+                  className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none"
                 >
                   <option value="all">All statuses</option>
                   <option value="completed">Completed</option>
@@ -190,16 +190,16 @@ export default function SalesHistoryPage() {
 
             {/* Actions */}
             <div className="flex items-center gap-2 ml-auto">
-              <button type="button" onClick={clearFilters} className="text-sm text-[#5D5FEF] hover:underline">
+              <button type="button" onClick={clearFilters} className="text-sm text-brand-600 hover:underline">
                 Clear filters
               </button>
-              <button type="button" onClick={() => setMoreFilters(m => !m)} className="text-sm text-[#5D5FEF] hover:underline">
+              <button type="button" onClick={() => setMoreFilters(m => !m)} className="text-sm text-brand-600 hover:underline">
                 {moreFilters ? "Fewer filters" : "More filters"}
               </button>
               <button
                 type="button"
                 onClick={() => void load()}
-                className="h-8 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white hover:bg-[#4a4cc8] transition-colors"
+                className="h-8 rounded bg-brand-600 px-4 text-sm font-medium text-white hover:bg-[#4a4cc8] transition-colors"
               >
                 Search
               </button>
@@ -236,7 +236,7 @@ export default function SalesHistoryPage() {
               {loading && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-[#888]">
-                    <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#5D5FEF] border-t-transparent" />
+                    <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
                   </td>
                 </tr>
               )}
@@ -265,7 +265,7 @@ export default function SalesHistoryPage() {
 
                     {/* Receipt # + date */}
                     <td className="px-4 py-3">
-                      <p className="font-medium text-[#5D5FEF]">{sale.receipt_number}</p>
+                      <p className="font-medium text-brand-600">{sale.receipt_number}</p>
                       <p className="text-xs text-[#888]">{fmt(sale.created_at)}</p>
                     </td>
 
@@ -344,7 +344,7 @@ function SaleDetailPanel({ sale }: { sale: SaleRecord }) {
     <div className="bg-[#2a2a2a] text-white px-6 py-5">
       {/* Tab bar */}
       <div className="mb-4 border-b border-white/10">
-        <button type="button" className="pb-2 text-sm font-medium text-white border-b-2 border-[#5D5FEF]">
+        <button type="button" className="pb-2 text-sm font-medium text-white border-b-2 border-brand-600">
           Sale details
         </button>
       </div>
@@ -416,7 +416,7 @@ function ActionBtn({ children, primary, danger }: { children: React.ReactNode; p
       type="button"
       className={[
         "w-full rounded px-4 py-2 text-sm font-medium text-left transition-colors",
-        primary ? "bg-[#5D5FEF] text-white hover:bg-[#4a4cc8]" :
+        primary ? "bg-brand-600 text-white hover:bg-[#4a4cc8]" :
         danger  ? "bg-transparent text-red-400 hover:text-red-300 border border-red-800 hover:border-red-600" :
                   "bg-white/10 text-white hover:bg-white/20",
       ].join(" ")}

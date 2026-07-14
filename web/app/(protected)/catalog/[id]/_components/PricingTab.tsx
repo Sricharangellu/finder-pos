@@ -57,7 +57,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-const INPUT = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
+const INPUT = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/Button";
 import { apiPatch, ApiResponseError } from "@/api-client/client";
 import type { CatalogProduct } from "@/api-client/types";
 
-const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
+const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -107,7 +107,7 @@ export function MarketingTab({
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="radio"
-              className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
+              className="mt-0.5 h-4 w-4 border-slate-300 text-brand-600"
               checked={loyaltyMode === "default"}
               onChange={() => setLoyaltyMode("default")}
             />
@@ -121,7 +121,7 @@ export function MarketingTab({
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="radio"
-              className="mt-0.5 h-4 w-4 border-slate-300 text-[#5D5FEF]"
+              className="mt-0.5 h-4 w-4 border-slate-300 text-brand-600"
               checked={loyaltyMode === "custom"}
               onChange={() => setLoyaltyMode("custom")}
             />
@@ -135,7 +135,7 @@ export function MarketingTab({
                     step="0.01"
                     min="0"
                     max="100"
-                    className="w-24 rounded-md border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-[#5D5FEF]"
+                    className="w-24 rounded-md border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600"
                     value={customLoyaltyPct}
                     onChange={(e) => setCustomLoyaltyPct(e.target.value)}
                   />
@@ -174,7 +174,7 @@ export function MarketingTab({
               <label key={key} className="flex cursor-pointer items-center gap-2.5">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                   checked={complianceForm[key]}
                   onChange={(e) => setComplianceForm((f) => ({ ...f, [key]: e.target.checked }))}
                 />
@@ -191,7 +191,7 @@ export function MarketingTab({
                 <label key={st} className="flex cursor-pointer items-center gap-1">
                   <input
                     type="checkbox"
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-[#5D5FEF]"
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600"
                     checked={complianceForm.restricted_states.includes(st)}
                     onChange={(e) => setComplianceForm((f) => ({
                       ...f,

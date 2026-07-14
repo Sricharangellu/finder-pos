@@ -94,7 +94,7 @@ export default function StoreProductPage() {
     return (
       <div className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6">
         <p className="text-slate-400">Product not found.</p>
-        <button type="button" onClick={() => router.push("/store")} className="mt-4 text-sm font-medium text-[#5D5FEF] hover:underline">
+        <button type="button" onClick={() => router.push("/store")} className="mt-4 text-sm font-medium text-brand-600 hover:underline">
           ← Back to store
         </button>
       </div>
@@ -106,13 +106,13 @@ export default function StoreProductPage() {
 
       {/* Breadcrumb */}
       <nav className="mb-6 flex items-center gap-2 text-sm text-slate-400">
-        <button type="button" onClick={() => router.push("/store")} className="hover:text-[#5D5FEF] transition-colors">
+        <button type="button" onClick={() => router.push("/store")} className="hover:text-brand-600 transition-colors">
           Products
         </button>
         <span>/</span>
         {master && master.id !== product.id && (
           <>
-            <button type="button" onClick={() => router.push(`/store/${master.id}`)} className="hover:text-[#5D5FEF] transition-colors">
+            <button type="button" onClick={() => router.push(`/store/${master.id}`)} className="hover:text-brand-600 transition-colors">
               {master.name}
             </button>
             <span>/</span>
@@ -144,7 +144,7 @@ export default function StoreProductPage() {
           {/* Master + variant full name */}
           <div>
             {master && master.id !== displayProduct.id && (
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#5D5FEF] mb-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-600 mb-1">
                 {master.name}
               </p>
             )}
@@ -176,7 +176,7 @@ export default function StoreProductPage() {
               <p className="mb-2 text-sm font-semibold text-[#111]">
                 Select variant
                 {selectedId && selectedId !== (master?.id) && (
-                  <span className="ml-2 text-[#5D5FEF]">
+                  <span className="ml-2 text-brand-600">
                     — {variants.find((v) => v.id === selectedId)?.variant_label ?? ""}
                   </span>
                 )}
@@ -188,8 +188,8 @@ export default function StoreProductPage() {
                   onClick={() => { setSelectedId(master!.id); setProduct(master!); }}
                   className={`rounded-xl border-2 px-4 py-2 text-sm font-medium transition-colors ${
                     selectedId === master?.id
-                      ? "border-[#5D5FEF] bg-[#5D5FEF]/5 text-[#5D5FEF]"
-                      : "border-slate-200 text-slate-600 hover:border-[#5D5FEF]/50"
+                      ? "border-brand-600 bg-brand-600/5 text-brand-600"
+                      : "border-slate-200 text-slate-600 hover:border-brand-600/50"
                   }`}
                 >
                   Default
@@ -201,8 +201,8 @@ export default function StoreProductPage() {
                     onClick={() => { setSelectedId(v.id); setProduct(v); router.replace(`/store/${v.id}`, { scroll: false }); }}
                     className={`rounded-xl border-2 px-4 py-2 text-sm font-medium transition-colors ${
                       selectedId === v.id
-                        ? "border-[#5D5FEF] bg-[#5D5FEF]/5 text-[#5D5FEF]"
-                        : "border-slate-200 text-slate-600 hover:border-[#5D5FEF]/50"
+                        ? "border-brand-600 bg-brand-600/5 text-brand-600"
+                        : "border-slate-200 text-slate-600 hover:border-brand-600/50"
                     }`}
                     title={v.name}
                   >
@@ -246,7 +246,7 @@ export default function StoreProductPage() {
               className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-all ${
                 addedToCart
                   ? "bg-emerald-500 text-white"
-                  : "bg-[#5D5FEF] text-white hover:bg-[#4849d0]"
+                  : "bg-brand-600 text-white hover:bg-[#4849d0]"
               }`}
             >
               {addedToCart ? "✓ Added to cart" : `Add to cart · ${formatMoney(displayProduct.price_cents * qty)}`}
@@ -267,7 +267,7 @@ export default function StoreProductPage() {
 
       {/* Back link */}
       <div className="mt-10">
-        <button type="button" onClick={() => router.push("/store")} className="text-sm font-medium text-slate-400 hover:text-[#5D5FEF] transition-colors">
+        <button type="button" onClick={() => router.push("/store")} className="text-sm font-medium text-slate-400 hover:text-brand-600 transition-colors">
           ← Back to all products
         </button>
       </div>

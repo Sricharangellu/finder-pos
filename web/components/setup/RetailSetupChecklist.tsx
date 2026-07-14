@@ -135,7 +135,7 @@ export function RetailSetupChecklist() {
   return (
     <section
       aria-label="Retail setup checklist"
-      className="mb-5 rounded-xl border border-[#5D5FEF]/25 bg-white p-5 shadow-sm"
+      className="mb-5 rounded-xl border border-brand-600/25 bg-white p-5 shadow-sm"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -159,7 +159,7 @@ export function RetailSetupChecklist() {
         aria-valuemin={0} aria-valuemax={tasks.length} aria-valuenow={doneCount}
         aria-label="Setup progress">
         <div
-          className="h-1.5 rounded-full bg-[#5D5FEF] transition-all"
+          className="h-1.5 rounded-full bg-brand-600 transition-all"
           style={{ width: `${(doneCount / tasks.length) * 100}%` }}
         />
       </div>
@@ -172,7 +172,7 @@ export function RetailSetupChecklist() {
               className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
                 task.done
                   ? "border-emerald-100 bg-emerald-50/50"
-                  : "border-slate-200 bg-white hover:border-[#5D5FEF]/40"
+                  : "border-slate-200 bg-white hover:border-brand-600/40"
               }`}
             >
               <span

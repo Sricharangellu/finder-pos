@@ -20,7 +20,7 @@ export function FieldInput({
         readOnly={readOnly}
         inputMode={inputMode}
         maxLength={maxLength}
-        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none ${readOnly ? "bg-slate-50 text-slate-400" : ""}`}
+        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none ${readOnly ? "bg-slate-50 text-slate-400" : ""}`}
       />
     </div>
   );
@@ -39,7 +39,7 @@ export function FieldSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
       >
         {children}
       </select>

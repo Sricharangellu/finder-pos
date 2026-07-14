@@ -81,14 +81,14 @@ export default function CustomersPage() {
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            className="rounded-md border border-[#5D5FEF] px-4 py-2 text-sm font-semibold text-[#5D5FEF] transition-colors hover:bg-[#5D5FEF]/5"
+            className="rounded-md border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-600/5"
           >
             Import customers
           </button>
           <button
             type="button"
             onClick={() => setShowNewCustomer(true)}
-            className="rounded-md bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
           >
             Add customer
           </button>

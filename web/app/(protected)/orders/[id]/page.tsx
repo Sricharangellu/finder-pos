@@ -93,7 +93,7 @@ function ConfirmModal({
           Cancel
         </button>
         <button type="button" onClick={onConfirm} disabled={loading}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${confirmClass ?? "bg-[#5D5FEF] hover:bg-indigo-600"}`}>
+          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${confirmClass ?? "bg-brand-600 hover:bg-indigo-600"}`}>
           {loading ? "Processing…" : confirmLabel}
         </button>
       </div>
@@ -190,7 +190,7 @@ export default function OrderDetailPage() {
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6">
           <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error ?? "Order not found."}</p>
           <button type="button" onClick={() => router.push("/orders")}
-            className="mt-3 text-sm text-[#5D5FEF] hover:underline">
+            className="mt-3 text-sm text-brand-600 hover:underline">
             ← Back to Orders
           </button>
         </div>
@@ -274,7 +274,7 @@ export default function OrderDetailPage() {
           {(order.customer_name || order.customerId) && (
             <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-[#5D5FEF]">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-brand-600">
                   {(order.customer_name ?? "?")[0]!.toUpperCase()}
                 </div>
                 <div>
@@ -284,7 +284,7 @@ export default function OrderDetailPage() {
               </div>
               {order.customerId && (
                 <button type="button" onClick={() => router.push(`/customers/${order.customerId}`)}
-                  className="flex items-center gap-1 text-xs font-medium text-[#5D5FEF] hover:underline">
+                  className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
                   View customer
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
@@ -342,7 +342,7 @@ export default function OrderDetailPage() {
               <button key={key} type="button" onClick={() => setActiveTab(key)}
                 className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === key
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-b-2 border-brand-600 text-brand-600"
                     : "border-b-2 border-transparent text-slate-500 hover:text-slate-800"
                 }`}>
                 {label}
@@ -369,7 +369,7 @@ export default function OrderDetailPage() {
                   <tr key={line.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3.5">
                       <button type="button" onClick={() => router.push(`/catalog/${line.productId}`)}
-                        className="text-sm font-medium text-[#5D5FEF] hover:underline text-left">
+                        className="text-sm font-medium text-brand-600 hover:underline text-left">
                         {line.name}
                       </button>
                       <div className="flex gap-2 mt-0.5">
@@ -458,7 +458,7 @@ export default function OrderDetailPage() {
             </svg>
             <p className="mt-2 text-sm text-slate-400">No returns for this order.</p>
             <button type="button" onClick={() => router.push(`/returns?order=${order.id}`)}
-              className="mt-2 text-sm text-[#5D5FEF] hover:underline">
+              className="mt-2 text-sm text-brand-600 hover:underline">
               Create return
             </button>
           </div>

@@ -12,24 +12,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Brand (SalesGent primary: #0137FC) ──────────────────────────────
+        // ── Brand (Ascend primary: #5D5FEF) ─────────────────────────────────
+        // Unified 2026-07-14: #5D5FEF was already the de facto primary across
+        // ~75 pages/components (buttons, links, active tabs) despite #0137FC
+        // being the only documented token. #5D5FEF matched real usage more
+        // widely, so it is now the canonical brand-600 — see AGENTS.md
+        // "Design System Rules". Full 50–950 ramp generated from this base.
         brand: {
-          50:  "#EBF0FF",
-          100: "#D6E0FF",
-          200: "#ADBFFF",
-          300: "#85A0FF",
-          400: "#5C7FFF",
-          500: "#2B5FFF",
-          600: "#0137FC", // primary — WCAG AA on white (5.1:1)
-          700: "#002EDB",
-          800: "#0025B8",
-          900: "#001C94",
-          950: "#001270",
+          50:  "#F5F5FE",
+          100: "#E8E9FD",
+          200: "#CBCCFA",
+          300: "#AEAFF7",
+          400: "#8A8CF3",
+          500: "#6D6FF1",
+          600: "#5D5FEF", // primary — WCAG AA on white (4.83:1)
+          700: "#5052CE",
+          800: "#4344AC",
+          900: "#36378B",
+          950: "#292A69",
         },
         // ── ERP Design Tokens ────────────────────────────────────────────────
         erp: {
           sidebar:     "#030B25", // dark navy sidebar
-          "sidebar-active": "#0137FC",
+          "sidebar-active": "#5D5FEF",
           header:      "#F7F7F7",
           "header-border": "rgb(229,220,220)",
           page:        "#F9F9F9",
@@ -37,7 +42,7 @@ const config: Config = {
           "table-border": "#F0F0F0",
           "text-primary":   "rgba(0,0,0,0.88)",
           "text-secondary": "rgba(0,0,0,0.45)",
-          link:        "#0137FC",
+          link:        "#5D5FEF",
           billed:      "#1890FF", // "Billed" status tag
           "not-billed": "#FA8C16", // "Not Billed" / "Pending"
         },

@@ -94,7 +94,7 @@ export function AddEmployeeModal({ onClose, onAdded }: Props) {
             Cancel
           </button>
           <button type="button" onClick={() => void handleSubmit()} disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
             {saving ? "Adding…" : "Add Employee"}
           </button>
         </div>

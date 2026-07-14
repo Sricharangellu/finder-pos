@@ -37,7 +37,7 @@ type SupplierForm = {
 
 const EMPTY_FORM: SupplierForm = { vendor_name: "", vendor_sku: "", cost_cents: "", lead_time_days: "", moq: "", case_pack: "", is_preferred: false, notes: "" };
 
-const INPUT = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]";
+const INPUT = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -151,7 +151,7 @@ export function SuppliersTab({ productId }: { productId: string }) {
               </Field>
             </div>
             <div className="col-span-2 sm:col-span-3 flex items-center gap-2">
-              <input type="checkbox" id="preferred" checked={form.is_preferred} onChange={(e) => setForm((f) => ({ ...f, is_preferred: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-[#5D5FEF]" />
+              <input type="checkbox" id="preferred" checked={form.is_preferred} onChange={(e) => setForm((f) => ({ ...f, is_preferred: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 accent-brand-600" />
               <label htmlFor="preferred" className="text-sm text-slate-600">Set as preferred supplier</label>
             </div>
           </div>
@@ -179,7 +179,7 @@ export function SuppliersTab({ productId }: { productId: string }) {
 
           <div className="space-y-3">
             {suppliers.map((s) => (
-              <div key={s.id} className={`rounded-lg border bg-white shadow-sm ${s.is_preferred ? "border-[#5D5FEF]" : "border-slate-200"}`}>
+              <div key={s.id} className={`rounded-lg border bg-white shadow-sm ${s.is_preferred ? "border-brand-600" : "border-slate-200"}`}>
                 <div className="flex items-start justify-between px-5 py-4">
                   <div className="flex items-center gap-2">
                     <div>

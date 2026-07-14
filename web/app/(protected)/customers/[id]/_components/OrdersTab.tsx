@@ -102,7 +102,7 @@ export function OrdersTab({ customerId }: { customerId: string }) {
                   <tr key={order.id} className="group cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => router.push(`/orders/${order.id}`)}>
                     <td className="px-5 py-3.5">
-                      <span className="text-sm font-semibold text-[#5D5FEF]">{order.orderNumber}</span>
+                      <span className="text-sm font-semibold text-brand-600">{order.orderNumber}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${st.bg} ${st.text}`}>

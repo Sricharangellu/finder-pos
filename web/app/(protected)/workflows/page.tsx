@@ -118,7 +118,7 @@ function WorkflowsTab() {
             {!loading && <p className="text-xs text-slate-500">{workflows.length} {workflows.length === 1 ? "workflow" : "workflows"}</p>}
           </div>
           <button type="button" onClick={() => setShowCreate(true)}
-            className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Workflow
           </button>
         </div>
@@ -130,7 +130,7 @@ function WorkflowsTab() {
             <p className="text-sm font-medium text-slate-700">No workflows yet</p>
             <p className="mt-1 text-sm text-slate-500">Create a workflow to automate checkout steps — or install one from Templates.</p>
             <button type="button" onClick={() => setShowCreate(true)}
-              className="mt-4 rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-medium text-white hover:bg-[#4B4DC8]">
+              className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-[#4B4DC8]">
               Create first workflow
             </button>
           </div>
@@ -196,7 +196,7 @@ function ApprovalChainsTab() {
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
           <h3 className="text-sm font-semibold text-slate-900">{chains.length} approval chains</h3>
           <button type="button"
-            className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Chain
           </button>
         </div>
@@ -227,7 +227,7 @@ function ApprovalChainsTab() {
                         await apiPatch(`/api/v1/workflows/approval-chains/${c.id}`, { enabled: !c.enabled });
                         await load();
                       }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${c.enabled ? "bg-[#5D5FEF]" : "bg-slate-200"}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${c.enabled ? "bg-brand-600" : "bg-slate-200"}`}
                     >
                       <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${c.enabled ? "translate-x-4" : "translate-x-0"}`} />
                     </button>
@@ -389,7 +389,7 @@ function TemplatesTab({ onInstall }: { onInstall: () => void }) {
       {loading ? <Skeleton rows={8} /> : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map(t => (
-            <div key={t.id} className={`rounded-xl border bg-white p-5 shadow-sm ${t.installed ? "border-[#5D5FEF]/30" : "border-slate-200"}`}>
+            <div key={t.id} className={`rounded-xl border bg-white p-5 shadow-sm ${t.installed ? "border-brand-600/30" : "border-slate-200"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-900">{t.name}</p>
@@ -400,7 +400,7 @@ function TemplatesTab({ onInstall }: { onInstall: () => void }) {
                   </div>
                 </div>
                 {t.installed && (
-                  <span className="shrink-0 rounded-full bg-[#5D5FEF]/10 px-2.5 py-0.5 text-[10px] font-bold text-[#5D5FEF]">Installed</span>
+                  <span className="shrink-0 rounded-full bg-brand-600/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-600">Installed</span>
                 )}
               </div>
               <p className="mt-3 text-xs text-slate-500 leading-relaxed">{t.description}</p>
@@ -413,7 +413,7 @@ function TemplatesTab({ onInstall }: { onInstall: () => void }) {
                   <button
                     onClick={() => void handleInstall(t.id)}
                     disabled={installing === t.id}
-                    className="w-full rounded-lg bg-[#5D5FEF] py-2 text-xs font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50"
+                    className="w-full rounded-lg bg-brand-600 py-2 text-xs font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50"
                   >
                     {installing === t.id ? "Installing…" : "Install template"}
                   </button>
@@ -450,7 +450,7 @@ export default function WorkflowsPage() {
                 onClick={() => setActiveTab(t.key)}
                 className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === t.key
-                    ? "border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-brand-600 text-brand-600"
                     : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
                 }`}
               >

@@ -98,7 +98,7 @@ export function ReturnsTab({ productId }: { productId: string }) {
               <tbody className="divide-y divide-slate-50">
                 {items.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-[#5D5FEF]">{r.return_number}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">{r.return_number}</td>
                     <td className="px-4 py-3 text-slate-600">{fmtDate(r.date)}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {r.original_sale_number ?? <span className="text-slate-400">—</span>}

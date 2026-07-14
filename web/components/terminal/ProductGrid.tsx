@@ -177,11 +177,11 @@ export function ProductGrid({ onAddProduct }: ProductGridProps) {
         {/* Mode pills: All Products | Quick Keys */}
         <div className="mb-2.5 flex gap-1.5">
           <button type="button" onClick={() => setMode("catalog")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "catalog" ? "bg-[#5D5FEF] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "catalog" ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
             All Products
           </button>
           <button type="button" onClick={() => setMode("quickkeys")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "quickkeys" ? "bg-[#5D5FEF] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "quickkeys" ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
             Quick Keys
           </button>
         </div>

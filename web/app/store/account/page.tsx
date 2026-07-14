@@ -54,7 +54,7 @@ export default function StoreAccountPage() {
   if (loading || !customer) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#5D5FEF] border-t-transparent" />
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
       </div>
     );
   }
@@ -80,7 +80,7 @@ export default function StoreAccountPage() {
       {/* Profile card */}
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#5D5FEF]/10 text-xl font-bold text-[#5D5FEF]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-600/10 text-xl font-bold text-brand-600">
             {customer.name.charAt(0).toUpperCase()}
           </div>
           <div>
@@ -103,7 +103,7 @@ export default function StoreAccountPage() {
           <div className="py-12 text-center">
             <p className="text-sm text-slate-400">No orders yet.</p>
             <button type="button" onClick={() => router.push("/store")}
-              className="mt-2 text-sm font-medium text-[#5D5FEF] hover:underline">
+              className="mt-2 text-sm font-medium text-brand-600 hover:underline">
               Browse products →
             </button>
           </div>
@@ -127,7 +127,7 @@ export default function StoreAccountPage() {
 
       <div className="mt-6">
         <button type="button" onClick={() => router.push("/store")}
-          className="text-sm font-medium text-slate-400 hover:text-[#5D5FEF] transition-colors">
+          className="text-sm font-medium text-slate-400 hover:text-brand-600 transition-colors">
           ← Continue shopping
         </button>
       </div>

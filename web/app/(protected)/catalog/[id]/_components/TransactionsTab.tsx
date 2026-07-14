@@ -40,7 +40,7 @@ export function TransactionsTab({ productId }: { productId: string }) {
             className={[
               "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
               tab === t.key
-                ? "bg-white text-[#5D5FEF] shadow-sm"
+                ? "bg-white text-brand-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-800",
             ].join(" ")}
           >

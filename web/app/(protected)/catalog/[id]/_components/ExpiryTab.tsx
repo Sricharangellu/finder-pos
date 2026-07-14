@@ -48,7 +48,7 @@ function statusLabel(r: ExpiryRecord): string {
   return `${d}d remaining`;
 }
 
-const FIELD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none";
+const FIELD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -164,7 +164,7 @@ function ExpiryModal({
         <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
           <button type="button" onClick={() => void handleSave()} disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
             {saving ? "Saving…" : existing ? "Update Batch" : "Add Batch"}
           </button>
         </div>
@@ -269,7 +269,7 @@ export function ExpiryTab({ productId }: { productId: string }) {
         ) : records.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm text-slate-400">No batches recorded for this product.</p>
-            <button type="button" onClick={() => setShowAdd(true)} className="mt-2 text-sm font-medium text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={() => setShowAdd(true)} className="mt-2 text-sm font-medium text-brand-600 hover:underline">
               Add the first batch
             </button>
           </div>
@@ -311,7 +311,7 @@ export function ExpiryTab({ productId }: { productId: string }) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => setEditing(r)}
-                        className="text-xs font-medium text-[#5D5FEF] hover:underline">Edit</button>
+                        className="text-xs font-medium text-brand-600 hover:underline">Edit</button>
                       <button type="button" onClick={() => setDeleteId(r.id)}
                         className="text-xs font-medium text-red-500 hover:underline">Delete</button>
                     </div>

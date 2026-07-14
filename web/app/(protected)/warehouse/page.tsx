@@ -124,13 +124,13 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string |
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${accent ? "text-[#5D5FEF]" : "text-slate-900"}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-bold ${accent ? "text-brand-600" : "text-slate-900"}`}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
     </div>
   );
 }
 
-function ProgressBar({ value, max, color = "bg-[#5D5FEF]" }: { value: number; max: number; color?: string }) {
+function ProgressBar({ value, max, color = "bg-brand-600" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -230,10 +230,10 @@ function LocationsTab() {
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search locations..."
-          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20"
+          className="h-9 w-64 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
         />
         <Can permission="inventory.adjust">
-          <button className="ml-auto rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + Add Location
           </button>
         </Can>
@@ -311,7 +311,7 @@ function ReceivingTab() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">{items.length} inbound shipments</p>
         <Can permission="inventory.receive">
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + Schedule Receiving
           </button>
         </Can>
@@ -371,7 +371,7 @@ function ReceivingTab() {
                     <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                       Print ASN
                     </button>
-                    <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+                    <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
                       Start Receiving
                     </button>
                   </Can>
@@ -406,7 +406,7 @@ function PutawayTab() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">{tasks.length} items awaiting putaway</p>
         <Can permission="inventory.adjust">
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             Print Putaway Sheet
           </button>
         </Can>
@@ -440,7 +440,7 @@ function PutawayTab() {
                 <td className="px-5 py-3.5 text-right font-semibold">{t.qty}</td>
                 <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{t.fromLocation}</td>
                 <td className="px-5 py-3.5">
-                  <span className="rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs font-semibold text-[#5D5FEF]">
+                  <span className="rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs font-semibold text-brand-600">
                     {t.suggestedBin}
                   </span>
                 </td>
@@ -448,7 +448,7 @@ function PutawayTab() {
                 <td className="px-5 py-3.5 text-xs text-slate-400">{fmtDateTime(t.receivedAt)}</td>
                 <td className="px-5 py-3.5">
                   <Can permission="inventory.adjust">
-                    <button className="rounded-lg bg-[#5D5FEF] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4B4DC8]">
+                    <button className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4B4DC8]">
                       Confirm
                     </button>
                   </Can>
@@ -494,14 +494,14 @@ function PicksTab() {
             key={s}
             onClick={() => setFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${
-              filter === s ? "bg-[#5D5FEF] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              filter === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             {s === "all" ? "All" : s.replace("_", " ")}
           </button>
         ))}
         <Can permission="orders.fulfill">
-          <button className="ml-auto rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             Generate Pick Lists
           </button>
         </Can>
@@ -528,7 +528,7 @@ function PicksTab() {
               const overdue = p.status !== "complete" && Date.now() > p.dueAt;
               return (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-semibold text-[#5D5FEF]">{p.pickNumber}</td>
+                  <td className="px-5 py-3.5 font-semibold text-brand-600">{p.pickNumber}</td>
                   <td className="px-5 py-3.5 text-xs text-slate-500">{p.orderNumber}</td>
                   <td className="px-5 py-3.5 text-slate-900">{p.customerName}</td>
                   <td className="px-5 py-3.5">
@@ -601,7 +601,7 @@ function CycleCountsTab() {
 
       <div className="flex justify-end">
         <Can permission="inventory.count">
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + Schedule Count
           </button>
         </Can>
@@ -626,7 +626,7 @@ function CycleCountsTab() {
               const st = COUNT_STATUS[c.status];
               return (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 font-semibold text-[#5D5FEF]">{c.countNumber}</td>
+                  <td className="px-5 py-3.5 font-semibold text-brand-600">{c.countNumber}</td>
                   <td className="px-5 py-3.5 font-medium text-slate-900">{c.zone}</td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${ABC_CLS[c.abcClass]}`}>
@@ -687,7 +687,7 @@ export default function WarehousePage() {
             <p className="mt-1 text-sm text-slate-500">Location hierarchy, receiving, putaway, picking, and cycle counts</p>
           </div>
           <Can permission="inventory.receive">
-            <button className="rounded-xl bg-[#5D5FEF] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#4B4DC8]">
+            <button className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#4B4DC8]">
               Receive Inventory
             </button>
           </Can>
@@ -702,7 +702,7 @@ export default function WarehousePage() {
                 onClick={() => setActiveTab(t.key)}
                 className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
                   activeTab === t.key
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-b-2 border-brand-600 text-brand-600"
                     : "text-slate-500 hover:text-slate-900"
                 }`}
               >

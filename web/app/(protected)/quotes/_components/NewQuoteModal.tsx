@@ -57,33 +57,33 @@ export function NewQuoteModal({ onClose, onCreated }: { onClose: () => void; onC
             <div>
               <label className="block text-xs font-medium text-[#555] mb-1">Customer</label>
               <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name"
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
             <div>
               <label className="block text-xs font-medium text-[#555] mb-1">Valid until</label>
               <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)}
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-medium text-[#555] mb-1">Note</label>
               <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional note"
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-[#888]">Line items</p>
               <button type="button" onClick={() => setLines((p) => [...p, { ...EMPTY_LINE }])}
-                className="text-xs text-[#5D5FEF] hover:underline">+ Add line</button>
+                className="text-xs text-brand-600 hover:underline">+ Add line</button>
             </div>
             {lines.map((line, i) => (
               <div key={i} className="flex gap-2 mb-2 items-center">
                 <input type="text" value={line.name} onChange={(e) => updateLine(i, "name", e.target.value)} placeholder="Product name"
-                  className="flex-1 h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                  className="flex-1 h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
                 <input type="number" value={line.qty} min="1" onChange={(e) => updateLine(i, "qty", e.target.value)} placeholder="Qty"
-                  className="w-14 h-8 rounded border border-[#D9D9D9] px-2 text-sm text-center focus:border-[#5D5FEF] focus:outline-none" />
+                  className="w-14 h-8 rounded border border-[#D9D9D9] px-2 text-sm text-center focus:border-brand-600 focus:outline-none" />
                 <input type="number" value={line.unitPrice} min="0" step="0.01" onChange={(e) => updateLine(i, "unitPrice", e.target.value)} placeholder="$"
-                  className="w-20 h-8 rounded border border-[#D9D9D9] px-2 text-sm text-right focus:border-[#5D5FEF] focus:outline-none" />
+                  className="w-20 h-8 rounded border border-[#D9D9D9] px-2 text-sm text-right focus:border-brand-600 focus:outline-none" />
                 <button type="button" onClick={() => setLines((p) => p.filter((_, j) => j !== i))} disabled={lines.length === 1}
                   className="text-[#ccc] hover:text-red-500 disabled:opacity-30">✕</button>
               </div>

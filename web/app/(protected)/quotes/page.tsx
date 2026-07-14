@@ -83,7 +83,7 @@ export default function QuotesPage() {
         <h1 className="text-lg font-semibold text-[#111]">Quotes</h1>
         {canManage && (
           <button type="button" onClick={() => setShowModal(true)}
-            className="rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+            className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
             + New quote
           </button>
         )}
@@ -95,7 +95,7 @@ export default function QuotesPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#555]">Status</label>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
               <option value="all">All statuses</option>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
@@ -107,27 +107,27 @@ export default function QuotesPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#555]">Customer</label>
             <input type="text" value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)} placeholder="Customer…"
-              className="h-8 w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+              className="h-8 w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#555]">Quote #</label>
             <input type="text" value={filterQuoteNo} onChange={(e) => setFilterQuoteNo(e.target.value)} placeholder="QT-00001"
-              className="h-8 w-28 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+              className="h-8 w-28 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
           </div>
           {moreFilters && (
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Valid after</label>
               <input type="date"
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
             </div>
           )}
           <div className="flex items-center gap-2 ml-auto">
-            <button type="button" onClick={clearFilters} className="text-sm text-[#5D5FEF] hover:underline">Clear filters</button>
-            <button type="button" onClick={() => setMoreFilters((m) => !m)} className="text-sm text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={clearFilters} className="text-sm text-brand-600 hover:underline">Clear filters</button>
+            <button type="button" onClick={() => setMoreFilters((m) => !m)} className="text-sm text-brand-600 hover:underline">
               {moreFilters ? "Fewer filters" : "More filters"}
             </button>
             <button type="button" onClick={load}
-              className="h-8 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+              className="h-8 rounded bg-brand-600 px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
               Search
             </button>
           </div>
@@ -157,14 +157,14 @@ export default function QuotesPage() {
           <tbody>
             {loading && (
               <tr><td colSpan={8} className="px-4 py-12 text-center text-[#888]">
-                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#5D5FEF] border-t-transparent" />
+                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
               </td></tr>
             )}
             {!loading && visible.length === 0 && (
               <tr><td colSpan={8} className="px-4 py-12 text-center text-[#888]">
                 No quotes found.
                 {(filterStatus !== "all" || filterCustomer || filterQuoteNo) && (
-                  <button type="button" onClick={clearFilters} className="ml-2 text-[#5D5FEF] hover:underline">Clear filters</button>
+                  <button type="button" onClick={clearFilters} className="ml-2 text-brand-600 hover:underline">Clear filters</button>
                 )}
               </td></tr>
             )}

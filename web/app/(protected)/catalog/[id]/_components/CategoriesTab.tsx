@@ -105,7 +105,7 @@ export function CategoriesTab({ productId }: { productId: string }) {
                 key={c.id}
                 type="button"
                 onClick={() => router.push(`/catalog/categories/${c.id}`)}
-                className="flex items-center gap-1.5 rounded-full border border-[#5D5FEF]/20 bg-[#5D5FEF]/8 px-2.5 py-0.5 text-xs font-medium text-[#5D5FEF] hover:bg-[#5D5FEF]/15 transition-colors"
+                className="flex items-center gap-1.5 rounded-full border border-brand-600/20 bg-brand-600/8 px-2.5 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-600/15 transition-colors"
               >
                 {c.name}
                 <svg className="h-3 w-3 opacity-60" viewBox="0 0 12 12" fill="none">
@@ -122,14 +122,14 @@ export function CategoriesTab({ productId }: { productId: string }) {
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <p className="text-sm font-semibold text-[#111]">Select categories</p>
           <button type="button" onClick={() => setShowForm((v) => !v)}
-            className="text-xs font-medium text-[#5D5FEF] hover:underline">
+            className="text-xs font-medium text-brand-600 hover:underline">
             + New category
           </button>
         </div>
 
         {/* New category inline form */}
         {showForm && (
-          <div className="flex items-end gap-2 border-b border-slate-100 bg-[#5D5FEF]/5 px-4 py-3">
+          <div className="flex items-end gap-2 border-b border-slate-100 bg-brand-600/5 px-4 py-3">
             <div className="flex-1">
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Name</label>
               <input
@@ -137,7 +137,7 @@ export function CategoriesTab({ productId }: { productId: string }) {
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
                 placeholder="Category name"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void handleCreateCategory();
                   if (e.key === "Escape") setShowForm(false);
@@ -147,13 +147,13 @@ export function CategoriesTab({ productId }: { productId: string }) {
             <div className="w-40">
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Parent (optional)</label>
               <select value={newParent} onChange={(e) => setNewParent(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none">
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none">
                 <option value="">— None —</option>
                 {roots.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <button type="button" onClick={() => void handleCreateCategory()} disabled={creating}
-              className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 whitespace-nowrap">
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 whitespace-nowrap">
               {creating ? "…" : "Create"}
             </button>
           </div>
@@ -172,7 +172,7 @@ export function CategoriesTab({ productId }: { productId: string }) {
                   <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                       checked={selected.has(root.id)}
                       onChange={() => toggleCat(root.id)}
                     />
@@ -185,7 +185,7 @@ export function CategoriesTab({ productId }: { productId: string }) {
                     <label key={sub.id} className="flex cursor-pointer items-center gap-3 py-2 pl-10 pr-4 hover:bg-slate-50">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                         checked={selected.has(sub.id)}
                         onChange={() => toggleCat(sub.id)}
                       />
@@ -210,7 +210,7 @@ export function CategoriesTab({ productId }: { productId: string }) {
       <div className="flex items-center justify-end gap-3">
         {saved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
         <button type="button" onClick={() => void handleSave()} disabled={saving}
-          className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+          className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
           {saving ? "Saving…" : "Save categories"}
         </button>
       </div>

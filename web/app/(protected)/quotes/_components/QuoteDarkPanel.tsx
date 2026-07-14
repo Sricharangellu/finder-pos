@@ -41,7 +41,7 @@ export function QuoteDarkPanel({
   return (
     <div className="bg-[#2a2a2a] text-white px-6 py-5">
       <div className="mb-4 border-b border-white/10">
-        <button type="button" className="pb-2 text-sm font-medium text-white border-b-2 border-[#5D5FEF]">
+        <button type="button" className="pb-2 text-sm font-medium text-white border-b-2 border-brand-600">
           Quote details
         </button>
         <button type="button" onClick={onClose}
@@ -98,7 +98,7 @@ export function QuoteDarkPanel({
         <div className="flex flex-col gap-2 min-w-[160px]">
           {(status === "draft" || status === "sent" || status === "accepted") && (
             <button type="button" onClick={onConvert} disabled={converting}
-              className="w-full rounded bg-[#5D5FEF] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50 transition-colors">
+              className="w-full rounded bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50 transition-colors">
               {converting ? "Converting…" : "Convert to sale"}
             </button>
           )}

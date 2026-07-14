@@ -96,7 +96,7 @@ export function InvoicesTab({ productId }: { productId: string }) {
               <tbody className="divide-y divide-slate-50">
                 {items.map((inv) => (
                   <tr key={inv.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-[#5D5FEF]">{inv.po_number}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">{inv.po_number}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">{inv.invoice_number ?? <span className="text-slate-400">—</span>}</td>
                     <td className="px-4 py-3 text-slate-600">{fmtDate(inv.date)}</td>
                     <td className="px-4 py-3 text-slate-600">{inv.supplier_name}</td>

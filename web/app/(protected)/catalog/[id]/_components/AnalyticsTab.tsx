@@ -110,7 +110,7 @@ export function AnalyticsTab({ productId }: { productId: string }) {
               key={p}
               type="button"
               onClick={() => setPeriod(p)}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${period === p ? "bg-[#5D5FEF] text-white" : "text-slate-500 hover:text-slate-700"}`}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${period === p ? "bg-brand-600 text-white" : "text-slate-500 hover:text-slate-700"}`}
             >
               {PERIOD_LABELS[p]}
             </button>

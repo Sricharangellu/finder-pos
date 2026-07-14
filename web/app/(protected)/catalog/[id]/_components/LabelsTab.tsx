@@ -95,7 +95,7 @@ function LabelPreview({ template, product, qty }: { template: LabelTemplate; pro
 
         {/* Qty watermark */}
         {qty > 1 && (
-          <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#5D5FEF] text-[9px] font-bold text-white">
+          <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 text-[9px] font-bold text-white">
             ×{qty}
           </div>
         )}
@@ -147,7 +147,7 @@ export function LabelsTab({ product }: { product: CatalogProduct }) {
               onClick={() => setSelectedTemplate(t.id)}
               className={`rounded-xl border-2 p-4 text-left transition-all ${
                 selectedTemplate === t.id
-                  ? "border-[#5D5FEF] bg-[#5D5FEF]/5"
+                  ? "border-brand-600 bg-brand-600/5"
                   : "border-slate-200 hover:border-slate-300"
               }`}
             >
@@ -158,7 +158,7 @@ export function LabelsTab({ product }: { product: CatalogProduct }) {
                   <p className="mt-1 text-[11px] text-slate-400">Size: {t.size}</p>
                 </div>
                 <div className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-all ${
-                  selectedTemplate === t.id ? "border-[#5D5FEF] bg-[#5D5FEF]" : "border-slate-300"
+                  selectedTemplate === t.id ? "border-brand-600 bg-brand-600" : "border-slate-300"
                 }`} />
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
@@ -201,7 +201,7 @@ export function LabelsTab({ product }: { product: CatalogProduct }) {
                 max="500"
                 value={qty}
                 onChange={(e) => setQty(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-20 rounded-lg border border-slate-300 py-2 text-center text-sm font-semibold focus:border-[#5D5FEF] focus:outline-none"
+                className="w-20 rounded-lg border border-slate-300 py-2 text-center text-sm font-semibold focus:border-brand-600 focus:outline-none"
               />
               <button type="button" onClick={() => setQty((q) => Math.min(500, q + 1))}
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
@@ -212,7 +212,7 @@ export function LabelsTab({ product }: { product: CatalogProduct }) {
               {[1, 5, 10, 25, 50, 100].map((n) => (
                 <button key={n} type="button" onClick={() => setQty(n)}
                   className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-                    qty === n ? "border-[#5D5FEF] bg-[#5D5FEF] text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"
+                    qty === n ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 text-slate-600 hover:border-slate-300"
                   }`}>
                   {n}
                 </button>
@@ -234,10 +234,10 @@ export function LabelsTab({ product }: { product: CatalogProduct }) {
             <button
               type="button"
               onClick={handleAddToQueue}
-              className={`rounded-lg border border-[#5D5FEF] px-5 py-2.5 text-sm font-semibold transition-all ${
+              className={`rounded-lg border border-brand-600 px-5 py-2.5 text-sm font-semibold transition-all ${
                 queued
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                  : "text-[#5D5FEF] hover:bg-[#5D5FEF]/5"
+                  : "text-brand-600 hover:bg-brand-600/5"
               }`}
             >
               {queued ? "✓ Added to print queue" : "Add to Print Queue"}
@@ -245,7 +245,7 @@ export function LabelsTab({ product }: { product: CatalogProduct }) {
             <button
               type="button"
               onClick={handlePrint}
-              className="rounded-lg bg-[#5D5FEF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-600"
+              className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-600"
             >
               Print {qty === 1 ? "Label" : `${qty} Labels`} Now
             </button>

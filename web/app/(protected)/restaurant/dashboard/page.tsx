@@ -77,7 +77,7 @@ function RangeButton({ label, active, onClick }: { label: string; active: boolea
       onClick={onClick}
       className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
         active
-          ? "bg-[#5D5FEF] text-white"
+          ? "bg-brand-600 text-white"
           : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
       }`}
     >
@@ -90,7 +90,7 @@ function QuickLink({ href, label, sub }: { href: string; label: string; sub: str
   return (
     <Link
       href={href}
-      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-[#5D5FEF]/40 hover:bg-[#5D5FEF]/5"
+      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-brand-600/40 hover:bg-brand-600/5"
     >
       <div>
         <p className="text-sm font-semibold text-[#111]">{label}</p>
@@ -200,7 +200,7 @@ export default function RestaurantDashboardPage() {
             </div>
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-[#5D5FEF] transition-all duration-500"
+                className="h-full rounded-full bg-brand-600 transition-all duration-500"
                 style={{
                   width: `${kpis.total_tables > 0 ? (kpis.open_tables / kpis.total_tables) * 100 : 0}%`,
                 }}
@@ -265,7 +265,7 @@ export default function RestaurantDashboardPage() {
                         <p className="truncate text-sm text-[#111]">{item.name}</p>
                         <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
                           <div
-                            className="h-full rounded-full bg-[#5D5FEF]/70"
+                            className="h-full rounded-full bg-brand-600/70"
                             style={{ width: `${(item.qty_sold / maxQty) * 100}%` }}
                           />
                         </div>
@@ -288,12 +288,12 @@ export default function RestaurantDashboardPage() {
             <h2 className="text-sm font-semibold text-[#111]">
               Active Sessions
               {!loading && sessions.length > 0 && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-[#5D5FEF]/10 px-1.5 py-0.5 text-[11px] font-semibold text-[#5D5FEF]">
+                <span className="ml-2 inline-flex items-center rounded-full bg-brand-600/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand-600">
                   {sessions.length}
                 </span>
               )}
             </h2>
-            <Link href="/restaurant/floor-plan" className="text-xs text-[#5D5FEF] hover:underline">
+            <Link href="/restaurant/floor-plan" className="text-xs text-brand-600 hover:underline">
               View floor plan →
             </Link>
           </div>

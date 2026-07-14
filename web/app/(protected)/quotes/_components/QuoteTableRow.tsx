@@ -49,7 +49,7 @@ export function QuoteTableRow({
 
         {/* Quote # / date */}
         <td className="px-4 py-3">
-          <p className="font-semibold text-[#5D5FEF] font-mono text-xs">{quote.quote_number}</p>
+          <p className="font-semibold text-brand-600 font-mono text-xs">{quote.quote_number}</p>
           <p className="text-xs text-[#888]">{fmtDateTime(quote.created_at)}</p>
         </td>
 
@@ -99,7 +99,7 @@ export function QuoteTableRow({
         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
           {canManage && quote.status === "draft" && (
             <button type="button" onClick={() => onSend(quote.id)} disabled={actioning === quote.id}
-              aria-label="Send quote" className="text-[#aaa] hover:text-[#5D5FEF] transition-colors disabled:opacity-40">
+              aria-label="Send quote" className="text-[#aaa] hover:text-brand-600 transition-colors disabled:opacity-40">
               <SendIcon />
             </button>
           )}

@@ -41,7 +41,7 @@ const STATUS_COLOR: Record<string, string> = {
   archived: "bg-slate-100 text-slate-500",
 };
 
-const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none";
+const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none";
 
 function priceToCents(value: string): number | null {
   const normalized = value.replace(/[$,\s]/g, "");
@@ -172,7 +172,7 @@ function LinkProductModal({
             </svg>
             <input
               autoFocus
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:border-[#5D5FEF] focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none"
               placeholder="Search products by name or SKU…"
               value={q}
               onChange={(e) => handleKey(e.target.value)}
@@ -189,7 +189,7 @@ function LinkProductModal({
                   <label key={p.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF]"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600"
                       checked={selected.has(p.id)}
                       onChange={() => toggle(p.id)}
                     />
@@ -225,7 +225,7 @@ function LinkProductModal({
             type="button"
             onClick={() => void handleLink()}
             disabled={linking || selected.size === 0}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
           >
             {linking ? "Linking…" : `Link ${selected.size > 0 ? `${selected.size} ` : ""}Product${selected.size !== 1 ? "s" : ""}`}
           </button>
@@ -340,7 +340,7 @@ function CreateVariantWizard({
                 key={item.key}
                 type="button"
                 onClick={() => setStep(index)}
-                className={`h-2 rounded-full transition-colors ${index <= step ? "bg-[#5D5FEF]" : "bg-slate-200"}`}
+                className={`h-2 rounded-full transition-colors ${index <= step ? "bg-brand-600" : "bg-slate-200"}`}
                 aria-label={`Go to ${item.title}`}
               />
             ))}
@@ -352,7 +352,7 @@ function CreateVariantWizard({
             </p>
             <label className="mt-2 block text-sm font-semibold text-[#111]">{current.title}</label>
             <input
-              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
               value={values[current.field]}
               onChange={(e) => setField(current.field, e.target.value)}
               placeholder={current.placeholder}
@@ -382,7 +382,7 @@ function CreateVariantWizard({
               type="button"
               onClick={() => setStep((prev) => Math.min(steps.length - 1, prev + 1))}
               disabled={!canContinue}
-              className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
+              className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
             >
               Next
             </button>
@@ -391,7 +391,7 @@ function CreateVariantWizard({
               type="button"
               onClick={() => void handleCreate()}
               disabled={saving || !canCreate}
-              className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
+              className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
             >
               {saving ? "Creating…" : "Create Variant"}
             </button>
@@ -475,14 +475,14 @@ export function VariantsTab({
   if (isChild) {
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-4 rounded-xl border border-[#5D5FEF]/20 bg-[#5D5FEF]/5 px-5 py-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5D5FEF]/10">
-            <svg className="h-5 w-5 text-[#5D5FEF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex items-start gap-4 rounded-xl border border-brand-600/20 bg-brand-600/5 px-5 py-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600/10">
+            <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#5D5FEF]">This product is a variant</p>
+            <p className="text-sm font-semibold text-brand-600">This product is a variant</p>
             <p className="mt-0.5 text-sm text-slate-600">
               {product.variant_label
                 ? <>Label: <span className="font-semibold text-[#111]">{product.variant_label}</span> · </>
@@ -492,7 +492,7 @@ export function VariantsTab({
             <button
               type="button"
               onClick={() => router.push(`/catalog/${product.parent_product_id}`)}
-              className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-[#5D5FEF] hover:underline"
+              className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
             >
               View master product →
             </button>
@@ -520,7 +520,7 @@ export function VariantsTab({
               Define attributes and auto-generate all variant combinations.
             </p>
           </div>
-          <span className="rounded-full border border-[#5D5FEF]/20 bg-[#5D5FEF]/5 px-2.5 py-0.5 text-xs font-semibold text-[#5D5FEF]">
+          <span className="rounded-full border border-brand-600/20 bg-brand-600/5 px-2.5 py-0.5 text-xs font-semibold text-brand-600">
             {combos.length} combination{combos.length !== 1 ? "s" : ""}
           </span>
         </div>
@@ -540,7 +540,7 @@ export function VariantsTab({
           <button
             type="button"
             onClick={addAttr}
-            className="flex items-center gap-1.5 text-sm font-medium text-[#5D5FEF] hover:underline"
+            className="flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -576,7 +576,7 @@ export function VariantsTab({
             type="button"
             onClick={() => void handleGenerate()}
             disabled={generating || validAttrs.length === 0}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
           >
             {generating ? "Generating…" : "Generate Variants"}
           </button>
@@ -598,7 +598,7 @@ export function VariantsTab({
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-[#5D5FEF] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4849d0] transition-colors"
+              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4849d0] transition-colors"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -652,7 +652,7 @@ export function VariantsTab({
                   >
                     <td className="px-4 py-3">
                       {child.variant_label ? (
-                        <span className="rounded-full bg-[#5D5FEF]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5D5FEF]">
+                        <span className="rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-semibold text-brand-600">
                           {child.variant_label}
                         </span>
                       ) : (
@@ -674,7 +674,7 @@ export function VariantsTab({
                         <button
                           type="button"
                           onClick={() => router.push(`/catalog/${child.id}`)}
-                          className="text-xs font-medium text-[#5D5FEF] hover:underline"
+                          className="text-xs font-medium text-brand-600 hover:underline"
                         >
                           Edit
                         </button>

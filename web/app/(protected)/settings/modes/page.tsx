@@ -114,9 +114,9 @@ function Toggle({
       aria-label={label}
       disabled={disabled}
       onClick={() => !disabled && onChange(!enabled)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF] focus-visible:ring-offset-2 ${
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-      } ${enabled ? "bg-[#5D5FEF]" : "bg-slate-200"}`}
+      } ${enabled ? "bg-brand-600" : "bg-slate-200"}`}
     >
       <span
         className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
@@ -131,7 +131,7 @@ function Toggle({
 
 const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
   core:                { text: "Core — always active", cls: "text-emerald-600" },
-  business_pack:       { text: "From business pack",   cls: "text-[#5D5FEF]" },
+  business_pack:       { text: "From business pack",   cls: "text-brand-600" },
   manual_override:     { text: "Manual override",      cls: "text-amber-600" },
   not_in_business_pack:{ text: "Not in current pack",  cls: "text-slate-400" },
 };
@@ -254,7 +254,7 @@ export default function BusinessProfilePage() {
                 <p className="mt-1 text-sm font-medium text-[#111]">
                   {capabilities.modules.filter((m) => m.enabled).length} of {capabilities.modules.length}
                 </p>
-                <Link href="/settings/permissions" className="mt-1 inline-block text-xs font-medium text-[#5D5FEF] hover:underline">
+                <Link href="/settings/permissions" className="mt-1 inline-block text-xs font-medium text-brand-600 hover:underline">
                   Role permissions →
                 </Link>
               </div>
@@ -280,9 +280,9 @@ export default function BusinessProfilePage() {
                     type="button"
                     onClick={() => void previewSwitch(bt.key)}
                     aria-pressed={current}
-                    className={`rounded-lg border p-3 text-left text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF] ${
+                    className={`rounded-lg border p-3 text-left text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
                       current
-                        ? "border-[#5D5FEF] bg-[#5D5FEF]/5"
+                        ? "border-brand-600 bg-brand-600/5"
                         : switchTarget === bt.key
                           ? "border-amber-400 bg-amber-50"
                           : "border-slate-200 bg-white hover:border-slate-300"
@@ -290,7 +290,7 @@ export default function BusinessProfilePage() {
                   >
                     <span className="font-medium text-[#111]">{bt.name}</span>
                     {current && (
-                      <span className="ml-2 rounded-full bg-[#5D5FEF]/10 px-2 py-0.5 text-[10px] font-semibold text-[#5D5FEF]">
+                      <span className="ml-2 rounded-full bg-brand-600/10 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                         Current
                       </span>
                     )}
@@ -329,7 +329,7 @@ export default function BusinessProfilePage() {
                         type="button"
                         onClick={() => void applySwitch()}
                         disabled={applying}
-                        className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-xs font-semibold text-white hover:bg-[#4849d0] disabled:opacity-60"
+                        className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-[#4849d0] disabled:opacity-60"
                       >
                         {applying ? "Applying…" : `Switch to ${impact.to.label}`}
                       </button>

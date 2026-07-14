@@ -97,7 +97,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     <button
       type="button"
       onClick={() => onChange(!on)}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/30 ${on ? "bg-[#5D5FEF]" : "bg-slate-200"}`}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600/30 ${on ? "bg-brand-600" : "bg-slate-200"}`}
     >
       <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-0"}`} />
     </button>
@@ -168,13 +168,13 @@ function InboxTab() {
         <div className="flex overflow-hidden rounded-lg border border-slate-200 text-sm">
           {(["all", "unread"] as const).map(f => (
             <button key={f} type="button" onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 capitalize transition-colors ${filter === f ? "bg-[#5D5FEF] text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+              className={`px-3 py-1.5 capitalize transition-colors ${filter === f ? "bg-brand-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
               {f}
             </button>
           ))}
         </div>
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-[#5D5FEF] focus:outline-none">
+          className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-600 focus:outline-none">
           <option value="all">All types</option>
           {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
@@ -199,8 +199,8 @@ function InboxTab() {
         <div className="space-y-2">
           {filtered.map(n => (
             <div key={n.id}
-              className={`relative rounded-xl border px-5 py-4 transition-colors ${n.read ? "border-slate-200 bg-white" : "border-[#5D5FEF]/30 bg-indigo-50"}`}>
-              {!n.read && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-[#5D5FEF]" />}
+              className={`relative rounded-xl border px-5 py-4 transition-colors ${n.read ? "border-slate-200 bg-white" : "border-brand-600/30 bg-indigo-50"}`}>
+              {!n.read && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-brand-600" />}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 pl-2">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -213,7 +213,7 @@ function InboxTab() {
                 </div>
                 {!n.read && (
                   <button type="button" onClick={() => void markRead(n.id)}
-                    className="shrink-0 text-xs font-medium text-[#5D5FEF] hover:underline">
+                    className="shrink-0 text-xs font-medium text-brand-600 hover:underline">
                     Mark read
                   </button>
                 )}
@@ -306,7 +306,7 @@ function PreferencesTab() {
                   <td className="px-5 py-3.5">
                     <select value={p.min_severity}
                       onChange={e => setSeverity(p.type, e.target.value as PrefRow["min_severity"])}
-                      className="h-8 rounded-lg border border-slate-200 px-2 text-xs focus:border-[#5D5FEF] focus:outline-none">
+                      className="h-8 rounded-lg border border-slate-200 px-2 text-xs focus:border-brand-600 focus:outline-none">
                       <option value="info">Info+</option>
                       <option value="warning">Warning+</option>
                       <option value="critical">Critical only</option>
@@ -324,7 +324,7 @@ function PreferencesTab() {
           {saved && <p className="text-xs text-emerald-600 font-medium">Preferences saved.</p>}
           {!saved && <span />}
           <button type="button" disabled={saving || loading} onClick={() => void handleSave()}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50">
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50">
             {saving ? "Saving…" : "Save preferences"}
           </button>
         </div>
@@ -386,7 +386,7 @@ function AlertRulesTab() {
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
           <h3 className="text-sm font-semibold text-slate-900">{rules.length} alert rules</h3>
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Rule
           </button>
         </div>
@@ -500,7 +500,7 @@ function DigestTab() {
 
   const ALL_TYPES = Object.entries(TYPE_LABELS);
 
-  const inp = "h-9 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20";
+  const inp = "h-9 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20";
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -569,7 +569,7 @@ function DigestTab() {
                           : config.include.filter(t => t !== type);
                         update("include", next);
                       }}
-                      className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]" />
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600" />
                     <span className="text-sm text-slate-700">{label}</span>
                   </label>
                 );
@@ -603,7 +603,7 @@ function DigestTab() {
             {saved && <p className="text-sm font-medium text-emerald-600">Digest settings saved.</p>}
             {!saved && <span />}
             <button type="button" disabled={saving} onClick={() => void handleSave()}
-              className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50">
+              className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-50">
               {saving ? "Saving…" : "Save digest settings"}
             </button>
           </div>
@@ -632,7 +632,7 @@ export default function NotificationsPage() {
               <button key={t.key} onClick={() => setActiveTab(t.key)}
                 className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === t.key
-                    ? "border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-brand-600 text-brand-600"
                     : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
                 }`}>
                 {t.label}

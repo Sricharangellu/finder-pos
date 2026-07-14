@@ -185,37 +185,37 @@ function NewMovementModal({ tab, onClose, onCreated }: { tab: TabKey; onClose: (
             <div>
               <label className="block text-xs font-medium text-[#555] mb-1">{cfg.fromLabel}</label>
               <input type="text" value={from} onChange={e => setFrom(e.target.value)} placeholder="Name…"
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
             <div>
               <label className="block text-xs font-medium text-[#555] mb-1">{cfg.toLabel}</label>
               <input type="text" value={to} onChange={e => setTo(e.target.value)} placeholder="Name…"
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-[#555] mb-1">Total qty</label>
               <input type="number" value={qty} min="1" onChange={e => setQty(e.target.value)}
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
             <div>
               <label className="block text-xs font-medium text-[#555] mb-1">Total cost ($)</label>
               <input type="number" value={cost} min="0" step="0.01" onChange={e => setCost(e.target.value)}
-                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+                className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-[#555] mb-1">Notes</label>
             <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional…"
-              className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+              className="w-full h-8 rounded border border-[#D9D9D9] px-2 text-sm focus:border-brand-600 focus:outline-none" />
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-[#F0F0F0] px-5 py-4">
           <button type="button" onClick={onClose}
             className="rounded border border-[#D9D9D9] px-3 py-1.5 text-sm text-[#555] hover:bg-[#F5F5F5]">Cancel</button>
           <button type="button" onClick={() => void handleSubmit()} disabled={submitting}
-            className="rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] disabled:opacity-50">
+            className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] disabled:opacity-50">
             {submitting ? "Creating…" : "Create"}
           </button>
         </div>
@@ -294,7 +294,7 @@ export default function InventoryPage() {
               onClick={() => { setActiveTab(t.key); clearFilters(); }}
               className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === t.key
-                  ? "border-[#5D5FEF] text-[#5D5FEF]"
+                  ? "border-brand-600 text-brand-600"
                   : "border-transparent text-[#666] hover:text-[#333]"
               }`}
             >
@@ -303,7 +303,7 @@ export default function InventoryPage() {
           ))}
         </div>
         <button type="button" onClick={() => setShowModal(true)}
-          className="mb-2 rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+          className="mb-2 rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
           + New {tabLabel.slice(0, -1)}
         </button>
       </div>
@@ -315,7 +315,7 @@ export default function InventoryPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#555]">Show</label>
             <select value={filterShow} onChange={e => setFilterShow(e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
               <option value="all">All statuses</option>
               <option value="pending">Pending</option>
               {activeTab === "orders"    && <option value="ordered">Ordered</option>}
@@ -333,13 +333,13 @@ export default function InventoryPage() {
             <label className="text-xs font-medium text-[#555]">Search</label>
             <input type="text" value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
               placeholder={`${TAB_PREFIX[activeTab]}-00001 or location…`}
-              className="h-8 w-44 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+              className="h-8 w-44 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
           </div>
           {/* Outlet */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#555]">Outlet</label>
             <select value={filterOutlet} onChange={e => setFilterOutlet(e.target.value)}
-              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+              className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none">
               <option value="all">All outlets</option>
               <option value="Main Store">Main Store</option>
               <option value="Warehouse">Warehouse</option>
@@ -351,17 +351,17 @@ export default function InventoryPage() {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">From date</label>
               <input type="date"
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-brand-600 focus:outline-none" />
             </div>
           )}
           {/* Actions */}
           <div className="flex items-center gap-2 ml-auto">
-            <button type="button" onClick={clearFilters} className="text-sm text-[#5D5FEF] hover:underline">Clear filters</button>
-            <button type="button" onClick={() => setMoreFilters(m => !m)} className="text-sm text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={clearFilters} className="text-sm text-brand-600 hover:underline">Clear filters</button>
+            <button type="button" onClick={() => setMoreFilters(m => !m)} className="text-sm text-brand-600 hover:underline">
               {moreFilters ? "Fewer filters" : "More filters"}
             </button>
             <button type="button" onClick={load}
-              className="h-8 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+              className="h-8 rounded bg-brand-600 px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
               Search
             </button>
           </div>
@@ -396,14 +396,14 @@ export default function InventoryPage() {
           <tbody>
             {loading && (
               <tr><td colSpan={7} className="px-4 py-12 text-center text-[#888]">
-                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#5D5FEF] border-t-transparent" />
+                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
               </td></tr>
             )}
             {!loading && visible.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-12 text-center text-[#888]">
                 No {tabLabel} found.
                 {(filterShow !== "all" || filterSearch || filterOutlet !== "all") && (
-                  <button type="button" onClick={clearFilters} className="ml-2 text-[#5D5FEF] hover:underline">Clear filters</button>
+                  <button type="button" onClick={clearFilters} className="ml-2 text-brand-600 hover:underline">Clear filters</button>
                 )}
               </td></tr>
             )}
@@ -411,7 +411,7 @@ export default function InventoryPage() {
               <tr key={row.id} className="border-b border-[#F5F5F5] hover:bg-[#FAFAFA]">
                 {/* # / Due date */}
                 <td className="px-4 py-3">
-                  <p className="font-semibold text-[#5D5FEF] font-mono text-xs">{row.number}</p>
+                  <p className="font-semibold text-brand-600 font-mono text-xs">{row.number}</p>
                   {row.due_date
                     ? <p className="text-xs text-[#888]">Due {fmtDateShort(row.due_date)}</p>
                     : <p className="text-xs text-[#ccc]">No due date</p>

@@ -336,7 +336,7 @@ export default function OrdersPage() {
                     className="group cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => router.push(`/orders/${order.id}`)}
                   >
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-[#5D5FEF]">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">
                       {order.orderNumber}
                     </td>
                     <td className="px-4 py-3">
@@ -355,7 +355,7 @@ export default function OrdersPage() {
                       {fmtDateTime(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-xs font-medium text-slate-400 group-hover:text-[#5D5FEF] transition-colors">
+                      <span className="text-xs font-medium text-slate-400 group-hover:text-brand-600 transition-colors">
                         View →
                       </span>
                     </td>

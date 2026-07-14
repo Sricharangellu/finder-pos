@@ -112,7 +112,7 @@ export function PurchasesTab({ productId }: { productId: string }) {
                   className="cursor-pointer hover:bg-slate-50 transition-colors"
                   onClick={() => router.push(`/purchasing/${line.po_id}`)}
                 >
-                  <td className="px-4 py-3 font-medium text-[#5D5FEF] hover:underline">{line.po_number}</td>
+                  <td className="px-4 py-3 font-medium text-brand-600 hover:underline">{line.po_number}</td>
                   <td className="px-4 py-3 text-slate-700">{line.vendor_name}</td>
                   <td className="px-4 py-3 text-slate-500">{fmtDate(line.ordered_at)}</td>
                   <td className="px-4 py-3 text-slate-500">{line.received_at ? fmtDate(line.received_at) : "—"}</td>

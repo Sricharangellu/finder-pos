@@ -27,7 +27,7 @@ interface VariantOnlineStatus {
   online: boolean;
 }
 
-const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none";
+const FLD = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none";
 const AREA = `${FLD} min-h-[80px] resize-y`;
 
 function slugify(name: string) {
@@ -44,7 +44,7 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
       aria-checked={on}
       disabled={disabled}
       onClick={() => onChange(!on)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#5D5FEF] focus:ring-offset-1 disabled:opacity-40 ${on ? "bg-[#5D5FEF]" : "bg-slate-200"}`}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-1 disabled:opacity-40 ${on ? "bg-brand-600" : "bg-slate-200"}`}
     >
       <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`} />
     </button>
@@ -292,7 +292,7 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
           <Section title="SEO & URL" hint="Control how search engines and the URL display this product.">
             <div>
               <FieldLabel>URL Slug</FieldLabel>
-              <div className="flex items-center overflow-hidden rounded-lg border border-slate-200 focus-within:border-[#5D5FEF]">
+              <div className="flex items-center overflow-hidden rounded-lg border border-slate-200 focus-within:border-brand-600">
                 <span className="shrink-0 bg-slate-50 px-3 py-2 text-xs text-slate-400 border-r border-slate-200">/store/</span>
                 <input
                   className="flex-1 px-3 py-2 text-sm outline-none"
@@ -316,7 +316,7 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
             <div>
               <FieldLabel>Meta Description</FieldLabel>
               <textarea
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none min-h-[60px] resize-y"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none min-h-[60px] resize-y"
                 value={settings.seo_description ?? ""}
                 onChange={(e) => set("seo_description", e.target.value || null)}
                 placeholder="Brief description for search engines…"
@@ -350,7 +350,7 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
                         <p className="text-xs text-slate-400">{v.sku} · {formatMoney(v.price_cents)}</p>
                       </div>
                       {v.variant_label && (
-                        <span className="rounded-full bg-[#5D5FEF]/10 px-2 py-0.5 text-xs font-semibold text-[#5D5FEF] shrink-0">
+                        <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-600 shrink-0">
                           {v.variant_label}
                         </span>
                       )}
@@ -372,7 +372,7 @@ export function EcommerceTab({ product }: { product: CatalogProduct }) {
           type="button"
           onClick={() => void handleSave()}
           disabled={saving}
-          className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
+          className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save online settings"}
         </button>

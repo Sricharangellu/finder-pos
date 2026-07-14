@@ -80,7 +80,7 @@ export function CreditsTab({ productId }: { productId: string }) {
               <tbody className="divide-y divide-slate-50">
                 {items.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-[#5D5FEF]">{c.credit_number}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">{c.credit_number}</td>
                     <td className="px-4 py-3 text-slate-600">{fmtDate(c.date)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-emerald-600">{formatMoney(c.amount_cents)}</td>
                     <td className="px-4 py-3 text-slate-600 max-w-[160px] truncate">{c.reason}</td>

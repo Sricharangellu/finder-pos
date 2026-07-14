@@ -144,7 +144,7 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
       <div className="mt-3 flex gap-1.5">
         {(["add", "deduct"] as const).map((m) => (
           <button key={m} type="button" onClick={() => setMode(m)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-colors ${mode === m ? "bg-[#5D5FEF] text-white" : "border border-slate-200 text-slate-600 hover:bg-gray-50"}`}>
+            className={`flex-1 rounded-md py-1.5 text-xs font-semibold capitalize transition-colors ${mode === m ? "bg-brand-600 text-white" : "border border-slate-200 text-slate-600 hover:bg-gray-50"}`}>
             {m === "add" ? "Add credit" : "Deduct"}
           </button>
         ))}
@@ -152,13 +152,13 @@ function StoreCreditPanel({ customerId }: { customerId: string }) {
       <div className="mt-2 space-y-2">
         <input type="number" min="0.01" step="0.01" placeholder="Amount ($)"
           value={amount} onChange={(e) => { setAmount(e.target.value); setError(null); }}
-          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-[#5D5FEF]" />
+          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
         <input type="text" placeholder="Reason (required)"
           value={reason} onChange={(e) => { setReason(e.target.value); setError(null); }}
-          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-[#5D5FEF]" />
+          className="w-full rounded border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand-600" />
         {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
         <button type="button" disabled={adjusting || !amount || !reason} onClick={() => void handleAdjust()}
-          className="w-full rounded-md bg-[#5D5FEF] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40">
+          className="w-full rounded-md bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40">
           {adjusting ? "Applying…" : mode === "add" ? "Add Credit" : "Deduct Credit"}
         </button>
       </div>
@@ -202,13 +202,13 @@ export function CustomerDetailPanel({ customer }: { customer: CustomerView }) {
         <div className="flex">
           {(["details", "loyalty", "account", "notes"] as DetailTab[]).map((t) => (
             <button key={t} type="button" onClick={(e) => { e.stopPropagation(); setTab(t); }}
-              className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${tab === t ? "border-b-2 border-[#5D5FEF] text-white" : "text-white/50 hover:text-white/75"}`}>
+              className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${tab === t ? "border-b-2 border-brand-600 text-white" : "text-white/50 hover:text-white/75"}`}>
               {t}
             </button>
           ))}
         </div>
         <button type="button" onClick={(e) => e.stopPropagation()}
-          className="my-2 rounded-md bg-[#5D5FEF] px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]">
+          className="my-2 rounded-md bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]">
           Edit customer
         </button>
       </div>

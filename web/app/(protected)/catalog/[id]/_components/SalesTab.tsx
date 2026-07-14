@@ -75,7 +75,7 @@ export function SalesTab({ productId }: { productId: string }) {
               onClick={() => setPeriod(key)}
               className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                 period === key
-                  ? "bg-[#5D5FEF] text-white"
+                  ? "bg-brand-600 text-white"
                   : "text-slate-500 hover:text-[#111]"
               }`}
             >
@@ -137,7 +137,7 @@ export function SalesTab({ productId }: { productId: string }) {
               <tbody className="divide-y divide-slate-50">
                 {items.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-[#5D5FEF]">{s.sale_number}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-600">{s.sale_number}</td>
                     <td className="px-4 py-3 text-slate-600">{fmtDate(s.date)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-900">{s.quantity}</td>
                     <td className="px-4 py-3 text-right text-slate-600">{formatMoney(s.unit_price_cents)}</td>

@@ -168,7 +168,7 @@ export function OverviewTab({
           {!loading && (
             <p className="mt-1 text-[11px] text-slate-400">{sales.length} recent transactions</p>
           )}
-          <p className="mt-2 text-[11px] font-medium text-[#5D5FEF] group-hover:underline">View transactions →</p>
+          <p className="mt-2 text-[11px] font-medium text-brand-600 group-hover:underline">View transactions →</p>
         </button>
 
         {/* Expiry alerts */}
@@ -192,7 +192,7 @@ export function OverviewTab({
               {expiredCount === 0 && criticalCount === 0 && <span>No alerts</span>}
             </div>
           )}
-          <p className="mt-2 text-[11px] font-medium text-[#5D5FEF] group-hover:underline">View expiry →</p>
+          <p className="mt-2 text-[11px] font-medium text-brand-600 group-hover:underline">View expiry →</p>
         </button>
 
         {/* Open POs */}
@@ -210,7 +210,7 @@ export function OverviewTab({
               {recentPos.filter((p) => p.status === "ordered" || p.status === "partial").length} in progress
             </p>
           )}
-          <p className="mt-2 text-[11px] font-medium text-[#5D5FEF] group-hover:underline">View purchasing →</p>
+          <p className="mt-2 text-[11px] font-medium text-brand-600 group-hover:underline">View purchasing →</p>
         </button>
       </div>
 
@@ -243,7 +243,7 @@ export function OverviewTab({
             <button
               type="button"
               onClick={() => onNavigate("general")}
-              className="text-xs font-medium text-[#5D5FEF] hover:underline"
+              className="text-xs font-medium text-brand-600 hover:underline"
             >
               Edit details →
             </button>
@@ -254,7 +254,7 @@ export function OverviewTab({
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
             <h3 className="text-sm font-semibold text-slate-900">Stock by location</h3>
-            <button type="button" onClick={() => onNavigate("inventory")} className="text-xs text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={() => onNavigate("inventory")} className="text-xs text-brand-600 hover:underline">
               All →
             </button>
           </div>
@@ -286,7 +286,7 @@ export function OverviewTab({
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
             <h3 className="text-sm font-semibold text-slate-900">Recent sales</h3>
-            <button type="button" onClick={() => onNavigate("transactions")} className="text-xs text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={() => onNavigate("transactions")} className="text-xs text-brand-600 hover:underline">
               All →
             </button>
           </div>
@@ -299,7 +299,7 @@ export function OverviewTab({
               {sales.slice(0, 5).map((s) => (
                 <div key={s.id} className="flex items-center justify-between py-2.5">
                   <div>
-                    <p className="text-xs font-medium text-[#5D5FEF]">{s.sale_number}</p>
+                    <p className="text-xs font-medium text-brand-600">{s.sale_number}</p>
                     <p className="text-[11px] text-slate-400">{fmtDate(s.date)} · {s.customer_name ?? "Walk-in"}</p>
                   </div>
                   <div className="text-right">
@@ -344,7 +344,7 @@ export function OverviewTab({
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
             <h3 className="text-sm font-semibold text-slate-900">Recent purchase orders</h3>
-            <button type="button" onClick={() => onNavigate("purchasing")} className="text-xs text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={() => onNavigate("purchasing")} className="text-xs text-brand-600 hover:underline">
               All POs →
             </button>
           </div>
@@ -362,7 +362,7 @@ export function OverviewTab({
               <tbody className="divide-y divide-slate-50">
                 {recentPos.map((po) => (
                   <tr key={po.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/purchasing/${po.id}`)}>
-                    <td className="px-4 py-2.5 font-medium text-[#5D5FEF]">{po.po_number}</td>
+                    <td className="px-4 py-2.5 font-medium text-brand-600">{po.po_number}</td>
                     <td className="px-4 py-2.5 text-slate-600">{po.vendor_name}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">{po.qty_ordered}</td>
                     <td className="px-4 py-2.5 text-slate-500">{fmtDate(po.ordered_at)}</td>

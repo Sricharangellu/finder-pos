@@ -208,7 +208,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
             placeholder="Customer or order…"
-            className="h-8 rounded-md border border-slate-200 bg-white pl-8 pr-3 text-sm focus:border-[#5D5FEF] focus:outline-none"
+            className="h-8 rounded-md border border-slate-200 bg-white pl-8 pr-3 text-sm focus:border-brand-600 focus:outline-none"
           />
         </div>
 
@@ -217,7 +217,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
           {(["all","retail","wholesale"] as CustomerType[]).map((t) => (
             <button key={t} type="button" onClick={() => setCustomerType(t)}
               className={`rounded px-2.5 py-1 text-xs font-medium transition-colors capitalize ${
-                customerType === t ? "bg-[#5D5FEF] text-white" : "text-slate-600 hover:bg-slate-50"
+                customerType === t ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50"
               }`}
             >
               {t === "all" ? "All" : t}
@@ -230,7 +230,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
           type="button"
           onClick={() => setShowFilters((v) => !v)}
           className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-            activeFilters > 0 ? "border-[#5D5FEF] bg-[#5D5FEF]/5 text-[#5D5FEF]" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+            activeFilters > 0 ? "border-brand-600 bg-brand-600/5 text-brand-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"
           }`}
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -266,7 +266,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
               <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:border-[#5D5FEF] focus:outline-none"
+                className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:border-brand-600 focus:outline-none"
               >
                 {options.map((o) => <option key={o}>{o}</option>)}
               </select>
@@ -316,7 +316,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
         <div className="rounded-lg border border-dashed border-slate-200 py-12 text-center">
           <p className="text-sm text-slate-400">No sales match the selected filters.</p>
           <button type="button" onClick={() => { setDatePreset("all"); setCustomerSearch(""); setCustomerType("all"); setOutlet("All outlets"); }}
-            className="mt-2 text-xs text-[#5D5FEF] hover:underline">
+            className="mt-2 text-xs text-brand-600 hover:underline">
             Clear filters
           </button>
         </div>
@@ -358,7 +358,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
                         <button
                           type="button"
                           onClick={() => router.push(`/customers/${row.customer_id}`)}
-                          className="text-sm font-medium text-[#5D5FEF] hover:underline"
+                          className="text-sm font-medium text-brand-600 hover:underline"
                         >
                           {row.customer_name}
                         </button>
@@ -375,7 +375,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
                       <button
                         type="button"
                         onClick={() => router.push(`/orders/${row.order_id}`)}
-                        className="text-xs font-medium text-[#5D5FEF] hover:underline"
+                        className="text-xs font-medium text-brand-600 hover:underline"
                       >
                         {row.order_number}
                       </button>
@@ -411,7 +411,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
                           type="button"
                           onClick={() => router.push(`/customers/${row.customer_id}`)}
                           title="View customer"
-                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-[#5D5FEF]"
+                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -421,7 +421,7 @@ export function SalesCustomerTab({ productId }: { productId: string }) {
                           type="button"
                           onClick={() => router.push(`/orders/${row.order_id}`)}
                           title="View order"
-                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-[#5D5FEF]"
+                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>

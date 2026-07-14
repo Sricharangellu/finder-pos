@@ -158,7 +158,7 @@ function ProfileTab({ vendor }: { vendor: Vendor }) {
           {infoRow("DBA", vendor.dba)}
           {infoRow("Contact", vendor.contact_name)}
           {infoRow("Sales rep", vendor.primary_sales_rep)}
-          {infoRow("Email", vendor.email ? <a href={`mailto:${vendor.email}`} className="text-[#5D5FEF] hover:underline">{vendor.email}</a> : null)}
+          {infoRow("Email", vendor.email ? <a href={`mailto:${vendor.email}`} className="text-brand-600 hover:underline">{vendor.email}</a> : null)}
           {infoRow("Phone", vendor.phone)}
           {infoRow("Address", [vendor.address1, vendor.city, vendor.state, vendor.zip].filter(Boolean).join(", ") || null)}
         </div>
@@ -240,7 +240,7 @@ function ProductsTab({ vendorId }: { vendorId: string }) {
                 <div className="flex items-center gap-2">
                   {p.is_preferred && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-blue-700">Preferred</span>}
                   <button type="button" onClick={() => router.push(`/catalog/${p.product_id}`)}
-                    className="text-sm font-medium text-[#5D5FEF] hover:underline text-left">
+                    className="text-sm font-medium text-brand-600 hover:underline text-left">
                     {p.product_name}
                   </button>
                 </div>
@@ -288,7 +288,7 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
     <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">
       No purchase orders for this vendor.
       <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}`)}
-        className="mt-2 block mx-auto text-sm text-[#5D5FEF] hover:underline">Create PO</button>
+        className="mt-2 block mx-auto text-sm text-brand-600 hover:underline">Create PO</button>
     </div>
   );
 
@@ -315,7 +315,7 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
                 <tr key={po.id} className="group cursor-pointer hover:bg-slate-50 transition-colors"
                   onClick={() => router.push(`/purchasing/${po.id}`)}>
                   <td className="px-5 py-3.5">
-                    <span className="text-sm font-semibold text-[#5D5FEF]">{po.po_number}</span>
+                    <span className="text-sm font-semibold text-brand-600">{po.po_number}</span>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${st.bg} ${st.text}`}>
@@ -344,7 +344,7 @@ function PurchaseOrdersTab({ vendorId }: { vendorId: string }) {
       </div>
       <div className="flex justify-end">
         <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendorId}`)}
-          className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
           + New Purchase Order
         </button>
       </div>
@@ -401,7 +401,7 @@ function InvoicesTab({ vendorId }: { vendorId: string }) {
                   <td className="px-5 py-3.5">
                     {inv.po_number ? (
                       <button type="button" onClick={() => router.push(`/purchasing/${inv.po_id}`)}
-                        className="text-xs text-[#5D5FEF] hover:underline">{inv.po_number}</button>
+                        className="text-xs text-brand-600 hover:underline">{inv.po_number}</button>
                     ) : <span className="text-xs text-slate-300">—</span>}
                   </td>
                   <td className="px-5 py-3.5">
@@ -491,7 +491,7 @@ function ReceivingTab({ vendorId }: { vendorId: string }) {
               <div>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => router.push(`/purchasing/${ev.po_id}`)}
-                    className="text-sm font-semibold text-[#5D5FEF] hover:underline">{ev.po_number}</button>
+                    className="text-sm font-semibold text-brand-600 hover:underline">{ev.po_number}</button>
                   {hasIssues && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Issues</span>}
                 </div>
                 <p className="mt-0.5 text-xs text-slate-400">Received by {ev.received_by} · {fmtDateTime(ev.received_at)}</p>
@@ -561,7 +561,7 @@ export default function VendorDetailPage() {
       <EnterpriseShell active="vendors" title="Vendor" subtitle="Not found" contentClassName="overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6">
           <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error ?? "Vendor not found."}</p>
-          <button type="button" onClick={() => router.push("/vendors")} className="mt-3 text-sm text-[#5D5FEF] hover:underline">
+          <button type="button" onClick={() => router.push("/vendors")} className="mt-3 text-sm text-brand-600 hover:underline">
             ← Back to Vendors
           </button>
         </div>
@@ -594,14 +594,14 @@ export default function VendorDetailPage() {
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
               {vendor.contact_name && <span>👤 {vendor.contact_name}</span>}
-              {vendor.email && <a href={`mailto:${vendor.email}`} className="text-[#5D5FEF] hover:underline">{vendor.email}</a>}
+              {vendor.email && <a href={`mailto:${vendor.email}`} className="text-brand-600 hover:underline">{vendor.email}</a>}
               {vendor.city && <span>📍 {vendor.city}, {vendor.state}</span>}
               {vendor.terms_days != null && <span>Net {vendor.terms_days}</span>}
             </div>
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => router.push(`/purchasing/new?supplier=${vendor.id}`)}
-              className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600">
               + New PO
             </button>
           </div>
@@ -629,7 +629,7 @@ export default function VendorDetailPage() {
               <button key={key} type="button" onClick={() => setActiveTab(key)}
                 className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === key
-                    ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-b-2 border-brand-600 text-brand-600"
                     : "border-b-2 border-transparent text-slate-500 hover:text-slate-800"
                 }`}>
                 {label}

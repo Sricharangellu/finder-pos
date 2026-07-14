@@ -254,7 +254,7 @@ function PromoFormModal({ initial, onSave, onClose }: {
     catch (ex) { setErr(ex instanceof ApiResponseError ? ex.message : "Save failed."); setSaving(false); }
   };
 
-  const inp = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20";
+  const inp = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -376,7 +376,7 @@ function PromoFormModal({ initial, onSave, onClose }: {
         <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
           <button type="button" onClick={onClose} className="min-h-[40px] rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
           <button type="submit" form="promo-form" disabled={saving}
-            className="min-h-[40px] rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-medium text-white hover:bg-[#4B4DC8] disabled:opacity-60">
+            className="min-h-[40px] rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-[#4B4DC8] disabled:opacity-60">
             {saving ? "Saving…" : initial ? "Save changes" : "Create campaign"}
           </button>
         </div>
@@ -438,9 +438,9 @@ function CampaignsTab() {
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
           <input type="search" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search campaigns…"
-            className="h-9 w-56 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20" />
+            className="h-9 w-56 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
           <select value={status} onChange={e => setStatus(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-[#5D5FEF] focus:outline-none">
+            className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:border-brand-600 focus:outline-none">
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="scheduled">Scheduled</option>
@@ -449,7 +449,7 @@ function CampaignsTab() {
           </select>
           <Can permission="promotions.manage">
             <button type="button" onClick={() => setShowCreate(true)}
-              className="ml-auto rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+              className="ml-auto rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
               + New Campaign
             </button>
           </Can>
@@ -460,7 +460,7 @@ function CampaignsTab() {
         ) : promos.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm text-slate-500">No campaigns found.</p>
-            <button type="button" onClick={() => setShowCreate(true)} className="mt-1 text-sm font-medium text-[#5D5FEF] hover:underline">
+            <button type="button" onClick={() => setShowCreate(true)} className="mt-1 text-sm font-medium text-brand-600 hover:underline">
               Create your first campaign →
             </button>
           </div>
@@ -494,7 +494,7 @@ function CampaignsTab() {
                       </td>
                       <td className="px-5 py-3.5">
                         {p.code
-                          ? <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-[#5D5FEF]">{p.code}</code>
+                          ? <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-brand-600">{p.code}</code>
                           : <span className="text-xs text-slate-400">Auto-apply</span>}
                       </td>
                       <td className="px-5 py-3.5">
@@ -518,7 +518,7 @@ function CampaignsTab() {
                         {p.usage_limit && <span className="text-xs text-slate-400"> / {p.usage_limit.toLocaleString()}</span>}
                         {usagePct !== null && (
                           <div className="ml-auto mt-1 h-1 w-16 overflow-hidden rounded-full bg-slate-100">
-                            <div className={`h-full rounded-full ${usagePct >= 90 ? "bg-orange-500" : "bg-[#5D5FEF]"}`}
+                            <div className={`h-full rounded-full ${usagePct >= 90 ? "bg-orange-500" : "bg-brand-600"}`}
                               style={{ width: `${usagePct}%` }} />
                           </div>
                         )}
@@ -665,10 +665,10 @@ function CouponsTab() {
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3.5">
           <input type="search" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search codes…"
-            className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#5D5FEF] focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/20" />
+            className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20" />
           {(["all", "used", "unused"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${filter === f ? "bg-[#5D5FEF] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+              className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors ${filter === f ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
               {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
@@ -678,7 +678,7 @@ function CouponsTab() {
               {generating ? "Generating…" : "Bulk Generate (10)"}
             </button>
             <button type="button"
-              className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
               + New Code
             </button>
           </Can>
@@ -701,7 +701,7 @@ function CouponsTab() {
               {filtered.map(c => (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-3.5">
-                    <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-[#5D5FEF]">{c.code}</code>
+                    <code className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-brand-600">{c.code}</code>
                   </td>
                   <td className="px-5 py-3.5 text-slate-700">{c.promotion_name}</td>
                   <td className="px-5 py-3.5">
@@ -801,7 +801,7 @@ function FlashSalesTab() {
       </div>
       <Can permission="promotions.manage">
         <div className="flex justify-end">
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + Create Flash Sale
           </button>
         </div>
@@ -834,7 +834,7 @@ function BundlesTab() {
       <div className="flex justify-between items-center">
         <p className="text-sm text-slate-500">{bundles.length} bundle rules</p>
         <Can permission="promotions.manage">
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Bundle Rule
           </button>
         </Can>
@@ -899,7 +899,7 @@ function StackabilityTab() {
       <div className="flex justify-between items-center">
         <p className="text-sm text-slate-500">{rules.length} stacking rules</p>
         <Can permission="promotions.manage">
-          <button className="rounded-lg bg-[#5D5FEF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
+          <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-[#4B4DC8]">
             + New Rule
           </button>
         </Can>
@@ -990,7 +990,7 @@ function AnalyticsTab() {
           {data.redemptions_by_day.map(d => (
             <div key={d.date} className="group relative flex-1 flex flex-col items-center gap-1">
               <div
-                className="w-full rounded-t bg-[#5D5FEF] transition-opacity group-hover:opacity-80"
+                className="w-full rounded-t bg-brand-600 transition-opacity group-hover:opacity-80"
                 style={{ height: `${Math.max(4, (d.count / maxRedemptions) * 100)}%` }}
               />
               <span className="text-[9px] text-slate-400 rotate-45 origin-left mt-1 hidden group-hover:block absolute -bottom-4">
@@ -1029,7 +1029,7 @@ function AnalyticsTab() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-[#5D5FEF]" style={{ width: `${pct}%` }} />
+                        <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
                       </div>
                       <span className="text-xs text-slate-500">{pct}%</span>
                     </div>
@@ -1066,7 +1066,7 @@ export default function PromotionsPage() {
                 onClick={() => setActiveTab(t.key)}
                 className={`shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === t.key
-                    ? "border-[#5D5FEF] text-[#5D5FEF]"
+                    ? "border-brand-600 text-brand-600"
                     : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
                 }`}
               >

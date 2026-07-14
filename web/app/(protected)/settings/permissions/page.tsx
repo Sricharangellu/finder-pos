@@ -30,9 +30,9 @@ function Toggle({
       onClick={() => !disabled && onChange(!enabled)}
       className={[
         "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF] focus-visible:ring-offset-2",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
         disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer",
-        enabled ? "bg-[#5D5FEF]" : "bg-slate-200",
+        enabled ? "bg-brand-600" : "bg-slate-200",
       ].join(" ")}
     >
       <span
@@ -203,7 +203,7 @@ function ApproveModal({ req, onClose, onDone }: {
               type="checkbox"
               checked={useExpiry}
               onChange={(e) => setUseExpiry(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-[#5D5FEF] focus:ring-[#5D5FEF]"
+              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
             />
             <label htmlFor="use-expiry" className="text-sm text-slate-700">Approve with expiry date</label>
           </div>
@@ -214,7 +214,7 @@ function ApproveModal({ req, onClose, onDone }: {
                 type="date"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
               />
             </div>
           )}
@@ -225,7 +225,7 @@ function ApproveModal({ req, onClose, onDone }: {
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Add context for the employee or audit log…"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
           {error && <p className="text-sm text-red-700">{error}</p>}
@@ -279,7 +279,7 @@ function RejectModal({ req, onClose, onDone }: {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Explain why this request was denied…"
-              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]"
+              className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
             />
           </div>
           {error && <p className="text-sm text-red-700">{error}</p>}
@@ -360,7 +360,7 @@ function PermissionRequestsAdmin() {
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#5D5FEF]" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-brand-600" />
           </div>
         ) : shown.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center">
@@ -386,7 +386,7 @@ function PermissionRequestsAdmin() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={`/team/${req.requested_for_user_id}`}
-                          className="text-sm font-semibold text-slate-900 hover:text-[#5D5FEF]"
+                          className="text-sm font-semibold text-slate-900 hover:text-brand-600"
                         >
                           {req.requested_for_name}
                         </Link>
@@ -598,7 +598,7 @@ export default function PermissionsPage() {
     return (
       <EnterpriseShell active="permissions" title="Role Permissions" subtitle="Configure access by role" contentClassName="overflow-hidden">
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#5D5FEF]" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-brand-600" />
         </div>
       </EnterpriseShell>
     );
@@ -626,7 +626,7 @@ export default function PermissionsPage() {
               className={[
                 "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
                 pageTab === t.id
-                  ? "border-b-2 border-[#5D5FEF] text-[#5D5FEF]"
+                  ? "border-b-2 border-brand-600 text-brand-600"
                   : "text-slate-500 hover:text-slate-700",
               ].join(" ")}
             >
@@ -652,7 +652,7 @@ export default function PermissionsPage() {
             <button
               type="button"
               onClick={() => setShowNewRole(true)}
-              className="flex items-center gap-1 rounded-md bg-[#5D5FEF] px-2 py-1 text-[11px] font-semibold text-white hover:bg-[#4849d0]"
+              className="flex items-center gap-1 rounded-md bg-brand-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-[#4849d0]"
               aria-label="Create custom role"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
@@ -672,11 +672,11 @@ export default function PermissionsPage() {
                   <button
                     type="button"
                     onClick={() => setActiveRoleId(roleId)}
-                    className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-[#5D5FEF]/8 text-[#111]" : "text-slate-600 hover:bg-slate-50"}`}
+                    className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-brand-600/8 text-[#111]" : "text-slate-600 hover:bg-slate-50"}`}
                   >
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${def.color}`} />
                     <div className="min-w-0 flex-1">
-                      <p className={`truncate text-sm font-semibold ${isActive ? "text-[#5D5FEF]" : ""}`}>{def.name}</p>
+                      <p className={`truncate text-sm font-semibold ${isActive ? "text-brand-600" : ""}`}>{def.name}</p>
                       <p className="truncate text-[11px] text-slate-400">
                         {def.immutable ? "Full access" : `${featureCount} permissions`}
                       </p>
@@ -709,12 +709,12 @@ export default function PermissionsPage() {
                       <button
                         type="button"
                         onClick={() => setActiveRoleId(cr.id)}
-                        className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-[#5D5FEF]/8 text-[#111]" : "text-slate-600 hover:bg-slate-50"}`}
+                        className={`flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left transition-colors ${isActive ? "bg-brand-600/8 text-[#111]" : "text-slate-600 hover:bg-slate-50"}`}
                       >
                         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cr.color}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <p className={`truncate text-sm font-semibold ${isActive ? "text-[#5D5FEF]" : ""}`}>{cr.name}</p>
+                            <p className={`truncate text-sm font-semibold ${isActive ? "text-brand-600" : ""}`}>{cr.name}</p>
                             <span className="shrink-0 rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold uppercase text-slate-400">Custom</span>
                           </div>
                           <p className="truncate text-[11px] text-slate-400">{featureCount} permissions</p>
@@ -764,7 +764,7 @@ export default function PermissionsPage() {
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={saving || isImmutable || !unsaved}
-                  className="rounded-lg bg-[#5D5FEF] px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
+                  className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0] disabled:opacity-40"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>
@@ -773,8 +773,8 @@ export default function PermissionsPage() {
           )}
 
           {isImmutable && (
-            <div className="shrink-0 border-b border-[#5D5FEF]/10 bg-[#5D5FEF]/5 px-6 py-2.5">
-              <p className="text-xs text-[#5D5FEF]">
+            <div className="shrink-0 border-b border-brand-600/10 bg-brand-600/5 px-6 py-2.5">
+              <p className="text-xs text-brand-600">
                 <strong>{activeRole?.name}</strong> always has full access and cannot be restricted.
               </p>
             </div>
@@ -797,7 +797,7 @@ export default function PermissionsPage() {
                               const allOn = group.features.every((f) => currentFeatures.has(f.id));
                               group.features.forEach((f) => toggleFeature(f.id, !allOn));
                             }}
-                            className="text-[11px] font-medium text-[#5D5FEF] hover:underline"
+                            className="text-[11px] font-medium text-brand-600 hover:underline"
                           >
                             {group.features.every((f) => currentFeatures.has(f.id)) ? "Remove all" : "Add all"}
                           </button>

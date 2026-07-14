@@ -42,7 +42,7 @@ export default function DocumentsPage() {
               className={[
                 "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                 tab === t.key
-                  ? "bg-white text-[#5D5FEF] shadow-sm"
+                  ? "bg-white text-brand-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-800",
               ].join(" ")}
             >

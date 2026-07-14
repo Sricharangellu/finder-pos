@@ -91,7 +91,7 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
       <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
         <p className="text-sm text-slate-400">No supplier pricing data available.</p>
         <button type="button" onClick={() => router.push(`/catalog/${productId}?tab=suppliers`)}
-          className="mt-2 text-sm text-[#5D5FEF] hover:underline">
+          className="mt-2 text-sm text-brand-600 hover:underline">
           Add a supplier
         </button>
       </div>
@@ -203,7 +203,7 @@ export function SupplierPriceComparisonTab({ productId }: { productId: string })
                       <button
                         type="button"
                         onClick={() => router.push(`/purchasing/new?supplier=${s.supplier_id}&product=${productId}`)}
-                        className="rounded-md bg-[#5D5FEF] px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 whitespace-nowrap"
+                        className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 whitespace-nowrap"
                       >
                         Create PO
                       </button>

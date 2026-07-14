@@ -87,7 +87,7 @@ export function CustomerTable({ customers, loading, error }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Name, phone, or code…"
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
           </div>
           <div className="w-44">
@@ -95,7 +95,7 @@ export function CustomerTable({ customers, loading, error }: Props) {
             <select
               value={groupFilter}
               onChange={(e) => setGroupFilter(e.target.value as SegmentFilter)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#5D5FEF] focus:ring-1 focus:ring-[#5D5FEF]"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             >
               <option value="All">All groups</option>
               <option value="Loyal">Loyal</option>
@@ -108,7 +108,7 @@ export function CustomerTable({ customers, loading, error }: Props) {
             <button
               type="button"
               onClick={() => { setQuery(""); setGroupFilter("All"); }}
-              className="text-sm text-[#5D5FEF] hover:underline"
+              className="text-sm text-brand-600 hover:underline"
             >
               Clear filters
             </button>
@@ -117,7 +117,7 @@ export function CustomerTable({ customers, loading, error }: Props) {
             </button>
             <button
               type="button"
-              className="rounded-md bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
+              className="rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#4849d0]"
             >
               Search
             </button>
@@ -200,7 +200,7 @@ export function CustomerTable({ customers, loading, error }: Props) {
                       <span className="ml-1 text-xs text-[#666]">lifetime</span>
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" aria-label={`Edit ${c.name}`} className="text-slate-400 hover:text-[#5D5FEF]">
+                      <button type="button" aria-label={`Edit ${c.name}`} className="text-slate-400 hover:text-brand-600">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>

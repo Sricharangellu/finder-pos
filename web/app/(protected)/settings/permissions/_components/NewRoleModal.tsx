@@ -55,14 +55,14 @@ export function NewRoleModal({
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Role Name *</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Floor Supervisor"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none" />
           </div>
 
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="What does this role do?"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none" />
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none" />
           </div>
 
           <div>
@@ -70,7 +70,7 @@ export function NewRoleModal({
             <div className="flex flex-wrap gap-2">
               {COLOR_OPTIONS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full ${c} transition-transform ${color === c ? "scale-110 ring-2 ring-[#5D5FEF] ring-offset-2" : "hover:scale-105"}`}
+                  className={`h-7 w-7 rounded-full ${c} transition-transform ${color === c ? "scale-110 ring-2 ring-brand-600 ring-offset-2" : "hover:scale-105"}`}
                   aria-label={c} />
               ))}
             </div>
@@ -79,7 +79,7 @@ export function NewRoleModal({
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">Copy permissions from</label>
             <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none">
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none">
               <option value="">— Start empty —</option>
               {allRoles.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
@@ -95,7 +95,7 @@ export function NewRoleModal({
             Cancel
           </button>
           <button type="button" onClick={() => void handleCreate()} disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
             {saving ? "Creating…" : "Create Role"}
           </button>
         </div>

@@ -124,7 +124,7 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
         <div className="flex shrink-0 border-b border-slate-100 px-5">
           {tabs.map(({ key, label }) => (
             <button key={key} type="button" onClick={() => setTab(key)}
-              className={`mr-4 border-b-2 py-2.5 text-sm font-medium transition-colors ${tab === key ? "border-[#5D5FEF] text-[#5D5FEF]" : "border-transparent text-slate-500 hover:text-[#111]"}`}>
+              className={`mr-4 border-b-2 py-2.5 text-sm font-medium transition-colors ${tab === key ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-[#111]"}`}>
               {label}
             </button>
           ))}
@@ -238,7 +238,7 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {ROLES.map((r) => (
                     <button key={r} type="button" onClick={() => setRole(r)}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${role === r ? "border-[#5D5FEF] bg-[#5D5FEF]/5 text-[#5D5FEF]" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${role === r ? "border-brand-600 bg-brand-600/5 text-brand-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
                       <span className={`h-2 w-2 rounded-full ${ROLE_COLORS[r].split(" ")[0]}`} />
                       {ROLE_LABELS[r]}
                     </button>
@@ -269,7 +269,7 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
                     value={suspendReason}
                     onChange={(e) => setSuspendReason(e.target.value)}
                     placeholder={status === "suspended" ? "Reason for suspension…" : "Reason for termination…"}
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
                   />
                 )}
               </div>
@@ -306,7 +306,7 @@ export function EmployeeModal({ employee, onClose, onUpdated }: Props) {
             Cancel
           </button>
           <button type="button" onClick={() => void handleSave()} disabled={saving}
-            className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
+            className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40">
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
