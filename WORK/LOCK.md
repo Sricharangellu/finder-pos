@@ -1,6 +1,29 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: RELEASED — variant engine consolidation shipped (structured options, non-destructive regen, chip/drag UX, 3-step wizard); see AUDIT_2026-07-13T061454Z-variant-engine-consolidation.md
+Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B)
+
+## Active Claim (Claude session B — ACPA M1.4 staged outbox publish)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session B (Fable 5, ACPA roadmap E1) |
+| Queue item | M1.4: EventBus.stage()/dispatchStaged() — outbox row commits inside the publisher's business tx (closes crash-after-commit-before-publish loss); payments.capture migrated; daily retention sweep (delivered outbox rows + old consumption claims). |
+| Files/areas expected | `src/shared/{events,outbox}.ts`; `src/modules/payments/service.ts`; `src/orchestration/{index.ts,queues/queue-names.ts,jobs/outbox-retention.job.ts}`; `src/app.staging.test.ts`; ACPA_ROADMAP. NO purchasing (deferred: receive() staging queued until session A's requisition claim releases), NO catalog, NO web. |
+| Started | 2026-07-14 |
+| Status | ACTIVE — implementing |
+| Blockers | purchasing.receive staged-publish deferred to respect session A's purchasing claim |
+
+
+## Active Claim (Claude session A — purchase requisitions)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8) |
+| Queue item | Purchase requisitions: draft→submitted→approved/rejected→converted-to-PO. New purchase_requisitions(+lines) tables, PR numbering via document_counters, cursor-paginated list, convert creates a PO through the existing (approval-gated) createOrder. Backend only; UI follows. |
+| Files/areas expected | `src/modules/purchasing/{index,service,routes,purchasing.test}.ts`; WORK audit + LOCK. NO shared/, NO catalog, NO web. |
+| Started | 2026-07-14 |
+| Status | RELEASED — shipped; purchasing 19/19, full 458/458, smoke 20/20. Audit: AUDIT_2026-07-14T225200Z-purchase-requisitions.md |
+| Blockers | none |
 
 ## Active Claim (Claude session A — catalog bulk-price)
 

@@ -2,7 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
-import { nextDocSeq } from "../../shared/docnumber.js";
+import { nextDocSeq, nextDocNumber } from "../../shared/docnumber.js";
 
 import { clampLimit, decodeCursor, toPage } from "../../shared/pagination.js";
 export type { CursorPage } from "../../shared/pagination.js";
@@ -1114,4 +1114,206 @@ export class PurchasingService {
       { t: tenantId },
     );
   }
+
+  // ── Purchase requisitions (procurement PRD module 1 / ACPA E2) ─────────────
+  // draft → submitted → approved | rejected → converted (to a PO).
+  // Only drafts are editable; conversion requires approval and goes through
+  // createOrder, so the resulting PO is still subject to PO approval tiers.
+
+  private async getRequisitionOrThrow(id: string, tenantId: string): Promise<Requisition> {
+    const row = await this.db.one<Requisition>(
+      "SELECT * FROM purchase_requisitions WHERE id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    if (!row) throw new HttpError(404, "not_found", `requisition '${id}' not found`);
+    return row;
+  }
+
+  async getRequisition(id: string, tenantId: string): Promise<RequisitionWithLines> {
+    const req = await this.getRequisitionOrThrow(id, tenantId);
+    const lines = await this.db.query<RequisitionLine>(
+      "SELECT * FROM purchase_requisition_lines WHERE requisition_id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    return { ...req, lines };
+  }
+
+  async createRequisition(
+    input: {
+      department?: string | null;
+      requiredDate?: number | null;
+      priority?: "low" | "normal" | "high";
+      notes?: string | null;
+      lines: Array<{ productId: string; quantity: number; estCostCents?: number; productName?: string | null }>;
+    },
+    actor: Actor,
+    tenantId: string,
+  ): Promise<RequisitionWithLines> {
+    if (input.lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
+    const now = Date.now();
+    const id = `preq_${uuidv7()}`;
+    const reqNumber = await nextDocNumber(this.db, tenantId, "purchase_requisitions", "PR");
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO purchase_requisitions (id, tenant_id, req_number, status, department, requested_by, required_date, priority, notes, created_at, updated_at)
+         VALUES (@id, @t, @num, 'draft', @dept, @by, @reqDate, @prio, @notes, @now, @now)`,
+        { id, t: tenantId, num: reqNumber, dept: input.department ?? null, by: actor.id, reqDate: input.requiredDate ?? null, prio: input.priority ?? "normal", notes: input.notes ?? null, now },
+      );
+      for (const l of input.lines) {
+        await tdb.query(
+          `INSERT INTO purchase_requisition_lines (id, tenant_id, requisition_id, product_id, product_name, quantity, est_cost_cents)
+           VALUES (@id, @t, @req, @pid, @pname, @qty, @est)`,
+          { id: `preql_${uuidv7()}`, t: tenantId, req: id, pid: l.productId, pname: l.productName ?? null, qty: l.quantity, est: l.estCostCents ?? 0 },
+        );
+      }
+    });
+    return this.getRequisition(id, tenantId);
+  }
+
+  /** Draft-only edits: header fields and full line replacement. */
+  async updateRequisition(
+    id: string,
+    input: {
+      department?: string | null;
+      requiredDate?: number | null;
+      priority?: "low" | "normal" | "high";
+      notes?: string | null;
+      lines?: Array<{ productId: string; quantity: number; estCostCents?: number; productName?: string | null }>;
+    },
+    tenantId: string,
+  ): Promise<RequisitionWithLines> {
+    const req = await this.getRequisitionOrThrow(id, tenantId);
+    if (req.status !== "draft") throw new HttpError(409, "not_draft", "only a draft requisition can be edited");
+    if (input.lines && input.lines.length === 0) throw new HttpError(400, "bad_request", "at least one line is required");
+    const now = Date.now();
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `UPDATE purchase_requisitions SET
+           department = COALESCE(@dept, department),
+           required_date = COALESCE(@reqDate, required_date),
+           priority = COALESCE(@prio, priority),
+           notes = COALESCE(@notes, notes),
+           updated_at = @now
+         WHERE id = @id AND tenant_id = @t`,
+        { dept: input.department ?? null, reqDate: input.requiredDate ?? null, prio: input.priority ?? null, notes: input.notes ?? null, now, id, t: tenantId },
+      );
+      if (input.lines) {
+        await tdb.query("DELETE FROM purchase_requisition_lines WHERE requisition_id = @id AND tenant_id = @t", { id, t: tenantId });
+        for (const l of input.lines) {
+          await tdb.query(
+            `INSERT INTO purchase_requisition_lines (id, tenant_id, requisition_id, product_id, product_name, quantity, est_cost_cents)
+             VALUES (@id, @t, @req, @pid, @pname, @qty, @est)`,
+            { id: `preql_${uuidv7()}`, t: tenantId, req: id, pid: l.productId, pname: l.productName ?? null, qty: l.quantity, est: l.estCostCents ?? 0 },
+          );
+        }
+      }
+    });
+    return this.getRequisition(id, tenantId);
+  }
+
+  private async transitionRequisition(
+    id: string, tenantId: string,
+    from: RequisitionStatus[], to: RequisitionStatus,
+    actor?: Actor, note?: string,
+  ): Promise<RequisitionWithLines> {
+    const req = await this.getRequisitionOrThrow(id, tenantId);
+    if (!from.includes(req.status)) {
+      throw new HttpError(409, "invalid_transition", `requisition is '${req.status}'; expected ${from.join("/")}`);
+    }
+    await this.db.query(
+      `UPDATE purchase_requisitions SET status = @to, decided_by = COALESCE(@by, decided_by),
+         decided_at = CASE WHEN @by IS NULL THEN decided_at ELSE @now END,
+         decision_note = COALESCE(@note, decision_note), updated_at = @now
+       WHERE id = @id AND tenant_id = @t`,
+      { to, by: actor?.id ?? null, note: note ?? null, now: Date.now(), id, t: tenantId },
+    );
+    return this.getRequisition(id, tenantId);
+  }
+
+  async submitRequisition(id: string, tenantId: string): Promise<RequisitionWithLines> {
+    return this.transitionRequisition(id, tenantId, ["draft"], "submitted");
+  }
+
+  async approveRequisition(id: string, actor: Actor, tenantId: string): Promise<RequisitionWithLines> {
+    return this.transitionRequisition(id, tenantId, ["submitted"], "approved", actor);
+  }
+
+  async rejectRequisition(id: string, actor: Actor, tenantId: string, note?: string): Promise<RequisitionWithLines> {
+    return this.transitionRequisition(id, tenantId, ["submitted"], "rejected", actor, note);
+  }
+
+  /** Convert an approved requisition into a PO for the given supplier. The PO
+   *  is created through createOrder, so PO approval tiers still apply. */
+  async convertRequisition(id: string, supplierId: string, actor: Actor, tenantId: string): Promise<{ requisition: RequisitionWithLines; po: PurchaseOrderWithLines }> {
+    const req = await this.getRequisition(id, tenantId);
+    if (req.status !== "approved") throw new HttpError(409, "not_approved", "only an approved requisition can be converted");
+    const po = await this.createOrder(
+      supplierId,
+      req.lines.map((l) => ({
+        productId: l.product_id,
+        quantity: l.quantity,
+        unitCostCents: Number(l.est_cost_cents ?? 0),
+        productName: l.product_name ?? null,
+      })),
+      tenantId,
+      actor,
+    );
+    await this.db.query(
+      "UPDATE purchase_requisitions SET status = 'converted', po_id = @po, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { po: po.id, now: Date.now(), id, t: tenantId },
+    );
+    return { requisition: await this.getRequisition(id, tenantId), po };
+  }
+
+  /** Cursor-paginated requisition list, optionally filtered by status. */
+  async listRequisitions(
+    tenantId: string,
+    opts: { status?: RequisitionStatus; cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<Requisition>> {
+    const limit = clampLimit(opts.limit, 100, 500);
+    const cur = decodeCursor(opts.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (opts.status) { where.push("status = @s"); params["s"] = opts.status; }
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<Requisition>(
+      `SELECT * FROM purchase_requisitions WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(items as unknown as Array<Requisition & Record<string, unknown>>, limit, "created_at") as CursorPage<Requisition>;
+  }
+}
+
+export type RequisitionStatus = "draft" | "submitted" | "approved" | "rejected" | "converted";
+
+export interface Requisition {
+  id: string;
+  tenant_id: string;
+  req_number: string;
+  status: RequisitionStatus;
+  department: string | null;
+  requested_by: string | null;
+  required_date: number | null;
+  priority: "low" | "normal" | "high";
+  notes: string | null;
+  decided_by: string | null;
+  decided_at: number | null;
+  decision_note: string | null;
+  po_id: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RequisitionLine {
+  id: string;
+  tenant_id: string;
+  requisition_id: string;
+  product_id: string;
+  product_name: string | null;
+  quantity: number;
+  est_cost_cents: number;
+}
+
+export interface RequisitionWithLines extends Requisition {
+  lines: RequisitionLine[];
 }

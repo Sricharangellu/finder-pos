@@ -354,3 +354,95 @@ test("concurrent PO creates mint distinct po_numbers (race-free counter)", async
   const numbers = results.map((r) => r.json.po_number);
   assert.equal(new Set(numbers).size, 5, `expected 5 distinct po_numbers, got ${numbers.join(",")}`);
 });
+
+// ── Purchase requisitions (E2) ────────────────────────────────────────────────
+
+test("requisition lifecycle: draft -> submit -> approve -> convert creates a linked PO", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "REQ-A");
+
+  const created = await call(app, "POST", "/api/purchasing/requisitions", {
+    department: "Grocery",
+    priority: "high",
+    lines: [{ productId, quantity: 12, estCostCents: 250, productName: "Widget" }],
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.json.status, "draft");
+  assert.match(created.json.req_number, /^PR-\d{5}$/);
+  assert.equal(created.json.lines.length, 1);
+
+  // Draft edits allowed…
+  const edited = await call(app, "PATCH", `/api/purchasing/requisitions/${created.json.id}`, {
+    lines: [{ productId, quantity: 20, estCostCents: 300 }],
+  });
+  assert.equal(edited.json.lines[0].quantity, 20);
+
+  const submitted = await call(app, "POST", `/api/purchasing/requisitions/${created.json.id}/submit`, {});
+  assert.equal(submitted.json.status, "submitted");
+
+  // …but not after submission.
+  const editBlocked = await call(app, "PATCH", `/api/purchasing/requisitions/${created.json.id}`, { notes: "late" });
+  assert.equal(editBlocked.status, 409);
+
+  const approved = await call(app, "POST", `/api/purchasing/requisitions/${created.json.id}/approve`, {});
+  assert.equal(approved.json.status, "approved");
+  assert.ok(approved.json.decided_by);
+
+  const converted = await call(app, "POST", `/api/purchasing/requisitions/${created.json.id}/convert`, { supplierId });
+  assert.equal(converted.status, 201);
+  assert.equal(converted.json.requisition.status, "converted");
+  assert.equal(converted.json.requisition.po_id, converted.json.po.id);
+  assert.equal(converted.json.po.lines[0].quantity, 20);
+  assert.equal(converted.json.po.lines[0].unit_cost_cents, 300);
+
+  // Converting twice is blocked.
+  const again = await call(app, "POST", `/api/purchasing/requisitions/${created.json.id}/convert`, { supplierId });
+  assert.equal(again.status, 409);
+});
+
+test("requisition guards: reject blocks convert; cashier cannot approve; convert requires approval", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const productId = await makeProduct(app, "REQ-B");
+
+  const mk = async () => (await call(app, "POST", "/api/purchasing/requisitions", {
+    lines: [{ productId, quantity: 1 }],
+  })).json;
+
+  // Convert straight from draft → 409 (must be approved).
+  const draft = await mk();
+  const draftConvert = await call(app, "POST", `/api/purchasing/requisitions/${draft.id}/convert`, { supplierId });
+  assert.equal(draftConvert.status, 409);
+
+  // Rejected requisitions cannot be converted; note is kept.
+  const rej = await mk();
+  await call(app, "POST", `/api/purchasing/requisitions/${rej.id}/submit`, {});
+  const rejected = await call(app, "POST", `/api/purchasing/requisitions/${rej.id}/reject`, { note: "over budget" });
+  assert.equal(rejected.json.status, "rejected");
+  assert.equal(rejected.json.decision_note, "over budget");
+  const rejConvert = await call(app, "POST", `/api/purchasing/requisitions/${rej.id}/convert`, { supplierId });
+  assert.equal(rejConvert.status, 409);
+
+  // Approval is manager-gated.
+  const pend = await mk();
+  await call(app, "POST", `/api/purchasing/requisitions/${pend.id}/submit`, {});
+  const denied = await call(app, "POST", `/api/purchasing/requisitions/${pend.id}/approve`, {}, "cashier");
+  assert.equal(denied.status, 403);
+});
+
+test("requisition list filters by status and paginates with a cursor", async () => {
+  const app = await freshApp();
+  const productId = await makeProduct(app, "REQ-C");
+  for (let i = 0; i < 3; i++) {
+    const r = (await call(app, "POST", "/api/purchasing/requisitions", { lines: [{ productId, quantity: 1 }] })).json;
+    if (i > 0) await call(app, "POST", `/api/purchasing/requisitions/${r.id}/submit`, {});
+  }
+  const drafts = await call(app, "GET", "/api/purchasing/requisitions?status=draft");
+  assert.equal(drafts.json.items.length, 1);
+  const page1 = await call(app, "GET", "/api/purchasing/requisitions?limit=2");
+  assert.equal(page1.json.items.length, 2);
+  assert.ok(page1.json.nextCursor);
+  const page2 = await call(app, "GET", `/api/purchasing/requisitions?limit=2&cursor=${encodeURIComponent(page1.json.nextCursor)}`);
+  assert.equal(page2.json.items.length, 1);
+});

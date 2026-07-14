@@ -181,6 +181,62 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json(await service.listReturns(tenantId(res), { cursor, limit }));
   }));
 
+  // ── Purchase requisitions (draft → submitted → approved/rejected → converted) ──
+  const requisitionLineSchema = z.object({
+    productId: z.string().min(1),
+    quantity: z.number().int().positive(),
+    estCostCents: z.number().int().nonnegative().optional(),
+    productName: z.string().nullable().optional(),
+  });
+  const requisitionSchema = z.object({
+    department: z.string().max(120).nullable().optional(),
+    requiredDate: z.number().int().positive().nullable().optional(),
+    priority: z.enum(["low", "normal", "high"]).optional(),
+    notes: z.string().max(2000).nullable().optional(),
+    lines: z.array(requisitionLineSchema).min(1).max(200),
+  });
+  const requisitionUpdateSchema = requisitionSchema.partial();
+
+  router.post("/requisitions", handler(async (req, res) => {
+    const b = parseBody(requisitionSchema, req.body);
+    res.status(201).json(await service.createRequisition(b, actor(res), tenantId(res)));
+  }));
+
+  router.get("/requisitions", handler(async (req, res) => {
+    const status = typeof req.query.status === "string" && req.query.status !== "" ? (req.query.status as never) : undefined;
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listRequisitions(tenantId(res), { status, cursor, limit }));
+  }));
+
+  router.get("/requisitions/:id", handler(async (req, res) => {
+    res.json(await service.getRequisition(String(req.params.id), tenantId(res)));
+  }));
+
+  router.patch("/requisitions/:id", handler(async (req, res) => {
+    const b = parseBody(requisitionUpdateSchema, req.body);
+    res.json(await service.updateRequisition(String(req.params.id), b, tenantId(res)));
+  }));
+
+  router.post("/requisitions/:id/submit", handler(async (req, res) => {
+    res.json(await service.submitRequisition(String(req.params.id), tenantId(res)));
+  }));
+
+  // Approval decisions and conversion are manager-gated.
+  router.post("/requisitions/:id/approve", mgr, handler(async (req, res) => {
+    res.json(await service.approveRequisition(String(req.params.id), actor(res), tenantId(res)));
+  }));
+
+  router.post("/requisitions/:id/reject", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ note: z.string().max(500).optional() }), req.body ?? {});
+    res.json(await service.rejectRequisition(String(req.params.id), actor(res), tenantId(res), b.note));
+  }));
+
+  router.post("/requisitions/:id/convert", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ supplierId: z.string().min(1) }), req.body);
+    res.status(201).json(await service.convertRequisition(String(req.params.id), b.supplierId, actor(res), tenantId(res)));
+  }));
+
   router.post("/orders", mgr, handler(async (req, res) => {
     const b = parseBody(poSchema, req.body);
     res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res), actor(res)));
