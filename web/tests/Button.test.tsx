@@ -42,7 +42,7 @@ describe("Button", () => {
   it("meets minimum touch target width (44px) via CSS classes", () => {
     render(<Button>Touch</Button>);
     const btn = screen.getByRole("button");
-    // SalesGent spec: 32px height (h-8), 44px min-width for touch targets
+    // Ascend spec: 32px height (h-8), 44px min-width for touch targets
     expect(btn.className).toContain("min-w-[44px]");
   });
 

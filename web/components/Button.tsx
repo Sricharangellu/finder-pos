@@ -22,7 +22,7 @@ export interface ButtonProps
 
 // ─── Variant styles ───────────────────────────────────────────────────────────
 const variantClasses: Record<ButtonVariant, string> = {
-  // #0137FC primary — matches SalesGent ERP spec
+  // #0137FC primary — matches Ascend ERP spec
   primary: [
     "bg-brand-600 text-white border-none",
     "hover:bg-brand-700 active:bg-brand-800",

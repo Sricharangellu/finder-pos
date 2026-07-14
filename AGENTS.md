@@ -156,6 +156,33 @@ Every frontend change must follow these rules:
 - Keep the UI practical, dense, and operational. Ascend is not a marketing site.
 - Do not add decorative complexity that distracts from POS, inventory, reporting, and workflow tasks.
 
+## Design System Rules
+
+Ascend has ONE design system: the tokens in `web/tailwind.config.ts`, the primitives in
+`web/components/`, and the authoritative spec `docs/ENTERPRISE_UX_SPEC.md`. Every new or edited
+page/component MUST conform. These are hard requirements, not preferences — treat a violation the
+same as a failing gate.
+
+- **Colors: tokens only.** Use the `brand`, `erp`, and semantic (`success`/`warning`/`danger`)
+  tokens. Do NOT hard-code hex colors (`#0137FC`, `bg-[#1890FF]`) in pages/components, and do NOT
+  reach for raw Tailwind default-palette classes (`text-slate-500`, `bg-red-50`, `border-gray-200`) —
+  map them to `erp`/semantic tokens (e.g. `text-erp-text-secondary`, `border-erp-table-border`,
+  `text-danger-700`). A genuinely new color is added to `tailwind.config.ts` as a named token first.
+- **Primitives are mandatory.** Build with the design-system components — `Button`, `Input`,
+  `Select`, `Card`, `Table`, `Modal`, `ConfirmDialog`, `Badge`, `EmptyState`, `Skeleton`, `KpiCard`.
+  Do NOT use raw `<button>`, `<input>`, or `<select>` in feature pages. If a primitive lacks a
+  variant you need, extend the primitive — never bypass it with bespoke markup.
+- **Spacing:** 8px base system (`gap-2`/`gap-4`/`p-4`…). No arbitrary pixel margins.
+- **Accessibility: WCAG 2.1 AA (non-negotiable).** Every interactive element needs a visible focus
+  state (`focus-visible:ring-*`), an accessible name/label, a ≥44px touch target, and keyboard
+  operability; text/background pairs must meet AA contrast (token comments record the ratios).
+- **States:** every async view wires loading (`Skeleton`), empty (`EmptyState`), error, and success —
+  this restates the Frontend Rules and is enforced here too.
+- **Branding:** never hard-code an old/other product name (e.g. `SalesGent`, `Finder`) into new
+  styles, tokens, or copy — the product is Ascend (see the Hard rule on brand names).
+- When unsure, read `docs/ENTERPRISE_UX_SPEC.md` first — it is authoritative; never reinvent a
+  primitive that already exists.
+
 ## AI / Recommendations Rules
 
 - Do not make AI the source of truth.

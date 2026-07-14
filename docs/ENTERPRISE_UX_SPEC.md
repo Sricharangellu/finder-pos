@@ -32,6 +32,23 @@ Ascend UI must be:
 ### Spacing
 - 8px base spacing system (Tailwind: `gap-2 = 8px`, `gap-4 = 16px`, etc.)
 
+### Strict enforcement (hard rules, not preferences)
+
+These are mandatory for every new or edited page/component. `AGENTS.md` → "Design System Rules"
+restates them for agents; treat a violation like a failing gate.
+
+- **Colors:** use the design tokens in `web/tailwind.config.ts` only — `brand`, `erp`, and semantic
+  (`success`/`warning`/`danger`). No hard-coded hex (`#0137FC`, `bg-[#1890FF]`) and no raw
+  default-palette classes (`text-slate-500`, `bg-red-50`, `border-gray-200`) in pages/components;
+  map them to `erp`/semantic tokens. New colors become named tokens first.
+- **Primitives:** always use the components above (`Button`, `Input`, `Select`, `Card`, `Table`,
+  `Modal`, `Badge`, `EmptyState`, `Skeleton`, `KpiCard`…). No raw `<button>`, `<input>`, `<select>`
+  in feature pages — extend the primitive if a variant is missing.
+- **Accessibility:** WCAG 2.1 AA — visible `focus-visible` state, accessible name/label, ≥44px touch
+  target, keyboard operable, AA contrast.
+- **Branding:** never bake an old/other product name (`SalesGent`, `Finder`) into tokens, styles, or
+  copy. The product is Ascend.
+
 ---
 
 ## 2. Main App Layout

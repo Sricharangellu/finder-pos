@@ -12,7 +12,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Brand (SalesGent primary: #0137FC) ──────────────────────────────
+        // ── Brand (Ascend primary: #0137FC) ─────────────────────────────────
         brand: {
           50:  "#EBF0FF",
           100: "#D6E0FF",
