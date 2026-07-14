@@ -274,6 +274,52 @@ export function requirePlan(required: Plan): RequestHandler {
   };
 }
 
+/**
+ * requireCapability(capability) — server-side business-package isolation guard (WP 02).
+ *
+ * Rejects with 403 unless the caller's tenant has `capability` enabled in
+ * `tenant_capabilities`. This is the layer that makes package separation real:
+ * the frontend hides features by capability, but CapabilitiesContext deliberately
+ * *fails open* (every check returns true on a capabilities outage), so the server
+ * must be the actual boundary — a retail tenant hitting a wholesale route has to
+ * get 403, not a merely-hidden-yet-reachable endpoint.
+ *
+ * Fail-CLOSED by design: if the capability can't be affirmatively confirmed
+ * (missing DB context or a query error), access is denied. Strict separation
+ * ("zero cross-contamination") demands deny-by-default — the deliberate opposite
+ * of requirePlan()'s fail-open entitlement gate above.
+ *
+ * The 403 message never names the capability, so a retail user cannot learn that
+ * other business packages exist.
+ *
+ * Usage: router.post("/quotes", requireCapability("wholesale"), handler(...))
+ */
+export function requireCapability(capability: string): RequestHandler {
+  return async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    if (!auth?.tenantId) { next(new HttpError(401, "unauthenticated", "Not authenticated.")); return; }
+    const db = res.locals["db"] as DB | undefined;
+    // Deny-by-default: no DB context means the license cannot be confirmed → 403.
+    if (!db) { next(new HttpError(403, "capability_unavailable", "This feature is not available for your account.")); return; }
+    try {
+      const row = await db.one<{ enabled: boolean | number }>(
+        "SELECT enabled FROM tenant_capabilities WHERE tenant_id = @t AND capability = @cap LIMIT 1",
+        { t: auth.tenantId, cap: capability },
+      );
+      const enabled = row ? row.enabled === true || row.enabled === 1 : false;
+      if (!enabled) {
+        next(new HttpError(403, "capability_not_enabled", "This feature is not available for your account."));
+        return;
+      }
+    } catch {
+      // Cannot verify the capability → deny (strict separation is deny-by-default).
+      next(new HttpError(403, "capability_unavailable", "This feature is not available for your account."));
+      return;
+    }
+    next();
+  };
+}
+
 export function tenantResolver(_req: Request, res: Response, next: NextFunction): void {
   // Enter the request-scoped tenant context (AsyncLocalStorage). From here on,
   // every DB query issued anywhere in this request's async chain runs inside a

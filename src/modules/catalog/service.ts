@@ -225,6 +225,14 @@ export interface CreateProductInput {
   ecommerce?: boolean;
 }
 
+export interface CreateVariantInput {
+  variant_label: string;
+  upc: string;
+  sku: string;
+  selling_price_cents: Cents;
+  category: string;
+}
+
 // UpdateProductInput mirrors CreateProductInput, all fields optional. `sku` may be
 // changed (guarded by the tenant-unique constraint) — needed for the variant setup
 // wizard's SKU assignment step.
@@ -606,6 +614,29 @@ export class CatalogService {
       "SELECT * FROM products WHERE tenant_id = @tenantId AND barcode = @barcode AND status = 'active' LIMIT 1",
       { tenantId, barcode },
     );
+  }
+
+  private async assertBarcodeAvailable(barcode: string, tenantId: string, exceptProductId?: string): Promise<void> {
+    const normalized = barcode.trim();
+    if (!normalized) return;
+    const existing = await this.db.one<{ id: string }>(
+      `SELECT p.id
+         FROM products p
+        WHERE p.tenant_id = @tenantId
+          AND p.barcode = @barcode
+          AND (@exceptProductId::text IS NULL OR p.id <> @exceptProductId)
+        UNION
+       SELECT pb.product_id AS id
+         FROM product_barcodes pb
+        WHERE pb.tenant_id = @tenantId
+          AND pb.barcode = @barcode
+          AND (@exceptProductId::text IS NULL OR pb.product_id <> @exceptProductId)
+        LIMIT 1`,
+      { tenantId, barcode: normalized, exceptProductId: exceptProductId ?? null },
+    );
+    if (existing) {
+      throw conflict(`barcode '${normalized}' is already assigned to another product`);
+    }
   }
 
   /** All UPCs registered for a product. */
@@ -1223,6 +1254,36 @@ export class CatalogService {
       throw conflict("product is not a child variant of this master product");
     }
     return this.update(childId, { parent_product_id: null, variant_label: null }, tenantId);
+  }
+
+  async createVariant(masterId: string, input: CreateVariantInput, tenantId: string): Promise<Product> {
+    const master = await this.assertCanBeMaster(masterId, tenantId);
+    const label = input.variant_label.trim();
+    const upc = input.upc.trim();
+    await this.assertBarcodeAvailable(upc, tenantId);
+    const product = await this.create(
+      {
+        sku: input.sku.trim(),
+        name: `${master.name} - ${label}`,
+        price_cents: input.selling_price_cents,
+        category: input.category.trim(),
+        tax_class: master.tax_class,
+        barcode: upc,
+        status: master.status,
+        description: master.description,
+        brand: master.brand,
+        image_url: master.image_url,
+        parent_product_id: masterId,
+        variant_label: label,
+        age_restricted: master.age_restricted === 1,
+        returnable: master.returnable === 1,
+        service_product: master.service_product === 1,
+        track_inventory: master.track_inventory === 1,
+        ecommerce: master.ecommerce === 1,
+      },
+      tenantId,
+    );
+    return product;
   }
 
   /**

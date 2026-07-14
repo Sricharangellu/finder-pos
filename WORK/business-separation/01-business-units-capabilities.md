@@ -5,10 +5,10 @@
 **Foundation shipped** in PR #36 (issue #35): the `business` module exists with
 `business_units`, `business_unit_locations`, `business_unit_channels`,
 `tenant_capabilities`, `user_business_unit_access`; `GET /api/v1/me/context`;
-business-unit list/create/get; and a demo retail + wholesale seed. This package
-now tracks the **remaining** work (marked ☐ below): capability read/write
-endpoints, PATCH + active-unit switching, `module_visibility`, and richer
-capability config. Do not recreate the shipped tables/routes.
+business-unit list/create/get; and a demo retail + wholesale seed. Backend
+capability read/write, PATCH, active-unit switching, `module_visibility`, and
+richer capability config are now shipped as a WP01 follow-up. Frontend shell
+consumption remains in WP 12. Do not recreate the shipped tables/routes.
 
 ## Goal
 
@@ -42,7 +42,7 @@ Every table includes `tenant_id`, timestamps, status where relevant, indexes, an
 -- business_unit_locations, tenant_capabilities, user_business_unit_access.
 -- Live DDL is in src/modules/business/index.ts.
 
--- ☐ REMAINING — per-user/BU module visibility.
+-- SHIPPED (WP01 follow-up): per-user/BU module visibility.
 module_visibility (
   id               TEXT PRIMARY KEY,
   tenant_id        TEXT NOT NULL,
@@ -56,9 +56,9 @@ module_visibility (
 );
 ```
 
-Note: shipped `tenant_capabilities` uses `(capability, enabled)`. The capability
-endpoints below should evolve it toward `module_key` + `feature_key` +
-`config_json` (see WP 12 for how the shell consumes visibility).
+Note: shipped `tenant_capabilities` began with `(capability, enabled)`. The
+WP01 follow-up adds `business_unit_id`, `module_key`, `feature_key`, and
+`config_json` while keeping backward compatibility.
 
 ## Current repo files affected
 
@@ -74,10 +74,10 @@ GET    /api/v1/business-units            # shipped
 POST   /api/v1/business-units            # shipped (owner)
 GET    /api/v1/business-units/:id        # shipped (access-checked)
 GET    /api/v1/me/context                # shipped
-PATCH  /api/v1/business-units/:id        # ☐ update name/kind/status/route
-GET    /api/v1/capabilities              # ☐ tenant + BU capability matrix
-PUT    /api/v1/capabilities/:id          # ☐ toggle/configure a capability
-POST   /api/v1/me/switch-business-unit   # ☐ set caller's active unit (persist pref)
+PATCH  /api/v1/business-units/:id        # shipped: update name/kind/status/route
+GET    /api/v1/business-capabilities     # shipped: tenant + BU capability matrix
+PUT    /api/v1/capabilities/:id          # shipped: toggle/configure a capability
+POST   /api/v1/me/switch-business-unit   # shipped: set caller's active unit
 ```
 
 `/me/context` returns visible modules, permissions, active business unit,
@@ -94,8 +94,8 @@ channels, landing route, and feature flags.
 
 - Retail-only user cannot access a wholesale business unit (shipped: context scoping).
 - Wholesale-only user cannot access a retail business unit (shipped).
-- Owner can switch between business units (☐ switch endpoint).
-- Capability response matches enabled modules (☐).
+- Owner can switch between business units (shipped).
+- Capability response matches enabled modules (shipped).
 - All queries scoped by `tenant_id` (shipped: tenant isolation test).
 
 ## Acceptance criteria
@@ -112,8 +112,8 @@ channels, landing route, and feature flags.
 - [x] `business` module + 5 tables + registration.
 - [x] `GET /api/v1/me/context`, business-unit list/create/get, demo seed.
 - [x] Backend tests: separation + tenant isolation.
-- [ ] `PATCH /business-units/:id`.
-- [ ] `GET /capabilities`, `PUT /capabilities/:id` (module_key/feature_key/config).
-- [ ] `POST /me/switch-business-unit` + persisted active-unit preference.
-- [ ] `module_visibility` table + inclusion in `/me/context`.
+- [x] `PATCH /business-units/:id`.
+- [x] `GET /business-capabilities`, `PUT /capabilities/:id` (module_key/feature_key/config).
+- [x] `POST /me/switch-business-unit` + persisted active-unit preference.
+- [x] `module_visibility` table + inclusion in `/me/context`.
 - [ ] Frontend switcher + context-driven navigation (see WP 12).

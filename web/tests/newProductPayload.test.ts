@@ -3,7 +3,7 @@ import {
   buildProductCreateBody,
   createInitialProductForm,
   validateProductForm,
-} from "@/app/(protected)/inventory/products/new/productForm";
+} from "@/app/(protected)/catalog/_components/productCreatePayload";
 
 describe("new product form payload", () => {
   it("builds a child variant create payload with full product fields", () => {

@@ -31,6 +31,14 @@ function comboKey(values: string[]): string {
   return JSON.stringify(values.map((v) => v.trim().toLowerCase()).sort());
 }
 
+interface VariantWizardValues {
+  label: string;
+  upc: string;
+  sku: string;
+  sellingPrice: string;
+  category: string;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function cartesian(arrays: string[][]): string[][] {
@@ -115,6 +123,12 @@ function ValueChipsInput({
       />
     </div>
   );
+}
+
+function priceToCents(value: string): number | null {
+  const normalized = value.replace(/[$,\s]/g, "");
+  if (!/^\d+(\.\d{0,2})?$/.test(normalized)) return null;
+  return Math.round(Number(normalized) * 100);
 }
 
 // ── Attribute row ─────────────────────────────────────────────────────────────
@@ -334,6 +348,173 @@ function LinkProductModal({
   );
 }
 
+// ── Create variant wizard ────────────────────────────────────────────────────
+
+function CreateVariantWizard({
+  product,
+  onClose,
+  onCreated,
+}: {
+  product: CatalogProduct;
+  onClose: () => void;
+  onCreated: (variant: CatalogProduct) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [values, setValues] = useState<VariantWizardValues>({
+    label: "",
+    upc: "",
+    sku: "",
+    sellingPrice: (product.price_cents / 100).toFixed(2),
+    category: product.category ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const steps = [
+    { key: "upc", title: "UPC", field: "upc" as const, placeholder: "Enter the variant UPC" },
+    { key: "sku", title: "SKU", field: "sku" as const, placeholder: `${product.sku}-VARIANT` },
+    { key: "price", title: "Selling price", field: "sellingPrice" as const, placeholder: "0.00" },
+    { key: "category", title: "Category", field: "category" as const, placeholder: "Category" },
+  ];
+
+  const current = steps[step];
+  const priceCents = priceToCents(values.sellingPrice);
+  const canContinue =
+    current.field === "sellingPrice"
+      ? priceCents !== null
+      : values[current.field].trim().length > 0;
+  const canCreate =
+    values.label.trim().length > 0 &&
+    values.upc.trim().length > 0 &&
+    values.sku.trim().length > 0 &&
+    priceCents !== null &&
+    values.category.trim().length > 0;
+
+  const setField = (field: keyof VariantWizardValues, value: string) => {
+    setError(null);
+    setValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreate = async () => {
+    if (!canCreate || priceCents === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const variant = await apiPost<CatalogProduct>(`/api/v1/catalog/${product.id}/variants`, {
+        variant_label: values.label.trim(),
+        upc: values.upc.trim(),
+        sku: values.sku.trim(),
+        selling_price_cents: priceCents,
+        category: values.category.trim(),
+      });
+      onCreated(variant);
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiResponseError ? e.message : "Failed to create variant.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-[#111]">Create Variant</h2>
+            <p className="mt-1 text-xs text-slate-500">Add one sellable child product under {product.name}.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="space-y-5 px-5 py-4">
+          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Variant label
+            </label>
+            <input
+              autoFocus
+              className={FLD}
+              value={values.label}
+              onChange={(e) => setField("label", e.target.value)}
+              placeholder="e.g. Small / Red / 12 pack"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {steps.map((item, index) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setStep(index)}
+                className={`h-2 rounded-full transition-colors ${index <= step ? "bg-[#5D5FEF]" : "bg-slate-200"}`}
+                aria-label={`Go to ${item.title}`}
+              />
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Step {step + 1} of {steps.length}
+            </p>
+            <label className="mt-2 block text-sm font-semibold text-[#111]">{current.title}</label>
+            <input
+              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#5D5FEF] focus:outline-none"
+              value={values[current.field]}
+              onChange={(e) => setField(current.field, e.target.value)}
+              placeholder={current.placeholder}
+              inputMode={current.field === "sellingPrice" ? "decimal" : "text"}
+            />
+          </div>
+
+          <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-2">
+            <span><strong className="text-slate-900">UPC:</strong> {values.upc || "Required"}</span>
+            <span><strong className="text-slate-900">SKU:</strong> {values.sku || "Required"}</span>
+            <span><strong className="text-slate-900">Price:</strong> {priceCents === null ? "Required" : formatMoney(priceCents)}</span>
+            <span><strong className="text-slate-900">Category:</strong> {values.category || "Required"}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setStep((prev) => Math.max(0, prev - 1))}
+            disabled={step === 0}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Back
+          </button>
+          {step < steps.length - 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep((prev) => Math.min(steps.length - 1, prev + 1))}
+              disabled={!canContinue}
+              className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={saving || !canCreate}
+              className="rounded-lg bg-[#5D5FEF] px-5 py-2 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-40"
+            >
+              {saving ? "Creating…" : "Create Variant"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── VariantsTab ───────────────────────────────────────────────────────────────
 
 export function VariantsTab({
@@ -348,6 +529,7 @@ export function VariantsTab({
   const [generating, setGenerating]   = useState(false);
   const [genError, setGenError]       = useState<string | null>(null);
   const [showLink, setShowLink]       = useState(false);
+  const [showCreate, setShowCreate]   = useState(false);
   const [unlinkId, setUnlinkId]       = useState<string | null>(null);
   const [showWizard, setShowWizard]   = useState(false);
   // Preview controls
@@ -621,7 +803,7 @@ export function VariantsTab({
 
       {/* Variant list */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
           <h3 className="text-sm font-semibold text-[#111]">
             Variants
             {children.length > 0 && (
@@ -630,16 +812,28 @@ export function VariantsTab({
               </span>
             )}
           </h3>
-          <button
-            type="button"
-            onClick={() => setShowLink(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-            Link existing
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-[#5D5FEF] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4849d0] transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create variant
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLink(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              Link existing
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -650,7 +844,7 @@ export function VariantsTab({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             <p className="text-sm text-slate-400">No variants yet.</p>
-            <p className="text-xs text-slate-400">Use Generate Variants above or link an existing product.</p>
+            <p className="text-xs text-slate-400">Create a variant, use Generate Variants above, or link an existing product.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -660,6 +854,8 @@ export function VariantsTab({
                   <th className="px-4 py-3 text-left">Label</th>
                   <th className="px-4 py-3 text-left">Name</th>
                   <th className="px-4 py-3 text-left">SKU</th>
+                  <th className="px-4 py-3 text-left">UPC</th>
+                  <th className="px-4 py-3 text-left">Category</th>
                   <th className="px-4 py-3 text-right">Price</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -683,6 +879,8 @@ export function VariantsTab({
                     </td>
                     <td className="px-4 py-3 font-medium text-[#111]">{child.name}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{child.sku}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{child.barcode || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600">{child.category}</td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(child.price_cents)}</td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_COLOR[child.status] ?? ""}`}>
@@ -726,6 +924,17 @@ export function VariantsTab({
       )}
 
       {/* Link modal */}
+      {showCreate && (
+        <CreateVariantWizard
+          product={product}
+          onClose={() => setShowCreate(false)}
+          onCreated={(variant) => setChildren((prev) => [...prev, variant].sort((a, b) => {
+            const byLabel = (a.variant_label ?? "").localeCompare(b.variant_label ?? "");
+            return byLabel || a.sku.localeCompare(b.sku);
+          }))}
+        />
+      )}
+
       {showLink && (
         <LinkProductModal
           masterId={product.id}

@@ -210,6 +210,14 @@ const variantSortSchema = z.object({
   mode: z.enum(VARIANT_SORT_MODES as unknown as [string, ...string[]]),
 });
 
+const createVariantSchema = z.object({
+  variant_label: z.string().min(1),
+  upc: z.string().min(1),
+  sku: z.string().min(1),
+  selling_price_cents: z.number().int().nonnegative(),
+  category: z.string().min(1),
+});
+
 function parseInt0(value: unknown): number | undefined {
   if (typeof value !== "string" || value.trim() === "") return undefined;
   const n = Number(value);
@@ -525,6 +533,16 @@ export function registerRoutes(router: Router, service: CatalogService): void {
       const body = parseBody(variantSortSchema, req.body);
       const items = await service.setVariantSort(String(req.params.id), body.channel, body.mode as VariantSortMode, tenantId(res));
       res.json({ items });
+    }),
+  );
+
+  router.post(
+    "/:id/variants",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(createVariantSchema, req.body);
+      const product = await service.createVariant(String(req.params.id), body, tenantId(res));
+      res.status(201).json(product);
     }),
   );
 

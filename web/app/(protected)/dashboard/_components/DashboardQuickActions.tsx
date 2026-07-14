@@ -75,7 +75,7 @@ export function DashboardQuickActions() {
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <QuickActionCard href="/terminal" label="New Sale" icon={<IconRegister />} />
-        <QuickActionCard href="/catalog?new=1" label="Add Product" icon={<IconPlus />} />
+        <QuickActionCard href="/catalog?new=product" label="Add Product" icon={<IconPlus />} />
         <QuickActionCard href="/quotes" label="New Quote" icon={<IconQuote />} />
         <QuickActionCard href="/reports" label="View Reports" icon={<IconChart />} />
         <QuickActionCard href="/inventory" label="Manage Inventory" icon={<IconBox />} />
