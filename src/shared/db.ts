@@ -235,9 +235,26 @@ export interface OpenDbOptions {
   max?: number;
 }
 
-function sslConfig(): { rejectUnauthorized: boolean } | undefined {
+/**
+ * TLS settings for the Postgres pool. Exported for unit testing.
+ *
+ * Modes, in precedence order:
+ *  1. PG_SSL explicitly off        → no TLS (local/CI Postgres without SSL).
+ *  2. PG_CA_CERT set (PEM)         → VERIFIED TLS: pins the provider CA and
+ *     enables rejectUnauthorized, so a MITM between app and database fails the
+ *     handshake instead of silently reading tenant data. This is the required
+ *     production posture (C-3). Vercel env vars flatten newlines to literal
+ *     "\n" — they are restored here so the PEM parses.
+ *  3. PG_SSL on / NODE_ENV=production without a CA → encrypted but UNVERIFIED
+ *     (legacy fallback; app.ts logs a boot warning until a CA is pinned).
+ */
+export function sslConfig(): { ca?: string; rejectUnauthorized: boolean } | undefined {
   const raw = process.env.PG_SSL?.trim().toLowerCase();
   if (raw && ["0", "false", "no", "off", "disable", "disabled"].includes(raw)) return undefined;
+
+  const ca = process.env.PG_CA_CERT?.replace(/\\n/g, "\n").trim();
+  if (ca) return { ca, rejectUnauthorized: true };
+
   if (raw && ["1", "true", "yes", "on", "require", "required"].includes(raw)) return { rejectUnauthorized: false };
   return process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined;
 }

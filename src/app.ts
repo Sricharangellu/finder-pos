@@ -64,6 +64,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
       ["METRICS_TOKEN", "Prometheus metrics scraping will be disabled until a bearer token is configured"],
       ["WEBHOOK_SECRET_KEY", "customer webhook secrets may use plaintext dev fallback instead of encryption"],
+      ["PG_CA_CERT", "database TLS is encrypted but NOT authenticated (rejectUnauthorized:false) — pin the provider CA to prevent MITM between app and Postgres"],
     ];
     for (const [name, reason] of WARNED_VARS) {
       if (!process.env[name]) {
