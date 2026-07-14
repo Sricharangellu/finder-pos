@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
@@ -53,18 +55,18 @@ function CatalogMetric({ label, value, helper, tone = "neutral", active = false 
   tone?: MetricTone; active?: boolean;
 }) {
   return (
-    <div className={clsx("rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
+    <div className={clsx("h-full min-w-0 rounded-md border px-4 py-3 transition-colors", metricToneClass(tone), active && "ring-2 ring-brand-200")}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-xl font-semibold tabular-nums text-slate-950">{value}</span>
-        <span className="text-xs text-slate-500">{helper}</span>
+        <span className="truncate text-xs text-slate-500">{helper}</span>
       </div>
     </div>
   );
 }
 
-function ProductListCard({ product, onEdit, onArchive }: {
-  product: Product; onEdit: () => void; onArchive: () => void;
+function ProductListCard({ product, productType, onEdit, onArchive }: {
+  product: Product; productType: string; onEdit: () => void; onArchive: () => void;
 }) {
   const style = productStatusStyle(product.status);
   return (
@@ -81,6 +83,7 @@ function ProductListCard({ product, onEdit, onArchive }: {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={statusBadge(product.status)}>{product.status.charAt(0).toUpperCase() + product.status.slice(1)}</Badge>
+        <span className="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{productType}</span>
         <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{product.category}</span>
         {product.brand && <span className="text-xs text-slate-500">{product.brand}</span>}
         {product.age_restricted === 1 && (
@@ -101,6 +104,7 @@ function ProductListCard({ product, onEdit, onArchive }: {
 
 export function ProductsTab({ categories }: { categories: Category[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [products, setProducts]     = useState<Product[]>([]);
   const [total, setTotal]           = useState(0);
   const [loading, setLoading]       = useState(true);
@@ -114,6 +118,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [filterTaxClass, setFilterTaxClass]           = useState("");
   const [filterBrand, setFilterBrand]                 = useState("");
   const [filterAgeRestricted, setFilterAgeRestricted] = useState(false);
+  const [filterProductType, setFilterProductType]     = useState<"all" | "standalone" | "master" | "variant">("all");
   const [priceMin, setPriceMin]                       = useState("");
   const [priceMax, setPriceMax]                       = useState("");
   const [showMoreFilters, setShowMoreFilters]          = useState(false);
@@ -144,7 +149,18 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const archivedCount   = products.filter(p => p.status === "archived").length;
   const restrictedCount = products.filter(p => p.age_restricted === 1).length;
 
-  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterAgeRestricted || priceMin || priceMax);
+  const masterIds = useMemo(() => new Set(products.map((p) => p.parent_product_id).filter(Boolean) as string[]), [products]);
+  const getProductType = useCallback((product: Product): "Standalone" | "Master" | "Variant" => {
+    if (product.parent_product_id) return "Variant";
+    if (masterIds.has(product.id)) return "Master";
+    return "Standalone";
+  }, [masterIds]);
+
+  const standaloneCount = products.filter((p) => !p.parent_product_id && !masterIds.has(p.id)).length;
+  const masterCount = products.filter((p) => !p.parent_product_id && masterIds.has(p.id)).length;
+  const variantCount = products.filter((p) => Boolean(p.parent_product_id)).length;
+
+  const hasFilters = Boolean(filterStatus || filterCategory || debouncedQ || filterTaxClass || filterBrand || filterAgeRestricted || filterProductType !== "all" || priceMin || priceMax);
 
   const filterSummary = [
     filterStatus         ? `Status: ${filterStatus}`          : null,
@@ -153,13 +169,30 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     filterTaxClass       ? `Tax: ${filterTaxClass}`           : null,
     filterBrand          ? `Brand: "${filterBrand}"`          : null,
     filterAgeRestricted  ? "Age restricted only"              : null,
+    filterProductType !== "all" ? `Type: ${filterProductType}` : null,
     priceMin && priceMax ? `Price: $${priceMin}–$${priceMax}` : priceMin ? `Price ≥ $${priceMin}` : priceMax ? `Price ≤ $${priceMax}` : null,
   ].filter(Boolean);
 
   const clearFilters = () => {
     setFilterStatus(""); setFilterCategory(""); setSearch(""); setDebouncedQ("");
     setFilterTaxClass(""); setFilterBrand(""); setFilterAgeRestricted(false);
+    setFilterProductType("all");
     setPriceMin(""); setPriceMax("");
+  };
+
+  const openCreate = () => {
+    setActionError(null);
+    setShowCreate(true);
+    if (searchParams.get("new") !== "product") {
+      router.push("/catalog?new=product");
+    }
+  };
+
+  const closeCreate = () => {
+    setShowCreate(false);
+    if (searchParams.get("new") === "product") {
+      router.replace("/catalog", { scroll: false });
+    }
   };
 
   useEffect(() => {
@@ -172,6 +205,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     if (filterTaxClass)      result = result.filter(p => p.tax_class === filterTaxClass);
     if (filterBrand)         result = result.filter(p => (p.brand ?? "").toLowerCase().includes(filterBrand.toLowerCase()));
     if (filterAgeRestricted) result = result.filter(p => p.age_restricted === 1);
+    if (filterProductType !== "all") {
+      result = result.filter((p) => getProductType(p).toLowerCase() === filterProductType);
+    }
     if (priceMin)            result = result.filter(p => p.price_cents >= parseFloat(priceMin) * 100);
     if (priceMax)            result = result.filter(p => p.price_cents <= parseFloat(priceMax) * 100);
     return [...result].sort((a, b) => {
@@ -187,7 +223,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
       if (av > bv) return sortDir === "asc" ?  1 : -1;
       return 0;
     });
-  }, [products, filterTaxClass, filterBrand, filterAgeRestricted, priceMin, priceMax, sortCol, sortDir]);
+  }, [products, filterTaxClass, filterBrand, filterAgeRestricted, filterProductType, getProductType, priceMin, priceMax, sortCol, sortDir]);
 
   const selectedProducts = visibleProducts.filter(p => selectedIds.has(p.id));
   const allSelected      = visibleProducts.length > 0 && visibleProducts.every(p => selectedIds.has(p.id));
@@ -221,7 +257,16 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const handleCreate = async (body: Record<string, unknown>) => { await apiPost("/api/v1/catalog", body); await load(); };
+  useEffect(() => {
+    if (searchParams.get("new") === "product") {
+      setShowCreate(true);
+    }
+  }, [searchParams]);
+
+  const handleCreate = async (body: Record<string, unknown>) => {
+    const created = await apiPost<Product>("/api/v1/catalog", body);
+    router.push(`/catalog/${created.id}`);
+  };
 
   const handleArchive = async () => {
     if (!archiveTarget) return;
@@ -270,18 +315,45 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     <>
       <Card className="overflow-hidden p-0">
         {/* ── Spec: header row — Import + Add product ─────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-3">
-          <span className="text-sm font-semibold text-[#111]">Products</span>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 border-b border-[#E8E8E8] px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-[#111]">Products</span>
+            <span className="text-xs text-slate-500">Manage retail catalog items, master products, and variants.</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setShowImport(true)}
-              className="flex items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] hover:bg-gray-50 transition-colors">
+              className="flex min-h-9 items-center gap-1.5 rounded border border-[#D9D9D9] bg-white px-3 py-1.5 text-sm text-[#555] transition-colors hover:bg-gray-50">
               ↑ Import
             </button>
-            <button type="button" onClick={() => { setShowCreate(true); setActionError(null); }}
-              className="rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+            <button type="button" onClick={openCreate}
+              className="min-h-9 rounded bg-[#5D5FEF] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
               + Add product
             </button>
           </div>
+        </div>
+
+        <div className="grid gap-3 border-b border-[#E8E8E8] bg-slate-50 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <button type="button" aria-pressed={!filterStatus && filterProductType === "all" && !filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => { setFilterStatus(""); setFilterProductType("all"); setFilterAgeRestricted(false); }}>
+            <CatalogMetric label="Total" value={total} helper={`${products.length} loaded`} active={!filterStatus && filterProductType === "all" && !filterAgeRestricted} />
+          </button>
+          <button type="button" aria-pressed={filterStatus === "active"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("active")}>
+            <CatalogMetric label="Active" value={activeCount} helper="sellable" tone="success" active={filterStatus === "active"} />
+          </button>
+          <button type="button" aria-pressed={filterStatus === "draft"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("draft")}>
+            <CatalogMetric label="Draft" value={draftCount} helper="needs review" tone="warning" active={filterStatus === "draft"} />
+          </button>
+          <button type="button" aria-pressed={filterStatus === "archived"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterStatus("archived")}>
+            <CatalogMetric label="Archived" value={archivedCount} helper="hidden" tone="muted" active={filterStatus === "archived"} />
+          </button>
+          <button type="button" aria-pressed={filterProductType === "master"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterProductType("master")}>
+            <CatalogMetric label="Masters" value={masterCount} helper="variant groups" active={filterProductType === "master"} />
+          </button>
+          <button type="button" aria-pressed={filterProductType === "variant"} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterProductType("variant")}>
+            <CatalogMetric label="Variants" value={variantCount} helper="sellable SKUs" active={filterProductType === "variant"} />
+          </button>
+          <button type="button" aria-pressed={filterAgeRestricted} className="rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2" onClick={() => setFilterAgeRestricted((v) => !v)}>
+            <CatalogMetric label="Restricted" value={restrictedCount} helper="ID required" tone="restricted" active={filterAgeRestricted} />
+          </button>
         </div>
 
         {/* ── Spec: standard filter bar ────────────────────────────────────── */}
@@ -292,28 +364,39 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               <label htmlFor="catalog-search" className="text-xs font-medium text-[#555]">Name or SKU</label>
               <input id="catalog-search" type="search" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search…"
-                className="h-8 w-44 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF]" />
+                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none focus:ring-1 focus:ring-[#5D5FEF] sm:w-44" />
             </div>
             {/* Category */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Category</label>
               <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                 <option value="">All categories</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            {/* Product type */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-[#555]">Product type</label>
+              <select value={filterProductType} onChange={e => setFilterProductType(e.target.value as typeof filterProductType)}
+                className="h-9 min-w-36 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                <option value="all">All types</option>
+                <option value="standalone">Standalone</option>
+                <option value="master">Master</option>
+                <option value="variant">Variant</option>
               </select>
             </div>
             {/* Brand */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Brand</label>
               <input type="text" value={filterBrand} onChange={e => setFilterBrand(e.target.value)} placeholder="Brand…"
-                className="h-8 w-28 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none" />
+                className="h-9 w-full rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none sm:w-32" />
             </div>
             {/* Channel (ecommerce status) */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[#555]">Channel</label>
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                 <option value="">All</option>
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
@@ -326,7 +409,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-[#555]">Tax class</label>
                   <select value={filterTaxClass} onChange={e => setFilterTaxClass(e.target.value)}
-                    className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                     <option value="">All</option>
                     <option value="standard">Standard</option>
                     <option value="exempt">Exempt</option>
@@ -335,7 +418,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-[#555]">Age restricted</label>
                   <select value={filterAgeRestricted ? "1" : "0"} onChange={e => setFilterAgeRestricted(e.target.value === "1")}
-                    className="h-8 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
+                    className="h-9 min-w-32 rounded border border-[#D9D9D9] px-2 text-sm text-[#111] focus:border-[#5D5FEF] focus:outline-none">
                     <option value="0">All</option>
                     <option value="1">18+ only</option>
                   </select>
@@ -343,13 +426,13 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               </>
             )}
             {/* Actions */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button type="button" onClick={clearFilters} className="text-sm text-[#5D5FEF] hover:underline">Clear filters</button>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+              <button type="button" onClick={clearFilters} disabled={!hasFilters} className="text-sm text-[#5D5FEF] hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline">Clear filters</button>
               <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="text-sm text-[#5D5FEF] hover:underline">
                 {showMoreFilters ? "Fewer filters" : "More filters"}
               </button>
               <button type="button" onClick={() => void load()}
-                className="h-8 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white hover:bg-[#4849d0] transition-colors">
+                className="h-9 rounded bg-[#5D5FEF] px-4 text-sm font-medium text-white transition-colors hover:bg-[#4849d0]">
                 Search
               </button>
             </div>
@@ -383,13 +466,24 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
 
         {loading ? (
-          <TableSkeleton headers={["", "Product", "SKU", "Category", "Price", "Status", ""]} rows={8} />
+          <TableSkeleton headers={["", "Product", "Type", "Brand", "Supplier", "Available", "Retail price", "Channels", "Created", ""]} rows={8} />
         ) : error ? (
-          <div className="px-4 py-6"><p role="alert" className="text-sm text-red-700">{error}</p></div>
+          <div className="px-4 py-10">
+            <EmptyState
+              title="Products could not load"
+              description={error}
+              action={<Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>}
+            />
+          </div>
         ) : visibleProducts.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">No products found.</p>
-            {hasFilters && <button type="button" onClick={clearFilters} className="mt-2 text-xs text-brand-600 hover:underline">Clear filters</button>}
+          <div className="px-4 py-10">
+            <EmptyState
+              title={hasFilters ? "No products match these filters" : "No products yet"}
+              description={hasFilters ? "Clear filters or adjust the search to see more catalog items." : "Create your first product to start building the catalog."}
+              action={hasFilters
+                ? <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>
+                : <Button size="sm" variant="primary" onClick={openCreate}>Add product</Button>}
+            />
           </div>
         ) : (
           <>
@@ -402,6 +496,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all products" className="h-4 w-4 rounded border-slate-300" />
                     </th>
                     <SortTh col="name"        label="Name"          cur={sortCol} dir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3">Type</th>
                     <SortTh col="brand"       label="Brand"         cur={sortCol} dir={sortDir} onSort={handleSort} />
                     <th className="px-4 py-3">Supplier</th>
                     <th className="px-4 py-3">Available</th>
@@ -415,6 +510,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                   {visibleProducts.map(p => {
                     const isSelected = selectedIds.has(p.id);
                     const isAvailable = p.status === "active";
+                    const productType = getProductType(p);
                     const createdDate = p.created_at
                       ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "2-digit" }).format(new Date(p.created_at))
                       : "—";
@@ -448,6 +544,17 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
                               <p className="text-[11px] text-[#888] font-mono">{p.sku}</p>
                             </div>
                           </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span className={clsx(
+                            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                            productType === "Variant" ? "bg-blue-50 text-blue-700"
+                              : productType === "Master" ? "bg-violet-50 text-violet-700"
+                              : "bg-slate-100 text-slate-600"
+                          )}>
+                            {productType}
+                          </span>
                         </td>
 
                         {/* Brand */}
@@ -514,6 +621,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
             <div className="divide-y divide-slate-100 md:hidden">
               {visibleProducts.map(p => (
                 <ProductListCard key={p.id} product={p}
+                  productType={getProductType(p)}
                   onEdit={() => router.push(`/catalog/${p.id}`)}
                   onArchive={() => { setArchiveTarget(p); setActionError(null); }} />
               ))}
@@ -524,7 +632,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
 
       {showImport    && <ImportCSVModal onDone={async () => { await load(); }} onClose={() => setShowImport(false)} />}
       {showPrintLabels && <PrintLabelsModal selected={selectedProducts} onClose={() => setShowPrintLabels(false)} />}
-      {showCreate    && <ProductFormModal categories={categories} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
+      {showCreate    && <ProductFormModal categories={categories} onSave={handleCreate} onClose={closeCreate} />}
 
       {archiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setArchiveTarget(null)}>

@@ -324,6 +324,99 @@ test("variants: create a child directly, list it, and clear its parent", async (
   assert.equal(afterClear.json.items.length, 0);
 });
 
+test("variants: create a child through the variant endpoint with UPC, SKU, price, and category", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", {
+    sku: "WIZ-MASTER",
+    name: "Coffee Bag",
+    price_cents: 1499,
+    category: "coffee",
+    barcode: "000MASTER",
+  });
+
+  const created = await call(app, "POST", `/api/catalog/${master.json.id}/variants`, {
+    variant_label: "Dark Roast",
+    upc: "000DARK",
+    sku: "WIZ-DARK",
+    selling_price_cents: 1699,
+    category: "coffee-beans",
+  });
+
+  assert.equal(created.status, 201);
+  assert.equal(created.json.parent_product_id, master.json.id);
+  assert.equal(created.json.variant_label, "Dark Roast");
+  assert.equal(created.json.barcode, "000DARK");
+  assert.equal(created.json.sku, "WIZ-DARK");
+  assert.equal(created.json.price_cents, 1699);
+  assert.equal(created.json.category, "coffee-beans");
+
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.deepEqual(variants.json.items.map((p: any) => p.id), [created.json.id]);
+});
+
+test("variants: reject duplicate UPCs when creating a child variant", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", {
+    sku: "DUPUPC-MASTER",
+    name: "Tea Master",
+    price_cents: 1299,
+    category: "tea",
+  });
+  await call(app, "POST", "/api/catalog/", {
+    sku: "DUPUPC-EXISTING",
+    name: "Existing Tea",
+    price_cents: 999,
+    category: "tea",
+    barcode: "DUP-UPC-1",
+  });
+
+  const duplicate = await call(app, "POST", `/api/catalog/${master.json.id}/variants`, {
+    variant_label: "Mint",
+    upc: "DUP-UPC-1",
+    sku: "DUPUPC-MINT",
+    selling_price_cents: 1399,
+    category: "tea",
+  });
+
+  assert.equal(duplicate.status, 409);
+  assert.match(duplicate.json.error.message, /already assigned/);
+});
+
+test("variants: reject UPCs already registered as alternate barcodes", async () => {
+  const app = await freshApp();
+
+  const master = await call(app, "POST", "/api/catalog/", {
+    sku: "ALTUPC-MASTER",
+    name: "Soda Master",
+    price_cents: 199,
+    category: "drinks",
+  });
+  const existing = await call(app, "POST", "/api/catalog/", {
+    sku: "ALTUPC-EXISTING",
+    name: "Existing Soda",
+    price_cents: 199,
+    category: "drinks",
+  });
+  await call(app, "POST", `/api/catalog/${existing.json.id}/barcodes`, {
+    barcode: "ALT-UPC-1",
+    kind: "case",
+    packSize: 12,
+  });
+
+  const duplicate = await call(app, "POST", `/api/catalog/${master.json.id}/variants`, {
+    variant_label: "Cherry",
+    upc: "ALT-UPC-1",
+    sku: "ALTUPC-CHERRY",
+    selling_price_cents: 249,
+    category: "drinks",
+  });
+
+  assert.equal(duplicate.status, 409);
+  assert.match(duplicate.json.error.message, /already assigned/);
+});
+
 test("variants: assign can set a label and unlink a child", async () => {
   const app = await freshApp();
 

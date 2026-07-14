@@ -161,7 +161,7 @@ export function CatalogTab() {
               </div>
             )}
           </div>
-          <Button variant="primary" size="sm" onClick={() => router.push("/catalog?new=1")}>
+          <Button variant="primary" size="sm" onClick={() => router.push("/catalog?new=product")}>
             New product
           </Button>
         </div>

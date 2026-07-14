@@ -14,7 +14,7 @@ export { requestIdMiddleware } from "./requestId.js";
 export type { RedisClient } from "../shared/redis.js";
 export { rateLimitMiddleware, tenantRateLimitMiddleware, RATE_TIERS } from "./rateLimit.js";
 export type { TierLimit, TenantRateLimitOptions } from "./rateLimit.js";
-export { authMiddleware, makeAuthMiddleware, tenantResolver, requireRole, requireScope, requirePlan } from "./auth.js";
+export { authMiddleware, makeAuthMiddleware, tenantResolver, requireRole, requireScope, requirePlan, requireCapability } from "./auth.js";
 export { errorEnvelopeMiddleware } from "./errorEnvelope.js";
 export { metricsMiddleware, renderMetrics, recordRequest, normalizePath, resetMetrics } from "./metrics.js";
 export type { AuthPayload } from "./auth.js";
