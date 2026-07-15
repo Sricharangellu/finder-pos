@@ -4,8 +4,11 @@ import jwt from "jsonwebtoken";
 import { HttpError } from "../shared/http.js";
 import type { Role } from "../identity/types.js";
 import { hasRole } from "../identity/types.js";
+import type { Plan } from "../identity/authorization.js";
+import { comparePlans, evaluateCapability, evaluatePermission } from "../identity/authorization.js";
 import type { DB } from "../shared/db.js";
 import { runWithTenant } from "../shared/tenant-context.js";
+import { SettingsService } from "../modules/settings/service.js";
 
 export interface AuthPayload {
   tenantId: string;
@@ -73,11 +76,7 @@ export function requirePermission(permission: string) {
       next(new HttpError(401, "unauthenticated", "Not authenticated."));
       return;
     }
-    if (auth.role === "owner" || auth.role === "manager") {
-      next();
-      return;
-    }
-    if (auth.permissions.includes(permission)) {
+    if (evaluatePermission(auth, permission)) {
       next();
       return;
     }
@@ -234,16 +233,6 @@ export function requireScope(scope: string) {
  * (e.g. in tests that bypass the DB). The auth check above already rejected any
  * request without a valid tenant, so we can trust `res.locals.auth.tenantId`.
  */
-// DB-13: Subscription plan hierarchy — each plan includes all plans below it.
-const PLAN_ORDER = ["starter", "growth", "professional", "enterprise", "platform"] as const;
-type Plan = typeof PLAN_ORDER[number];
-
-function planSatisfies(actual: string, required: Plan): boolean {
-  const ai = PLAN_ORDER.indexOf(actual as Plan);
-  const ri = PLAN_ORDER.indexOf(required);
-  return ai >= ri;
-}
-
 /**
  * requirePlan(plan) — middleware that checks the tenant's subscription plan.
  * Reads from the `subscriptions` table on every request (no caching — plans
@@ -263,7 +252,7 @@ export function requirePlan(required: Plan): RequestHandler {
         { t: auth.tenantId },
       );
       const plan = sub?.plan ?? "starter";
-      if (!planSatisfies(plan, required)) {
+      if (!comparePlans(plan, required)) {
         next(new HttpError(403, "plan_required", `This feature requires the '${required}' plan or higher. Current plan: '${plan}'.`));
         return;
       }
@@ -306,14 +295,55 @@ export function requireCapability(capability: string): RequestHandler {
         "SELECT enabled FROM tenant_capabilities WHERE tenant_id = @t AND capability = @cap LIMIT 1",
         { t: auth.tenantId, cap: capability },
       );
-      const enabled = row ? row.enabled === true || row.enabled === 1 : false;
-      if (!enabled) {
+      if (!evaluateCapability(row)) {
         next(new HttpError(403, "capability_not_enabled", "This feature is not available for your account."));
         return;
       }
     } catch {
       // Cannot verify the capability → deny (strict separation is deny-by-default).
       next(new HttpError(403, "capability_unavailable", "This feature is not available for your account."));
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * requireModule(moduleKey) — business-pack module isolation guard.
+ *
+ * Ascend is one platform serving 12+ business verticals (retail, healthcare,
+ * automotive, rental, ...); each tenant's selected business type unlocks a
+ * curated module bundle (see src/shared/moduleRegistry.ts BUSINESS_BUNDLES).
+ * Today that resolution (SettingsService.getCapabilities) only drives what the
+ * *frontend* shows — it correctly defaults a module to disabled unless it's
+ * core or in the tenant's business-type bundle (or explicitly turned on), but
+ * nothing enforced it server-side, so a retail tenant could call
+ * `/api/v1/healthcare/...` directly and get real data.
+ *
+ * This reuses that same resolution (not a second, parallel policy) so the
+ * backend agrees with whatever the frontend already decided, and fails closed
+ * — matching requireCapability() above, not requirePlan()'s fail-open — since
+ * this is the actual isolation boundary between business packs.
+ *
+ * Usage: router.use(requireModule("patient_records")) at the top of a
+ * vertical module's router.
+ */
+export function requireModule(moduleKey: string): RequestHandler {
+  return async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    if (!auth?.tenantId) { next(new HttpError(401, "unauthenticated", "Not authenticated.")); return; }
+    const db = res.locals["db"] as DB | undefined;
+    // Deny-by-default: no DB context means the module can't be confirmed enabled → 403.
+    if (!db) { next(new HttpError(403, "module_unavailable", "This feature is not available for your account.")); return; }
+    try {
+      const capabilities = await new SettingsService(db).getCapabilities(auth);
+      const enabled = capabilities.modules.some((m) => m.key === moduleKey && m.enabled);
+      if (!enabled) {
+        next(new HttpError(403, "module_not_enabled", "This feature is not available for your account."));
+        return;
+      }
+    } catch {
+      next(new HttpError(403, "module_unavailable", "This feature is not available for your account."));
       return;
     }
     next();

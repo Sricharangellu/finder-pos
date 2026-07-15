@@ -149,3 +149,32 @@ test("initiate returns 400 when SSO config exists but enabled=false", async () =
   }, "owner");
   assert.equal(status, 400);
 });
+
+// ── 11. regression: initiate/callback reachable with NO bearer token ────────
+// Every test above goes through test-request.ts, which always attaches a
+// Bearer token — so it never actually exercised the real pre-login scenario
+// (a user who is trying to log in has no token yet). Before the app.ts fix,
+// these routes sat behind makeAuthMiddleware and returned 401 for a tokenless
+// caller, making SSO login impossible in practice.
+test("POST /sso/initiate is reachable with no Authorization header at all", async () => {
+  const app = await freshApp();
+  await call(app, "PUT", "/api/sso/config", VALID_CONFIG);
+
+  const http = await import("node:http");
+  const status = await new Promise<number>((resolve, reject) => {
+    const server = http.createServer(app.express);
+    server.listen(0, () => {
+      const address = server.address();
+      if (address === null || typeof address === "string") { server.close(); reject(new Error("bind failed")); return; }
+      const body = JSON.stringify({ tenantId: "tnt_demo", redirectUri: "https://app.example.com/sso/callback" });
+      const req = http.request(
+        { host: "127.0.0.1", port: address.port, method: "POST", path: "/api/v1/sso/initiate", headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(body)) } },
+        (res) => { res.on("data", () => {}); res.on("end", () => { server.close(); resolve(res.statusCode ?? 0); }); },
+      );
+      req.on("error", (err) => { server.close(); reject(err); });
+      req.write(body);
+      req.end();
+    });
+  });
+  assert.equal(status, 200);
+});

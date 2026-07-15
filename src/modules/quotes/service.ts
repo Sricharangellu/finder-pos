@@ -1,93 +1,85 @@
 import { v7 as uuidv7 } from "uuid";
-import type { DB } from "../../shared/db.js";
+import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
-
-export interface QuoteLine {
-  productId: string;
-  sku?: string;
-  name: string;
-  quantity: number;
-  unitCents: number;
-  discountCents?: number;
-  taxCents?: number;
-}
-
-export interface CreateQuoteInput {
-  customerId?: string | null;
-  outletId?: string | null;
-  lines: QuoteLine[];
-  validUntil?: number | null;
-  notes?: string | null;
-  currency?: string;
-  createdBy?: string;
-}
+import type { QuotesRepository } from "./quotes.repository.js";
+import type {
+  CreateQuoteInput,
+  ConvertQuoteResponseDto,
+  QuoteListResponseDto,
+  QuoteResponseDto,
+} from "./quotes.dto.js";
 
 export class QuotesService {
-  constructor(private readonly db: DB) {}
+  constructor(
+    private readonly repo: QuotesRepository,
+    private readonly events: EventBus,
+  ) {}
 
-  async create(input: CreateQuoteInput, tenantId: string) {
+  async create(input: CreateQuoteInput, tenantId: string): Promise<QuoteResponseDto> {
     const now = Date.now();
     const id = `qt_${uuidv7()}`;
     const quoteNumber = `QT-${now.toString(36).toUpperCase().slice(-8)}`;
 
-    let subtotal = 0, discount = 0, tax = 0;
+    let subtotalCents = 0, discountCents = 0, taxCents = 0;
     for (const l of input.lines) {
-      subtotal += l.unitCents * l.quantity;
-      discount += (l.discountCents ?? 0);
-      tax += (l.taxCents ?? 0);
+      subtotalCents += l.unitCents * l.quantity;
+      discountCents += l.discountCents ?? 0;
+      taxCents += l.taxCents ?? 0;
     }
-    const total = subtotal - discount + tax;
+    const totalCents = subtotalCents - discountCents + taxCents;
 
-    await this.db.query(
-      `INSERT INTO quotations (id, tenant_id, outlet_id, customer_id, quote_number, status, currency, subtotal_cents, discount_cents, tax_cents, total_cents, valid_until, notes, created_by, created_at, updated_at)
-       VALUES (@id, @t, @outlet, @cust, @num, 'draft', @curr, @sub, @disc, @tax, @total, @valid, @notes, @by, @now, @now)`,
-      { id, t: tenantId, outlet: input.outletId ?? null, cust: input.customerId ?? null, num: quoteNumber, curr: input.currency ?? 'USD', sub: subtotal, disc: discount, tax, total, valid: input.validUntil ?? null, notes: input.notes ?? null, by: input.createdBy ?? null, now }
-    );
-
-    for (const l of input.lines) {
-      await this.db.query(
-        `INSERT INTO quote_lines (id, tenant_id, quote_id, product_id, sku, name, quantity, unit_cents, discount_cents, tax_cents, line_cents, created_at)
-         VALUES (@id, @t, @qid, @pid, @sku, @name, @qty, @unit, @disc, @tax, @line, @now)`,
-        { id: `qtl_${uuidv7()}`, t: tenantId, qid: id, pid: l.productId, sku: l.sku ?? '', name: l.name, qty: l.quantity, unit: l.unitCents, disc: l.discountCents ?? 0, tax: l.taxCents ?? 0, line: l.unitCents * l.quantity - (l.discountCents ?? 0) + (l.taxCents ?? 0), now }
-      );
-    }
+    await this.repo.insertQuote({
+      id,
+      tenantId,
+      outletId: input.outletId,
+      customerId: input.customerId,
+      quoteNumber,
+      currency: input.currency ?? "USD",
+      totals: { subtotalCents, discountCents, taxCents, totalCents },
+      validUntil: input.validUntil,
+      notes: input.notes,
+      createdBy: input.createdBy,
+      lines: input.lines,
+    });
 
     return this.get(id, tenantId);
   }
 
-  async get(id: string, tenantId: string) {
-    const quote = await this.db.one<Record<string, unknown>>("SELECT * FROM quotations WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
+  async get(id: string, tenantId: string): Promise<QuoteResponseDto> {
+    const quote = await this.repo.findById(id, tenantId);
     if (!quote) throw new HttpError(404, "not_found", `Quote '${id}' not found`);
-    const lines = await this.db.query("SELECT * FROM quote_lines WHERE quote_id = @id AND tenant_id = @t ORDER BY created_at ASC", { id, t: tenantId });
+    const lines = await this.repo.findLines(id, tenantId);
     return { ...quote, lines };
   }
 
-  async list(tenantId: string, limit = 50, offset = 0) {
-    const items = await this.db.query("SELECT * FROM quotations WHERE tenant_id = @t ORDER BY created_at DESC LIMIT @limit OFFSET @offset", { t: tenantId, limit, offset });
-    const count = await this.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM quotations WHERE tenant_id = @t", { t: tenantId });
-    return { items, total: Number(count?.n ?? 0) };
+  async list(tenantId: string, limit = 50, offset = 0): Promise<QuoteListResponseDto> {
+    return this.repo.list(tenantId, limit, offset);
   }
 
-  async updateStatus(id: string, status: string, tenantId: string) {
-    const now = Date.now();
-    await this.db.query("UPDATE quotations SET status = @status, updated_at = @now WHERE id = @id AND tenant_id = @t", { status, now, id, t: tenantId });
+  async updateStatus(id: string, status: string, tenantId: string): Promise<QuoteResponseDto> {
+    await this.repo.updateStatus(id, status, tenantId);
     return this.get(id, tenantId);
   }
 
-  async convertToOrder(id: string, tenantId: string): Promise<{ quoteId: string; message: string }> {
-    const quote = await this.db.one<{ status: string; converted_order_id: string | null }>( "SELECT status, converted_order_id FROM quotations WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
+  /** Converting a quote is the aggregate's one state-transition boundary: this
+   *  is the only place `quote.converted` is raised, matching the discipline
+   *  sales/service.ts uses for `sales_order.*` events. */
+  async convertToOrder(id: string, tenantId: string): Promise<ConvertQuoteResponseDto> {
+    const quote = await this.repo.findForConversion(id, tenantId);
     if (!quote) throw new HttpError(404, "not_found", `Quote '${id}' not found`);
-    if (quote.converted_order_id) throw new HttpError(409, "already_converted", "This quote has already been converted to an order");
+    if (quote.converted_order_id || quote.status === "converted") throw new HttpError(409, "already_converted", "This quote has already been converted to an order");
     if (quote.status === "expired") throw new HttpError(400, "quote_expired", "Cannot convert an expired quote");
-    const now = Date.now();
-    await this.db.query("UPDATE quotations SET status = 'converted', updated_at = @now WHERE id = @id AND tenant_id = @t", { now, id, t: tenantId });
+
+    await this.repo.markConverted(id, tenantId);
+    await this.events.publish("quote.converted", { quoteId: id, tenantId }, id);
+
     return { quoteId: id, message: "Quote marked as converted. Create the sales order manually with the quoted lines." };
   }
 
-  async delete(id: string, tenantId: string) {
-    const quote = await this.db.one<{ status: string }>("SELECT status FROM quotations WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
+  async delete(id: string, tenantId: string): Promise<void> {
+    const quote = await this.repo.findForDelete(id, tenantId);
     if (!quote) throw new HttpError(404, "not_found", `Quote '${id}' not found`);
     if (quote.status === "converted") throw new HttpError(400, "cannot_delete", "Cannot delete a converted quote");
-    await this.db.query("DELETE FROM quotations WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
+    await this.repo.deleteQuote(id, tenantId);
   }
 }

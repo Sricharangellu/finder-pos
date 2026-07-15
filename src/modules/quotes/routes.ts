@@ -1,30 +1,11 @@
 import type { Router, Response } from "express";
-import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import type { QuotesService } from "./service.js";
+import { createQuoteSchema, updateStatusSchema } from "./quotes.dto.js";
 
 function tenantId(res: Response) { return (res.locals["auth"] as AuthPayload).tenantId; }
 function userId(res: Response) { return (res.locals["auth"] as AuthPayload).userId; }
-
-const lineSchema = z.object({
-  productId: z.string().min(1),
-  sku: z.string().optional(),
-  name: z.string().min(1),
-  quantity: z.number().int().positive(),
-  unitCents: z.number().int().nonnegative(),
-  discountCents: z.number().int().nonnegative().optional(),
-  taxCents: z.number().int().nonnegative().optional(),
-});
-
-const createSchema = z.object({
-  customerId: z.string().nullable().optional(),
-  outletId: z.string().nullable().optional(),
-  lines: z.array(lineSchema).min(1),
-  validUntil: z.number().int().positive().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  currency: z.string().length(3).optional(),
-});
 
 export function registerRoutes(router: Router, service: QuotesService) {
   router.get("/", handler(async (req, res) => {
@@ -34,7 +15,7 @@ export function registerRoutes(router: Router, service: QuotesService) {
   }));
 
   router.post("/", handler(async (req, res) => {
-    const body = parseBody(createSchema, req.body);
+    const body = parseBody(createQuoteSchema, req.body);
     const quote = await service.create({ ...body, createdBy: userId(res) }, tenantId(res));
     res.status(201).json(quote);
   }));
@@ -44,7 +25,7 @@ export function registerRoutes(router: Router, service: QuotesService) {
   }));
 
   router.patch("/:id/status", handler(async (req, res) => {
-    const body = parseBody(z.object({ status: z.enum(["draft", "sent", "accepted", "rejected", "expired"]) }), req.body);
+    const body = parseBody(updateStatusSchema, req.body);
     res.json(await service.updateStatus(String(req.params.id), body.status, tenantId(res)));
   }));
 

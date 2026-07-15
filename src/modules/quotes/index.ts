@@ -1,9 +1,16 @@
 import type { PosModule } from "../types.js";
 import { QuotesService } from "./service.js";
+import { QuotesRepository } from "./quotes.repository.js";
 import { registerRoutes } from "./routes.js";
 
+// NOTE: named "quote_headers", not "quotations" — the sales module already owns
+// a table literally named "quotations" with an incompatible schema (no
+// outlet_id/currency/notes/converted_order_id). Both modules did
+// `CREATE TABLE IF NOT EXISTS quotations`; since sales registers first in
+// modules/index.ts, this module silently ran against sales' schema and every
+// query failed on a missing column. Distinct table name closes that collision.
 const CREATE_QUOTATIONS_TABLE = `
-CREATE TABLE IF NOT EXISTS quotations (
+CREATE TABLE IF NOT EXISTS quote_headers (
   id                    TEXT PRIMARY KEY,
   tenant_id             TEXT NOT NULL,
   outlet_id             TEXT,
@@ -25,15 +32,15 @@ CREATE TABLE IF NOT EXISTS quotations (
 `;
 
 const CREATE_QUOTATIONS_INDEXES = `
-CREATE INDEX IF NOT EXISTS quotations_tenant_idx ON quotations (tenant_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS quotations_customer_idx ON quotations (tenant_id, customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS quote_headers_tenant_idx ON quote_headers (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS quote_headers_customer_idx ON quote_headers (tenant_id, customer_id) WHERE customer_id IS NOT NULL;
 `;
 
 const CREATE_QUOTATION_LINES_TABLE = `
 CREATE TABLE IF NOT EXISTS quote_lines (
   id             TEXT PRIMARY KEY,
   tenant_id      TEXT NOT NULL,
-  quote_id       TEXT NOT NULL REFERENCES quotations(id) ON DELETE CASCADE,
+  quote_id       TEXT NOT NULL REFERENCES quote_headers(id) ON DELETE CASCADE,
   product_id     TEXT NOT NULL,
   sku            TEXT NOT NULL DEFAULT '',
   name           TEXT NOT NULL,
@@ -53,8 +60,8 @@ CREATE INDEX IF NOT EXISTS quote_lines_quote_idx ON quote_lines (tenant_id, quot
 export const quotesModule: PosModule = {
   name: "quotes",
   migrations: [CREATE_QUOTATIONS_TABLE, CREATE_QUOTATIONS_INDEXES, CREATE_QUOTATION_LINES_TABLE, CREATE_QUOTATION_LINES_INDEX],
-  register({ db, router }) {
-    registerRoutes(router, new QuotesService(db));
+  register({ db, events, router }) {
+    registerRoutes(router, new QuotesService(new QuotesRepository(db), events));
   },
 };
 

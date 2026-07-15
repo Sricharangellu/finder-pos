@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody, notFound } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -72,10 +72,11 @@ export const healthcareModule: PosModule = {
   name: "healthcare",
   migrations: [CREATE_PATIENTS, CREATE_PRESCRIPTIONS],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("patient_records"));
 
     // ── Patients ────────────────────────────────────────────────────────────
 
-    router.get("/healthcare/patients", handler(async (req, res) => {
+    router.get("/patients", handler(async (req, res) => {
       const t = tid(res);
       const q = typeof req.query.q === "string" ? req.query.q : undefined;
       const where = q ? "WHERE tenant_id = @t AND name ILIKE @q" : "WHERE tenant_id = @t";
@@ -84,7 +85,7 @@ export const healthcareModule: PosModule = {
       res.json({ items: await db.query(`SELECT * FROM patients ${where} ORDER BY name LIMIT 500`, params) });
     }));
 
-    router.get("/healthcare/patients/:id", handler(async (req, res) => {
+    router.get("/patients/:id", handler(async (req, res) => {
       const patient = await db.one("SELECT * FROM patients WHERE id = @id AND tenant_id = @t",
         { id: String(req.params["id"]), t: tid(res) });
       if (!patient) { res.status(404).json({ error: { code: "not_found" } }); return; }
@@ -95,7 +96,7 @@ export const healthcareModule: PosModule = {
       res.json({ ...patient, prescriptions });
     }));
 
-    router.post("/healthcare/patients", handler(async (req, res) => {
+    router.post("/patients", handler(async (req, res) => {
       const body = parseBody(patientSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -114,14 +115,14 @@ export const healthcareModule: PosModule = {
 
     // ── Prescriptions ───────────────────────────────────────────────────────
 
-    router.get("/healthcare/patients/:id/prescriptions", handler(async (req, res) => {
+    router.get("/patients/:id/prescriptions", handler(async (req, res) => {
       res.json({ items: await db.query(
         "SELECT * FROM prescriptions WHERE patient_id = @id AND tenant_id = @t ORDER BY created_at DESC LIMIT 100",
         { id: String(req.params["id"]), t: tid(res) },
       )});
     }));
 
-    router.post("/healthcare/patients/:id/prescriptions", requireRole("manager"), handler(async (req, res) => {
+    router.post("/patients/:id/prescriptions", requireRole("manager"), handler(async (req, res) => {
       const body = parseBody(rxSchema, req.body);
       const t    = tid(res);
       const id   = `rx_${uuidv7()}`;
@@ -144,7 +145,7 @@ export const healthcareModule: PosModule = {
     }));
 
     // Dispense a prescription (decrement refills)
-    router.post("/healthcare/prescriptions/:id/dispense", handler(async (req, res) => {
+    router.post("/prescriptions/:id/dispense", handler(async (req, res) => {
       const id = String(req.params["id"]);
       const t  = tid(res);
       const rx = await db.one<{ refills_remaining: number }>(

@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody, notFound } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -74,10 +74,11 @@ export const rentalModule: PosModule = {
   name: "rental",
   migrations: [CREATE_RENTAL_ASSETS, CREATE_RENTAL_CONTRACTS],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("rental_contracts"));
 
     // ── Assets ────────────────────────────────────────────────────────────────
 
-    router.get("/rental/assets", handler(async (req, res) => {
+    router.get("/assets", handler(async (req, res) => {
       const t      = tid(res);
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const where  = status ? "WHERE tenant_id = @t AND status = @s" : "WHERE tenant_id = @t";
@@ -89,7 +90,7 @@ export const rentalModule: PosModule = {
       )});
     }));
 
-    router.post("/rental/assets", requireRole("manager"), handler(async (req, res) => {
+    router.post("/assets", requireRole("manager"), handler(async (req, res) => {
       const body = parseBody(assetSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -109,7 +110,7 @@ export const rentalModule: PosModule = {
 
     // ── Contracts ─────────────────────────────────────────────────────────────
 
-    router.get("/rental/contracts", handler(async (req, res) => {
+    router.get("/contracts", handler(async (req, res) => {
       const t      = tid(res);
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const where  = status ? "WHERE rc.tenant_id = @t AND rc.status = @s" : "WHERE rc.tenant_id = @t";
@@ -124,7 +125,7 @@ export const rentalModule: PosModule = {
       )});
     }));
 
-    router.post("/rental/contracts", handler(async (req, res) => {
+    router.post("/contracts", handler(async (req, res) => {
       const body  = parseBody(contractSchema, req.body);
       const t     = tid(res);
       const now   = Date.now();
@@ -158,7 +159,7 @@ export const rentalModule: PosModule = {
     }));
 
     // Return asset
-    router.post("/rental/contracts/:id/return", handler(async (req, res) => {
+    router.post("/contracts/:id/return", handler(async (req, res) => {
       const id  = String(req.params["id"]);
       const t   = tid(res);
       const now = Date.now();
