@@ -101,6 +101,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
   // Registered before /:productId routes so "deduct" isn't treated as a product id.
   router.post(
     "/deduct",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(deductSchema, req.body);
       const t = tenantId(res);
@@ -201,6 +202,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/transfers",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(transferSchema, req.body);
       const row = await service.createTransfer(tenantId(res), {
@@ -236,6 +238,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/adjustments",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(locationAdjustSchema, req.body);
       const { actualDelta } = await service.adjustAtLocation(tenantId(res), {
@@ -280,6 +283,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/:productId/receive",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(receiveSchema, req.body);
       const productId = String(req.params.productId);
@@ -312,6 +316,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/:productId/adjust",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(adjustSchema, req.body);
       const reason: MovementReason = body.reason ?? "adjustment";
@@ -322,6 +327,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.put(
     "/:productId/reorder-point",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(reorderSchema, req.body);
       const row = await service.setReorderPoint(String(req.params.productId), body.reorderPt, tenantId(res));

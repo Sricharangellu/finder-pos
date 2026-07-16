@@ -25,11 +25,11 @@ async function seedOrder(app: App, opts: SeedOpts): Promise<void> {
 }
 
 /** Inject a POST /api/payments/ capture via the service path (HTTP-free). */
-function capture(app: App, body: unknown) {
+function capture(app: App, body: unknown, role: string = "owner") {
   // Exercise the real service through the registered route handler by calling
   // the module service indirectly is awkward; instead use a lightweight
   // in-process request against the express app.
-  return request(app, "POST", "/api/payments/", body);
+  return request(app, "POST", "/api/payments/", body, role);
 }
 
 interface HttpResult {
@@ -42,11 +42,12 @@ function request(
   method: string,
   path: string,
   body?: unknown,
+  role: string = "owner",
 ): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
     Promise.all([import("node:http"), import("jsonwebtoken")]).then(([{ default: http }, { default: jwt }]) => {
       const token = jwt.sign(
-        { sub: "usr_demo_owner", tenantId: "tnt_demo", role: "owner" },
+        { sub: `usr_demo_${role}`, tenantId: "tnt_demo", role },
         process.env.JWT_SECRET ?? "test-secret-finder-pos",
         { expiresIn: "1h" },
       );
@@ -110,6 +111,33 @@ test("exact cash payment captures with no change", async () => {
   assert.equal(res.body.change_cents, 0);
   assert.equal(res.body.status, "captured");
   assert.match(res.body.id, /^pay_/);
+});
+
+test("manager can capture a payment", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_mgr_capture", totalCents: 1000 });
+
+  const res = await capture(app, {
+    orderId: "ord_mgr_capture",
+    method: "cash",
+    tenderedCents: 1000,
+  }, "manager");
+
+  assert.equal(res.status, 201);
+  assert.equal(res.body.status, "captured");
+});
+
+test("cashier cannot capture a payment (403)", async () => {
+  const app = await buildApp({ schema: __schema() });
+  await seedOrder(app, { id: "ord_cashier_capture", totalCents: 1000 });
+
+  const res = await capture(app, {
+    orderId: "ord_cashier_capture",
+    method: "cash",
+    tenderedCents: 1000,
+  }, "cashier");
+
+  assert.equal(res.status, 403);
 });
 
 test("cash payment with change computes change correctly", async () => {

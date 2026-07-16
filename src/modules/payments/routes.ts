@@ -4,6 +4,7 @@ import { handler, parseBody, badRequest } from "../../shared/http.js";
 import { PaymentsService } from "./service.js";
 import { isStripeConfigured, getStripe } from "./stripe.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import { HttpError } from "../../shared/http.js";
 
 const captureSchema = z.object({
@@ -27,6 +28,8 @@ function userId(res: Response): string {
 }
 
 export function registerRoutes(router: Router, service: PaymentsService): void {
+  const mgr = requireRole("manager");
+
   // ── Stripe Terminal: connection token (browser SDK uses this to authenticate)
   router.post(
     "/connection-token",
@@ -73,6 +76,7 @@ export function registerRoutes(router: Router, service: PaymentsService): void {
   // ── Capture payment (cash / card / split)
   router.post(
     "/",
+    mgr,
     handler(async (req: Request, res: Response) => {
       const body = parseBody(captureSchema, req.body);
       const payment = await service.capture(body, tenantId(res), userId(res));

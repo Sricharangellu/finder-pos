@@ -16,9 +16,10 @@ async function call(
   method: string,
   path: string,
   body?: unknown,
+  role?: string,
 ): Promise<{ status: number; json: any }> {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body);
+  return request(app.express, method, path, body, role);
 }
 
 test("missing inventory row reports zeroed stock (no 404)", async () => {
@@ -323,4 +324,128 @@ test("inventory.adjusted is emitted on the bus", async () => {
   assert.equal(p.delta, 6);
   assert.equal(p.reason, "receiving");
   assert.equal(p.stockQty, 6);
+});
+
+// ── Role gate: manager+ required for stock-movement mutations ─────────────────
+
+test("manager can receive stock", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_role_recv/receive", { quantity: 5 }, "manager");
+  assert.equal(status, 201);
+  assert.equal(json.stockQty, 5);
+});
+
+test("cashier cannot receive stock (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "POST", "/api/inventory/prod_role_recv2/receive", { quantity: 5 }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can adjust stock", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_adj/receive", { quantity: 5 }, "manager");
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_role_adj/adjust", {
+    delta: 2,
+    reason: "adjustment",
+  }, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.stockQty, 7);
+});
+
+test("cashier cannot adjust stock (403)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_adj2/receive", { quantity: 5 }, "manager");
+  const { status } = await call(app, "POST", "/api/inventory/prod_role_adj2/adjust", {
+    delta: 2,
+    reason: "adjustment",
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can set the reorder point", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "PUT", "/api/inventory/prod_role_rp/reorder-point", {
+    reorderPt: 4,
+  }, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.reorderPt, 4);
+});
+
+test("cashier cannot set the reorder point (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "PUT", "/api/inventory/prod_role_rp2/reorder-point", {
+    reorderPt: 4,
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can deduct stock for a completed sale", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_deduct/receive", { quantity: 10 }, "manager");
+  const { status, json } = await call(app, "POST", "/api/inventory/deduct", {
+    lines: [{ product_id: "prod_role_deduct", qty: 3 }],
+  }, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.ok, true);
+
+  const stock = await call(app, "GET", "/api/inventory/prod_role_deduct");
+  assert.equal(stock.json.stockQty, 7);
+});
+
+test("cashier cannot deduct stock (403)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_deduct2/receive", { quantity: 10 }, "manager");
+  const { status } = await call(app, "POST", "/api/inventory/deduct", {
+    lines: [{ product_id: "prod_role_deduct2", qty: 3 }],
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can create a location transfer", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_xfr/receive", { quantity: 10 }, "manager");
+  const { status, json } = await call(app, "POST", "/api/inventory/transfers", {
+    from_location_id: "iloc_a",
+    to_location_id: "iloc_b",
+    product_id: "prod_role_xfr",
+    quantity: 3,
+  }, "manager");
+  assert.equal(status, 201, `transfer create failed: ${JSON.stringify(json)}`);
+  assert.ok(json.id.startsWith("xfr_"));
+});
+
+test("cashier cannot create a location transfer (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "POST", "/api/inventory/transfers", {
+    from_location_id: "iloc_a",
+    to_location_id: "iloc_b",
+    product_id: "prod_role_xfr2",
+    quantity: 3,
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can perform a location-level stock adjustment", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "POST", "/api/inventory/adjustments", {
+    product_id: "prod_role_locadj",
+    location_id: "iloc_a",
+    delta: 5,
+    mode: "add",
+    reason: "cycle_count",
+  }, "manager");
+  assert.equal(status, 201, `location adjustment failed: ${JSON.stringify(json)}`);
+  assert.equal(json.delta, 5);
+});
+
+test("cashier cannot perform a location-level stock adjustment (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "POST", "/api/inventory/adjustments", {
+    product_id: "prod_role_locadj2",
+    location_id: "iloc_a",
+    delta: 5,
+    mode: "add",
+    reason: "cycle_count",
+  }, "cashier");
+  assert.equal(status, 403);
 });

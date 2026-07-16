@@ -5,9 +5,9 @@ import { buildApp, type App } from "../../app.js";
 let __seq = 0;
 const __schema = () => `test_${process.pid}_${Date.now().toString(36)}_${__seq++}`;
 async function freshApp(): Promise<App> { return buildApp({ schema: __schema() }); }
-async function call(app: App, method: string, path: string, body?: unknown) {
+async function call(app: App, method: string, path: string, body?: unknown, role?: string) {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body);
+  return request(app.express, method, path, body, role);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,6 +73,25 @@ test("paying more than outstanding is rejected", async () => {
   assert.equal(r.status, 400);
 });
 
+test("manager can pay a bill", async () => {
+  const app = await freshApp();
+  const supplier = await mkSupplier(app);
+  const bill = (await call(app, "POST", "/api/billing/bills", { supplierId: supplier.id, totalCents: 5000 })).json;
+
+  const r = await call(app, "POST", `/api/billing/bills/${bill.id}/pay`, { amountCents: 5000, method: "cash" }, "manager");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.status, "paid");
+});
+
+test("cashier cannot pay a bill (403)", async () => {
+  const app = await freshApp();
+  const supplier = await mkSupplier(app);
+  const bill = (await call(app, "POST", "/api/billing/bills", { supplierId: supplier.id, totalCents: 5000 })).json;
+
+  const r = await call(app, "POST", `/api/billing/bills/${bill.id}/pay`, { amountCents: 5000, method: "cash" }, "cashier");
+  assert.equal(r.status, 403);
+});
+
 // ─── Invoices (AR) ────────────────────────────────────────────────────────────
 
 test("create an invoice and pay it in full", async () => {
@@ -96,6 +115,25 @@ test("create an invoice and pay it in full", async () => {
   assert.equal(paid.status, 200);
   assert.equal(paid.json.status, "paid");
   assert.equal(paid.json.paid_cents, 25000);
+});
+
+test("manager can pay an invoice", async () => {
+  const app = await freshApp();
+  const customer = await mkCustomer(app);
+  const inv = (await call(app, "POST", "/api/billing/invoices", { customerId: customer.id, totalCents: 10000 })).json;
+
+  const paid = await call(app, "POST", `/api/billing/invoices/${inv.id}/pay`, { amountCents: 10000, method: "card" }, "manager");
+  assert.equal(paid.status, 200);
+  assert.equal(paid.json.status, "paid");
+});
+
+test("cashier cannot pay an invoice (403)", async () => {
+  const app = await freshApp();
+  const customer = await mkCustomer(app);
+  const inv = (await call(app, "POST", "/api/billing/invoices", { customerId: customer.id, totalCents: 10000 })).json;
+
+  const paid = await call(app, "POST", `/api/billing/invoices/${inv.id}/pay`, { amountCents: 10000, method: "card" }, "cashier");
+  assert.equal(paid.status, 403);
 });
 
 test("invoice auto-derives total from linked order", async () => {
