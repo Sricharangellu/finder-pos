@@ -7,12 +7,26 @@ the backlog freely; the loop treats your edits as authoritative.
 
 | Field | Value |
 |---|---|
-| loop_status | RUNNING (winding down — 3 sweeps exhausted) |
-| last_iteration_utc | 2026-07-16T06:00:00Z |
+| loop_status | STOPPED (deliberate — all 4 high-value sweeps exhausted; needs Sri direction to resume) |
+| last_iteration_utc | 2026-07-16T06:15:00Z |
 | runner | session D (local, VSCode) |
-| branch | feat/delivery-pipeline (PR #70) |
-| idle_streak | 1 (real backlog drained; stop at ≥3) |
+| branch | feat/delivery-pipeline (PR #70 — 3 commits awaiting review) |
+| idle_streak | 2 (tenant-scoping sweep found no fix — clean bill of health) |
 | loop_commits | 2 (batch since PR #66 merge; pause + notify at ≥15) |
+
+### Why stopped
+Four systematic verification sweeps complete, all retail-core modules:
+1. Route drift (iters 1,4) — fixed 4 prod 404s.
+2. Unbounded-list pagination (iters 1,5) — fixed movements/audit/journal.
+3. Authorization (iters 6,7,8) — fixed sync/reports/ecommerce/notifications.
+4. Tenant-scoping (iter 9) — **VERIFIED CLEAN, no cross-tenant leaks**: every
+   literal `WHERE id=@id` mutation is gated by a prior `WHERE id AND tenant_id`
+   verify (verify-then-mutate) or re-reads a just-created row; dynamic `${where}`
+   builders include tenant_id; RLS backstop underneath.
+
+No autonomous high-value work remains. Further progress = feature development
+(needs Sri to choose scope) — the loop's explicit "needs Sri decision" stop.
+**To resume:** `/loop` with a specific initiative, or merge PR #70 first.
 | last_merge | 2026-07-16 PR #66 → master 29a27d7; prod deploy healthy, /readyz db:connected under C-3 cert verification |
 | cloud_watchdog | trig_01VVXryUgSBHoy9mAqRdhfzz (notify-only, every 3h, emails on ≥3h stale heartbeat) |
 
@@ -28,7 +42,8 @@ the backlog freely; the loop treats your edits as authoritative.
 | 6 | 2026-07-16T04:25Z | 6ae6bb5 | sync authz gap: /online /push /pull /integrations had NO role guard (any cashier could toggle company sync / drain queue / connect integrations); added requireRole manager (ops) + owner (integrations, matches webhooks); webhooks verified already-guarded; 9/9 + smoke 20/20 |
 | — | 2026-07-16T05:16Z | 29a27d7 | **PR #66 MERGED to master + deployed to prod** — /readyz db:connected under C-3 cert verification; 6 loop fixes live |
 | 7 | 2026-07-16T05:45Z | 89b2e3b | module-wide authz sweep: reports POST /ar-aging/sweep (AR dunning mutation) + ecommerce PUT /products/:id/online (storefront publish) were unguarded → requireRole(manager); team verified guarded (in-handler requireManagement), orders/payments POS-by-design; 2 new 403 tests, reports 11/11 + ecommerce 9/9 + smoke 20/20 |
-| 8 | 2026-07-16T06:00Z | (this) | authz sweep completed: notifications POST / was unguarded (cashier could post spoofed notifications) → requireRole(manager); internal event-driven creation bypasses route (proven); first tests for the module; 2/2 + smoke 20/20. 3 sweeps (drift/pagination/authz) now exhausted — loop winding down |
+| 8 | 2026-07-16T06:00Z | 7ce3e6e | authz sweep completed: notifications POST / was unguarded (cashier could post spoofed notifications) → requireRole(manager); internal event-driven creation bypasses route (proven); first tests for the module; 2/2 + smoke 20/20. 3 sweeps (drift/pagination/authz) now exhausted — loop winding down |
+| 9 | 2026-07-16T06:15Z | (no code) | tenant-scoping sweep across all service queries: VERIFIED CLEAN — no cross-tenant leaks (verify-then-mutate pattern is consistent; dynamic where-builders include tenant_id; RLS backstop). No fix needed. 4th & final sweep — loop STOPPED cleanly |
 
 ## Backlog (loop-selectable, in priority order)
 
