@@ -21,7 +21,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-In dev mode the login form is pre-filled with `cashier@finder-pos.dev`.
+In dev mode the login form is pre-filled with `cashier@ascend.dev`.
 Use any password (enter `wrong` to test the error state).
 
 ---

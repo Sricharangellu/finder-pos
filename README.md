@@ -16,8 +16,8 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry â
 | Backend API | https://finder-pos-backend.vercel.app |
 
 **Demo credentials:**
-- Owner: `owner@finder-pos.dev` / `FinderDemo!2026`
-- Cashier: `cashier@finder-pos.dev` / `FinderDemo!2026`
+- Owner: `owner@ascend.dev` / `AscendDemo!2026`
+- Cashier: `cashier@ascend.dev` / `AscendDemo!2026`
 
 > These demo credentials are public and are also planted by `scripts/seed-e2e.ts`
 > for CI. Treat them as demo-only; never seed them into a real database.

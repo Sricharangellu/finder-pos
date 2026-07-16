@@ -111,7 +111,7 @@ real "am I talking to Postgres" check.
 ALLOW_E2E_SEED=1 DATABASE_URL="$DATABASE_URL" npx tsx scripts/seed-e2e.ts
 ```
 
-This inserts the `tnt_demo` tenant + `owner@finder-pos.dev` / `FinderDemo!2026`.
+This inserts the `tnt_demo` tenant + `owner@ascend.dev` / `AscendDemo!2026`.
 The credentials are **public and well-known** and the script bypasses production
 guards — run it **only** against a disposable local/dev database, never
 production (the script refuses without `ALLOW_E2E_SEED=1`).

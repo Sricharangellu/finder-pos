@@ -19,7 +19,7 @@ web.
 4. Launch it. First run: macOS Gatekeeper will warn the app is from an
    unidentified developer (it isn't code-signed/notarized). Right-click the
    app → **Open** to bypass this once.
-5. Log in with `owner@finder-pos.dev` / `FinderDemo!2026` (or your own
+5. Log in with `owner@ascend.dev` / `AscendDemo!2026` (or your own
    account).
 
 ## Other platforms

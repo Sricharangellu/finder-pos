@@ -20,8 +20,8 @@ import path from "path";
 
 const AUTH_FILE = path.join(__dirname, ".auth/owner.json");
 
-const E2E_EMAIL = process.env["E2E_EMAIL"] ?? "owner@finder-pos.dev";
-const E2E_PASSWORD = process.env["E2E_PASSWORD"] ?? "FinderDemo!2026";
+const E2E_EMAIL = process.env["E2E_EMAIL"] ?? "owner@ascend.dev";
+const E2E_PASSWORD = process.env["E2E_PASSWORD"] ?? "AscendDemo!2026";
 
 export const test = base.extend<object, { workerContext: BrowserContext }>({
   workerContext: [

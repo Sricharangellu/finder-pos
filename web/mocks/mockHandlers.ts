@@ -160,7 +160,7 @@ let _bpAuditSeq = 0;
 function pushBpAudit(action: string, changes: Record<string, { from: unknown; to: unknown }>): void {
   _bpAuditEvents.push({
     id: `aud_bp_${++_bpAuditSeq}`,
-    actor: { id: "usr_demo_owner", email: "owner@finder-pos.dev", role: "owner" },
+    actor: { id: "usr_demo_owner", email: "owner@ascend.dev", role: "owner" },
     action,
     resource_type: "business_profile",
     resource_id: "business_profile",
@@ -1006,7 +1006,7 @@ export const mockHandlers = [
       { id: "emp_8",  name: "Carlos Ruiz",     email: "carlos@demo.dev",  phone: "555-1008", role: "warehouse",  department: "Warehouse",    employment_type: "full_time",  hourly_rate_cents: 1700, status: "active",     suspend_reason: null, pin: "8901", hire_date: D(150), clocked_in: true,  clocked_in_at: H(1),   today_minutes: 0    },
       { id: "emp_9",  name: "Alex Kim",        email: "alex@demo.dev",    phone: "555-1009", role: "driver",     department: "Delivery",     employment_type: "full_time",  hourly_rate_cents: 1900, status: "active",     suspend_reason: null, pin: "9012", hire_date: D(60),  clocked_in: true,  clocked_in_at: H(5),   today_minutes: 0    },
       { id: "emp_10", name: "Jordan Lee",      email: "jordan@demo.dev",  phone: "555-1010", role: "cashier",    department: "Front End",    employment_type: "full_time",  hourly_rate_cents: 1600, status: "active",     suspend_reason: null, pin: "0123", hire_date: D(45),  clocked_in: false, clocked_in_at: null,   today_minutes: 480  },
-      { id: "emp_11", name: "Demo Owner",      email: "owner@finder-pos.dev", phone: null,   role: "owner",      department: "Management",   employment_type: "full_time",  hourly_rate_cents: null, status: "active",     suspend_reason: null, pin: null,   hire_date: D(900), clocked_in: false, clocked_in_at: null,   today_minutes: 0    },
+      { id: "emp_11", name: "Demo Owner",      email: "owner@ascend.dev", phone: null,   role: "owner",      department: "Management",   employment_type: "full_time",  hourly_rate_cents: null, status: "active",     suspend_reason: null, pin: null,   hire_date: D(900), clocked_in: false, clocked_in_at: null,   today_minutes: 0    },
     ];
 
     // Seed today's time entries for active demo employees

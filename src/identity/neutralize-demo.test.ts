@@ -32,14 +32,14 @@ async function plantDemoOwner(app: App): Promise<void> {
     `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
      VALUES (@id, @t, @e, @h, 'owner', @c, @u)
      ON CONFLICT (tenant_id, email) DO UPDATE SET password_hash = @h`,
-    { id: "usr_demo_owner", t: DEMO_TENANT_ID, e: "owner@finder-pos.dev", h: hash, c: now, u: now },
+    { id: "usr_demo_owner", t: DEMO_TENANT_ID, e: "owner@ascend.dev", h: hash, c: now, u: now },
   );
 }
 
 async function currentHash(app: App): Promise<string> {
   const row = await app.db.one<{ password_hash: string }>(
     "SELECT password_hash FROM users WHERE email = @e",
-    { e: "owner@finder-pos.dev" },
+    { e: "owner@ascend.dev" },
   );
   return row!.password_hash;
 }

@@ -59,7 +59,7 @@ export interface AuthUser {
 
 /** Demo tenant + credentials seeded on first boot (idempotent). */
 export const DEMO_TENANT_ID = "tnt_demo";
-export const DEMO_PASSWORD = "FinderDemo!2026";
+export const DEMO_PASSWORD = "AscendDemo!2026";
 
 export interface RegisterInput {
   storeName: string;
@@ -416,8 +416,8 @@ export class IdentityService {
     const { default: bcrypt } = await import("bcryptjs");
     const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
     const demoUsers: Array<{ id: string; email: string; role: Role }> = [
-      { id: "usr_demo_owner", email: "owner@finder-pos.dev", role: "owner" },
-      { id: "usr_demo_cashier", email: "cashier@finder-pos.dev", role: "cashier" },
+      { id: "usr_demo_owner", email: "owner@ascend.dev", role: "owner" },
+      { id: "usr_demo_cashier", email: "cashier@ascend.dev", role: "cashier" },
     ];
     for (const u of demoUsers) {
       await this.db.query(
@@ -442,7 +442,7 @@ export class IdentityService {
     if (process.env["NODE_ENV"] !== "production") return;
     const { default: bcrypt } = await import("bcryptjs");
     const { randomBytes } = await import("node:crypto");
-    const demoEmails = ["owner@finder-pos.dev", "cashier@finder-pos.dev"];
+    const demoEmails = ["owner@ascend.dev", "cashier@ascend.dev"];
     for (const email of demoEmails) {
       try {
         const row = await this.db.one<{ id: string; password_hash: string }>(

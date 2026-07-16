@@ -14,8 +14,8 @@ import { dirname, join } from "node:path";
 
 const BASE = process.argv[2] || process.env.BASE || "https://finder-pos-backend.vercel.app";
 const BATCH = Number(process.argv[3] || process.env.BATCH || 500);
-const EMAIL = process.env.EMAIL || "owner@finder-pos.dev";
-const PASSWORD = process.env.PASSWORD || "FinderDemo!2026";
+const EMAIL = process.env.EMAIL || "owner@ascend.dev";
+const PASSWORD = process.env.PASSWORD || "AscendDemo!2026";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const items = JSON.parse(readFileSync(join(here, "products-import.json"), "utf8"));

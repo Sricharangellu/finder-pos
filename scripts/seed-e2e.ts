@@ -15,8 +15,8 @@ import { openDb } from "../src/shared/db.js";
 import bcrypt from "bcryptjs";
 
 const DEMO_TENANT_ID = "tnt_demo";
-const DEMO_EMAIL = "owner@finder-pos.dev";
-const DEMO_PASSWORD = "FinderDemo!2026";
+const DEMO_EMAIL = "owner@ascend.dev";
+const DEMO_PASSWORD = "AscendDemo!2026";
 
 async function main() {
   // SECURITY: this script plants PUBLICLY-KNOWN demo credentials and bypasses

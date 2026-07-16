@@ -39,7 +39,7 @@ const ROOT = "*";
 
 const MOCK_USER: UserProfile = {
   id: "usr_01hx0000000000000000000001",
-  email: "cashier@finder-pos.dev",
+  email: "cashier@ascend.dev",
   name: "Demo Cashier",
   role: "cashier",
   tenantId: "ten_01hx0000000000000000000001",
@@ -1060,7 +1060,7 @@ export const handlers = [
       tenantId: "tnt_demo",
       role: "owner",
       name: "Demo Owner",
-      email: "owner@finder-pos.dev",
+      email: "owner@ascend.dev",
     });
   }),
 
