@@ -2649,9 +2649,9 @@ mockHandlers.push(
     await lat();
     return HttpResponse.json({
       items: [
-        { id: "eco_1", so_number: "SO-00001", customer_id: "cust_1", customer_name: "Alice Johnson", status: "pending_approve", total_cents: 12500, store_id: "ecommerce", created_at: Date.now() - 3600000 },
-        { id: "eco_2", so_number: "SO-00002", customer_id: "cust_2", customer_name: "Bob Smith", status: "confirmed", total_cents: 8750, store_id: "ecommerce", created_at: Date.now() - 7200000 },
-        { id: "eco_3", so_number: "SO-00003", customer_id: "cust_3", customer_name: "Carol Davis", status: "invoiced", total_cents: 22000, store_id: "ecommerce", created_at: Date.now() - 86400000 },
+        { id: "eco_1", so_number: "SO-00001", customer_id: "cust_1", customer_name: "Alice Johnson", status: "pending_approve", fulfillment_status: "unfulfilled", total_cents: 12500, store_id: "ecommerce", created_at: Date.now() - 3600000 },
+        { id: "eco_2", so_number: "SO-00002", customer_id: "cust_2", customer_name: "Bob Smith", status: "confirmed", fulfillment_status: "shipped", total_cents: 8750, store_id: "ecommerce", created_at: Date.now() - 7200000 },
+        { id: "eco_3", so_number: "SO-00003", customer_id: "cust_3", customer_name: "Carol Davis", status: "invoiced", fulfillment_status: "delivered", total_cents: 22000, store_id: "ecommerce", created_at: Date.now() - 86400000 },
       ],
     });
   }),

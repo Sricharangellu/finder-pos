@@ -1039,6 +1039,8 @@ export interface OnlineOrder {
   /** display name returned by some handlers */
   customerName?: string;
   status: string;
+  /** delivery-pipeline stage: unfulfilled|picking|packed|shipped|delivered */
+  fulfillment_status?: string;
   total_cents?: number;
   /** camelCase alias some mock handlers return */
   totalCents?: number;
