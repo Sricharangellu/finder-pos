@@ -135,12 +135,16 @@ export const ordersModule: PosModule = {
     registerRoutes(ctx.router, service);
 
     // A captured payment completes the order it was made against.
-    ctx.events.on("payment.captured", async (event) => {
+    // Durable (ACPA M1.3): markCompleted only transitions 'open' → 'completed',
+    // so it is naturally idempotent — redelivery needs no claim.
+    const completeOrder = async (event: { aggregateId?: string; occurredAt: string; payload: unknown }) => {
       const payload = event.payload as { orderId?: string; tenantId?: string };
       const orderId = payload.orderId ?? event.aggregateId;
       const tenantId = payload.tenantId ?? "";
       if (orderId && tenantId) await service.markCompleted(orderId, tenantId);
-    });
+    };
+    ctx.events.on("payment.captured", completeOrder);
+    ctx.outbox?.onDurable("payment.captured", completeOrder);
   },
 };
 

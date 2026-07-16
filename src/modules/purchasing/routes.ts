@@ -9,6 +9,12 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+/** Actor identity for the approval audit trail. */
+function actor(res: Response): { id: string | null; role: string } {
+  const a = res.locals["auth"] as AuthPayload;
+  return { id: a.userId ?? null, role: a.role };
+}
+
 // All editable vendor profile fields — shared by create and update schemas.
 const supplierProfileSchema = {
   email: z.string().email().nullable().optional(),
@@ -149,7 +155,14 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   router.get("/vendor-credits", handler(async (req, res) => {
     const supplierId = typeof req.query.supplierId === "string" ? req.query.supplierId : undefined;
     const poId = typeof req.query.poId === "string" ? req.query.poId : undefined;
-    res.json({ items: await service.listVendorCreditsFiltered(tenantId(res), { supplierId, poId }) });
+    if (poId) {
+      // Per-PO credits are naturally bounded — no pagination needed.
+      res.json({ items: await service.listVendorCreditsFiltered(tenantId(res), { supplierId, poId }) });
+      return;
+    }
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listVendorCredits(tenantId(res), supplierId, { cursor, limit }));
   }));
 
   router.post("/vendor-credits/:id/void", mgr, handler(async (req, res) => {
@@ -162,13 +175,104 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.status(201).json(await service.createReturn(b, tenantId(res)));
   }));
 
-  router.get("/returns", handler(async (_req, res) => {
-    res.json({ items: await service.listReturns(tenantId(res)) });
+  router.get("/returns", handler(async (req, res) => {
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listReturns(tenantId(res), { cursor, limit }));
+  }));
+
+  // ── Purchase requisitions (draft → submitted → approved/rejected → converted) ──
+  const requisitionLineSchema = z.object({
+    productId: z.string().min(1),
+    quantity: z.number().int().positive(),
+    estCostCents: z.number().int().nonnegative().optional(),
+    productName: z.string().nullable().optional(),
+  });
+  const requisitionSchema = z.object({
+    department: z.string().max(120).nullable().optional(),
+    requiredDate: z.number().int().positive().nullable().optional(),
+    priority: z.enum(["low", "normal", "high"]).optional(),
+    notes: z.string().max(2000).nullable().optional(),
+    lines: z.array(requisitionLineSchema).min(1).max(200),
+  });
+  const requisitionUpdateSchema = requisitionSchema.partial();
+
+  router.post("/requisitions", handler(async (req, res) => {
+    const b = parseBody(requisitionSchema, req.body);
+    res.status(201).json(await service.createRequisition(b, actor(res), tenantId(res)));
+  }));
+
+  router.get("/requisitions", handler(async (req, res) => {
+    const status = typeof req.query.status === "string" && req.query.status !== "" ? (req.query.status as never) : undefined;
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    res.json(await service.listRequisitions(tenantId(res), { status, cursor, limit }));
+  }));
+
+  router.get("/requisitions/:id", handler(async (req, res) => {
+    res.json(await service.getRequisition(String(req.params.id), tenantId(res)));
+  }));
+
+  router.patch("/requisitions/:id", handler(async (req, res) => {
+    const b = parseBody(requisitionUpdateSchema, req.body);
+    res.json(await service.updateRequisition(String(req.params.id), b, tenantId(res)));
+  }));
+
+  router.post("/requisitions/:id/submit", handler(async (req, res) => {
+    res.json(await service.submitRequisition(String(req.params.id), tenantId(res)));
+  }));
+
+  // Approval decisions and conversion are manager-gated.
+  router.post("/requisitions/:id/approve", mgr, handler(async (req, res) => {
+    res.json(await service.approveRequisition(String(req.params.id), actor(res), tenantId(res)));
+  }));
+
+  router.post("/requisitions/:id/reject", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ note: z.string().max(500).optional() }), req.body ?? {});
+    res.json(await service.rejectRequisition(String(req.params.id), actor(res), tenantId(res), b.note));
+  }));
+
+  router.post("/requisitions/:id/convert", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ supplierId: z.string().min(1) }), req.body);
+    res.status(201).json(await service.convertRequisition(String(req.params.id), b.supplierId, actor(res), tenantId(res)));
   }));
 
   router.post("/orders", mgr, handler(async (req, res) => {
     const b = parseBody(poSchema, req.body);
-    res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res)));
+    res.status(201).json(await service.createOrder(b.supplierId, b.lines, tenantId(res), actor(res)));
+  }));
+
+  // ── PO approval workflow ─────────────────────────────────────────────────────
+  // Config: absent = approvals disabled (all POs auto-approve). Owner-only to change.
+  router.get("/approval-config", handler(async (_req, res) => {
+    res.json({ config: await service.getApprovalConfig(tenantId(res)) });
+  }));
+
+  router.put("/approval-config", requireRole("owner"), handler(async (req, res) => {
+    const b = parseBody(
+      z.object({
+        autoLimitCents: z.number().int().nonnegative(),
+        managerLimitCents: z.number().int().nonnegative(),
+        enabled: z.boolean().optional(),
+      }),
+      req.body,
+    );
+    res.json({ config: await service.setApprovalConfig(b, tenantId(res)) });
+  }));
+
+  // Approve/reject a pending PO. Manager may approve mid-tier amounts; the service
+  // enforces the owner tier for large POs. History is append-only (no delete route).
+  router.post("/orders/:id/approve", mgr, handler(async (req, res) => {
+    res.json(await service.approveOrder(String(req.params.id), actor(res), tenantId(res)));
+  }));
+
+  router.post("/orders/:id/reject", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ note: z.string().max(500).optional() }), req.body ?? {});
+    res.json(await service.rejectOrder(String(req.params.id), actor(res), tenantId(res), b.note));
+  }));
+
+  router.get("/orders/:id/approvals", handler(async (req, res) => {
+    res.json({ items: await service.listApprovals(String(req.params.id), tenantId(res)) });
   }));
 
   router.get("/orders", handler(async (req, res) => {

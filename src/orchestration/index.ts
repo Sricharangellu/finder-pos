@@ -130,7 +130,7 @@ import { closeRegisterJob } from "./jobs/close-register.job.js";
 import { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 import { arDunningJob } from "./jobs/ar-dunning.job.js";
 import { idempotencyExpiryJob, IDEMPOTENCY_EXPIRY_INTERVAL_MS } from "./jobs/idempotency-expiry.job.js";
-import { outboxRelayJob, OUTBOX_RELAY_INTERVAL_MS } from "./jobs/outbox-relay.job.js";
+import { outboxRetentionJob, OUTBOX_RETENTION_INTERVAL_MS } from "./jobs/outbox-retention.job.js";
 
 export interface OrchestrationBootstrap {
   runner: WorkflowRunner;
@@ -267,26 +267,37 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
     }).catch(() => {});
   }
 
-  // DB-8: Outbox relay — dispatches pending event_outbox rows every 5 seconds.
-  jobConsumer.register(QueueNames.OUTBOX_RELAY, async (job) => {
-    await outboxRelayJob(job, db, events);
-    // Re-schedule immediately for fast at-least-once delivery.
+  // ACPA M1.4: daily retention sweep — purges delivered event_outbox rows and
+  // event_consumptions claims past the 30-day window.
+  jobConsumer.register(QueueNames.OUTBOX_RETENTION, async (job) => {
+    await outboxRetentionJob(job, db);
     await jobProducer.enqueueOnce({
-      type: QueueNames.OUTBOX_RELAY,
+      type: QueueNames.OUTBOX_RETENTION,
       tenantId: "system",
       payload: {},
-      runAt: Date.now() + OUTBOX_RELAY_INTERVAL_MS,
+      runAt: Date.now() + OUTBOX_RETENTION_INTERVAL_MS,
       maxAttempts: 3,
     });
   });
   if (backgroundJobsEnabled) {
     void jobProducer.enqueueOnce({
-      type: QueueNames.OUTBOX_RELAY,
+      type: QueueNames.OUTBOX_RETENTION,
       tenantId: "system",
       payload: {},
       runAt: Date.now(),
       maxAttempts: 3,
     }).catch(() => {});
+  }
+
+  // ACPA M1.2: the DB-8 outbox relay is retired. It republished
+  // dispatched=FALSE event_outbox rows to ALL bus subscribers — a
+  // double-dispatch hazard for non-idempotent consumers — and has had no
+  // producers since M1 (rows are written dispatched=TRUE with a status state
+  // machine; the shared Outbox reconciler owns redelivery). Purge the
+  // self-re-enqueueing relay jobs left behind by older deploys so they don't
+  // park as "No handler registered" failures.
+  if (backgroundJobsEnabled) {
+    void db.query("DELETE FROM job_queue WHERE type = 'outbox_relay'").catch(() => {});
   }
 
   // Start polling background jobs.

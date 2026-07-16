@@ -18,8 +18,10 @@ export const QueueNames = {
   WEBHOOK_DELIVERY: "webhook_delivery",
   /** DB-10: Idempotency key expiry sweep — deletes expired keys every 6 hours. */
   IDEMPOTENCY_EXPIRY: "idempotency_expiry",
-  /** DB-8: Event outbox relay — dispatches un-delivered events every 5 seconds. */
-  OUTBOX_RELAY: "outbox_relay",
+  /** ACPA M1.4: daily retention sweep — purges delivered outbox rows and old consumption claims. */
+  OUTBOX_RETENTION: "outbox_retention",
 } as const;
+// "outbox_relay" (DB-8) retired in ACPA M1.2 — the shared Outbox reconciler
+// owns redelivery; stale relay jobs are purged at bootstrap.
 
 export type QueueName = typeof QueueNames[keyof typeof QueueNames];

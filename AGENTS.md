@@ -20,9 +20,13 @@ You are working on Ascend, a retail-first POS and business operating platform.
 Before making changes, read these files in order:
 
 1. `AGENTS.md`
-2. `WORK/FORWARD_PLAN.md`
-3. `WORK/LOCK.md`
-4. Latest relevant file in `WORK/audits/`
+2. `docs/architecture/ENGINEERING_CONSTITUTION.md` — the engineering
+   constitution (architecture rules, ADRs, roadmap). Mandatory for any
+   architectural or cross-module work; update it (and add an ADR) whenever you
+   make a significant architectural or domain change.
+3. `WORK/FORWARD_PLAN.md`
+4. `WORK/LOCK.md`
+5. Latest relevant file in `WORK/audits/`
 
 There is only one active agent instruction file:
 
@@ -250,6 +254,12 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+```
+
+Before release / for the full backend + web gate in one shot:
+
+```bash
+npm run verify   # hygiene + backend typecheck/test/smoke + web typecheck/lint/build
 ```
 
 Full production confidence:

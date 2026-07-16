@@ -1,6 +1,7 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, badRequest } from "../../shared/http.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import type { SyncEngine, SyncStatus } from "./service.js";
 
@@ -43,8 +44,12 @@ export function registerRoutes(router: Router, engine: SyncEngine): void {
     }),
   );
 
+  // Sync controls mutate company-wide state (toggle the engine, force-drain the
+  // queue) — manager+ only. Previously unguarded: any cashier could flip a
+  // tenant's sync state or drain its queue.
   router.post(
     "/online",
+    requireRole("manager"),
     handler(async (req, res) => {
       const { online } = parseBody(onlineSchema, req.body);
       engine.setOnline(online);
@@ -56,6 +61,7 @@ export function registerRoutes(router: Router, engine: SyncEngine): void {
 
   router.post(
     "/push",
+    requireRole("manager"),
     handler(async (_req, res) => {
       const result = await engine.pushSync({ forceAll: true });
       res.json({ online: engine.isOnline(), ...result, ...(await engine.counts()) });
@@ -71,6 +77,7 @@ export function registerRoutes(router: Router, engine: SyncEngine): void {
 
   router.post(
     "/pull",
+    requireRole("manager"),
     handler((_req, res) => {
       res.json({ pulled: 0, note: "pull sync stub — Year 2" });
     }),
@@ -95,7 +102,10 @@ export function registerRoutes(router: Router, engine: SyncEngine): void {
     res.json({ items: await engine.listCompanyIntegrations(tenantId(res)) });
   }));
 
-  router.post("/integrations", handler(async (req, res) => {
+  // Connecting/configuring a third-party integration (may carry credentials in
+  // settings) is owner-level, matching the webhooks module's external-config
+  // guard. Was unguarded.
+  router.post("/integrations", requireRole("owner"), handler(async (req, res) => {
     const body = parseBody(z.object({ providerId: z.string().min(1), status: z.string().optional(), settings: z.string().nullable().optional() }), req.body);
     const id = await engine.upsertCompanyIntegration(tenantId(res), body.providerId, body.status ?? 'inactive', body.settings);
     res.status(201).json({ id });

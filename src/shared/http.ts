@@ -2,12 +2,38 @@ import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
 import { logError, contextFromRequest } from "./monitoring.js";
 
+/**
+ * Shared error-code vocabulary. Every code here has ONE meaning and ONE
+ * canonical status; use these for cross-cutting failures. Modules may mint
+ * domain-specific codes (snake_case, stable — e.g. `already_received`,
+ * `invalid_transition`) for state-machine conflicts; those live with the
+ * module, not here. Codes are part of the public API contract: additive
+ * only, never remove or repurpose (see CODING_STANDARDS.md).
+ */
+export const ERROR_CODES = {
+  bad_request: 400,
+  validation_error: 400,
+  unauthenticated: 401,
+  token_expired: 401,
+  invalid_credentials: 401,
+  forbidden: 403,
+  not_found: 404,
+  conflict: 409,
+  rate_limit_exceeded: 429,
+  account_locked: 429,
+  internal: 500,
+  misconfigured: 500,
+} as const;
+export type SharedErrorCode = keyof typeof ERROR_CODES;
+
 /** Thrown by services/routes to signal a 4xx with a stable error code. */
 export class HttpError extends Error {
   constructor(
     public status: number,
     public code: string,
     message: string,
+    /** Optional structured detail (e.g. per-field validation issues). */
+    public details?: unknown,
   ) {
     super(message);
   }
@@ -31,7 +57,13 @@ export function handler(
 export function parseBody<T>(schema: ZodSchema<T>, body: unknown): T {
   const result = schema.safeParse(body);
   if (!result.success) {
-    throw new HttpError(400, "validation_error", flatten(result.error));
+    // Structured per-field issues ride along in `details` (additive — the
+    // flattened message stays the same for existing clients).
+    const details = result.error.issues.map((i) => ({
+      field: i.path.join(".") || "(root)",
+      message: i.message,
+    }));
+    throw new HttpError(400, "validation_error", flatten(result.error), details);
   }
   return result.data;
 }
@@ -50,7 +82,13 @@ export function errorMiddleware(
   _next: NextFunction,
 ) {
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: { code: err.code, message: err.message } });
+    res.status(err.status).json({
+      error: {
+        code: err.code,
+        message: err.message,
+        ...(err.details !== undefined ? { details: err.details } : {}),
+      },
+    });
     return;
   }
   // Security: never echo raw error text (it can leak SQL/stack internals). Log

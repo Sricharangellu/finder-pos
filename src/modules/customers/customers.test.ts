@@ -77,3 +77,27 @@ test("redeem: 100 points -> $5, validates balance and multiples", async () => {
   assert.equal(r.json.valueCents, 1000);
   assert.equal(r.json.pointsRemaining, bal - 200);
 });
+
+test("loyalty: a redelivered payment.captured never double-awards points (ACPA M1.3)", async () => {
+  const app = await freshApp();
+  const c = await call(app, "POST", "/api/customers/", { name: "Ada Lovelace" });
+  const cusId = c.json.id;
+  const p = await call(app, "POST", "/api/catalog/", { sku: "LOY-M13", name: "Loyalty Widget 2", price_cents: 10000, category: "general" });
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  const o = await call(app, "POST", "/api/orders/", {
+    stateCode: "TX", customerId: cusId, lines: [{ productId: p.json.id, quantity: 1 }],
+  });
+  const pay = await call(app, "POST", "/api/payments/", { orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents });
+  assert.equal(pay.status, 201);
+  const earned = (await call(app, "GET", `/api/customers/${cusId}`)).json.points;
+  assert.ok(earned > 0, "points were awarded on the sync path");
+
+  // Crash window: flip the payment.captured outbox row back to pending and reconcile.
+  await app.db.query(
+    "UPDATE event_outbox SET status = 'pending', created_at = @past WHERE type = 'payment.captured'",
+    { past: Date.now() - 60_000 },
+  );
+  await app.outbox.reconcile();
+  const after = (await call(app, "GET", `/api/customers/${cusId}`)).json.points;
+  assert.equal(after, earned, "redelivery must not award points twice");
+});

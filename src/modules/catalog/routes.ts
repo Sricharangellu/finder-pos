@@ -1,7 +1,8 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
-import type { CatalogService, ProductStatus, TaxClass } from "./service.js";
+import type { CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode, PriceTarget, PriceOp } from "./service.js";
+import { VARIANT_SORT_MODES, PRICE_OPS } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
@@ -76,6 +77,18 @@ const detailFieldsSchema = {
   // Variant (BE-8)
   parent_product_id: z.string().min(1).nullable().optional(),
   variant_label: z.string().min(1).nullable().optional(),
+  // Structured attribute map, JSON object of attribute name -> value.
+  variant_options: z
+    .string()
+    .refine((s) => {
+      try {
+        const o = JSON.parse(s) as unknown;
+        return Boolean(o) && typeof o === "object" && !Array.isArray(o) &&
+          Object.values(o as Record<string, unknown>).every((v) => typeof v === "string");
+      } catch { return false; }
+    }, { message: "variant_options must be a JSON object mapping attribute name to value" })
+    .nullable()
+    .optional(),
   // Operational flags
   age_restricted: z.boolean().optional(),
   returnable: z.boolean().optional(),
@@ -101,6 +114,7 @@ const createSchema = z.object({
 });
 
 const updateFieldsSchema = z.object({
+  sku: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   price_cents: z.number().int().nonnegative().optional(),
   category: z.string().min(1).optional(),
@@ -120,6 +134,16 @@ const bulkUpdateSchema = z.object({
     message: "at least one field is required",
   }),
 });
+const bulkPriceSchema = z
+  .object({
+    ids: z.array(z.string().min(1)).min(1).max(500),
+    target: z.enum(["selling", "cost"]),
+    op: z.enum(PRICE_OPS as unknown as [string, ...string[]]),
+    value: z.number().nonnegative().optional(),
+  })
+  .refine((o) => o.op === "round_99" || o.op === "round_95" || o.value !== undefined, {
+    message: "value is required for this operation",
+  });
 
 const importCsvSchema = z.object({
   csv: z.string().min(1),
@@ -172,6 +196,18 @@ const generateVariantsSchema = z.object({
     )
     .min(1)
     .max(5),
+  // Value combinations to skip (removed/disabled in the preview), each a list of
+  // attribute values. Matched order-independently against the generated matrix.
+  exclude: z.array(z.array(z.string().min(1))).max(200).optional(),
+});
+const channelSchema = z.enum(["online", "offline"]);
+const reorderVariantsSchema = z.object({
+  channel: channelSchema,
+  orderedIds: z.array(z.string().min(1)).min(1).max(500),
+});
+const variantSortSchema = z.object({
+  channel: channelSchema,
+  mode: z.enum(VARIANT_SORT_MODES as unknown as [string, ...string[]]),
 });
 
 const createVariantSchema = z.object({
@@ -248,6 +284,18 @@ export function registerRoutes(router: Router, service: CatalogService): void {
         status: body.update.status as ProductStatus | undefined,
       };
       const items = await service.bulkUpdate(body.ids, update, tenantId(res));
+      res.json({ updated: items.length, items });
+    }),
+  );
+
+  // Bulk price/cost adjustment computed per product (increase/decrease by % or fixed
+  // amount, set exact, round to .99/.95) — for the Matrix Builder bulk toolbar.
+  router.post(
+    "/bulk-price",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const b = parseBody(bulkPriceSchema, req.body);
+      const items = await service.bulkAdjustPrice(b.ids, b.target as PriceTarget, b.op as PriceOp, b.value ?? 0, tenantId(res));
       res.json({ updated: items.length, items });
     }),
   );
@@ -447,11 +495,44 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     }),
   );
 
+  // Append-only price-change timeline (selling + cost), newest first.
+  router.get(
+    "/:id/price-history",
+    handler(async (req, res) => {
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+      res.json({ items: await service.listPriceHistory(String(req.params.id), tenantId(res), limit) });
+    }),
+  );
+
   // Master/child variants (BE-8).
   router.get(
     "/:id/variants",
     handler(async (req, res) => {
-      res.json({ items: await service.listVariants(String(req.params.id), tenantId(res)) });
+      const channel = req.query.channel === "online" || req.query.channel === "offline" ? (req.query.channel as VariantChannel) : undefined;
+      res.json({ items: await service.listVariants(String(req.params.id), tenantId(res), channel) });
+    }),
+  );
+
+  // Persist a manual drag order of a master's variants for one channel (independent
+  // online vs offline). Switches that channel's sort mode to 'manual'.
+  router.post(
+    "/:id/variants/reorder",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(reorderVariantsSchema, req.body);
+      const items = await service.reorderVariants(String(req.params.id), body.channel, body.orderedIds, tenantId(res));
+      res.json({ items });
+    }),
+  );
+
+  // Set the sort mode for a master's variants on one channel.
+  router.patch(
+    "/:id/variants/sort",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(variantSortSchema, req.body);
+      const items = await service.setVariantSort(String(req.params.id), body.channel, body.mode as VariantSortMode, tenantId(res));
+      res.json({ items });
     }),
   );
 
@@ -481,7 +562,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(generateVariantsSchema, req.body);
-      const items = await service.generateVariants(String(req.params.id), body.attributes, tenantId(res));
+      const items = await service.generateVariants(String(req.params.id), body.attributes, tenantId(res), body.exclude);
       res.json({ items });
     }),
   );

@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { openDb, type DB } from "./shared/db.js";
 import { openRedis } from "./shared/redis.js";
 import { EventBus } from "./shared/events.js";
+import { Outbox } from "./shared/outbox.js";
 import { logger } from "./shared/logger.js";
 import { buildInfo } from "./shared/version.js";
 import { errorMiddleware } from "./shared/http.js";
@@ -30,6 +31,8 @@ export interface App {
   express: Express;
   db: DB;
   events: EventBus;
+  /** Transactional outbox (ACPA M1) — exposed for crash-recovery tests. */
+  outbox: Outbox;
   /** Call on graceful shutdown to disconnect the Redis event-bus subscriber. */
   cleanup: () => Promise<void>;
 }
@@ -63,6 +66,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
       ["METRICS_TOKEN", "Prometheus metrics scraping will be disabled until a bearer token is configured"],
+      ["CRON_SECRET", "the /jobs/tick cron endpoint will return 503 — background jobs will NOT run on serverless deploys"],
       ["WEBHOOK_SECRET_KEY", "customer webhook secrets may use plaintext dev fallback instead of encryption"],
     ];
     for (const [name, reason] of WARNED_VARS) {
@@ -75,6 +79,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   const schema = options.schema ?? "public";
   const db = openDb({ connectionString: options.connectionString, schema });
   const events = new EventBus();
+  // ACPA M1: transactional outbox — financially-critical events are persisted
+  // before dispatch and redelivered to idempotent durable consumers on crash.
+  const outbox = new Outbox(db);
+  events.setOutbox(outbox);
   const redis = openRedis();
   const app = express();
 
@@ -339,8 +347,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   //    routes are already top-level resource names.)
   for (const mod of modules) {
     const router = Router();
-    await mod.register({ db, events, router });
+    await mod.register({ db, events, router, outbox });
     app.use(mod.mountPath ?? `/api/v1/${mod.name}`, router);
+  }
+
+  // Outbox crash recovery: deliver any events left pending by a previous
+  // process death, then sweep periodically when background jobs are enabled.
+  void outbox.reconcile().catch((err) => logger.warn({ err }, "outbox boot reconcile failed"));
+  if (process.env["FINDER_BACKGROUND_JOBS"] !== "false") {
+    setInterval(() => {
+      void outbox.reconcile().catch((err) => logger.warn({ err }, "outbox sweep failed"));
+    }, 60_000).unref();
   }
 
   // ── Root info
@@ -369,7 +386,35 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   });
 
   // ── Orchestration layer (workflows, sagas, command handlers, background jobs)
-  bootstrapOrchestration(db, events);
+  const orchestration = bootstrapOrchestration(db, events);
+
+  // ── Background-job tick — GET /jobs/tick (ACPA M1.2, closes C-2)
+  // The in-process setInterval pollers freeze between serverless invocations,
+  // so on Vercel a cron (vercel.json "crons") hits this endpoint instead.
+  // Vercel sends `Authorization: Bearer ${CRON_SECRET}` automatically when the
+  // env var is set. Each tick drains due jobs (bounded) and reconciles the
+  // outbox; FOR UPDATE SKIP LOCKED + consumer idempotency make concurrent
+  // ticks and long-lived-deploy intervals safe to overlap.
+  app.get("/jobs/tick", handler(async (req, res) => {
+    const expected = process.env["CRON_SECRET"];
+    if (!expected && process.env["NODE_ENV"] === "production") {
+      res.status(503).json({ error: "cron_unconfigured" });
+      return;
+    }
+    if (expected) {
+      const provided = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+      if (provided !== expected) { res.status(401).end(); return; }
+    }
+    const deadline = Date.now() + 10_000;
+    let jobsProcessed = 0;
+    for (let i = 0; i < 20 && Date.now() < deadline; i++) {
+      const n = await orchestration.jobConsumer.poll();
+      jobsProcessed += n;
+      if (n === 0) break;
+    }
+    const reconciled = await outbox.reconcile();
+    res.json({ status: "ok", jobsProcessed, outbox: reconciled, ts: Date.now() });
+  }));
 
   // ── Server-Sent Events stream — GET /api/v1/stream
   const sseBroker = new SseBroker();
@@ -431,5 +476,5 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   app.use(errorMiddleware);
   app.use(errorEnvelopeMiddleware);
 
-  return { express: app, db, events, cleanup: cleanupEventBridge };
+  return { express: app, db, events, outbox, cleanup: cleanupEventBridge };
 }

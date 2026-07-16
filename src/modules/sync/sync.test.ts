@@ -176,3 +176,51 @@ test("POST /pull returns the Year 2 stub", async () => {
   assert.equal(res.json.pulled, 0);
   assert.match(res.json.note, /stub/);
 });
+
+// ─── Authorization: sync mutations are role-gated (session D, loop iter 6) ─────
+// These mutate company-wide state / connect external integrations and were
+// previously reachable by any authenticated user (incl. cashier).
+import http from "node:http";
+import jwt from "jsonwebtoken";
+
+function callAs(app: App, role: string, method: string, path: string, body?: unknown): Promise<{ status: number; json: any }> {
+  const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
+  const token = jwt.sign({ sub: "usr_role_test", tenantId: "tnt_demo", role }, secret, { expiresIn: "1h" });
+  const p = path.replace("/api/", "/api/v1/");
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(app.express);
+    server.listen(0, () => {
+      const addr = server.address();
+      if (addr === null || typeof addr === "string") { server.close(); reject(new Error("bind fail")); return; }
+      const payload = body === undefined ? undefined : JSON.stringify(body);
+      const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+      if (payload) { headers["content-type"] = "application/json"; headers["content-length"] = String(Buffer.byteLength(payload)); }
+      const req = http.request({ host: "127.0.0.1", port: addr.port, method, path: p, headers }, (res) => {
+        let data = ""; res.setEncoding("utf8"); res.on("data", (c) => (data += c));
+        res.on("end", () => { server.close(); let json: any; try { json = data ? JSON.parse(data) : undefined; } catch { json = data; } resolve({ status: res.statusCode ?? 0, json }); });
+      });
+      req.on("error", (e) => { server.close(); reject(e); });
+      if (payload) req.write(payload);
+      req.end();
+    });
+  });
+}
+
+test("cashier cannot control sync or connect integrations (403); manager can toggle sync", async () => {
+  const { app } = await freshApp();
+
+  // Operational sync controls: manager+ only.
+  assert.equal((await callAs(app, "cashier", "POST", "/api/sync/online", { online: false })).status, 403, "cashier /online → 403");
+  assert.equal((await callAs(app, "cashier", "POST", "/api/sync/push", {})).status, 403, "cashier /push → 403");
+  assert.equal((await callAs(app, "cashier", "POST", "/api/sync/pull", {})).status, 403, "cashier /pull → 403");
+
+  // Integration config: owner only (manager also denied).
+  assert.equal((await callAs(app, "cashier", "POST", "/api/sync/integrations", { providerId: "p1" })).status, 403, "cashier /integrations → 403");
+  assert.equal((await callAs(app, "manager", "POST", "/api/sync/integrations", { providerId: "p1" })).status, 403, "manager /integrations → 403 (owner-only)");
+
+  // A manager can still run operational sync controls.
+  assert.equal((await callAs(app, "manager", "POST", "/api/sync/online", { online: false })).status, 200, "manager /online → 200");
+
+  // Reads stay open to any authenticated role.
+  assert.equal((await callAs(app, "cashier", "GET", "/api/sync/status")).status, 200, "cashier can read status");
+});

@@ -1,6 +1,7 @@
 import type { Router } from "express";
 import type { DB } from "../shared/db.js";
 import type { EventBus } from "../shared/events.js";
+import type { Outbox } from "../shared/outbox.js";
 
 /**
  * Context handed to every module at registration time. A module receives the
@@ -13,6 +14,9 @@ export interface ModuleContext {
   db: DB;
   events: EventBus;
   router: Router;
+  /** Transactional outbox (ACPA M1). Modules with idempotent, financially
+   *  critical event consumers register them here for crash-safe redelivery. */
+  outbox?: Outbox;
 }
 
 /**

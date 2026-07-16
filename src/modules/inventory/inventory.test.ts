@@ -324,3 +324,86 @@ test("inventory.adjusted is emitted on the bus", async () => {
   assert.equal(p.reason, "receiving");
   assert.equal(p.stockQty, 6);
 });
+
+// ── Availability breakdown (retail product benchmark #2) ─────────────────────
+
+test("availability = on-hand / reserved (approved unshipped SO) / incoming (open PO remainder)", async () => {
+  const app = await freshApp();
+  const prod = (await call(app, "POST", "/api/catalog/", { sku: "AVL-1", name: "Avail Widget", price_cents: 2000, category: "general" })).json;
+  const sup = (await call(app, "POST", "/api/purchasing/suppliers", { name: "Avail Supply" })).json;
+
+  // PO for 20 units; receive 12 → on-hand 12, incoming 8.
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: sup.id,
+    lines: [{ productId: prod.id, quantity: 20, unitCostCents: 500 }],
+  })).json;
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 12 }],
+  });
+  assert.equal(recv.status, 200);
+
+  // Approved sales order for 5, not yet shipped → reserved 5.
+  const customer = (await call(app, "POST", "/api/customers/", { name: "Avail Buyer" })).json;
+  const so = (await call(app, "POST", "/api/sales/sales-orders", {
+    customerId: customer.id,
+    lines: [{ productId: prod.id, quantity: 5 }],
+  })).json;
+  const approved = await call(app, "POST", `/api/sales/sales-orders/${so.id}/approve`, {});
+  assert.equal(approved.status, 200);
+
+  const avail = await call(app, "GET", `/api/inventory/${prod.id}/availability`);
+  assert.equal(avail.status, 200);
+  assert.deepEqual(avail.json, { on_hand: 12, reserved: 5, incoming: 8, available: 7 });
+});
+
+test("availability is zeros for a product with no activity", async () => {
+  const app = await freshApp();
+  const prod = (await call(app, "POST", "/api/catalog/", { sku: "AVL-2", name: "Untouched", price_cents: 100 })).json;
+  const avail = await call(app, "GET", `/api/inventory/${prod.id}/availability`);
+  assert.deepEqual(avail.json, { on_hand: 0, reserved: 0, incoming: 0, available: 0 });
+});
+
+// ─── Durable receiving (ACPA M1.3) ────────────────────────────────────────────
+
+test("a redelivered purchase_order.received never double-counts stock", async () => {
+  const app = await freshApp();
+  const evt = await app.events.publish(
+    "purchase_order.received",
+    { tenantId: "tnt_demo", poId: "po_m13", lines: [{ productId: "prod_m13", quantity: 7 }] },
+    "po_m13",
+  );
+  let got = await call(app, "GET", "/api/inventory/prod_m13");
+  assert.equal(got.json.stockQty, 7);
+
+  // Crash window: dispatch completed but the row was never marked delivered.
+  await app.db.query(
+    "UPDATE event_outbox SET status = 'pending', created_at = @past WHERE id = @id",
+    { past: Date.now() - 60_000, id: evt.id },
+  );
+  const r = await app.outbox.reconcile();
+  assert.equal(r.delivered, 1); // redelivered to durable consumers…
+  got = await call(app, "GET", "/api/inventory/prod_m13");
+  assert.equal(got.json.stockQty, 7); // …but the consumption claim blocks a second apply
+});
+
+test("crash before dispatch: a pending receive is applied exactly once by the reconciler", async () => {
+  const app = await freshApp();
+  await app.db.query(
+    `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
+     VALUES ('evt_m13_lost', 'tnt_demo', 'purchase_order.received', @payload, 'po_lost', @occ, TRUE, 'pending', 0, @past)`,
+    {
+      payload: JSON.stringify({ tenantId: "tnt_demo", poId: "po_lost", lines: [{ productId: "prod_lost", quantity: 3 }] }),
+      occ: new Date().toISOString(),
+      past: Date.now() - 60_000,
+    },
+  );
+  await app.outbox.reconcile();
+  let got = await call(app, "GET", "/api/inventory/prod_lost");
+  assert.equal(got.json.stockQty, 3);
+
+  // A second redelivery of the same row must be a no-op.
+  await app.db.query("UPDATE event_outbox SET status = 'pending', created_at = @past WHERE id = 'evt_m13_lost'", { past: Date.now() - 60_000 });
+  await app.outbox.reconcile();
+  got = await call(app, "GET", "/api/inventory/prod_lost");
+  assert.equal(got.json.stockQty, 3);
+});

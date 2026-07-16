@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
+import { clampLimit as clampCursorLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 
 export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
 
@@ -389,6 +390,43 @@ export class InventoryService {
     return row ?? { product_id: productId, tenant_id: tenantId, stock_qty: 0, reorder_pt: 0, updated_at: 0 };
   }
 
+  /**
+   * Availability breakdown (retail product benchmark #2). A read-model over
+   * state other modules already maintain — no new writes:
+   *   onHand   — inventory.stock_qty
+   *   reserved — quantity on approved sales orders not yet shipped
+   *              (fulfillment unfulfilled/picking/packed; shipping deducts stock at ship)
+   *   incoming — open remainder (qty - received) on approved, undelivered PO lines
+   *   available = onHand - reserved (floored at 0)
+   */
+  async availability(productId: string, tenantId: string): Promise<{
+    on_hand: number; reserved: number; incoming: number; available: number;
+  }> {
+    const stock = await this.getStock(productId, tenantId);
+    const reservedRow = await this.db.one<{ n: number }>(
+      `SELECT COALESCE(SUM(l.quantity), 0)::int AS n
+         FROM sales_order_lines l
+         JOIN sales_orders so ON so.id = l.sales_order_id AND so.tenant_id = l.tenant_id
+        WHERE l.tenant_id = @t AND l.product_id = @p
+          AND so.status = 'approved'
+          AND so.fulfillment_status IN ('unfulfilled', 'picking', 'packed')`,
+      { t: tenantId, p: productId },
+    );
+    const incomingRow = await this.db.one<{ n: number }>(
+      `SELECT COALESCE(SUM(GREATEST(l.quantity - COALESCE(l.received_qty, 0), 0)), 0)::int AS n
+         FROM purchase_order_lines l
+         JOIN purchase_orders po ON po.id = l.po_id AND po.tenant_id = l.tenant_id
+        WHERE l.tenant_id = @t AND l.product_id = @p
+          AND po.status IN ('ordered', 'partially_received')
+          AND po.approval_status = 'approved'`,
+      { t: tenantId, p: productId },
+    );
+    const onHand = Number(stock.stock_qty ?? 0);
+    const reserved = Number(reservedRow?.n ?? 0);
+    const incoming = Number(incomingRow?.n ?? 0);
+    return { on_hand: onHand, reserved, incoming, available: Math.max(0, onHand - reserved) };
+  }
+
   async getReorderSuggestions(tenantId: string): Promise<ReorderSuggestion[]> {
     const rows = await this.db.query<{
       product_id: string; name: string; sku: string | null;
@@ -559,11 +597,24 @@ export class InventoryService {
     return { items, nextCursor, limit };
   }
 
-  async movements(productId: string, tenantId: string): Promise<MovementRow[]> {
-    return this.db.query<MovementRow>(
-      "SELECT * FROM inventory_movements WHERE tenant_id = @tenantId AND product_id = @productId ORDER BY created_at DESC, id DESC",
-      { tenantId, productId },
+  /** Movement history for a product — keyset-paginated (the table is
+   *  append-only and unbounded; fetching everything was a scan). */
+  async movements(
+    productId: string,
+    tenantId: string,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<CursorPage<MovementRow>> {
+    const limit = clampCursorLimit(opts.limit, 50, 200);
+    const cur = decodeCursor(opts.cursor);
+    const rows = await this.db.query<MovementRow>(
+      `SELECT * FROM inventory_movements
+       WHERE tenant_id = @tenantId AND product_id = @productId
+       ${cur ? "AND (created_at, id) < (@curAt, @curId)" : ""}
+       ORDER BY created_at DESC, id DESC
+       LIMIT @limit`,
+      { tenantId, productId, limit, ...(cur ? { curAt: cur.at, curId: cur.id } : {}) },
     );
+    return toPage(rows as unknown as Array<MovementRow & Record<string, unknown>>, limit, "created_at") as CursorPage<MovementRow>;
   }
 
   /**

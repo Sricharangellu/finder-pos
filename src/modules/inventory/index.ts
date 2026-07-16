@@ -1,4 +1,6 @@
 import type { PosModule } from "../types.js";
+import type { DomainEvent } from "../../shared/types.js";
+import { claimEventOnce } from "../../shared/outbox.js";
 import { InventoryService } from "./service.js";
 import { registerRoutes } from "./routes.js";
 import { dropLegacyNoTenant } from "../../shared/migrate.js";
@@ -222,7 +224,7 @@ CREATE TABLE IF NOT EXISTS inventory_transfers (
 CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers (tenant_id, created_at DESC);
 `,
   ],
-  register({ db, events, router }) {
+  register({ db, events, router, outbox }) {
     const service = new InventoryService(db, events);
     const purchasing = new PurchasingService(db, events);
     registerRoutes(router, service, purchasing);
@@ -250,7 +252,10 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
     });
 
     // purchase_order.received -> increase stock for each received line (reason 'receiving').
-    events.on("purchase_order.received", async (event) => {
+    // Durable (ACPA M1.3): stock increments are not naturally idempotent, so
+    // the handler claims the event id before applying — sync dispatch and
+    // crash redelivery of the same receipt can never double-count stock.
+    const receiveStock = async (event: { id?: string; aggregateId?: string; occurredAt: string; payload: unknown }) => {
       const payload = event.payload as {
         tenantId?: string;
         poId?: string;
@@ -259,6 +264,7 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       const tenantId = payload.tenantId ?? "";
       const poId = payload.poId ?? event.aggregateId ?? "";
       if (!tenantId) return;
+      if (!(await claimEventOnce(db, "inventory.receiving", event as DomainEvent))) return; // already applied
       for (const line of payload.lines ?? []) {
         await service.adjust(line.productId, line.quantity, "receiving", tenantId, poId);
         // If the received line carries an expiry, record a lot for FEFO / near-expiry tracking.
@@ -269,7 +275,9 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
           );
         }
       }
-    });
+    };
+    events.on("purchase_order.received", receiveStock);
+    outbox?.onDurable("purchase_order.received", receiveStock);
 
     // stock.written_off (damaged/expired/vendor return) -> decrement stock + the specific lot.
     events.on("stock.written_off", async (event) => {

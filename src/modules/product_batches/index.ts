@@ -27,6 +27,10 @@ CREATE INDEX IF NOT EXISTS product_batches_tenant_expiry_idx ON product_batches 
 
 export const productBatchesModule: PosModule = {
   name: "product_batches",
+  // Routes are top-level resource names (router.get("/product-batches", …)); mount
+  // at /api/v1 like store_locations, not the default /api/v1/product_batches which
+  // 404s the client's hyphenated path (MSW masks it in dev).
+  mountPath: "/api/v1",
   migrations: [CREATE_PRODUCT_BATCHES],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = productBatchesService(db, events);

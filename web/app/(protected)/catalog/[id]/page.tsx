@@ -26,11 +26,12 @@ import { AnalyticsTab }  from "./_components/AnalyticsTab";
 import { AuditLogTab }   from "./_components/AuditLogTab";
 import { ImagesTab }     from "./_components/ImagesTab";
 import { LabelsTab }     from "./_components/LabelsTab";
+import { CategoriesTab } from "./_components/CategoriesTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab =
-  | "overview" | "general" | "variants" | "pricing"
+  | "overview" | "general" | "variants" | "pricing" | "categories"
   | "inventory" | "purchasing" | "transactions" | "expiry"
   | "media" | "ecommerce" | "compliance" | "labels"
   | "analytics" | "audit-log";
@@ -44,6 +45,7 @@ const TABS: { key: Tab; label: string; group: string }[] = [
   { key: "variants",      label: "Master & Variants", group: "core" },
   { key: "overview",      label: "Overview",         group: "core" },
   { key: "pricing",       label: "Pricing",          group: "core" },
+  { key: "categories",    label: "Categories",       group: "core" },
   { key: "inventory",     label: "Inventory",        group: "inventory" },
   { key: "purchasing",    label: "Purchasing",       group: "inventory" },
   { key: "expiry",        label: "Expiry",           group: "inventory" },
@@ -390,6 +392,7 @@ export default function ProductDetailPage() {
         {activeTab === "general"      && <GeneralTab product={product} onSaved={setProduct} />}
         {activeTab === "variants"     && <VariantsTab product={product} />}
         {activeTab === "pricing"      && <PricingTab product={product} />}
+        {activeTab === "categories"   && <CategoriesTab productId={product.id} />}
         {activeTab === "inventory"    && <InventoryTab product={product} onSaved={setProduct} />}
         {activeTab === "purchasing"   && <PurchasingTab productId={product.id} />}
         {activeTab === "transactions" && <TransactionsTab productId={product.id} />}

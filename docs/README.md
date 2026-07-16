@@ -1,11 +1,17 @@
 # Ascend — Documentation
 
-Ascend is a modular, multi-vertical point-of-sale platform. One codebase powers retail, restaurant, hospitality, healthcare, automotive, manufacturing, rental, entertainment, and education businesses. You enable only the modules your business needs.
+Ascend is a modular, multi-vertical point-of-sale platform: one codebase is designed to serve retail, restaurant, hospitality, healthcare, automotive, manufacturing, rental, entertainment, and education businesses through configurable modules, enabling only what a business needs.
+
+> **Maturity note:** the vertical guides below describe intended capability, not
+> uniform readiness. **Retail is the only pack proven end-to-end today**; the other
+> verticals are **Partial** or **Planned**. See
+> [`WORK/FORWARD_PLAN.md`](../WORK/FORWARD_PLAN.md) for honest per-area status.
 
 ## Quick links
 
 | I want to… | Go to |
 |---|---|
+| Run the backend locally (developers) | [Local development](getting-started/local-development.md) |
 | Set up for the first time | [Getting started](getting-started/01-onboarding.md) |
 | Ring up a sale | [Checkout workflow](core-workflows/checkout.md) |
 | Process a return | [Returns & refunds](core-workflows/returns.md) |
@@ -49,7 +55,7 @@ Ascend is a modular, multi-vertical point-of-sale platform. One codebase powers 
 - [Settings overview](admin/settings.md)
 - [Compliance & age verification](admin/compliance.md)
 - [Webhooks & integrations](admin/webhooks.md)
-- [Hardware setup](admin/hardware.md)
+- [Hardware setup](getting-started/02-hardware.md)
 
 ## API
 

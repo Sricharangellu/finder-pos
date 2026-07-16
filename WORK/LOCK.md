@@ -1,6 +1,260 @@
 # Ascend — Multi-Agent Work Lock
 
-Status: IDLE — no active claim
+Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
+
+## Active Claim (Claude session D — sync mutation authorization) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 6) |
+| Queue item | sync module mutations (/online /push /pull /integrations) had NO role guard — any cashier could toggle company sync, drain the queue, or connect integrations. Added requireRole("manager") on ops controls + requireRole("owner") on /integrations (matches webhooks). webhooks verified already owner-guarded. |
+| Files/areas expected | `src/modules/sync/routes.ts` + sync.test.ts (1 new authz test). gateway/auth.ts imported only (NOT edited — session C's claim). NOT payments/shared (B). |
+| Started | 2026-07-16 |
+| Status | RELEASED — guards added, cashier 403 test. 9/9 sync isolated, typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-16T042500Z-sync-authz.md |
+| Blockers | none |
+
+## Active Claim (Claude session D — journal-entry keyset pagination) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 5) |
+| Queue item | accounting.listJournal was a bare LIMIT 500 on journal_entries (most append-heavy financial table) — deep ledger/audit history unreachable. Added keyset cursor (additive {items,nextCursor,limit}); reports verified already-bounded aggregations, no change. accounting not in any B/C claim. |
+| Files/areas expected | `src/modules/accounting/{service,routes}.ts` + accounting.test.ts (2 new tests). NOT payments/shared/orchestration (B), NOT quotes/gateway/sso (C). |
+| Started | 2026-07-16 |
+| Status | RELEASED — keyset cursor on listJournal, backward-compatible response. 19/19 accounting isolated, typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-16T040500Z-journal-keyset-pagination.md |
+| Blockers | none |
+
+## Active Claim (Claude session D — route-mount drift sweep) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 4) |
+| Queue item | Mock-vs-real drift sweep: customer-invoices/service-orders/product-batches registered top-level hyphenated routes but shipped without mountPath → 404 in prod (mock-masked). Added mountPath /api/v1 (store_locations convention); name unchanged (migrations safe). Removed 51 gitignored ` 2.` collision dupes blocking local tsc. |
+| Files/areas expected | `src/modules/{customer_invoices,service_orders,product_batches}/index.ts` + NEW customer_invoices/{route-mount.test.ts,test-request.ts}. NOT in any B/C claim (C owns quotes/gateway/sso/verticals; B owns shared/payments/orchestration). |
+| Started | 2026-07-16 |
+| Status | RELEASED — mountPath fix + mount test (2/2), typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-16T034500Z-route-mount-drift.md |
+| Blockers | none |
+
+## Active Claim (Claude session D — unbounded-list pagination + movements route drift)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — loop iteration; CODING_STANDARDS cursor policy enforcement) |
+| Queue item | (1) REAL DRIFT BUG: web calls GET /inventory/movements?product_id= (InventoryTab, MovementsDrawer) which exists only in MSW mocks — real backend binds productId="movements" → empty array, so movements panels are silently blank in prod. Add the real query-param route (bounded + cursor). (2) inventory service.movements is unbounded (every movement ever per product) — bound + keyset-paginate via shared/pagination. (3) audit_log list: additive cursor mode (offset path unchanged for existing clients) + id tiebreaker on ORDER BY. |
+| Files/areas expected | `src/modules/inventory/{routes,service}.ts` + NEW pagination test; `src/modules/audit_log/{routes,service}.ts` + NEW pagination test; WORK audit + this LOCK. NO files claimed by sessions B (shared/events,outbox, payments, orchestration) or C (quotes, gateway, sso, verticals, app.ts). |
+| Started | 2026-07-15 |
+| Status | RELEASED — drift fixed: real GET /inventory/movements?product_id= route added (was mock-only; prod panels silently empty); movements() keyset-paginated (was unbounded); audit_log gains additive listCursor (offset path + total untouched) + id tiebreaker. 6 new tests (first ever for audit_log) + inventory 21 = 27/27 isolated, typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-15T173000Z-movements-drift-pagination.md |
+| Blockers | none |
+
+## Active Claim (Claude session D — C-4 slice: scheduled uptime heartbeat)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — standing critical C-4, code-addressable slice) |
+| Queue item | C-4 "no alerting between deploys": today an outage is invisible until the next deploy's smoke. Add a scheduled GitHub Actions heartbeat (every 15 min) probing prod /healthz, /readyz, the /api/v1/flags 401 auth boundary, and the frontend — mirroring ci.yml's post-deploy smoke. Failure → red workflow run → GitHub notification to watchers. Zero new accounts/secrets; richer channels (Slack/PagerDuty) remain Sri's decision, noted as follow-up. |
+| Files/areas expected | NEW `.github/workflows/uptime.yml`; WORK audit + this LOCK. NOT ci.yml, NOT deploy-prod.yml (no changes to existing pipelines). |
+| Started | 2026-07-15 |
+| Status | RELEASED — 15-min heartbeat (healthz, readyz, flags-401 auth boundary, frontend) mirroring the post-deploy smoke; red run → GitHub notification. YAML validated; all 4 probes executed live against prod from this session and PASSED. Cron activates when merged to master (GitHub runs schedules from default branch only). C-4 not fully closed: richer fan-out (Slack/Sentry) is Sri's call. Audit: AUDIT_2026-07-15T170000Z-uptime-heartbeat.md |
+| Blockers | none |
+
+## Active Claim (Claude session D — C-3: verified DB TLS)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — standing critical C-3) |
+| Queue item | Production DB connections use TLS with `rejectUnauthorized:false` (MITM-able). Fix: verify certificates by default in production (managed PG providers use publicly-signed certs); `PG_CA_CERT`/`PG_CA_CERT_B64` for custom CAs; explicit `PG_SSL_NO_VERIFY=1` escape hatch that logs a loud warning. NOTE FOR SRI: merging flips prod TLS behavior — if the prod DB cert chain is not publicly verifiable, set the escape hatch or CA var before deploy; /readyz + post-deploy smoke will catch a failure. |
+| Files/areas expected | `src/shared/db.ts` (sslConfig only); NEW `src/shared/db-ssl.test.ts`; `.env.example`; WORK audit + this LOCK. NOT `src/shared/{events,outbox}.ts` (session B), NOT `src/app.ts` (session C). |
+| Started | 2026-07-15 |
+| Status | RELEASED — sslConfig now verifies certs whenever TLS is on (prod default); PG_CA_CERT/PG_CA_CERT_B64 for private CAs; PG_SSL_NO_VERIFY=1 explicit escape hatch with boot warning. 7/7 matrix tests, typecheck PASS, smoke 20/20. ⚠️ Merge flips prod TLS behavior — see deploy note in AUDIT_2026-07-15T164500Z-db-tls-verification.md before deploying. |
+| Blockers | none |
+
+## Active Claim (Claude session D — SSO refresh-token persistence)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — follow-up flagged in the SSO-hardening audit) |
+| Queue item | SSO sessions cannot refresh: handleCallback signs a refresh JWT but never stores its hash in refresh_tokens, so identity.refresh() rejects it after the 15-min access token expires. Fix: persist the row on SSO login exactly as identity does (uuidv7 id, sha256 token_hash, 7d expiry). Test proves SSO login → identity refresh round-trip. |
+| Files/areas expected | `src/modules/sso/service.ts`; `src/modules/sso/sso-security.test.ts` (session D's own file); WORK audit + this LOCK. Same exclusions as the prior SSO claim (NOT routes.ts / sso.test.ts / index.ts — session C). |
+| Started | 2026-07-15 |
+| Status | RELEASED — SSO login now persists the refresh-token hash in refresh_tokens (uuidv7/sha256/7d, mirrors identity.issueLoginSession), so identity.refresh() accepts + rotates SSO tokens. Round-trip test added. Gates: typecheck PASS, sso-security 5/5 + sso 10/10 + identity 21/21 = 36/36 isolated, smoke 20/20. Audit: AUDIT_2026-07-15T163000Z-sso-refresh-persistence.md |
+| Blockers | none |
+
+## Active Claim (Claude session D — SSO OIDC hardening: token verification + DB state + SSRF guard)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — tech-debt-report triage, the one surviving critical) |
+| Queue item | (1) Verify OIDC id_token signature via the provider's JWKS + iss/aud/exp validation (today: `jwt.decode` unverified — tenant-admin→any-user escalation via rogue IdP config); (2) move the OAuth2 state store from in-memory Map to settings_kv rows (in-memory breaks SSO on serverless when callback lands on a different instance); (3) SSRF guard on discoveryUrl (https-only, loopback allowed only outside production, private/link-local IPs rejected). No new dependency (Node crypto JWK + jsonwebtoken verify). |
+| Files/areas expected | `src/modules/sso/service.ts`; NEW `src/modules/sso/sso-security.test.ts`; WORK audit + this LOCK. Deliberately NOT `src/modules/sso/routes.ts`, NOT `src/modules/sso/sso.test.ts`, NOT `src/modules/sso/index.ts` (session C has uncommitted work in routes/test and claims index/mount order). Verified C's worktree has NOT touched service.ts. |
+| Started | 2026-07-15 |
+| Status | RELEASED — id_token now JWKS-verified (sig + iss/aud/exp, asymmetric algs only, 401 invalid_id_token); OAuth2 state moved to settings_kv rows (DELETE..RETURNING single-use — fixes SSO-broken-on-serverless); assertSafeDiscoveryUrl SSRF guard at save + use. No new dependency, no schema change. Gates: typecheck PASS, sso 14/14 isolated (4 new security + 10 existing unchanged), smoke 20/20. Audit: AUDIT_2026-07-15T161500Z-sso-oidc-hardening.md. FOLLOW-UP flagged (not taken): SSO refresh tokens never stored in refresh_tokens → SSO sessions can't refresh; near session C's area. |
+| Blockers | none |
+
+
+## Active Claim (Claude session D — API-review fixes: login lockout, CONTRACTS.md, error registry)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — Sri-directed API-review remediation) |
+| Queue item | Three fixes from the external API-endpoint review triage: (1) login brute-force protection — DB-backed failed-attempt lockout in identity (serverless-safe; global IP limiter alone leaves password spraying practical); (2) CONTRACTS.md truth-restore (still says SQLite; reality is Postgres+RLS) + pagination/versioning policy paragraphs; (3) error-code registry consolidating ad-hoc error code strings in shared/http. |
+| Files/areas expected | `src/identity/{routes,service,migrations,types}.ts` + new focused test; `CONTRACTS.md`; `src/shared/http.ts` (additive) or new `src/shared/error-codes.ts`; WORK audit + this LOCK. NO `src/gateway/auth.ts`, NO `src/identity/authorization.ts`, NO `src/modules/quotes/**`, NO vertical-module index.ts, NO `src/app.ts` (session C); NO `src/shared/{events,outbox}.ts`, NO `payments/*`, NO `src/orchestration/*` (session B). Working on `feat/delivery-pipeline` in the main checkout; staging only own files. |
+| Started | 2026-07-15 |
+| Status | RELEASED — lockout was already implemented (triage error, corrected); added missing lockout regression tests (3/3); CONTRACTS.md superseded-banner truth-restore; pagination/versioning policy in CODING_STANDARDS.md; ERROR_CODES registry + additive error.details in shared/http. Gates: typecheck PASS, identity+payments+lockout 40/40 isolated, smoke 20/20. Audit: AUDIT_2026-07-15T155332Z-api-review-fixes.md |
+| Blockers | none |
+
+## Active Claim (Claude session C — Clean Architecture pilot: quotes + gateway auth)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session C (Sonnet 5) |
+| Queue item | (1) Clean Architecture pilot: Repository + DTO extraction on `quotes` module, pure rule-evaluation extraction from `src/gateway/auth.ts` into `src/identity/authorization.ts` — see plan `~/.claude/plans/eager-splashing-hoare.md`. (2) Full API-endpoint audit (39+ route files, 12 dimensions) surfaced 3 critical bugs, now being fixed in this same claim: restaurant/workforce double-URL-prefix (routes 404 in prod), SSO login unreachable (blocked by global auth gate), and business-pack isolation never enforced server-side (`requireModule` middleware, reusing `SettingsService.getCapabilities`, applied to the 8 vertical modules). |
+| Files/areas expected | `src/modules/quotes/**`; `src/gateway/auth.ts`; `src/identity/authorization.ts`; `src/modules/restaurant/routes.ts`; `src/modules/workforce/routes.ts`; `src/app.ts` (SSO mount order only); `src/modules/sso/index.ts`; `src/modules/{appointments,entertainment,education,healthcare,hospitality,manufacturing,automotive,rental}/index.ts` (add requireModule guard only). Working in isolated worktree off `origin/master` at `/private/tmp/claude-501/-Users-sri-Desktop-Prj/00f2e7ff-1f2f-4b86-b5fd-4de2d0f8bd7e/scratchpad/ascend-clean-arch`, branch `feat/clean-arch-pilot-quotes`. NO `src/shared/{events,outbox}.ts`, NO `src/orchestration/*`, NO `payments/*` (session B's active claim). |
+| Started | 2026-07-15 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
+## Active Claim (Claude session B — ACPA M1.4 staged outbox publish)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session B (Fable 5, ACPA roadmap E1) |
+| Queue item | M1.4: EventBus.stage()/dispatchStaged() — outbox row commits inside the publisher's business tx (closes crash-after-commit-before-publish loss); payments.capture migrated; daily retention sweep (delivered outbox rows + old consumption claims). |
+| Files/areas expected | `src/shared/{events,outbox}.ts`; `src/modules/payments/service.ts`; `src/orchestration/{index.ts,queues/queue-names.ts,jobs/outbox-retention.job.ts}`; `src/app.staging.test.ts`; ACPA_ROADMAP. NO purchasing (deferred: receive() staging queued until session A's requisition claim releases), NO catalog, NO web. |
+| Started | 2026-07-14 |
+| Status | ACTIVE — implementing |
+| Blockers | purchasing.receive staged-publish deferred to respect session A's purchasing claim |
+
+
+## Active Claim (Claude session A — purchase requisitions)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8) |
+| Queue item | Purchase requisitions: draft→submitted→approved/rejected→converted-to-PO. New purchase_requisitions(+lines) tables, PR numbering via document_counters, cursor-paginated list, convert creates a PO through the existing (approval-gated) createOrder. Backend only; UI follows. |
+| Files/areas expected | `src/modules/purchasing/{index,service,routes,purchasing.test}.ts`; WORK audit + LOCK. NO shared/, NO catalog, NO web. |
+| Started | 2026-07-14 |
+| Status | RELEASED — shipped; purchasing 19/19, full 458/458, smoke 20/20. Audit: AUDIT_2026-07-14T225200Z-purchase-requisitions.md |
+| Blockers | none |
+
+## Active Claim (Claude session A — catalog bulk-price)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, Matrix Builder PRD) |
+| Queue item | Backend bulk price/cost engine: POST /catalog/bulk-price computes per-item (inc/dec %, inc/dec fixed, set exact, round .99/.95) for selling or cost across many ids; wire the Matrix Builder toolbar to it (selling + cost). |
+| Files/areas expected | `src/modules/catalog/{service,routes,catalog.test}.ts`; `web/app/(protected)/catalog/matrix/page.tsx`; WORK audit + LOCK. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — shipped. POST /catalog/bulk-price (manager-gated, ids ≤500, value required unless round op) + adjustPrice/bulkAdjustPrice; Matrix toolbar now one bulk call w/ Sell/Cost target + Round .99. catalog 43/43 isolated, smoke 20/20, hygiene clean, web typecheck/lint/build pass. Audit: AUDIT_2026-07-13T051053Z-bulk-price-engine.md |
+| Blockers | none |
+
+## Released Claim (Claude session A — variant integrity backend)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, Matrix Builder PRD backend slices) |
+| Queue item | #8 drop the hyphen in generated variant names (`master.name label`); #1 category inheritance — assign forces child category=master; update coerces a child's category to its master's (can't set independently); changing a master's category cascades to all children. catalog module only. |
+| Files/areas expected | `src/modules/catalog/service.ts`; `src/modules/catalog/catalog.test.ts`; WORK audit + LOCK. NO web, NO schema. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — built_verified. #8 variant naming drops the hyphen; #1 category inheritance (assign forces child cat, update coerces child cat to master's, master category change cascades to children). Gates: typecheck / test 401/401 / smoke 20/20 / hygiene 926. Audit: AUDIT_2026-07-13T031942Z-variant-category-inheritance-naming.md. |
+| Blockers | none |
+
+## Released Claim (Claude session A — Matrix Builder workspace v1)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, Product Matrix Builder PRD — UI slice) |
+| Queue item | New `/catalog/matrix` workspace: category→master→variant hierarchy, expandable groups, inline edit (selling/cost price), online/active toggles, bulk selection + sticky toolbar (activate/deactivate, enable/disable online, adjust selling price by %), search, loading/empty/error states, manager-gated. Frontend only; wired to existing catalog APIs (GET /catalog, PATCH /:id, POST /bulk-update). |
+| Files/areas expected | NEW `web/app/(protected)/catalog/matrix/page.tsx`; `web/components/EnterpriseShell.tsx` (nav); WORK audit + LOCK. NO backend changes. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — built_not_verified. /catalog/matrix workspace: master→variant hierarchy, inline price/cost edit, online/active toggles + badges, bulk selection + sticky toolbar (activate/deactivate/online + sell price ±%), search, loading/empty/error, manager-gated. Web typecheck/lint/build PASS (route 6.13 kB). Browser e2e blocked by local auth harness + no seeded variant data. Audit: AUDIT_2026-07-13T030727Z-product-matrix-builder-v1.md. Deferred PRD slices listed there. |
+| Blockers | none |
+
+## Released Claim (Claude session A — race-free doc numbering + delivery e2e + UI polish)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, follow-ups from review remediation) |
+| Queue item | (A) Build a reusable race-free document-number primitive (`document_counters` table + `shared/docnumber.ts`) and adopt it in shipping (replace the retry hack) and sales (SO/QT), with safe max-suffix seeding; flag other modules for incremental adoption. (B) Add a `/delivery` Playwright golden-path e2e matching repo conventions. |
+| Files/areas expected | NEW `src/shared/docnumber.ts`, `src/modules/sequences/*`; `src/modules/{sales,shipping}/*`; `src/modules/index.ts`; NEW `web/e2e/delivery.spec.ts`; tests; WORK audit + LOCK. |
+| Started | 2026-07-13 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — (A) numbering fix committed 5340dc1 (isolation 15/15, smoke 20/20). (B) /delivery e2e spec + UI polish (loading/skeleton, product names, button spinners, aria/role, stepper overflow, list scroll): web typecheck/lint/build PASS. Local e2e blocked by the repo's shared login fixture (two-port auth flake), not the spec — did NOT touch the auth/e2e harness. Audits: race-free-doc-numbering + delivery-ui-polish. |
+| Blockers | Local Playwright auth harness (fixtures.ts login) times out in this env; CI runs it. |
+
+## Released Claim (Claude session A — fix reviewed findings 1–7)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, code-review remediation) |
+| Queue item | Fix the 7 delivery-pipeline review findings in severity order: (1) server-side manager gating on fulfillment/shipping mutations; (2) make pack→shipment robust/retriable (inject ShippingService, drop fire-once event); (3) "Delivered" badge on picked lines; (4) ship_number COUNT race → retry-on-conflict; (5) fulfillment_status CHECK constraint + guarded transition lookup; (6) /delivery loadDetail stale-render race; (7) web SalesOrderStatus type drift. |
+| Files/areas expected | `src/modules/{fulfillment,shipping,sales}/*`; `web/app/(protected)/delivery/page.tsx`; `web/api-client/types.ts`; tests; WORK audit + LOCK. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-13 |
+| Status | RELEASED — all 7 findings fixed + 2 tests (authz 403, re-pack recovery). Gates: backend typecheck / test 396/396 / smoke 20/20 / hygiene 918; web typecheck / lint / build. Audit: WORK/audits/AUDIT_2026-07-13T000416Z-delivery-review-remediation.md. Committed on `feat/delivery-pipeline`. |
+| Blockers | none |
+
+## Released Claim (Claude session A — behavior-preserving pipeline cleanup)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, refactor/optimization pass) |
+| Queue item | Behavior-preserving cleanup of the delivery pipeline: (1) fulfillment.buildPickList returns a `created` flag so the sales-order path stops running a redundant pick_lists existence query; (2) extract a shipment factory in shipping to remove the duplicated ShippingOrder literal between createFromInvoice/createFromSalesOrder. No behavior change; verified by the existing pipeline tests. |
+| Files/areas expected | `src/modules/fulfillment/service.ts`, `src/modules/shipping/service.ts`; WORK audit + this LOCK. NO route/schema/contract changes. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified, no behavior change. fulfillment.buildPickList returns {pickList,created} (drops a redundant pick_lists SELECT on the SO path); shipping.newShipment factory dedups the ShippingOrder literal. Gates: backend typecheck / test 389/389 / smoke 20/20 / hygiene 916. Audit: WORK/audits/AUDIT_2026-07-12T230449Z-pipeline-refactor.md. |
+| Blockers | none |
+
+## Released Claim (Claude session A — local dev quickstart + honest status)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, docs/planning gap: local Postgres quickstart) |
+| Queue item | Create a correct local-dev quickstart for running the backend against a real Postgres (the current README manual path is broken — no .env auto-load). Add honest status framing (retail proven E2E; other verticals Partial/Planned; tenant isolation = gateway context + RLS backstop). Docs only — no code changes. |
+| Files/areas expected | NEW `docs/getting-started/local-development.md`; edits to `README.md`, `db/README.md`; WORK audit + this LOCK. NO src/web/db code changes. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — docs only. NEW docs/getting-started/local-development.md (backend-on-own-Postgres quickstart); README project-status + fixed-broken-manual-dev + stale counts; docs/README maturity note + dev link; db/README startup-vs-run.sh note. All links/files verified; hygiene pass (914). Audit: WORK/audits/AUDIT_2026-07-12T223507Z-local-dev-quickstart.md. |
+| Blockers | none |
+
+## Released Claim (Claude session A — replace fetch-all-then-filter in /delivery)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, persistent-agent: continue + improve) |
+| Queue item | Robustness/perf: the /delivery panel fetched ALL pick-lists (≤200) and ALL shipments (≤500) then filtered client-side for the selected order — breaks past those limits. Add server-side `salesOrderId`/`orderId` filters to shipping.list and fulfillment.listPickLists (matching the invoice `?salesOrderId=` pattern) and have the page query only what it needs. Extend existing modules only. |
+| Files/areas expected | `src/modules/shipping/{service,routes}.ts`, `src/modules/fulfillment/{service,routes}.ts`, `src/modules/shipping/delivery-pipeline.test.ts`, `web/app/(protected)/delivery/page.tsx`; WORK audit + this LOCK. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified. /delivery detail now queries pick-lists/shipments by order (server-side filters) instead of fetch-all-then-filter. Gates: backend typecheck / test 389/389 / smoke 20/20 / hygiene 913; web typecheck / lint / build. Audit: `WORK/audits/AUDIT_2026-07-12T213543Z-delivery-targeted-queries.md`. Committed on `feat/delivery-pipeline`. |
+| Blockers | none |
+
+## Released Claim (Claude session A — link AR invoice to sales order + surface in delivery)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, "next" → complete invoices part of the pipeline) |
+| Queue item | Link the auto-raised AR invoice back to its sales order: add `invoices.sales_order_id`, set it when billing raises an invoice from `sales_order.invoiced`, add a `?salesOrderId=` list filter. Surface invoice status on the `/delivery` panel and add a "Create invoice" action when the SO is approved but not yet invoiced. Extend billing + sales + web; no new module. |
+| Files/areas expected | `src/modules/billing/{index,service,routes}.ts`, billing test; `web/app/(protected)/delivery/page.tsx`, `web/api-client/types.ts`; WORK audit + this LOCK. NO db canonical DDL rewrite beyond idempotent ALTERs. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified (backend), built-not-verified (web panel). AR invoice raised from a sales order is now linked (`invoices.sales_order_id`) and surfaced on the `/delivery` panel with a Create-invoice action. Gates: backend typecheck / test 388/388 / smoke 20/20 / hygiene; web typecheck / lint / build (/delivery emitted). Audit: `WORK/audits/AUDIT_2026-07-12T064225Z-invoice-sales-order-link.md`. Committed on `feat/delivery-pipeline`. |
+| Blockers | none |
+
+## Released Claim (Claude session A — delivery pipeline connect-the-seams)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session A (Opus 4.8, user feature: retail order / invoices / sales orders (ecommerce) / delivery pipelines) |
+| Queue item | Connect the delivery pipeline for sales orders (incl. ecommerce): add `sales_orders.fulfillment_status`; make fulfillment build pick-lists from sales orders and, on pack, flip SO→packed + emit `sales_order.packed`; make shipping sales-order-aware (nullable invoice_id + sales_order_id), auto-create a shipment on `sales_order.packed`, and propagate ship/deliver back to the SO. Add a web delivery-pipeline page. Extend existing modules; split across commits (backend then frontend). |
+| Files/areas expected | `src/modules/sales/{index,service,routes}.ts`, `src/modules/fulfillment/{index,service,routes}.ts`, `src/modules/shipping/{index,service,routes}.ts`, tests in those modules; `web/app/(protected)/**` delivery pipeline page + api-client; WORK audit + this LOCK. NO db/ canonical DDL rewrite beyond idempotent ALTERs, NO unrelated modules. |
+| Started | 2026-07-12 |
+| Last update | 2026-07-12 |
+| Status | RELEASED — built_verified (backend), built-not-verified (web page). Sales/ecommerce orders now flow order → pick → pack → ship → deliver with fulfillment_status propagation; `/delivery` web page drives it. Gates: backend typecheck / test 389/389 / smoke 20/20 / hygiene; web typecheck / lint / build. Audit: `WORK/audits/AUDIT_2026-07-12T062801Z-delivery-pipeline.md`. |
+| Blockers | none |
 
 ## Released Claim (Codex session P — retail progress truth tracking)
 

@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { nextDocNumber } from "../../shared/docnumber.js";
 
 /**
  * Sales module — the B2B order-to-cash front half of the ERP benchmark:
@@ -16,6 +17,21 @@ import { notFound, badRequest, conflict } from "../../shared/http.js";
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "expired" | "cancelled";
 export type SOStatus = "pending_approve" | "approved" | "invoiced" | "partially_invoiced" | "cancelled";
+
+/** Delivery-pipeline status, independent of the order-to-cash `SOStatus`.
+ *  Advanced by the fulfillment (picking/packed) and shipping (shipped/delivered) modules. */
+export type SOFulfillmentStatus = "unfulfilled" | "picking" | "packed" | "shipped" | "delivered";
+
+/** Legal forward transitions for the delivery pipeline. Setting a status not
+ *  reachable from the current one is rejected so the pipeline can't skip stages
+ *  or move backwards. */
+const FULFILLMENT_TRANSITIONS: Record<SOFulfillmentStatus, SOFulfillmentStatus[]> = {
+  unfulfilled: ["picking"],
+  picking: ["packed"],
+  packed: ["shipped"],
+  shipped: ["delivered"],
+  delivered: [],
+};
 
 /** Tier → line discount %. Tier 1 = best price. Placeholder until per-product
  *  tier prices land in Wave B; documented in ERP_BENCHMARK.md. */
@@ -44,6 +60,7 @@ export interface SalesOrder {
   quotation_id: string | null;
   customer_id: string;
   status: SOStatus;
+  fulfillment_status: SOFulfillmentStatus;
   subtotal_cents: number;
   discount_cents: number;
   total_cents: number;
@@ -142,13 +159,9 @@ export class SalesService {
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  private async nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
-    const row = await this.db.one<{ n: number }>(
-      `SELECT COUNT(*)::int AS n FROM ${table} WHERE tenant_id = @t`,
-      { t: tenantId },
-    );
-    const seq = Number(row?.n ?? 0) + 1;
-    return `${prefix}-${String(seq).padStart(5, "0")}`;
+  /** Race-free document number; `table` doubles as the counter kind. */
+  private nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
+    return nextDocNumber(this.db, tenantId, table, prefix);
   }
 
   private async customerTier(customerId: string, tenantId: string): Promise<number> {
@@ -333,6 +346,7 @@ export class SalesService {
     const so: SalesOrder = {
       id: `sso_${uuidv7()}`, tenant_id: tenantId, so_number: await this.nextNumber("sales_orders", "SO", tenantId),
       quotation_id: args.quotationId ?? null, customer_id: args.customerId, status: "pending_approve",
+      fulfillment_status: "unfulfilled",
       subtotal_cents: args.subtotal, discount_cents: args.discount, total_cents: args.subtotal - args.discount,
       sales_rep_id: args.salesRepId ?? null, picker_id: args.pickerId ?? null, store_id: args.storeId ?? null,
       created_at: now, updated_at: now,
@@ -350,13 +364,14 @@ export class SalesService {
 
   async listSalesOrders(
     tenantId: string,
-    filter: { status?: SOStatus; salesRepId?: string; pickerId?: string; cursor?: string; limit?: number } = {},
+    filter: { status?: SOStatus; fulfillmentStatus?: SOFulfillmentStatus; salesRepId?: string; pickerId?: string; cursor?: string; limit?: number } = {},
   ): Promise<{ items: SalesOrder[]; nextCursor: string | null; limit: number }> {
     const limit = Math.min(filter.limit ?? 50, 200);
     const where: string[] = ["tenant_id = @t"];
     const params: Record<string, unknown> = { t: tenantId };
 
     if (filter.status) { where.push("status = @s"); params.s = filter.status; }
+    if (filter.fulfillmentStatus) { where.push("fulfillment_status = @fs"); params.fs = filter.fulfillmentStatus; }
     if (filter.salesRepId) { where.push("sales_rep_id = @r"); params.r = filter.salesRepId; }
     if (filter.pickerId) { where.push("picker_id = @p"); params.p = filter.pickerId; }
 
@@ -426,6 +441,30 @@ export class SalesService {
     if (so.status === "invoiced") throw conflict("cannot cancel an invoiced sales order");
     await this.db.query("UPDATE sales_orders SET status = 'cancelled', updated_at = @now WHERE id = @id AND tenant_id = @t", { now: Date.now(), id, t: tenantId });
     return { ...so, status: "cancelled" };
+  }
+
+  // ── Delivery pipeline ────────────────────────────────────────────────────────
+
+  /** Advance a sales order's delivery status. Called by the fulfillment and
+   *  shipping modules as the order flows through pick → pack → ship → deliver.
+   *  Rejects transitions that skip stages or move backwards; re-setting the
+   *  current status is a no-op so pipeline steps are idempotent. */
+  async setFulfillmentStatus(id: string, next: SOFulfillmentStatus, tenantId: string): Promise<SalesOrder> {
+    const so = await this.db.one<SalesOrder>("SELECT * FROM sales_orders WHERE id = @id AND tenant_id = @t", { id, t: tenantId });
+    if (!so) throw notFound(`sales order '${id}' not found`);
+    if (so.fulfillment_status === next) return so;
+    // Guard the map lookup: an unexpected stored value (should be prevented by the
+    // CHECK constraint) yields a clean 409 rather than a TypeError.
+    const allowed = FULFILLMENT_TRANSITIONS[so.fulfillment_status] ?? [];
+    if (!allowed.includes(next)) {
+      throw conflict(`cannot move fulfillment from ${so.fulfillment_status} to ${next}`);
+    }
+    await this.db.query(
+      "UPDATE sales_orders SET fulfillment_status = @s, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { s: next, now: Date.now(), id, t: tenantId },
+    );
+    await this.events.publish(`sales_order.${next}`, { salesOrderId: id, tenantId, customerId: so.customer_id }, id);
+    return { ...so, fulfillment_status: next };
   }
 
   // ── Sales reps (BE-29) ───────────────────────────────────────────────────────

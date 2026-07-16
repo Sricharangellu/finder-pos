@@ -3,7 +3,7 @@ import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
-import type { SalesService, QuoteStatus, SOStatus } from "./service.js";
+import type { SalesService, QuoteStatus, SOStatus, SOFulfillmentStatus } from "./service.js";
 import type { DB } from "../../shared/db.js";
 
 const repSchema = z.object({
@@ -126,6 +126,7 @@ export function registerRoutes(router: Router, service: SalesService, db?: DB): 
   router.get("/sales-orders", handler(async (req, res) => {
     res.json(await service.listSalesOrders(tenantId(res), {
       status: typeof req.query.status === "string" ? (req.query.status as SOStatus) : undefined,
+      fulfillmentStatus: typeof req.query.fulfillmentStatus === "string" ? (req.query.fulfillmentStatus as SOFulfillmentStatus) : undefined,
       salesRepId: typeof req.query.salesRepId === "string" ? req.query.salesRepId : undefined,
       pickerId: typeof req.query.pickerId === "string" ? req.query.pickerId : undefined,
       cursor: typeof req.query.cursor === "string" ? req.query.cursor : undefined,

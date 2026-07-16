@@ -34,6 +34,16 @@ db/
 
 ## Running migrations
 
+> **Relationship to the running app.** You usually do **not** need to run these
+> scripts to develop locally. The backend applies each module's migrations
+> automatically on startup (advisory-locked, hash-tracked in a `schema_migrations`
+> table — see `src/app.ts`), so starting the server against an empty database
+> provisions the schema. The `run.sh` path below is the **canonical SQL of record**
+> (tracked separately in `migrations_applied`) and the only way to run `down`
+> rollbacks; it is a parallel mechanism, not a prerequisite for `npm run dev`. For
+> the full local-backend setup see
+> [`docs/getting-started/local-development.md`](../docs/getting-started/local-development.md).
+
 ### Prerequisites
 
 - `psql` on PATH (PostgreSQL client tools).

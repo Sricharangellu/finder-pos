@@ -35,6 +35,42 @@ const manualDepositSchema = z.object({
 export function registerRoutes(router: Router, service: AccountingService): void {
   const mgr = requireRole("manager");
 
+  // ── Posting ledger ─────────────────────────────────────────────────────
+  // Read-only surface: postings are created by event subscribers (and the
+  // manual endpoint below); journal rows are never updated or deleted.
+  router.get("/journal", handler(async (req, res) => {
+    const q = req.query;
+    // Returns { items, nextCursor, limit } — additive to the prior { items }.
+    // Pass ?cursor=<nextCursor> to page deeper into ledger history.
+    res.json(
+      await service.listJournal(tenantId(res), {
+        docType: typeof q.docType === "string" ? q.docType : undefined,
+        docId: typeof q.docId === "string" ? q.docId : undefined,
+        accountCode: typeof q.accountCode === "string" ? q.accountCode : undefined,
+        limit: typeof q.limit === "string" ? Number(q.limit) : undefined,
+        cursor: typeof q.cursor === "string" && q.cursor !== "" ? q.cursor : undefined,
+      }),
+    );
+  }));
+
+  router.get("/trial-balance", handler(async (_req, res) => {
+    res.json(await service.trialBalance(tenantId(res)));
+  }));
+
+  // Manual journal transaction (adjustments/reversals) — manager+.
+  const journalSchema = z.object({
+    memo: z.string().max(300).optional(),
+    legs: z.array(z.object({
+      accountCode: z.string().min(1),
+      debitCents: z.number().int().nonnegative().optional(),
+      creditCents: z.number().int().nonnegative().optional(),
+    })).min(2).max(20),
+  });
+  router.post("/journal", mgr, handler(async (req, res) => {
+    const b = parseBody(journalSchema, req.body);
+    res.status(201).json({ items: await service.postTransaction("manual", null, b.legs, tenantId(res), b.memo) });
+  }));
+
   // ── Chart of Accounts ──────────────────────────────────────────────────
   router.post("/accounts", mgr, handler(async (req, res) => {
     res.status(201).json(await service.createAccount(parseBody(accountSchema, req.body), tenantId(res)));

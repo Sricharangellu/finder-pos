@@ -10,10 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx scripts/test.ts",
     "smoke": "tsx scripts/smoke.ts",
+    "hygiene": "node tools/hygiene-check.mjs",
     "ops:check": "tsx scripts/ops-check.ts",
     "prevent:drift": "node tools/prevention-agent.mjs",
     "seed:e2e": "tsx scripts/seed-e2e.ts",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "verify": "npm run hygiene && npm run typecheck && npm test && npm run smoke && npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

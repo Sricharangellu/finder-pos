@@ -21,3 +21,4 @@ public/mockServiceWorker.js
 .idea/
 .vscode/settings.json
 .vercel
+.env*

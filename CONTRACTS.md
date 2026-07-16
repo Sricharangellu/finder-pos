@@ -1,13 +1,29 @@
-# Ascend — Module Contracts (Year 1 Foundation)
+# Ascend — Module Contracts (Year 1 Foundation) — HISTORICAL
 
-This is the **single source of truth** that every bounded-context module builds
+> **⚠️ Superseded (2026-07-15).** This is the Year-1 founding contract, kept
+> because code comments still cite its rules (tax engine, event shapes,
+> module isolation). It is **not** the source of truth anymore:
+> - **Architecture**: `docs/architecture/ARCHITECTURE.md` (as-built, kept
+>   truthful). The database is **PostgreSQL** (tenant-scoped tables + RLS),
+>   not SQLite as written below.
+> - **Schema truth**: per-module migrations in `src/**/migrations.ts` +
+>   canonical SQL in `db/migrations/`. The DDL below predates multi-tenancy —
+>   real tables all carry `tenant_id`.
+> - **Conventions** (pagination, versioning, errors, money, IDs):
+>   `docs/architecture/CODING_STANDARDS.md`.
+> - **Domain model**: `docs/architecture/DOMAIN_MODEL.md`.
+>
+> Still true and enforced: module isolation (no cross-module TS imports),
+> integration via shared tables + EventBus events, integer-cents money.
+
+This is the single source of truth that every bounded-context module builds
 against. Modules are isolated: they never import each other's TypeScript. They
-integrate only through (1) the shared SQLite tables defined here and (2) domain
+integrate only through (1) the shared tables defined here and (2) domain
 events on the in-process `EventBus`.
 
 ## Architecture
 
-Modular monolith. `buildApp()` opens one SQLite DB, runs every module's
+Modular monolith. `buildApp()` opens one DB, runs every module's
 migrations (in registration order), then mounts each module at `/api/<name>`.
 
 Shared kernel (do **not** modify — import only):

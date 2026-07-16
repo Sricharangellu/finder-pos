@@ -1,0 +1,54 @@
+# Scheduled production heartbeat (standing critical C-4, first slice).
+#
+# ci.yml's smoke only runs ON deploy — between deploys an outage is invisible
+# (no alerting exists). This probes the live endpoints every 15 minutes,
+# mirroring the post-deploy smoke checks; a failure turns the run red and
+# GitHub notifies repo watchers. Zero external accounts or secrets.
+# Richer channels (Slack webhook, PagerDuty, Sentry cron monitors) are a
+# follow-up decision — this is the floor, not the ceiling.
+name: Production heartbeat
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: none
+
+concurrency:
+  group: uptime-heartbeat
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    name: Probe production endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Backend liveness (/healthz)
+        run: |
+          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+            https://finder-pos-backend.vercel.app/healthz \
+            || (echo "❌ /healthz failed" && exit 1)
+      - name: Backend readiness (/readyz — DB reachable)
+        run: |
+          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+            https://finder-pos-backend.vercel.app/readyz \
+            || (echo "❌ /readyz failed" && exit 1)
+      - name: Auth boundary (/api/v1/flags must 401 unauthenticated)
+        run: |
+          http_status="$(curl -sS --max-time 15 --retry 2 --retry-delay 5 \
+            -o /tmp/flags-response.json \
+            -w '%{http_code}' \
+            https://finder-pos-backend.vercel.app/api/v1/flags)"
+          if [ "$http_status" != "401" ]; then
+            echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
+            cat /tmp/flags-response.json
+            exit 1
+          fi
+      - name: Frontend reachable
+        run: |
+          curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
+            https://finder-pos-frontend.vercel.app/ >/dev/null \
+            || (echo "❌ frontend failed" && exit 1)

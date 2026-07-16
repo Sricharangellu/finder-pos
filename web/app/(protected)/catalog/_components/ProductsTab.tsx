@@ -136,7 +136,10 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [duplicating, setDuplicating]         = useState<string | null>(null);
 
-  const [showCreate, setShowCreate]       = useState(false);
+  // ?new=1 (e.g. the dashboard "Add Product" quick action) opens the create modal on load.
+  const [showCreate, setShowCreate]       = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("new") === "1",
+  );
   const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
   const [archiving, setArchiving]         = useState(false);
   const [actionError, setActionError]     = useState<string | null>(null);

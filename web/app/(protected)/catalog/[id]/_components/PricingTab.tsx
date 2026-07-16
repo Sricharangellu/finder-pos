@@ -5,7 +5,16 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
+import { fmtDateTime } from "@/lib/date";
 import type { CatalogProduct } from "@/api-client/types";
+
+interface PriceHistoryEntry {
+  id: string;
+  field: "selling" | "cost";
+  old_price_cents: number | null;
+  new_price_cents: number;
+  changed_at: number;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -72,6 +81,7 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
 
   const [showAddTier, setShowAddTier] = useState(false);
   const [tierForm, setTierForm] = useState({ min_qty: "", price_cents: "", label: "" });
+  const [history, setHistory] = useState<PriceHistoryEntry[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -80,6 +90,10 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
       setData(d);
       setWholesale(d.wholesale_price_cents != null ? (d.wholesale_price_cents / 100).toFixed(2) : "");
       setMap(d.map_price_cents != null ? (d.map_price_cents / 100).toFixed(2) : "");
+      // Append-only price-change timeline (selling + cost). Non-fatal if it fails.
+      apiGet<{ items: PriceHistoryEntry[] }>(`/api/v1/catalog/${product.id}/price-history?limit=20`)
+        .then((h) => setHistory(h.items ?? []))
+        .catch(() => { /* timeline is auxiliary */ });
     } catch (e) {
       setError(e instanceof ApiResponseError ? e.message : "Failed to load pricing.");
     } finally { setLoading(false); }
@@ -297,6 +311,35 @@ export function PricingTab({ product }: { product: CatalogProduct }) {
               </tbody>
             </table>
           </div>
+        )}
+      </Section>
+
+      {/* Append-only price-change timeline — written by the backend on every
+          selling/cost change (direct edit, bulk update, bulk price ops). */}
+      <Section title="Price History">
+        {history.length === 0 ? (
+          <p className="text-sm text-slate-400">No price changes recorded yet.</p>
+        ) : (
+          <ol className="space-y-2.5">
+            {history.map((h) => {
+              const up = h.old_price_cents != null && h.new_price_cents > h.old_price_cents;
+              const down = h.old_price_cents != null && h.new_price_cents < h.old_price_cents;
+              return (
+                <li key={h.id} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${h.field === "selling" ? "bg-[#5D5FEF]" : "bg-amber-400"}`} aria-hidden />
+                  <span className="font-medium capitalize text-slate-700">{h.field === "selling" ? "Sell price" : "Cost"}</span>
+                  <span className="text-slate-500">
+                    {h.old_price_cents != null ? formatMoney(h.old_price_cents) : "—"}
+                    {" → "}
+                    <span className={`font-semibold ${up ? "text-red-600" : down ? "text-emerald-600" : "text-slate-900"}`}>
+                      {formatMoney(h.new_price_cents)}
+                    </span>
+                  </span>
+                  <span className="ml-auto text-xs text-slate-400">{fmtDateTime(h.changed_at)}</span>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </Section>
 

@@ -46,3 +46,4 @@ version.json
 .next
 .next.stuck-*
 web/.next.stuck-*
+.env*

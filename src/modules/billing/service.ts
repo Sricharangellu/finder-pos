@@ -2,6 +2,8 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
+import { nextDocNumber } from "../../shared/docnumber.js";
+import { clampLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 
 /** Billing — supplier bills (AP) and customer invoices (AR). Tenant-scoped.
  *  Bills can be auto-drafted from a received PO; invoices from an order.
@@ -38,6 +40,7 @@ export interface Invoice {
   tenant_id: string;
   customer_id: string;
   order_id: string | null;
+  sales_order_id: string | null;
   invoice_number: string;
   status: DocStatus;
   total_cents: number;
@@ -57,9 +60,11 @@ const DAY = 86_400_000;
 export class BillingService {
   constructor(private readonly db: DB, private readonly events?: EventBus) {}
 
+  /** Race-free document numbers via the shared atomic counter. The legacy
+   *  COUNT(*)+1 pattern let two concurrent creates mint the same bill/invoice
+   *  number; counters are seeded from existing MAX suffixes in the migration. */
   private async nextNumber(table: string, prefix: string, tenantId: string): Promise<string> {
-    const row = await this.db.one<{ c: number }>(`SELECT COUNT(*)::int AS c FROM ${table} WHERE tenant_id = @tenantId`, { tenantId });
-    return `${prefix}-${String(Number(row?.c ?? 0) + 1).padStart(5, "0")}`;
+    return nextDocNumber(this.db, tenantId, table, prefix);
   }
 
   private nextStatus(total: number, paid: number): DocStatus {
@@ -100,6 +105,12 @@ export class BillingService {
        VALUES (@id,@tenant_id,@supplier_id,@po_id,@bill_number,@status,@total_cents,@paid_cents,@due_date,@issued_at,@discount_pct,@discount_date,@discount_applied_cents)`,
       bill as unknown as Record<string, unknown>,
     );
+    // Accounting listens: Dr GRNI / Cr Accounts Payable for the bill total.
+    await this.events?.publish(
+      "bill.created",
+      { tenantId, billId: bill.id, supplierId, poId: input.poId ?? null, totalCents: total },
+      bill.id,
+    );
     return bill;
   }
 
@@ -119,28 +130,34 @@ export class BillingService {
    * enriched with the supplier's name/company so the Bill List can show and group
    * by supplier without a second round-trip (the "by supplier" filter option).
    */
+  /** Cursor-paginated (keyset on issued_at,id) — the old LIMIT 500 silently hid
+   *  a busy tenant's older bills. Default page size unchanged (500). */
   async listBills(
     tenantId: string,
-    opts: { status?: string; supplierId?: string } = {},
-  ): Promise<BillWithSupplier[]> {
+    opts: { status?: string; supplierId?: string; cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<BillWithSupplier>> {
+    const limit = clampLimit(opts.limit, 500, 500);
+    const cur = decodeCursor(opts.cursor);
     const where = ["b.tenant_id = @t"];
-    const params: Record<string, unknown> = { t: tenantId };
+    const params: Record<string, unknown> = { t: tenantId, limit };
     if (opts.status) { where.push("b.status = @s"); params["s"] = opts.status; }
     if (opts.supplierId) { where.push("b.supplier_id = @sid"); params["sid"] = opts.supplierId; }
-    return this.db.query<BillWithSupplier>(
+    if (cur) { where.push("(b.issued_at, b.id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const items = await this.db.query<BillWithSupplier>(
       `SELECT b.*, s.name AS supplier_name, s.company AS supplier_company
          FROM bills b
          LEFT JOIN suppliers s ON s.tenant_id = b.tenant_id AND s.id = b.supplier_id
         WHERE ${where.join(" AND ")}
-        ORDER BY b.issued_at DESC
-        LIMIT 500`,
+        ORDER BY b.issued_at DESC, b.id DESC
+        LIMIT @limit`,
       params,
     );
+    return toPage(items as unknown as Array<BillWithSupplier & Record<string, unknown>>, limit, "issued_at") as CursorPage<BillWithSupplier>;
   }
 
   async payBill(id: string, amountCents: number, method: string, tenantId: string): Promise<Bill> {
     if (amountCents <= 0) throw new HttpError(400, "bad_request", "amountCents must be positive");
-    return this.db.withTenant(tenantId).tx(async (tdb) => {
+    const result = await this.db.withTenant(tenantId).tx(async (tdb) => {
       const bill = await tdb.one<Bill>("SELECT * FROM bills WHERE id = @id AND tenant_id = @t FOR UPDATE", { id, t: tenantId });
       if (!bill) throw new HttpError(404, "not_found", `bill '${id}' not found`);
       if (bill.status === "void") throw new HttpError(409, "void", "bill is void");
@@ -172,11 +189,15 @@ export class BillingService {
       );
       return { ...bill, paid_cents: paid, status, discount_applied_cents: discountApplied };
     });
+    // Published after the tx commits so a ledger posting can't precede the payment.
+    // Accounting listens: Dr Accounts Payable / Cr Bank for the amount paid.
+    await this.events?.publish("bill.paid", { tenantId, billId: id, amountCents, method }, id);
+    return result;
   }
 
   // ── Invoices (AR) ─────────────────────────────────────────────────────────────
   async createInvoice(
-    input: { customerId: string; orderId?: string; totalCents?: number; dueDate?: number },
+    input: { customerId: string; orderId?: string; salesOrderId?: string; totalCents?: number; dueDate?: number },
     tenantId: string,
   ): Promise<Invoice> {
     let total = input.totalCents;
@@ -220,13 +241,14 @@ export class BillingService {
     const now = Date.now();
     const inv: Invoice = {
       id: `inv_${uuidv7()}`, tenant_id: tenantId, customer_id: input.customerId, order_id: input.orderId ?? null,
+      sales_order_id: input.salesOrderId ?? null,
       invoice_number: await this.nextNumber("invoices", "INV", tenantId), status: "open",
       total_cents: total, paid_cents: 0, due_date: input.dueDate ?? now + 30 * DAY, issued_at: now,
       dunning_level: 0,
     };
     await this.db.query(
-      `INSERT INTO invoices (id, tenant_id, customer_id, order_id, invoice_number, status, total_cents, paid_cents, due_date, issued_at)
-       VALUES (@id,@tenant_id,@customer_id,@order_id,@invoice_number,@status,@total_cents,@paid_cents,@due_date,@issued_at)`,
+      `INSERT INTO invoices (id, tenant_id, customer_id, order_id, sales_order_id, invoice_number, status, total_cents, paid_cents, due_date, issued_at)
+       VALUES (@id,@tenant_id,@customer_id,@order_id,@sales_order_id,@invoice_number,@status,@total_cents,@paid_cents,@due_date,@issued_at)`,
       inv as unknown as Record<string, unknown>,
     );
     return inv;
@@ -234,13 +256,14 @@ export class BillingService {
 
   async listInvoices(
     tenantId: string,
-    opts: { status?: string; cursor?: string; limit?: number } = {},
+    opts: { status?: string; salesOrderId?: string; cursor?: string; limit?: number } = {},
   ): Promise<{ items: Invoice[]; nextCursor: string | null; limit: number }> {
     const limit = Math.min(opts.limit ?? 50, 200);
     const where: string[] = ["tenant_id = @t"];
     const params: Record<string, unknown> = { t: tenantId };
 
     if (opts.status) { where.push("status = @s"); params.s = opts.status; }
+    if (opts.salesOrderId) { where.push("sales_order_id = @so"); params.so = opts.salesOrderId; }
 
     if (opts.cursor) {
       const cur = JSON.parse(Buffer.from(opts.cursor, "base64url").toString()) as { at: number; id: string };

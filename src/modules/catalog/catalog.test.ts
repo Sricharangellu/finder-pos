@@ -484,7 +484,9 @@ test("variants: matrix generation creates missing children and is idempotent", a
   });
   assert.equal(generated.status, 200);
   assert.equal(generated.json.items.length, 2);
-  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M / Black", "S / Black"]);
+  // Values read together with a single space — no dash/slash/pipe.
+  assert.deepEqual(generated.json.items.map((p: any) => p.variant_label).sort(), ["M Black", "S Black"]);
+  assert.ok(generated.json.items.every((p: any) => !/[/|-]/.test(String(p.variant_label))));
   assert.ok(generated.json.items.every((p: any) => p.parent_product_id === master.json.id));
   assert.ok(generated.json.items.every((p: any) => p.brand === "Ascend"));
 
@@ -641,4 +643,277 @@ test("category mutations are manager/owner-gated", async () => {
   const { status, json } = await request(app.express, "POST", "/api/catalog/categories", { name: "Should Fail" }, "cashier");
   assert.equal(status, 403);
   assert.equal(json.error.code, "forbidden");
+});
+
+test("generated variant name joins values with a space, no dash/slash/pipe (#3)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "COKE", name: "Coca-Cola", price_cents: 0, category: "beverages" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["330ml"] }, { name: "Pack", values: ["6ct"] }],
+  });
+  assert.equal(gen.status, 200);
+  const v = gen.json.items[0];
+  assert.equal(v.variant_label, "330ml 6ct");     // values together, single space
+  assert.equal(v.name, "Coca-Cola 330ml 6ct");    // master joined by a space too
+  assert.ok(!/[/|]/.test(v.name));                // never a slash or pipe
+});
+
+test("assigning a product as a variant inherits the master's category (#1)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "BEV-M", name: "Soda", price_cents: 0, category: "beverages" });
+  const child = await call(app, "POST", "/api/catalog/", { sku: "BEV-C1", name: "Soda 1L", price_cents: 299, category: "general" });
+  assert.equal(child.json.category, "general");
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [child.json.id] });
+  const after = await call(app, "GET", `/api/catalog/${child.json.id}`);
+  assert.equal(after.json.category, "beverages"); // inherited from master
+});
+
+test("a child variant's category cannot be changed independently (#1)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "BEV-M2", name: "Juice", price_cents: 0, category: "beverages" });
+  const child = await call(app, "POST", "/api/catalog/", { sku: "BEV-C2", name: "Juice S", price_cents: 199, category: "beverages" });
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [child.json.id] });
+  // Attempt to move just the child to another category — must be coerced back to the master's.
+  const patched = await call(app, "PATCH", `/api/catalog/${child.json.id}`, { category: "electronics" });
+  assert.equal(patched.json.category, "beverages");
+});
+
+test("changing a master's category cascades to all its variants (#1)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "BEV-M3", name: "Water", price_cents: 0, category: "beverages" });
+  const c1 = await call(app, "POST", "/api/catalog/", { sku: "BEV-C3A", name: "Water 500ml", price_cents: 99, category: "beverages" });
+  const c2 = await call(app, "POST", "/api/catalog/", { sku: "BEV-C3B", name: "Water 1L", price_cents: 149, category: "beverages" });
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [c1.json.id, c2.json.id] });
+  await call(app, "PATCH", `/api/catalog/${master.json.id}`, { category: "groceries" });
+  const variants = await call(app, "GET", `/api/catalog/${master.json.id}/variants`);
+  assert.ok(variants.json.items.length === 2 && variants.json.items.every((v: any) => v.category === "groceries"));
+});
+
+async function mkMasterWith3Variants(app: App) {
+  const master = await call(app, "POST", "/api/catalog/", { sku: "TEE", name: "Tee", price_cents: 0, category: "apparel" });
+  const v1 = await call(app, "POST", "/api/catalog/", { sku: "TEE-S", name: "S", price_cents: 100 });
+  const v2 = await call(app, "POST", "/api/catalog/", { sku: "TEE-M", name: "M", price_cents: 300 });
+  const v3 = await call(app, "POST", "/api/catalog/", { sku: "TEE-L", name: "L", price_cents: 200 });
+  await call(app, "POST", `/api/catalog/${master.json.id}/variants/assign`, { productIds: [v1.json.id, v2.json.id, v3.json.id] });
+  return { master: master.json.id, v1: v1.json.id, v2: v2.json.id, v3: v3.json.id };
+}
+
+test("variant manual reorder is per-channel and independent (#3)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2, v3 } = await mkMasterWith3Variants(app);
+  const reordered = await call(app, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v3, v1, v2] });
+  assert.equal(reordered.status, 200);
+
+  const online = await call(app, "GET", `/api/catalog/${master}/variants?channel=online`);
+  assert.deepEqual(online.json.items.map((p: any) => p.id), [v3, v1, v2]); // manual order
+
+  // Offline is untouched — still the default (sku) order, proving independence.
+  const offline = await call(app, "GET", `/api/catalog/${master}/variants?channel=offline`);
+  assert.deepEqual(offline.json.items.map((p: any) => p.id), [v3, v2, v1]); // TEE-L, TEE-M, TEE-S
+});
+
+test("variant sort mode price_asc orders by price (#3)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2, v3 } = await mkMasterWith3Variants(app);
+  const set = await call(app, "PATCH", `/api/catalog/${master}/variants/sort`, { channel: "online", mode: "price_asc" });
+  assert.equal(set.status, 200);
+  const online = await call(app, "GET", `/api/catalog/${master}/variants?channel=online`);
+  assert.deepEqual(online.json.items.map((p: any) => p.id), [v1, v3, v2]); // 100, 200, 300
+});
+
+test("reorder rejects ids that are not the master's variants (#3)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2 } = await mkMasterWith3Variants(app);
+  const bad = await call(app, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v1, v2] }); // missing one
+  assert.equal(bad.status, 400);
+});
+
+test("variant sort/reorder require manager role (#3, #11)", async () => {
+  const app = await freshApp();
+  const { master, v1, v2, v3 } = await mkMasterWith3Variants(app);
+  const { default: request } = await import("./test-request.js");
+  const r = await request(app.express, "POST", `/api/catalog/${master}/variants/reorder`, { channel: "online", orderedIds: [v3, v1, v2] }, "cashier");
+  assert.equal(r.status, 403);
+});
+
+test("bulk-price: increase selling price by percent (#4)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-A", name: "A", price_cents: 100 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BP-B", name: "B", price_cents: 250 });
+  const r = await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id, b.json.id], target: "selling", op: "inc_pct", value: 10 });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.updated, 2);
+  const pa = await call(app, "GET", `/api/catalog/${a.json.id}`);
+  const pb = await call(app, "GET", `/api/catalog/${b.json.id}`);
+  assert.equal(pa.json.price_cents, 110);
+  assert.equal(pb.json.price_cents, 275);
+});
+
+test("bulk-price: set exact cost across products (#4)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-C", name: "C", price_cents: 100, raw_cost_price_cents: 40 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BP-D", name: "D", price_cents: 100 });
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id, b.json.id], target: "cost", op: "set", value: 55 });
+  const pa = await call(app, "GET", `/api/catalog/${a.json.id}`);
+  const pb = await call(app, "GET", `/api/catalog/${b.json.id}`);
+  assert.equal(pa.json.raw_cost_price_cents, 55);
+  assert.equal(pb.json.raw_cost_price_cents, 55);
+});
+
+test("bulk-price: round to .99 and clamp at zero (#4)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-E", name: "E", price_cents: 149 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "BP-F", name: "F", price_cents: 300 });
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id, b.json.id], target: "selling", op: "round_99" });
+  assert.equal((await call(app, "GET", `/api/catalog/${a.json.id}`)).json.price_cents, 199); // 1.49 -> 1.99
+  assert.equal((await call(app, "GET", `/api/catalog/${b.json.id}`)).json.price_cents, 399); // 3.00 -> 3.99
+  // Decrease by a fixed amount larger than the price clamps to 0, never negative.
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "dec_amount", value: 100000 });
+  assert.equal((await call(app, "GET", `/api/catalog/${a.json.id}`)).json.price_cents, 0);
+});
+
+test("bulk-price requires a value for non-round ops and manager role (#4, #11)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "BP-G", name: "G", price_cents: 100 });
+  const missing = await call(app, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "inc_pct" });
+  assert.equal(missing.status, 400);
+  const { default: request } = await import("./test-request.js");
+  const denied = await request(app.express, "POST", "/api/catalog/bulk-price", { ids: [a.json.id], target: "selling", op: "set", value: 10 }, "cashier");
+  assert.equal(denied.status, 403);
+});
+
+// ── Variant engine foundation: structured options + non-destructive regen ──────
+
+test("generate stores structured variant_options per child (#1/#8)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "OPT-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S"] }, { name: "Color", values: ["Red"] }],
+  });
+  const v = gen.json.items[0];
+  assert.deepEqual(JSON.parse(v.variant_options), { Size: "S", Color: "Red" });
+  assert.equal(v.variant_label, "S Red");
+  assert.equal(v.name, "Tee S Red");
+});
+
+test("re-generating with an added value keeps existing variants (same id/sku) and only adds the new one (#6)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "REG-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const first = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M"] }],
+  });
+  const sVar = first.json.items.find((p: any) => p.variant_label === "S");
+  // Give the existing S variant a distinct SKU/price/upc/inventory-ish marker to prove preservation.
+  await call(app, "PATCH", `/api/catalog/${sVar.id}`, { price_cents: 9999, barcode: "111222333" });
+
+  const second = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M", "L"] }],
+  });
+  assert.equal(second.json.items.length, 3); // S, M preserved + L added — never duplicated
+  const sAfter = second.json.items.find((p: any) => p.variant_label === "S");
+  assert.equal(sAfter.id, sVar.id);          // same variant, updated in place
+  assert.equal(sAfter.sku, sVar.sku);        // SKU preserved
+  assert.equal(sAfter.price_cents, 9999);    // pricing preserved
+  assert.equal(sAfter.barcode, "111222333"); // upc/barcode preserved
+});
+
+test("re-generating with a changed attribute order does not duplicate (order-independent identity) (#4/#6)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "ORD-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const first = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S"] }, { name: "Color", values: ["Red"] }],
+  });
+  const id1 = first.json.items[0].id;
+  // Same combo, attributes listed in the opposite order → naming flips but identity holds.
+  const second = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Color", values: ["Red"] }, { name: "Size", values: ["S"] }],
+  });
+  assert.equal(second.json.items.length, 1);      // not duplicated
+  assert.equal(second.json.items[0].id, id1);     // same variant
+  assert.equal(second.json.items[0].variant_label, "Red S"); // name follows new order
+});
+
+test("a product's sku can be reassigned, and collisions are rejected (wizard step 1)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "SKU-OLD", name: "A", price_cents: 100 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "SKU-TAKEN", name: "B", price_cents: 100 });
+  const ok = await call(app, "PATCH", `/api/catalog/${a.json.id}`, { sku: "SKU-NEW" });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.sku, "SKU-NEW");
+  const clash = await call(app, "PATCH", `/api/catalog/${a.json.id}`, { sku: "SKU-TAKEN" });
+  assert.equal(clash.status, 409);
+  assert.equal(clash.json.error.code, "conflict");
+  assert.equal(b.json.sku, "SKU-TAKEN"); // untouched
+});
+
+test("generate honors an exclude list — removed combinations are not created (#7)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "EXC-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S", "M"] }, { name: "Color", values: ["Red", "Blue"] }],
+    exclude: [["M", "Blue"]], // matched order-independently
+  });
+  assert.equal(gen.status, 200);
+  const labels = gen.json.items.map((p: any) => p.variant_label).sort();
+  assert.deepEqual(labels, ["M Red", "S Blue", "S Red"]); // 3 of 4 — "M Blue" excluded
+});
+
+test("editing a variant's options updates its name/label in place, preserving id and sku (#4)", async () => {
+  const app = await freshApp();
+  const master = await call(app, "POST", "/api/catalog/", { sku: "EDIT-M", name: "Tee", price_cents: 2000, category: "apparel" });
+  const gen = await call(app, "POST", `/api/catalog/${master.json.id}/variants/generate`, {
+    attributes: [{ name: "Size", values: ["S"] }],
+  });
+  const v = gen.json.items[0];
+  const patched = await call(app, "PATCH", `/api/catalog/${v.id}`, { variant_options: JSON.stringify({ Size: "M" }) });
+  assert.equal(patched.status, 200);
+  assert.equal(patched.json.id, v.id);              // never recreated
+  assert.equal(patched.json.sku, v.sku);            // sku preserved
+  assert.equal(patched.json.variant_label, "M");    // label recomputed
+  assert.equal(patched.json.name, "Tee M");         // name recomputed
+});
+
+// ── Price-change history ──────────────────────────────────────────────────────
+
+test("price and cost changes append to the price history (all paths)", async () => {
+  const app = await freshApp();
+  const p = await call(app, "POST", "/api/catalog/", { sku: "PH-1", name: "Hist", price_cents: 1000 });
+
+  // Direct PATCH (selling), then cost, then a bulk-price op — all must log.
+  await call(app, "PATCH", `/api/catalog/${p.json.id}`, { price_cents: 1200 });
+  await call(app, "PATCH", `/api/catalog/${p.json.id}`, { raw_cost_price_cents: 700 });
+  await call(app, "POST", "/api/catalog/bulk-price", { ids: [p.json.id], target: "selling", op: "round_99" }); // 1200 -> 1299
+
+  const hist = await call(app, "GET", `/api/catalog/${p.json.id}/price-history`);
+  assert.equal(hist.status, 200);
+  const items = hist.json.items; // newest first
+  assert.equal(items.length, 3);
+  assert.deepEqual(items.map((e: any) => [e.field, e.old_price_cents, e.new_price_cents]), [
+    ["selling", 1200, 1299],
+    ["cost", null, 700],
+    ["selling", 1000, 1200],
+  ]);
+
+  // No-op update logs nothing.
+  await call(app, "PATCH", `/api/catalog/${p.json.id}`, { price_cents: 1299 });
+  const again = await call(app, "GET", `/api/catalog/${p.json.id}/price-history`);
+  assert.equal(again.json.items.length, 3);
+});
+
+test("bulk-price is atomic: one foreign id fails the whole batch with no changes (#M2)", async () => {
+  const app = await freshApp();
+  const a = await call(app, "POST", "/api/catalog/", { sku: "ATM-1", name: "A", price_cents: 1000 });
+  const b = await call(app, "POST", "/api/catalog/", { sku: "ATM-2", name: "B", price_cents: 2000 });
+
+  const res = await call(app, "POST", "/api/catalog/bulk-price", {
+    ids: [a.json.id, b.json.id, "prod_does_not_exist"],
+    target: "selling", op: "inc_pct", value: 10,
+  });
+  assert.equal(res.status, 404);
+
+  // Neither product changed — the batch validates before writing.
+  assert.equal((await call(app, "GET", `/api/catalog/${a.json.id}`)).json.price_cents, 1000);
+  assert.equal((await call(app, "GET", `/api/catalog/${b.json.id}`)).json.price_cents, 2000);
+  const hist = await call(app, "GET", `/api/catalog/${a.json.id}/price-history`);
+  assert.equal(hist.json.items.length, 0);
 });

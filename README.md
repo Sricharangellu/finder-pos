@@ -19,6 +19,33 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry �
 - Owner: `owner@finder-pos.dev` / `FinderDemo!2026`
 - Cashier: `cashier@finder-pos.dev` / `FinderDemo!2026`
 
+> These demo credentials are public and are also planted by `scripts/seed-e2e.ts`
+> for CI. Treat them as demo-only; never seed them into a real database.
+
+---
+
+## Project status
+
+Honest maturity, not marketing — the feature list below describes the codebase's
+breadth, not uniform readiness:
+
+- **Retail is the one pack proven end-to-end.** The POS lifecycle (login → open
+  register → sale → payment → inventory movement → refund → end-of-day → close) is
+  covered by the backend test suite and `npm run smoke`.
+- **The other verticals exist as code but are Partial or Planned**, not verified
+  production-ready. See [`WORK/FORWARD_PLAN.md`](WORK/FORWARD_PLAN.md) for the
+  per-area honest-status labels (`Built and verified` · `Partial` · `Planned` · …).
+- **Tenant isolation** is enforced primarily at the application layer (handlers
+  scope every query by the JWT tenant), with PostgreSQL **RLS as a defense-in-depth
+  backstop** — both are proven by `src/gateway/tenant-isolation.test.ts`.
+- **Operational hardening is open work** — Redis-backed rate limiting in
+  production, backup/restore drills, monitoring/alerting, and a `/delivery` e2e are
+  still pending (FORWARD_PLAN Phase 4).
+
+**New here?** Start with
+[docs/getting-started/local-development.md](docs/getting-started/local-development.md)
+to run the backend against your own Postgres.
+
 ---
 
 ## Features
@@ -75,7 +102,7 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry �
 | Database | PostgreSQL (integer cents, idempotent migrations) |
 | Auth | JWT (15-min access tokens, single-use refresh rotation), TOTP MFA |
 | Deployment | Vercel (frontend + backend serverless) |
-| Testing | 304 integration tests, per-test Postgres schema isolation |
+| Testing | 300+ backend integration tests, per-test Postgres schema isolation (embedded Postgres) |
 | CI/CD | GitHub Actions (typecheck → test → build → deploy) |
 
 ---
@@ -91,29 +118,37 @@ Built for the tobacco, vapor, hemp, and specialty retail distribution industry �
 
 ```bash
 git clone https://github.com/Sricharangellu/Ascend.git
-cd finder-pos
-cp .env.example .env
-docker-compose up
+cd Ascend
+docker-compose up        # Postgres + backend (:3001) + frontend (:3000)
 ```
 
 Frontend: http://localhost:3000  
 Backend API: http://localhost:3001
 
-### Local development (manual)
+Compose injects `DATABASE_URL`/`JWT_SECRET` for the backend container, so no
+`.env` setup is needed for this path.
+
+### Local development (manual, your own Postgres)
+
+The backend does **not** auto-load `.env`, so you must export the variables (a
+plain `cp .env.example .env` alone will fail with `DATABASE_URL is not set`).
+Migrations run automatically on startup — there is no separate migrate command.
 
 ```bash
-# Backend
-cp .env.example .env
-# Edit .env with your DATABASE_URL
+# Backend — the server does NOT auto-load .env, so export the two required vars:
+export DATABASE_URL='postgresql://finder:finder@localhost:5432/finder_dev'
+export JWT_SECRET='dev-only-secret-at-least-32-characters-long'
 npm install
-npm run dev          # starts tsx watch on src/server.ts
+npm run dev                          # tsx watch src/server.ts — applies migrations, then serves
+curl -s localhost:3001/readyz        # expect "status":"ok","db":"connected"
 
 # Frontend (separate terminal)
-cd web
-cp .env.example .env
-npm install
-npm run dev          # starts Next.js on localhost:3000
+cd web && npm install
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 npm run dev   # Next.js on :3000
 ```
+
+Full walkthrough (env vars, verification, embedded-postgres test harness vs. your
+DB, troubleshooting): **[docs/getting-started/local-development.md](docs/getting-started/local-development.md)**.
 
 ### Running tests
 
@@ -151,7 +186,7 @@ finder-pos/
 │   ├── server.ts              # HTTP server entry point
 │   ├── gateway/               # Auth middleware, rate limiting, metrics
 │   ├── identity/              # Users, JWT, MFA, API keys, devices
-│   ├── modules/               # 27 domain modules
+│   ├── modules/               # ~50 domain modules (many Partial/Planned — see FORWARD_PLAN)
 │   │   ├── catalog/           # Products, variants, categories, images
 │   │   ├── inventory/         # Stock, movements, locations, cycle counts
 │   │   ├── orders/            # POS orders with inventory reservations
@@ -172,10 +207,15 @@ finder-pos/
 │   │   └── ...
 │   ├── orchestration/         # Sagas, workflows, CQRS, event bus
 │   └── shared/                # DB, email, SSE, money, HTTP helpers
-├── web/                       # Next.js 14 frontend (45 pages)
+├── web/                       # Next.js 14 frontend (~145 pages)
 │   ├── app/(protected)/       # Authenticated pages
 │   ├── components/            # Design system components
 │   └── mocks/                 # MSW mock handlers for dev
+├── api/                       # Vercel serverless entry (wraps dist/src/app.js)
+├── db/                        # Migrations, seeds, RLS policies
+├── docs/                      # Architecture docs, ADRs, roadmaps
+├── orchestration/             # Project-process docs (agent playbooks, status) — not the engine in src/orchestration/
+├── WORK/                      # Multi-agent work packages + lock protocol
 ├── .github/workflows/ci.yml   # CI/CD pipeline
 ├── Dockerfile                 # Multi-stage production build
 ├── docker-compose.yml         # Local dev stack

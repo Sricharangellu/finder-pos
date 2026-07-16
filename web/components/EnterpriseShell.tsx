@@ -29,7 +29,7 @@ export type NavKey =
   | "restaurant-dashboard" | "restaurant-floor-plan" | "restaurant-tabs"
   | "permissions" | "modes" | "kiosk-settings" | "b2b-settings"
   | "warehouse" | "pricing" | "edi-imports" | "promotions" | "documents"
-  | "inventory-errors" | "bills";
+  | "inventory-errors" | "bills" | "delivery";
 
 // ── Section / nav tree ────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ const SECTION_MAP: Record<NavKey, RailSection> = {
   vendors: "inventory", shipping: "inventory", "inventory-locations": "inventory",
   "inventory-expiry": "inventory", "inventory-serials": "inventory",
   "inventory-reorder": "inventory", "inventory-counts": "inventory", "inventory-pipeline": "inventory", "inventory-errors": "inventory", workforce: "inventory",
-  warehouse: "inventory",
+  warehouse: "inventory", delivery: "inventory",
   customers: "customers", appointments: "customers", healthcare: "customers",
   finance: "finance", accounting: "finance", invoicing: "finance", bills: "finance",
   settings: "setup", team: "setup", workflows: "setup", integrations: "setup",
@@ -146,8 +146,8 @@ const NAV_TREE: NavSection[] = [
     label: "Catalog",
     icon: <CatalogIcon />,
     children: [
-      { label: "Products",    href: "/catalog",             featureGate: "catalog" },
-      { label: "Pricing",     href: "/pricing",             featureGate: "catalog", partial: true },
+      { label: "Products",       href: "/catalog",             featureGate: "catalog" },
+      { label: "Pricing",        href: "/pricing",             featureGate: "catalog", partial: true },
       { label: "Promotions",  href: "/catalog/promotions",  featureGate: "catalog", partial: true },
       { label: "Discounts",   href: "/discounts",           featureGate: "discounts" },
       { label: "Gift Cards",  href: "/gift-cards",          featureGate: "gift-cards" },
@@ -163,6 +163,7 @@ const NAV_TREE: NavSection[] = [
       { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
       { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
+      { label: "Delivery",      href: "/delivery",                featureGate: "shipping" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },
       { label: "EDI Imports",   href: "/purchasing/edi-imports",  featureGate: "purchasing" },
       { label: "Error Center",  href: "/inventory/errors",        featureGate: "inventory" },

@@ -235,11 +235,37 @@ export interface OpenDbOptions {
   max?: number;
 }
 
-function sslConfig(): { rejectUnauthorized: boolean } | undefined {
-  const raw = process.env.PG_SSL?.trim().toLowerCase();
+/**
+ * TLS settings for the Postgres pool (standing critical C-3).
+ *
+ * Certificates are VERIFIED by default whenever TLS is on. Managed Postgres
+ * providers use publicly-signed chains, so this works with Node's bundled
+ * CAs. For a private CA, supply the PEM via PG_CA_CERT (or base64 in
+ * PG_CA_CERT_B64). PG_SSL_NO_VERIFY=1 restores the old unverified behavior
+ * as an explicit, loudly-logged escape hatch — never silently.
+ *
+ * Exported for tests.
+ */
+export function sslConfig(env: NodeJS.ProcessEnv = process.env): { rejectUnauthorized: boolean; ca?: string } | undefined {
+  const raw = env.PG_SSL?.trim().toLowerCase();
+  const wantSsl =
+    (raw && ["1", "true", "yes", "on", "require", "required"].includes(raw)) ||
+    (!raw && env.NODE_ENV === "production");
   if (raw && ["0", "false", "no", "off", "disable", "disabled"].includes(raw)) return undefined;
-  if (raw && ["1", "true", "yes", "on", "require", "required"].includes(raw)) return { rejectUnauthorized: false };
-  return process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined;
+  if (!wantSsl) return undefined;
+
+  if (env.PG_SSL_NO_VERIFY === "1") {
+    console.warn(
+      "[db] PG_SSL_NO_VERIFY=1 — TLS certificate verification is DISABLED. " +
+        "Connections are open to man-in-the-middle interception. Provide PG_CA_CERT instead.",
+    );
+    return { rejectUnauthorized: false };
+  }
+
+  const ca =
+    env.PG_CA_CERT ??
+    (env.PG_CA_CERT_B64 ? Buffer.from(env.PG_CA_CERT_B64, "base64").toString("utf8") : undefined);
+  return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized: true };
 }
 
 /**

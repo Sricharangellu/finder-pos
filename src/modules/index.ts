@@ -1,4 +1,5 @@
 import type { PosModule } from "./types.js";
+import { sequencesModule } from "./sequences/index.js";
 import { catalogModule } from "./catalog/index.js";
 import { inventoryModule } from "./inventory/index.js";
 import { ordersModule } from "./orders/index.js";
@@ -55,6 +56,7 @@ import { businessModule } from "./business/index.js";
  * catalog -> inventory -> orders -> payments -> sync -> customers -> giftcards -> webhooks -> team -> outlets -> purchasing -> reports.
  */
 export const modules: PosModule[] = [
+  sequencesModule, // must precede modules that seed a document_counters row
   catalogModule,
   inventoryModule,
   ordersModule,

@@ -631,6 +631,38 @@ function ReplenishmentSection({ product, onSaved }: { product: CatalogProduct; o
 
 // ── InventoryTab ──────────────────────────────────────────────────────────────
 
+// ── Availability breakdown ────────────────────────────────────────────────────
+// Read-model over existing state: on-hand (inventory), reserved (approved
+// unshipped sales orders), incoming (open approved PO remainder), available.
+
+function AvailabilityCard({ productId, refreshKey }: { productId: string; refreshKey: number }) {
+  const [avail, setAvail] = useState<{ on_hand: number; reserved: number; incoming: number; available: number } | null>(null);
+
+  useEffect(() => {
+    apiGet<{ on_hand: number; reserved: number; incoming: number; available: number }>(`/api/v1/inventory/${productId}/availability`)
+      .then(setAvail)
+      .catch(() => setAvail(null));
+  }, [productId, refreshKey]);
+
+  if (!avail) return null;
+  const tiles = [
+    { label: "On Hand", value: avail.on_hand, cls: "text-slate-900" },
+    { label: "Reserved", value: avail.reserved, cls: avail.reserved > 0 ? "text-amber-600" : "text-slate-400", hint: "On approved orders awaiting fulfillment" },
+    { label: "Incoming", value: avail.incoming, cls: avail.incoming > 0 ? "text-[#5D5FEF]" : "text-slate-400", hint: "On open purchase orders" },
+    { label: "Available", value: avail.available, cls: avail.available > 0 ? "text-emerald-600" : "text-red-600", hint: "On hand minus reserved" },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:grid-cols-4">
+      {tiles.map((t) => (
+        <div key={t.label} className="bg-white px-4 py-3" title={t.hint}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t.label}</p>
+          <p className={`mt-0.5 text-xl font-semibold tabular-nums ${t.cls}`}>{t.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function InventoryTab({
   product,
   onSaved,
@@ -676,6 +708,9 @@ export function InventoryTab({
           </div>
         </div>
       )}
+
+      {/* Availability breakdown */}
+      <AvailabilityCard productId={product.id} refreshKey={stockRefreshKey} />
 
       {/* Stock by location */}
       <StockByLocation productId={product.id} refreshKey={stockRefreshKey} />

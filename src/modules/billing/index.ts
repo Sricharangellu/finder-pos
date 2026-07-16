@@ -60,6 +60,13 @@ const ALTER_INVOICES_DUNNING = `
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dunning_level INTEGER NOT NULL DEFAULT 0;
 `;
 
+// Delivery pipeline — link an AR invoice back to the sales order it was raised
+// from, so the sales order / delivery views can show its billing status.
+const ALTER_INVOICES_SALES_ORDER = `
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sales_order_id TEXT;
+CREATE INDEX IF NOT EXISTS invoices_tenant_so_idx ON invoices (tenant_id, sales_order_id) WHERE sales_order_id IS NOT NULL;
+`;
+
 // BE-30: early payment discount on bills.
 const ALTER_BILLS_DISCOUNT = `
 ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_pct     NUMERIC(5,2);
@@ -92,24 +99,54 @@ END;
 $$;
 `;
 
+// Seed the race-free document counters (shared/docnumber.ts) from the current
+// MAX numeric suffix so existing bill/invoice numbering continues without
+// collision. Replaces the COUNT(*)+1 pattern that minted duplicate numbers
+// under concurrent creates. Fresh databases seed nothing → first is 00001.
+const SEED_BILLING_COUNTERS = `
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'bills', COALESCE(MAX(CAST(SUBSTRING(bill_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM bills GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'invoices', COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM '[0-9]+$') AS BIGINT)), 0)
+    FROM invoices GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;`;
+
 /** Billing — supplier bills (AP) + customer invoices (AR). A received PO
  *  auto-drafts a bill (via the purchase_order.received event). */
 export const billingModule: PosModule = {
   name: "billing",
-  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE],
-  async register({ db, events, router }) {
+  migrations: [CREATE_BILLS, CREATE_INVOICES, CREATE_PAYMENTS, INDEXES, ALTER_BILLS_VARIANCE, ALTER_INVOICES_DUNNING, ALTER_INVOICES_SALES_ORDER, ALTER_BILLS_DISCOUNT, ADD_BILLING_ENTERPRISE, SEED_BILLING_COUNTERS],
+  async register({ db, events, router, outbox }) {
     const service = new BillingService(db, events);
-    events.on("purchase_order.received", async (event) => {
+    // Auto-bill on receive. Registered on the bus AND as a durable outbox
+    // consumer (ACPA M1): billFromPO is idempotent (skips if a bill exists),
+    // so crash redelivery can never draft a duplicate bill.
+    const autoBill = async (event: { payload: unknown }) => {
       const p = event.payload as { tenantId?: string; poId?: string };
       if (p.tenantId && p.poId) await service.billFromPO(p.poId, p.tenantId);
-    });
-    // A sales order converted to an invoice raises the matching AR invoice.
-    events.on("sales_order.invoiced", async (event) => {
-      const p = event.payload as { tenantId?: string; customerId?: string; totalCents?: number };
-      if (p.tenantId && p.customerId && p.totalCents && p.totalCents > 0) {
-        await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents }, p.tenantId);
+    };
+    events.on("purchase_order.received", autoBill);
+    outbox?.onDurable("purchase_order.received", autoBill);
+    // A sales order converted to an invoice raises the matching AR invoice,
+    // linked back to the sales order so delivery/sales views can show it.
+    // Durable (ACPA M1.3): idempotent by natural key — one AR invoice per
+    // sales order — so crash redelivery can never raise a duplicate.
+    const raiseArInvoice = async (event: { payload: unknown }) => {
+      const p = event.payload as { tenantId?: string; customerId?: string; totalCents?: number; salesOrderId?: string };
+      if (!p.tenantId || !p.customerId || !p.totalCents || p.totalCents <= 0) return;
+      if (p.salesOrderId) {
+        const existing = await db.one<{ id: string }>(
+          "SELECT id FROM invoices WHERE tenant_id = @t AND sales_order_id = @so LIMIT 1",
+          { t: p.tenantId, so: p.salesOrderId },
+        );
+        if (existing) return; // already invoiced (redelivery or retry)
       }
-    });
+      await service.createInvoice({ customerId: p.customerId, totalCents: p.totalCents, salesOrderId: p.salesOrderId }, p.tenantId);
+    };
+    events.on("sales_order.invoiced", raiseArInvoice);
+    outbox?.onDurable("sales_order.invoiced", raiseArInvoice);
     registerRoutes(router, service);
   },
 };

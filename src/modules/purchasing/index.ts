@@ -306,11 +306,88 @@ END;
 $$;
 `;
 
+// PO approval workflow (enterprise procurement). `approval_status` is orthogonal
+// to the fulfillment `status` so existing lifecycle queries are unaffected:
+//   approved (default — legacy rows and auto-approved POs) | pending | rejected.
+// po_approvals is an APPEND-ONLY audit trail — no code path may update or delete
+// rows. po_approval_config holds per-tenant amount tiers; absent row = approvals
+// disabled (every PO auto-approves), so enabling the workflow is an explicit act.
+const CREATE_PO_APPROVALS = `
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS approved_at BIGINT;
+
+CREATE TABLE IF NOT EXISTS po_approvals (
+  id           TEXT PRIMARY KEY,
+  tenant_id    TEXT NOT NULL,
+  po_id        TEXT NOT NULL,
+  action       TEXT NOT NULL,
+  actor_id     TEXT,
+  actor_role   TEXT,
+  amount_cents BIGINT NOT NULL DEFAULT 0,
+  note         TEXT,
+  created_at   BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS po_approvals_po_idx ON po_approvals (tenant_id, po_id, created_at);
+
+CREATE TABLE IF NOT EXISTS po_approval_config (
+  tenant_id           TEXT PRIMARY KEY,
+  auto_limit_cents    BIGINT NOT NULL,
+  manager_limit_cents BIGINT NOT NULL,
+  enabled             BOOLEAN NOT NULL DEFAULT true,
+  updated_at          BIGINT NOT NULL
+);
+`;
+
+// Purchase requisitions (procurement PRD module 1 / ACPA E2): departments
+// request inventory; a requisition moves draft → submitted → approved/rejected
+// → converted (to a PO). Approval snapshot lives on the row (decided_by/at,
+// note); unification with the po_approvals pattern is the E4 workflow story.
+const CREATE_REQUISITIONS = `
+CREATE TABLE IF NOT EXISTS purchase_requisitions (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  req_number     TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'draft',
+  department     TEXT,
+  requested_by   TEXT,
+  required_date  BIGINT,
+  priority       TEXT NOT NULL DEFAULT 'normal',
+  notes          TEXT,
+  decided_by     TEXT,
+  decided_at     BIGINT,
+  decision_note  TEXT,
+  po_id          TEXT,
+  created_at     BIGINT NOT NULL,
+  updated_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS preq_tenant_status_idx ON purchase_requisitions (tenant_id, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS purchase_requisition_lines (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  requisition_id TEXT NOT NULL REFERENCES purchase_requisitions(id) ON DELETE CASCADE,
+  product_id     TEXT NOT NULL,
+  product_name   TEXT,
+  quantity       INTEGER NOT NULL,
+  est_cost_cents BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS preq_lines_req_idx ON purchase_requisition_lines (tenant_id, requisition_id);
+`;
+
+// Seed the race-free po_number counter from the current MAX so existing
+// numbering continues without collision (replaces MAX(po_number)+1, which
+// minted duplicate numbers under concurrent creates).
+const SEED_PO_COUNTER = `
+INSERT INTO document_counters (tenant_id, kind, val)
+  SELECT tenant_id, 'purchase_orders', COALESCE(MAX(po_number), 0)
+    FROM purchase_orders GROUP BY tenant_id
+  ON CONFLICT (tenant_id, kind) DO NOTHING;`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
     registerRoutes(router, service);

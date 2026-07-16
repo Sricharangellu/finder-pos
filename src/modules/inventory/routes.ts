@@ -1,6 +1,6 @@
 import type { Router, Request, Response } from "express";
 import { z } from "zod";
-import { handler, parseBody } from "../../shared/http.js";
+import { handler, parseBody, badRequest } from "../../shared/http.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { InventoryService, MovementReason } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -157,6 +157,22 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Movement history by query param — the shape the web client actually calls
+  // (GET /inventory/movements?product_id=…&limit=…). Previously mock-only: the
+  // real backend bound productId="movements" and returned [], leaving the
+  // movements panels silently empty in production. Registered before
+  // /:productId routes so "movements" isn't captured as a product id.
+  router.get(
+    "/movements",
+    handler(async (req, res) => {
+      const productId = typeof req.query.product_id === "string" ? req.query.product_id : "";
+      if (!productId) throw badRequest("product_id is required");
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+      const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
+      res.json(await service.movements(productId, tenantId(res), { limit, cursor }));
+    }),
+  );
+
   // Near-expiry report — registered before /:productId so "expiring" isn't an id.
   router.get(
     "/expiring",
@@ -256,6 +272,15 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Availability read-model: on-hand / reserved (approved unshipped SOs) /
+  // incoming (open approved PO remainder) / available.
+  router.get(
+    "/:productId/availability",
+    handler(async (req, res) => {
+      res.json(await service.availability(String(req.params.productId), tenantId(res)));
+    }),
+  );
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
@@ -271,10 +296,13 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Legacy path-param shape — kept for compatibility; returns the bare array
+  // (now bounded to the max page) rather than the cursor envelope.
   router.get(
     "/:productId/movements",
     handler(async (req, res) => {
-      res.json(await service.movements(String(req.params.productId), tenantId(res)));
+      const page = await service.movements(String(req.params.productId), tenantId(res), { limit: 200 });
+      res.json(page.items);
     }),
   );
 

@@ -1,6 +1,7 @@
 import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import { notFound, badRequest, conflict } from "../../shared/http.js";
+import { clampLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 
 /**
  * Accounting module — Chart of Accounts + Batch Deposits (ERP benchmark #9).
@@ -50,6 +51,28 @@ export interface BatchDepositItem {
   amount_cents: number;
 }
 
+/** One leg of a journal transaction (exactly one of debit/credit is non-zero). */
+export interface JournalLeg {
+  accountCode: string;
+  debitCents?: number;
+  creditCents?: number;
+}
+
+/** A posted journal row — append-only; no code path updates or deletes these. */
+export interface JournalEntry {
+  id: string;
+  tenant_id: string;
+  entry_group: string; // groups the balanced legs of one transaction
+  doc_type: string;    // purchase_receipt | bill | bill_payment | pos_payment | manual
+  doc_id: string | null;
+  account_code: string;
+  account_name: string; // denormalized so history survives account renames
+  debit_cents: number;
+  credit_cents: number;
+  memo: string | null;
+  created_at: number;
+}
+
 /** Standard wholesale-distribution chart of accounts, seeded on first use. */
 const DEFAULT_COA: Array<{ code: string; name: string; type: AccountType }> = [
   { code: "1000", name: "Cash", type: "asset" },
@@ -58,6 +81,7 @@ const DEFAULT_COA: Array<{ code: string; name: string; type: AccountType }> = [
   { code: "1100", name: "Accounts Receivable", type: "asset" },
   { code: "1200", name: "Inventory Asset", type: "asset" },
   { code: "2000", name: "Accounts Payable", type: "liability" },
+  { code: "2050", name: "Goods Received Not Invoiced", type: "liability" },
   { code: "2100", name: "Sales Tax Payable", type: "liability" },
   { code: "2200", name: "Credit Card", type: "liability" },
   { code: "4000", name: "Sales Revenue", type: "income" },
@@ -235,5 +259,125 @@ export class AccountingService {
       dep as unknown as Record<string, unknown>,
     );
     return dep;
+  }
+
+  // ── Posting ledger (journal entries) ──────────────────────────────────────
+  // Append-only double-entry journal. Operational modules stay ignorant of
+  // accounting: they publish domain events, and the accounting module's
+  // subscribers call postTransaction(). Nothing ever updates or deletes rows.
+
+  /** Resolve an account by code, auto-creating it from the default COA when the
+   *  tenant hasn't seeded a chart yet — postings must never silently drop. */
+  private async resolveAccount(code: string, tenantId: string): Promise<{ code: string; name: string }> {
+    const row = await this.db.one<{ code: string; name: string }>(
+      "SELECT code, name FROM accounts WHERE tenant_id = @t AND code = @c",
+      { t: tenantId, c: code },
+    );
+    if (row) return row;
+    const def = DEFAULT_COA.find((a) => a.code === code);
+    if (!def) throw badRequest(`unknown account code '${code}'`);
+    await this.createAccount(def, tenantId);
+    return { code: def.code, name: def.name };
+  }
+
+  /** Post one balanced transaction. Validates Σdebits == Σcredits > 0. */
+  async postTransaction(
+    docType: string,
+    docId: string | null,
+    legs: JournalLeg[],
+    tenantId: string,
+    memo?: string,
+  ): Promise<JournalEntry[]> {
+    if (legs.length < 2) throw badRequest("a journal transaction needs at least two legs");
+    const debits = legs.reduce((s, l) => s + (l.debitCents ?? 0), 0);
+    const credits = legs.reduce((s, l) => s + (l.creditCents ?? 0), 0);
+    if (debits !== credits || debits <= 0) {
+      throw badRequest(`journal transaction must balance (debits ${debits} != credits ${credits})`);
+    }
+    const group = `jrn_${uuidv7()}`;
+    const now = Date.now();
+    const rows: JournalEntry[] = [];
+    for (const leg of legs) {
+      const acct = await this.resolveAccount(leg.accountCode, tenantId);
+      rows.push({
+        id: `jre_${uuidv7()}`, tenant_id: tenantId, entry_group: group,
+        doc_type: docType, doc_id: docId,
+        account_code: acct.code, account_name: acct.name,
+        debit_cents: leg.debitCents ?? 0, credit_cents: leg.creditCents ?? 0,
+        memo: memo ?? null, created_at: now,
+      });
+    }
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      for (const r of rows) {
+        await tdb.query(
+          `INSERT INTO journal_entries (id, tenant_id, entry_group, doc_type, doc_id, account_code, account_name, debit_cents, credit_cents, memo, created_at)
+           VALUES (@id,@tenant_id,@entry_group,@doc_type,@doc_id,@account_code,@account_name,@debit_cents,@credit_cents,@memo,@created_at)`,
+          r as unknown as Record<string, unknown>,
+        );
+      }
+    });
+    return rows;
+  }
+
+  /** True when a transaction for this document already exists (idempotency guard). */
+  async hasPosting(docType: string, docId: string, tenantId: string): Promise<boolean> {
+    const row = await this.db.one(
+      "SELECT 1 FROM journal_entries WHERE tenant_id = @t AND doc_type = @dt AND doc_id = @d LIMIT 1",
+      { t: tenantId, dt: docType, d: docId },
+    );
+    return Boolean(row);
+  }
+
+  /**
+   * List posted journal entries — keyset-paginated. journal_entries is the
+   * most append-heavy financial table; a bare LIMIT silently truncated the
+   * ledger at the most recent N rows, making deep/audit history unreachable
+   * (CODING_STANDARDS: cursor REQUIRED on unbounded append-heavy lists).
+   * The `(created_at, id)` cursor rides the existing DESC ordering.
+   */
+  async listJournal(
+    tenantId: string,
+    opts: { docType?: string; docId?: string; accountCode?: string; limit?: number; cursor?: string } = {},
+  ): Promise<CursorPage<JournalEntry>> {
+    const limit = clampLimit(opts.limit, 200, 500);
+    const cur = decodeCursor(opts.cursor);
+    const where = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit };
+    if (opts.docType) { where.push("doc_type = @dt"); params["dt"] = opts.docType; }
+    if (opts.docId) { where.push("doc_id = @d"); params["d"] = opts.docId; }
+    if (opts.accountCode) { where.push("account_code = @a"); params["a"] = opts.accountCode; }
+    if (cur) { where.push("(created_at, id) < (@curAt, @curId)"); params["curAt"] = cur.at; params["curId"] = cur.id; }
+    const rows = await this.db.query<JournalEntry>(
+      `SELECT * FROM journal_entries WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+      params,
+    );
+    return toPage(rows as unknown as Array<JournalEntry & Record<string, unknown>>, limit, "created_at") as CursorPage<JournalEntry>;
+  }
+
+  /** Per-account debit/credit totals; total debits always equal total credits. */
+  async trialBalance(tenantId: string): Promise<{
+    accounts: Array<{ account_code: string; account_name: string; debit_cents: number; credit_cents: number; balance_cents: number }>;
+    total_debit_cents: number;
+    total_credit_cents: number;
+  }> {
+    const accounts = await this.db.query<{ account_code: string; account_name: string; debit_cents: number; credit_cents: number }>(
+      `SELECT account_code, account_name,
+              COALESCE(SUM(debit_cents), 0)::bigint  AS debit_cents,
+              COALESCE(SUM(credit_cents), 0)::bigint AS credit_cents
+         FROM journal_entries WHERE tenant_id = @t
+        GROUP BY account_code, account_name ORDER BY account_code`,
+      { t: tenantId },
+    );
+    const rows = accounts.map((a) => ({
+      ...a,
+      debit_cents: Number(a.debit_cents),
+      credit_cents: Number(a.credit_cents),
+      balance_cents: Number(a.debit_cents) - Number(a.credit_cents),
+    }));
+    return {
+      accounts: rows,
+      total_debit_cents: rows.reduce((s, a) => s + a.debit_cents, 0),
+      total_credit_cents: rows.reduce((s, a) => s + a.credit_cents, 0),
+    };
   }
 }

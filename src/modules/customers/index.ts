@@ -1,4 +1,6 @@
 import type { PosModule } from "../types.js";
+import type { DomainEvent } from "../../shared/types.js";
+import { claimEventOnce } from "../../shared/outbox.js";
 import { CustomersService } from "./service.js";
 import { registerRoutes } from "./routes.js";
 
@@ -198,10 +200,13 @@ CREATE INDEX IF NOT EXISTS cpp_product_idx  ON customer_product_prices (tenant_i
 export const customersModule: PosModule = {
   name: "customers",
   migrations: [CREATE_CUSTOMERS_TABLE, CREATE_CUSTOMERS_INDEXES, ADD_PROFILE_COLUMNS, ADD_CUSTOMER_TYPE_FIELDS, ADD_CUSTOMER_XLSX_FIELDS, CREATE_LOYALTY_TIER_RULES, CREATE_CUSTOMER_ADDRESSES, CREATE_CUSTOMER_CONTACTS, CREATE_CUSTOMER_GROUPS, CREATE_CUSTOMER_NOTES, CREATE_CUSTOMER_PRODUCT_PRICES],
-  async register({ db, events, router }) {
+  async register({ db, events, router, outbox }) {
     const service = new CustomersService(db, events);
 
-    events.on("payment.captured", async (event) => {
+    // Durable (ACPA M1.3): points are a counter increment, not naturally
+    // idempotent — claim the event id first so a redelivered payment can
+    // never award the same points twice.
+    const awardLoyalty = async (event: { id?: string; occurredAt: string; payload: unknown }) => {
       const p = event.payload as {
         tenantId?: string;
         orderId?: string;
@@ -215,8 +220,12 @@ export const customersModule: PosModule = {
       if (!customerId) return; // walk-in / no loyalty account
       const netSpent = (p.amountCents ?? 0) - (p.changeCents ?? 0);
       const points = Math.floor(netSpent / 100);
+      if (points <= 0) return;
+      if (!(await claimEventOnce(db, "customers.loyalty", event as DomainEvent))) return; // already awarded
       await service.awardPoints(customerId, points, tenantId);
-    });
+    };
+    events.on("payment.captured", awardLoyalty);
+    outbox?.onDurable("payment.captured", awardLoyalty);
 
     registerRoutes(router, service);
   },

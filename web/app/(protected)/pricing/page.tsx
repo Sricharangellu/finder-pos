@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
-import { apiGet } from "@/api-client/client";
+import { apiGet, apiPost, safeLoad } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import { fmtDate } from "@/lib/date";
 import { Can } from "@/components/rbac";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = "price-books" | "tier" | "contracts" | "scheduled" | "margin-rules" | "simulator";
+type Tab = "price-books" | "customer-overrides" | "tier" | "contracts" | "scheduled" | "margin-rules" | "simulator";
 
 interface PriceBook {
   id: string;
@@ -85,12 +85,13 @@ interface SimulatorResult {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "price-books",  label: "Price Books" },
-  { key: "tier",         label: "Tier Pricing" },
-  { key: "contracts",    label: "Contract Prices" },
-  { key: "scheduled",    label: "Scheduled" },
-  { key: "margin-rules", label: "Margin Rules" },
-  { key: "simulator",    label: "Simulator" },
+  { key: "price-books",        label: "Price Books" },
+  { key: "customer-overrides", label: "Customer Overrides" },
+  { key: "tier",               label: "Tier Pricing" },
+  { key: "contracts",          label: "Contract Prices" },
+  { key: "scheduled",          label: "Scheduled" },
+  { key: "margin-rules",       label: "Margin Rules" },
+  { key: "simulator",          label: "Simulator" },
 ];
 
 const BOOK_TYPE_LABEL: Record<PriceBook["type"], string> = {
@@ -209,6 +210,164 @@ function PriceBooksTab() {
             </td>
           </tr>
         ))}
+      </TableShell>
+    </div>
+  );
+}
+
+// ── Customer Overrides Tab ────────────────────────────────────────────────────
+// Folded in from the old /catalog/price-book page (FE-47): per-customer price
+// overrides via /customers/:id/product-prices. One pricing surface for all
+// price management.
+
+interface OverrideProduct { id: string; sku: string; name: string; price_cents: number; category: string; }
+interface OverrideCustomer { id: string; name: string; email: string | null; }
+interface PriceOverride { product_id: string; price_cents: number; updated_at: number; }
+
+function CustomerOverridesTab() {
+  const [products, setProducts] = useState<OverrideProduct[]>([]);
+  const [customers, setCustomers] = useState<OverrideCustomer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [overrides, setOverrides] = useState<Map<string, number>>(new Map());
+  const [editing, setEditing] = useState<{ productId: string; value: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    safeLoad(
+      apiGet<{ items: OverrideProduct[] }>("/api/v1/catalog?pageSize=200")
+        .then((r) => setProducts(r.items ?? []))
+        .finally(() => setLoading(false)),
+    );
+    safeLoad(
+      apiGet<{ items: OverrideCustomer[] }>("/api/v1/customers?pageSize=200")
+        .then((r) => setCustomers(r.items ?? [])),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCustomer) { setOverrides(new Map()); return; }
+    safeLoad(
+      apiGet<{ items: PriceOverride[] }>(`/api/v1/customers/${selectedCustomer}/product-prices`)
+        .then((r) => {
+          const map = new Map<string, number>();
+          for (const o of r.items ?? []) map.set(o.product_id, o.price_cents);
+          setOverrides(map);
+        }),
+    );
+  }, [selectedCustomer]);
+
+  const handleSave = async (productId: string) => {
+    if (!selectedCustomer || !editing || editing.productId !== productId) return;
+    const cents = Math.round(parseFloat(editing.value) * 100);
+    if (isNaN(cents) || cents < 0) return;
+    setSaving(true);
+    try {
+      await apiPost(`/api/v1/customers/${selectedCustomer}/product-prices`, { productId, priceCents: cents });
+      setOverrides((prev) => new Map(prev).set(productId, cents));
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filtered = products.filter((p) =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={selectedCustomer}
+          onChange={(e) => setSelectedCustomer(e.target.value)}
+          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#5D5FEF]"
+          aria-label="Customer"
+        >
+          <option value="">Select customer to edit prices</option>
+          {customers.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Search products…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9 w-48 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5D5FEF]"
+        />
+        {!selectedCustomer && (
+          <p className="text-xs text-slate-400">Select a customer to view and edit their custom prices.</p>
+        )}
+      </div>
+
+      <TableShell cols={["SKU", "Product", "Category", "Standard", "Custom", "Discount", ""]} empty={!loading && filtered.length === 0}>
+        {loading
+          ? [1, 2, 3, 4, 5].map((i) => (
+              <tr key={i}>
+                {[1, 2, 3, 4, 5, 6, 7].map((j) => (
+                  <td key={j} className="px-5 py-3"><div className="h-4 animate-pulse rounded bg-slate-100" /></td>
+                ))}
+              </tr>
+            ))
+          : filtered.map((p) => {
+              const override = overrides.get(p.id);
+              const isEditing = editing?.productId === p.id;
+              const discountPct = override && override < p.price_cents
+                ? Math.round((1 - override / p.price_cents) * 100)
+                : null;
+              return (
+                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-5 py-3 font-mono text-xs text-slate-500">{p.sku}</td>
+                  <td className="px-5 py-3 font-medium text-slate-900">{p.name}</td>
+                  <td className="px-5 py-3 capitalize text-slate-500">{p.category}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-slate-500">{formatMoney(p.price_cents)}</td>
+                  <td className="px-5 py-3 text-right">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        autoFocus
+                        min="0"
+                        step="0.01"
+                        value={editing.value}
+                        onChange={(e) => setEditing({ productId: p.id, value: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === "Enter") void handleSave(p.id); if (e.key === "Escape") setEditing(null); }}
+                        className="w-24 rounded border border-[#5D5FEF] px-2 py-0.5 text-right text-sm outline-none"
+                        aria-label={`Custom price for ${p.name}`}
+                      />
+                    ) : (
+                      <span className={`tabular-nums font-medium ${override ? "text-[#5D5FEF]" : "text-slate-400"}`}>
+                        {override ? formatMoney(override) : "—"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {discountPct !== null ? <span className="text-xs font-semibold text-emerald-600">-{discountPct}%</span> : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {selectedCustomer && (
+                      isEditing ? (
+                        <div className="flex justify-end gap-1">
+                          <button disabled={saving} onClick={() => void handleSave(p.id)} className="rounded-lg bg-[#5D5FEF] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4B4DC8] disabled:opacity-40">Save</button>
+                          <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                        </div>
+                      ) : (
+                        <Can permission="pricing.manage">
+                          <button
+                            onClick={() => setEditing({ productId: p.id, value: override ? (override / 100).toFixed(2) : (p.price_cents / 100).toFixed(2) })}
+                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            {override ? "Edit" : "Set"}
+                          </button>
+                        </Can>
+                      )
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
       </TableShell>
     </div>
   );
@@ -646,8 +805,15 @@ function SimulatorTab() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+const TAB_KEYS: readonly Tab[] = ["price-books", "customer-overrides", "tier", "contracts", "scheduled", "margin-rules", "simulator"];
+
 export default function PricingPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("price-books");
+  // ?tab=customer-overrides deep-links a tab (used by the old /catalog/price-book redirect).
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "price-books";
+    const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
+    return t && TAB_KEYS.includes(t) ? t : "price-books";
+  });
 
   return (
     <EnterpriseShell active="pricing" title="Pricing Engine" subtitle="Price books, tier rules, contracts, schedules, and margin floors" contentClassName="overflow-y-auto">
@@ -679,7 +845,8 @@ export default function PricingPage() {
           </nav>
         </div>
 
-        {activeTab === "price-books"  && <PriceBooksTab />}
+        {activeTab === "price-books"        && <PriceBooksTab />}
+        {activeTab === "customer-overrides" && <CustomerOverridesTab />}
         {activeTab === "tier"         && <TierPricingTab />}
         {activeTab === "contracts"    && <ContractPricesTab />}
         {activeTab === "scheduled"    && <ScheduledTab />}

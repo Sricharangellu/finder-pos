@@ -153,3 +153,239 @@ test("list deposits filtered by status", async () => {
   assert.equal(pending.status, 200);
   assert.ok(pending.json.items.every((d: { status: string }) => d.status === "pending_approval"));
 });
+
+// ─── Posting ledger ───────────────────────────────────────────────────────────
+
+async function setupReceivedPO(app: App) {
+  const prod = await call(app, "POST", "/api/catalog/", { sku: `LED-${Date.now()}`, name: "Ledger Widget", price_cents: 1500, category: "general" });
+  assert.equal(prod.status, 201);
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Ledger Supply Co" });
+  assert.equal(sup.status, 201);
+  const po = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: sup.json.id,
+    lines: [{ productId: prod.json.id, quantity: 10, unitCostCents: 500 }], // $50 goods
+  });
+  assert.equal(po.status, 201);
+  const recv = await call(app, "POST", `/api/purchasing/orders/${po.json.id}/receive`, {});
+  assert.equal(recv.status, 200);
+  return { poId: po.json.id as string };
+}
+
+test("receiving a PO posts Dr Inventory / Cr GRNI, and the auto-bill posts GRNI -> AP", async () => {
+  const app = await freshApp();
+  const { poId } = await setupReceivedPO(app);
+
+  // Receipt posting: 5000 into Inventory, 5000 into GRNI.
+  const receipt = await call(app, "GET", "/api/accounting/journal?docType=purchase_receipt");
+  assert.equal(receipt.status, 200);
+  assert.equal(receipt.json.items.length, 2);
+  const dr = receipt.json.items.find((e: any) => e.debit_cents > 0);
+  const cr = receipt.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(dr.account_code, "1200"); // Inventory Asset
+  assert.equal(dr.debit_cents, 5000);
+  assert.equal(cr.account_code, "2050"); // GRNI
+  assert.equal(cr.credit_cents, 5000);
+  assert.equal(dr.entry_group, cr.entry_group); // one balanced transaction
+  assert.ok(String(dr.memo).includes(poId));
+
+  // Auto-drafted bill (billing listens to purchase_order.received) relieves GRNI into AP.
+  const billPost = await call(app, "GET", "/api/accounting/journal?docType=bill");
+  assert.equal(billPost.json.items.length, 2);
+  const billDr = billPost.json.items.find((e: any) => e.debit_cents > 0);
+  const billCr = billPost.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(billDr.account_code, "2050");
+  assert.equal(billCr.account_code, "2000"); // Accounts Payable
+  assert.equal(billCr.credit_cents, 5000);
+});
+
+test("paying a bill posts Dr AP / Cr Bank, and the trial balance stays balanced", async () => {
+  const app = await freshApp();
+  await setupReceivedPO(app);
+
+  const bills = await call(app, "GET", "/api/billing/bills");
+  assert.equal(bills.status, 200);
+  const bill = bills.json.items[0];
+  const pay = await call(app, "POST", `/api/billing/bills/${bill.id}/pay`, { amountCents: 5000, method: "ach" });
+  assert.equal(pay.status, 200);
+
+  const payment = await call(app, "GET", "/api/accounting/journal?docType=bill_payment");
+  assert.equal(payment.json.items.length, 2);
+  const dr = payment.json.items.find((e: any) => e.debit_cents > 0);
+  const cr = payment.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(dr.account_code, "2000"); // AP relieved
+  assert.equal(cr.account_code, "1010"); // Bank Checking down
+  assert.equal(cr.credit_cents, 5000);
+
+  // Trial balance: total debits == total credits; GRNI nets to zero
+  // (received 5000 credit, relieved 5000 debit); AP nets to zero after payment.
+  const tb = await call(app, "GET", "/api/accounting/trial-balance");
+  assert.equal(tb.status, 200);
+  assert.equal(tb.json.total_debit_cents, tb.json.total_credit_cents);
+  const grni = tb.json.accounts.find((a: any) => a.account_code === "2050");
+  assert.equal(grni.balance_cents, 0);
+  const ap = tb.json.accounts.find((a: any) => a.account_code === "2000");
+  assert.equal(ap.balance_cents, 0);
+  const inventory = tb.json.accounts.find((a: any) => a.account_code === "1200");
+  assert.equal(inventory.balance_cents, 5000); // asset remains on the books
+});
+
+test("manual journal transactions must balance and use known accounts", async () => {
+  const app = await freshApp();
+
+  const unbalanced = await call(app, "POST", "/api/accounting/journal", {
+    legs: [
+      { accountCode: "1000", debitCents: 100 },
+      { accountCode: "4000", creditCents: 90 },
+    ],
+  });
+  assert.equal(unbalanced.status, 400);
+
+  const unknownAccount = await call(app, "POST", "/api/accounting/journal", {
+    legs: [
+      { accountCode: "9999", debitCents: 100 },
+      { accountCode: "4000", creditCents: 100 },
+    ],
+  });
+  assert.equal(unknownAccount.status, 400);
+
+  const ok = await call(app, "POST", "/api/accounting/journal", {
+    memo: "opening cash",
+    legs: [
+      { accountCode: "1000", debitCents: 100000 },
+      { accountCode: "4000", creditCents: 100000 },
+    ],
+  });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.json.items.length, 2);
+  assert.equal(ok.json.items[0].doc_type, "manual");
+});
+
+// ─── Transactional outbox (ACPA M1) ───────────────────────────────────────────
+
+test("normal flow: financial events are persisted and marked delivered", async () => {
+  const app = await freshApp();
+  await setupReceivedPO(app);
+
+  // receive publishes purchase_order.received (durable) and auto-bill publishes
+  // bill.created (durable) — both rows must exist and be delivered, none pending.
+  const rows = await app.db.query<{ type: string; status: string }>(
+    "SELECT type, status FROM event_outbox ORDER BY created_at", {},
+  );
+  const types = rows.map((r) => r.type);
+  assert.ok(types.includes("purchase_order.received"), `outbox rows: ${types.join(",")}`);
+  assert.ok(types.includes("bill.created"));
+  assert.ok(rows.every((r) => r.status === "delivered"), "no row may stay pending on the happy path");
+});
+
+test("crash recovery: a pending outbox row is redelivered to idempotent consumers exactly once", async () => {
+  const app = await freshApp();
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Crash Supply" });
+
+  // Simulate a crash after the business write but before dispatch: a bill.created
+  // event sits in the outbox as 'pending' with no ledger posting made.
+  const billId = "bil_crashsim_1";
+  await app.db.query(
+    `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
+     VALUES ('obx_crash_1', 'tnt_demo', 'bill.created', @payload, @agg, @occ, TRUE, 'pending', 0, @past)`,
+    {
+      payload: JSON.stringify({ tenantId: "tnt_demo", billId, supplierId: sup.json.id, poId: null, totalCents: 7700 }),
+      agg: billId,
+      occ: new Date().toISOString(),
+      past: Date.now() - 60_000, // older than the reconciler's in-flight window
+    },
+  );
+
+  // First reconcile: posts Dr GRNI / Cr AP for the lost event.
+  const first = await app.outbox.reconcile();
+  assert.equal(first.delivered, 1);
+  const journal = await call(app, "GET", `/api/accounting/journal?docType=bill&docId=${billId}`);
+  assert.equal(journal.json.items.length, 2); // one balanced transaction
+  assert.equal(journal.json.items.reduce((s: number, e: any) => s + e.debit_cents, 0), 7700);
+
+  // Row is now delivered; a second reconcile must not double-post (idempotency).
+  const second = await app.outbox.reconcile();
+  assert.equal(second.delivered, 0);
+  const again = await call(app, "GET", `/api/accounting/journal?docType=bill&docId=${billId}`);
+  assert.equal(again.json.items.length, 2);
+});
+
+test("a failing durable consumer increments attempts and stays pending for retry", async () => {
+  const app = await freshApp();
+  // Malformed payload → JSON.parse succeeds but posting is skipped (totalCents 0
+  // → handler no-ops → delivered). Use a genuinely failing case: unparseable is
+  // impossible here, so register a one-shot failing consumer type instead.
+  let calls = 0;
+  app.outbox.onDurable("test.always_fails", async () => { calls++; throw new Error("boom"); });
+  await app.db.query(
+    `INSERT INTO event_outbox (id, tenant_id, type, payload, aggregate_id, occurred_at, dispatched, status, attempts, created_at)
+     VALUES ('obx_fail_1', 'tnt_demo', 'test.always_fails', '{}', 'obx_fail_1', @occ, TRUE, 'pending', 0, @past)`,
+    { occ: new Date().toISOString(), past: Date.now() - 60_000 },
+  );
+  const r = await app.outbox.reconcile();
+  assert.equal(r.failed, 1);
+  assert.equal(calls, 1);
+  const row = await app.db.one<{ status: string; attempts: number; last_error: string }>(
+    "SELECT status, attempts, last_error FROM event_outbox WHERE id = 'obx_fail_1'", {},
+  );
+  assert.equal(row!.status, "pending"); // retried on the next sweep
+  assert.equal(Number(row!.attempts), 1);
+  assert.match(row!.last_error, /boom/);
+});
+
+test("stable event identity: crash between dispatch and delivery-marking never double-posts (ACPA M1.3)", async () => {
+  const app = await freshApp();
+  await setupReceivedPO(app);
+  const before = await app.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM journal_entries", {});
+
+  // Crash window: every delivered row goes back to pending, then the reconciler
+  // redelivers. Because redelivered events carry the ORIGINAL occurredAt (not a
+  // regenerated timestamp), every posting's idempotency key matches and no
+  // consumer double-applies.
+  await app.db.query(
+    "UPDATE event_outbox SET status = 'pending', created_at = @past WHERE status = 'delivered'",
+    { past: Date.now() - 60_000 },
+  );
+  const r = await app.outbox.reconcile();
+  assert.ok(r.delivered >= 2, "rows were redelivered");
+  const after = await app.db.one<{ n: number }>("SELECT COUNT(*)::int AS n FROM journal_entries", {});
+  assert.equal(after!.n, before!.n, "journal must not grow on redelivery");
+});
+
+// ─── Journal keyset pagination (session D, loop iter 5) ───────────────────────
+// journal_entries is the most append-heavy financial table; listJournal used a
+// bare LIMIT 500 with no cursor, so ledger/audit history beyond the most recent
+// page was unreachable. These pin the additive cursor behavior.
+
+test("GET /accounting/journal keyset-pages the ledger without dup or gap", async () => {
+  const app = await freshApp();
+  // Seed 5 journal rows for the auth helper's tenant (tnt_demo), distinct times.
+  const base = Date.now();
+  for (let i = 0; i < 5; i++) {
+    await app.db.exec(`
+      INSERT INTO journal_entries (id, tenant_id, entry_group, doc_type, doc_id, account_code, account_name, debit_cents, credit_cents, memo, created_at)
+      VALUES ('jre_pg_${i}_${base}', 'tnt_demo', 'grp_${i}', 'manual', NULL, '1200', 'Inventory', ${100 * (i + 1)}, 0, 'seed ${i}', ${base + i})
+    `);
+  }
+
+  const p1 = await call(app, "GET", "/api/accounting/journal?accountCode=1200&limit=2");
+  assert.equal(p1.status, 200);
+  assert.equal(p1.json.items.length, 2, "first page holds the limit");
+  assert.ok(p1.json.nextCursor, "full page yields a cursor");
+
+  const p2 = await call(app, "GET", `/api/accounting/journal?accountCode=1200&limit=2&cursor=${encodeURIComponent(p1.json.nextCursor)}`);
+  const p3 = await call(app, "GET", `/api/accounting/journal?accountCode=1200&limit=2&cursor=${encodeURIComponent(p2.json.nextCursor)}`);
+  assert.equal(p3.json.items.length, 1, "last page holds the remainder");
+  assert.equal(p3.json.nextCursor, null, "short page ends the sequence");
+
+  const ids = [...p1.json.items, ...p2.json.items, ...p3.json.items].map((e: { id: string }) => e.id);
+  assert.equal(new Set(ids).size, 5, "no journal row duplicated or skipped across pages");
+  const times = [...p1.json.items, ...p2.json.items, ...p3.json.items].map((e: { created_at: number }) => e.created_at);
+  assert.deepEqual(times, [...times].sort((a, b) => b - a), "newest-first across pages");
+});
+
+test("GET /accounting/journal without cursor stays backward-compatible ({ items })", async () => {
+  const app = await freshApp();
+  const r = await call(app, "GET", "/api/accounting/journal");
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json.items), "items[] still present for existing clients");
+});

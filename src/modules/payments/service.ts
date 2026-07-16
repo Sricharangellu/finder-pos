@@ -284,7 +284,11 @@ export class PaymentsService {
       created_at: Date.now(),
     };
 
-    await this.db.withTenant(tenantId).tx(async (tdb) => {
+    // The capture event is STAGED inside the payment transaction (ACPA M1.4):
+    // its outbox row commits atomically with the payment insert, so a crash
+    // after commit can no longer lose the downstream revenue posting, order
+    // completion, or loyalty award — the reconciler redelivers them.
+    const stagedEvent = await this.db.withTenant(tenantId).tx(async (tdb) => {
       await tdb.query(
         `INSERT INTO payments
            (id, tenant_id, order_id, method, amount_cents, cash_cents, card_cents,
@@ -312,20 +316,25 @@ export class PaymentsService {
           },
         );
       }
+
+      return this.events.stage(
+        tdb,
+        "payment.captured",
+        {
+          id: record.id,
+          tenantId,
+          orderId: record.order_id,
+          method: record.method,
+          amountCents: record.amount_cents,
+          changeCents: record.change_cents,
+        },
+        record.id,
+      );
     });
 
-    await this.events.publish(
-      "payment.captured",
-      {
-        id: record.id,
-        tenantId,
-        orderId: record.order_id,
-        method: record.method,
-        amountCents: record.amount_cents,
-        changeCents: record.change_cents,
-      },
-      record.id,
-    );
+    // Transaction committed — run the synchronous consumers (revenue posting,
+    // order completion, loyalty).
+    await this.events.dispatchStaged(stagedEvent);
 
     await writeAudit(this.db, {
       tenantId,
