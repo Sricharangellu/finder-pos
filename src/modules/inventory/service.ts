@@ -314,6 +314,40 @@ export class InventoryService {
     );
   }
 
+  async getExpiry(id: string, tenantId: string): Promise<ExpiryWriteoff> {
+    const row = await this.db.one<ExpiryWriteoff>(
+      "SELECT * FROM expiry_writeoffs WHERE id = @id AND tenant_id = @t",
+      { id, t: tenantId },
+    );
+    if (!row) throw new HttpError(404, "not_found", `expiry write-off '${id}' not found`);
+    return row;
+  }
+
+  /** Resolve an expiry pool item — discarded (loss stands) or returned to
+   *  vendor (disposition_ref = vendor return id). Single-winner via a
+   *  conditional UPDATE so a double-disposition can't occur. */
+  async disposeExpiry(
+    id: string,
+    tenantId: string,
+    status: "discarded" | "returned",
+    ref?: string,
+  ): Promise<ExpiryWriteoff> {
+    const now = Date.now();
+    const updated = await this.db.one<ExpiryWriteoff>(
+      `UPDATE expiry_writeoffs
+          SET status = @status, disposition_ref = @ref, resolved_at = @now
+        WHERE id = @id AND tenant_id = @t AND status = 'pending'
+      RETURNING *`,
+      { id, t: tenantId, status, ref: ref ?? null, now },
+    );
+    if (!updated) {
+      // Either it doesn't exist or it was already disposed.
+      await this.getExpiry(id, tenantId); // throws 404 if missing
+      throw new HttpError(409, "already_resolved", "this expiry item has already been disposed");
+    }
+    return updated;
+  }
+
   /** Expiry value-at-risk: counts + cost value of expired and soon-to-expire stock. */
   async expirySummary(tenantId: string, soonDays = 30): Promise<{
     expired: { lots: number; units: number; valueCents: number };

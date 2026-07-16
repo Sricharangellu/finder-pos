@@ -4,6 +4,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import http from "node:http";
+import jwt from "jsonwebtoken";
 import { buildApp, type App } from "../../app.js";
 import { InventoryService } from "./service.js";
 import { AccountingService } from "../accounting/service.js";
@@ -57,5 +59,85 @@ test("sweepExpired pulls expired stock into the pool, reduces active stock, book
   const again = await inv.sweepExpired(tenant);
   assert.equal(again.swept, 0, "second sweep finds nothing");
 
+  await app.db.close();
+});
+
+async function call(app: App, method: string, path: string, body?: unknown, role = "manager") {
+  const { default: request } = await import("./test-request.js");
+  return request(app.express, method, path, body, role);
+}
+
+async function seedExpired(app: App, product: string, qty = 5, cost = 300) {
+  const inv = new InventoryService(app.db, app.events);
+  await app.db.exec(
+    `INSERT INTO products (id, tenant_id, sku, name, price_cents, category, tax_class, status, created_at, updated_at)
+     VALUES ('${product}', 'tnt_demo', '${product}-sku', 'P ${product}', 500, 'general', 'standard', 'active', ${Date.now()}, ${Date.now()})`,
+  );
+  await inv.adjust(product, qty, "receiving", "tnt_demo");
+  await inv.createLot({ productId: product, expiryDate: Date.now() - DAY, quantity: qty, unitCostCents: cost }, "tnt_demo");
+  await inv.sweepExpired("tnt_demo");
+  return inv;
+}
+
+test("discard resolves an expiry item and removes it from the pool", async () => {
+  const app: App = await buildApp({ schema: __schema() });
+  const inv = await seedExpired(app, "prod_disc");
+  const pool = await inv.listExpiryPool("tnt_demo");
+  assert.equal(pool.length, 1);
+
+  const r = await call(app, "POST", `/api/inventory/expiry/${pool[0]!.id}/discard`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.status, "discarded");
+  assert.equal((await inv.listExpiryPool("tnt_demo")).length, 0, "no longer pending");
+
+  // Double-dispose is rejected.
+  const again = await call(app, "POST", `/api/inventory/expiry/${pool[0]!.id}/discard`);
+  assert.equal(again.status, 409);
+
+  await app.db.close();
+});
+
+test("return-to-vendor creates a vendor return and resolves the item", async () => {
+  const app: App = await buildApp({ schema: __schema() });
+  const inv = await seedExpired(app, "prod_ret");
+  const sup = await call(app, "POST", "/api/purchasing/suppliers", { name: "Return Vendor", email: "r@v.com" });
+  assert.equal(sup.status, 201);
+  const pool = await inv.listExpiryPool("tnt_demo");
+
+  const r = await call(app, "POST", `/api/inventory/expiry/${pool[0]!.id}/return-to-vendor`, { supplierId: sup.json.id });
+  assert.equal(r.status, 200, `return failed: ${JSON.stringify(r.json)}`);
+  assert.equal(r.json.writeoff.status, "returned");
+  assert.equal(r.json.writeoff.disposition_ref, r.json.vendorReturn.id, "linked to the vendor return");
+  assert.equal((await inv.listExpiryPool("tnt_demo")).length, 0, "no longer pending");
+
+  await app.db.close();
+});
+
+function callAs(app: App, role: string, method: string, path: string, body?: unknown): Promise<{ status: number }> {
+  const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
+  const token = jwt.sign({ sub: "usr_role", tenantId: "tnt_demo", role }, secret, { expiresIn: "1h" });
+  const p = path.replace("/api/", "/api/v1/");
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(app.express);
+    server.listen(0, () => {
+      const addr = server.address();
+      if (addr === null || typeof addr === "string") { server.close(); reject(new Error("bind fail")); return; }
+      const payload = body === undefined ? undefined : JSON.stringify(body);
+      const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+      if (payload) { headers["content-type"] = "application/json"; headers["content-length"] = String(Buffer.byteLength(payload)); }
+      const req = http.request({ host: "127.0.0.1", port: addr.port, method, path: p, headers }, (res) => {
+        res.on("data", () => {}); res.on("end", () => { server.close(); resolve({ status: res.statusCode ?? 0 }); });
+      });
+      req.on("error", (e) => { server.close(); reject(e); });
+      if (payload) req.write(payload); req.end();
+    });
+  });
+}
+
+test("cashier cannot run the sweep (403) but can read the pool", async () => {
+  const app: App = await buildApp({ schema: __schema() });
+  assert.equal((await callAs(app, "cashier", "POST", "/api/inventory/expiry/sweep", {})).status, 403);
+  assert.equal((await callAs(app, "manager", "POST", "/api/inventory/expiry/sweep", {})).status, 200);
+  assert.equal((await callAs(app, "cashier", "GET", "/api/inventory/expiry")).status, 200);
   await app.db.close();
 });
