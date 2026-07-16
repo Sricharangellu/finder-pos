@@ -444,6 +444,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // env var is set. Each tick drains due jobs (bounded) and reconciles the
   // outbox; FOR UPDATE SKIP LOCKED + consumer idempotency make concurrent
   // ticks and long-lived-deploy intervals safe to overlap.
+  //
+  // This is also what runs the DEMO-1 trial-expiry sweep (job type
+  // "trial_expiry", registered in bootstrapOrchestration) — a prospect's
+  // trial signup enqueues/reschedules itself into the same job_queue this
+  // endpoint drains, so no separate scheduler entry point is needed for it.
   app.get("/jobs/tick", handler(async (req, res) => {
     const expected = process.env["CRON_SECRET"];
     if (!expected && process.env["NODE_ENV"] === "production") {

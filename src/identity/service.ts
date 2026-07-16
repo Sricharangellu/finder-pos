@@ -18,6 +18,12 @@ const MFA_BACKUP_CODE_COUNT = 8;
 const MAX_FAILED_ATTEMPTS = 10;           // lock after 10 consecutive failures
 const LOCKOUT_DURATION_MS = 30 * 60_000; // 30 minutes
 
+// DEMO-1: Self-serve trial length. New tenants created via the plain signup
+// flow (register()) get a `subscriptions` row with trial_ends_at = now + this.
+// The daily trial-expiry job (src/orchestration/jobs/trial-expiry.job.ts)
+// soft-expires tenants that never converted to a paid plan before this lapses.
+export const TRIAL_DURATION_MS = 14 * 24 * 60 * 60 * 1000;
+
 // Fixed bcrypt hash (cost 10) used only to equalize login response time when the
 // email is unknown: without a dummy compare, a missing email returns before any
 // bcrypt work while a real email pays for bcrypt.compare, letting an attacker
@@ -65,6 +71,15 @@ export interface RegisterInput {
   storeName: string;
   email: string;
   password: string;
+  /**
+   * Escape hatch for callers of this same endpoint that are NOT a plain
+   * self-serve trial signup (e.g. a future sales-assisted or paid-plan
+   * signup flow reusing /api/identity/register). When true, no trial
+   * subscription row is created. Defaults to false — today register() is
+   * only ever called by the self-serve signup form, so trials are the
+   * default behavior.
+   */
+  skipTrial?: boolean;
 }
 
 export interface AuditWriteInput {
@@ -231,6 +246,19 @@ export class IdentityService {
   }
 
   private async issueLoginSession(user: UserRow, ip: string | null): Promise<TokenPair & { user: AuthUser }> {
+    // DEMO-1: reject login for tenants the trial-expiry sweep has soft-expired.
+    // Checked here (shared by password + MFA login) rather than in
+    // authMiddleware so it only affects new logins, not the DB cost of every
+    // authenticated request; tenant data itself is never touched.
+    const sub = await this.db.one<{ status: string }>(
+      "SELECT status FROM subscriptions WHERE tenant_id = @tenantId LIMIT 1",
+      { tenantId: user.tenant_id },
+    );
+    if (sub?.status === "expired") {
+      await this.logLoginAttempt({ email: user.email, success: false, reason: "trial_expired", userId: user.id, tenantId: user.tenant_id, ip });
+      throw new HttpError(403, "trial_expired", "Your trial has expired. Upgrade your plan to continue.");
+    }
+
     await this.logLoginAttempt({ email: user.email, success: true, reason: null, userId: user.id, tenantId: user.tenant_id, ip });
 
     const permissions = user.custom_role_id
@@ -385,6 +413,19 @@ export class IdentityService {
       "INSERT INTO refresh_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at) VALUES (@id, @tenantId, @userId, @hash, @exp, @now)",
       { id: uuidv7(), tenantId, userId, hash: this.hashToken(pair.refreshToken), exp: now + 7 * 86_400_000, now },
     );
+
+    // DEMO-1: plain self-serve signups start a 14-day trial. `subscriptions`
+    // already models this (status can be 'trialing', trial_ends_at column
+    // exists) — nothing read it or wrote it before this. ON CONFLICT DO
+    // NOTHING keeps this idempotent against the (tenant_id) unique index.
+    if (!input.skipTrial) {
+      await this.db.query(
+        `INSERT INTO subscriptions (id, tenant_id, plan, status, trial_ends_at, created_at, updated_at)
+         VALUES (@id, @tenantId, 'starter', 'trialing', @trialEndsAt, @now, @now)
+         ON CONFLICT (tenant_id) DO NOTHING`,
+        { id: `sub_${uuidv7()}`, tenantId, trialEndsAt: now + TRIAL_DURATION_MS, now },
+      );
+    }
 
     const name = (input.email.split("@")[0] ?? input.email).replace(/[._-]/g, " ");
     const user: AuthUser = { id: userId, email: input.email.toLowerCase().trim(), name, role: "owner", tenantId };
