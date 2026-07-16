@@ -7,11 +7,11 @@ the backlog freely; the loop treats your edits as authoritative.
 
 | Field | Value |
 |---|---|
-| loop_status | RUNNING (focus: INVENTORY subsystem hardening — Sri-directed 2026-07-16) |
-| last_iteration_utc | 2026-07-16T13:45:00Z |
+| loop_status | STOPPED (inventory hardening exhausted 2026-07-16 — 5 fixes shipped; remaining items are Sri-policy / defense-in-depth / untestable) |
+| last_iteration_utc | 2026-07-16T14:20:00Z |
 | runner | session D (local, VSCode) |
 | branch | feat/delivery-pipeline (PR #70) |
-| idle_streak | 0 |
+| idle_streak | 1 (inventory queue below bar — stopped cleanly) |
 | loop_commits | 11 (batch since PR #66 merge; pause + notify at ≥15) |
 | focus | Inventory hardening. DONE: (1) oversell race, (2) transfer atomicity, (3) cycle-count double-close, (4) transfer over-draw phantom stock (source availability guard). NEXT: transfer-number doc-counter (max-seeding), cross-transfer lock ordering (hard to test), FEFO edges. INTERRUPT (done): Sri feature — Purchase cost-entry page + Receive Stock per-line location (3 slices 52643c2/d55e719/cfb28e7). |
 
