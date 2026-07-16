@@ -1,5 +1,6 @@
 import type { PosModule } from "../types.js";
 import { ExpensesService } from "./service.js";
+import { ExpensesRepository } from "./expenses.repository.js";
 import { registerRoutes } from "./routes.js";
 
 // Business expenses — recording actual spend (distinct from the chart-of-accounts
@@ -29,9 +30,9 @@ export const expensesModule: PosModule = {
   name: "expenses",
   migrations: [CREATE_TABLE, CREATE_INDEXES],
   register({ db, router }) {
-    registerRoutes(router, new ExpensesService(db));
+    registerRoutes(router, new ExpensesService(new ExpensesRepository(db)));
   },
 };
 
 export { ExpensesService } from "./service.js";
-export type { Expense, CreateExpenseInput, ListExpensesQuery, ExpensesSummary } from "./service.js";
+export type { Expense, CreateExpenseInput, ListExpensesQuery, ExpensesSummary } from "./expenses.dto.js";

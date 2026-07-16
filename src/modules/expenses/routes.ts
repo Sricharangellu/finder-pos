@@ -1,9 +1,9 @@
 import type { Router, Response, Request } from "express";
-import { z } from "zod";
 import { handler, parseBody } from "../../shared/http.js";
 import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import type { ExpensesService } from "./service.js";
+import { createExpenseSchema, updateExpenseSchema } from "./expenses.dto.js";
 
 function auth(res: Response): AuthPayload {
   return res.locals["auth"] as AuthPayload;
@@ -20,31 +20,12 @@ function readInt(v: unknown): number | undefined {
   return Number.isFinite(n) ? Math.floor(n) : undefined;
 }
 
-const createSchema = z.object({
-  amountCents: z.number().int().positive(),
-  category: z.string().min(1).max(64).nullable().optional(),
-  spentAt: z.number().int().positive().optional(),
-  vendor: z.string().max(128).nullable().optional(),
-  note: z.string().max(512).nullable().optional(),
-  accountId: z.string().min(1).nullable().optional(),
-});
-
-const updateSchema = z
-  .object({
-    amountCents: z.number().int().positive().optional(),
-    category: z.string().min(1).max(64).nullable().optional(),
-    spentAt: z.number().int().positive().optional(),
-    vendor: z.string().max(128).nullable().optional(),
-    note: z.string().max(512).nullable().optional(),
-  })
-  .refine((o) => Object.keys(o).length > 0, { message: "at least one field is required" });
-
 export function registerRoutes(router: Router, service: ExpensesService): void {
   const mgr = requireRole("manager");
 
   // POST /api/v1/expenses — record a business expense (manager+). Audited in the service.
   router.post("/", mgr, handler(async (req, res) => {
-    const body = parseBody(createSchema, req.body);
+    const body = parseBody(createExpenseSchema, req.body);
     res.status(201).json(await service.create(body, tenantId(res), actorId(res)));
   }));
 
@@ -71,7 +52,7 @@ export function registerRoutes(router: Router, service: ExpensesService): void {
 
   // PATCH /api/v1/expenses/:id — categorize/correct an expense (manager+). Audited in the service.
   router.patch("/:id", mgr, handler(async (req, res) => {
-    const body = parseBody(updateSchema, req.body);
+    const body = parseBody(updateExpenseSchema, req.body);
     res.json(await service.update(String(req.params.id), body, tenantId(res), actorId(res)));
   }));
 
