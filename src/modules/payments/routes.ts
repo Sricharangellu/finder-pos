@@ -71,6 +71,9 @@ export function registerRoutes(router: Router, service: PaymentsService): void {
   );
 
   // ── Capture payment (cash / card / split)
+  // Deliberately NOT manager-gated: web/components/terminal/TenderScreen.tsx
+  // calls this directly on every routine cashier checkout — gating it would
+  // make the POS unusable without a manager present for every sale.
   router.post(
     "/",
     handler(async (req: Request, res: Response) => {

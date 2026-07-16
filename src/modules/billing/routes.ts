@@ -44,7 +44,7 @@ export function registerRoutes(router: Router, service: BillingService): void {
     const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
     res.json(await service.listBills(tenantId(res), { status, supplierId, cursor, limit }));
   }));
-  router.post("/bills/:id/pay", handler(async (req, res) => {
+  router.post("/bills/:id/pay", mgr, handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);
     res.json(await service.payBill(String(req.params.id), b.amountCents, b.method ?? b.mode ?? "transfer", tenantId(res)));
   }));
@@ -60,7 +60,7 @@ export function registerRoutes(router: Router, service: BillingService): void {
     const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) || undefined : undefined;
     res.json(await service.listInvoices(tenantId(res), { status, salesOrderId, cursor, limit }));
   }));
-  router.post("/invoices/:id/pay", handler(async (req, res) => {
+  router.post("/invoices/:id/pay", mgr, handler(async (req, res) => {
     const b = parseBody(paySchema, req.body);
     res.json(await service.payInvoice(String(req.params.id), b.amountCents, b.method ?? b.mode ?? "transfer", tenantId(res)));
   }));

@@ -99,6 +99,11 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   // POST /deduct — decrement stock for multiple products after a completed sale.
   // Registered before /:productId routes so "deduct" isn't treated as a product id.
+  // Deliberately NOT manager-gated: web/app/(protected)/terminal/_components/
+  // TerminalInner.tsx calls this automatically after every cashier-completed
+  // sale (handleTenderSuccess), with the response silently swallowed
+  // (.catch(() => {})). Gating it would not fail loudly — it would silently
+  // stop inventory from decrementing after routine cashier sales.
   router.post(
     "/deduct",
     handler(async (req, res) => {
@@ -254,6 +259,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/transfers",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(transferSchema, req.body);
       const row = await service.createTransfer(tenantId(res), {
@@ -289,6 +295,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/adjustments",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(locationAdjustSchema, req.body);
       const { actualDelta } = await service.adjustAtLocation(tenantId(res), {
@@ -368,6 +375,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/:productId/receive",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(receiveSchema, req.body);
       const productId = String(req.params.productId);
@@ -400,6 +408,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.post(
     "/:productId/adjust",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(adjustSchema, req.body);
       const reason: MovementReason = body.reason ?? "adjustment";
@@ -410,6 +419,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
 
   router.put(
     "/:productId/reorder-point",
+    mgr,
     handler(async (req, res) => {
       const body = parseBody(reorderSchema, req.body);
       const row = await service.setReorderPoint(String(req.params.productId), body.reorderPt, tenantId(res));

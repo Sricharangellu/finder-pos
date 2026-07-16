@@ -16,9 +16,10 @@ async function call(
   method: string,
   path: string,
   body?: unknown,
+  role?: string,
 ): Promise<{ status: number; json: any }> {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body);
+  return request(app.express, method, path, body, role);
 }
 
 /** Create a product through the catalog API; return its id. */
@@ -341,6 +342,76 @@ test("void sets status to voided", async () => {
   const { status, json } = await call(app, "POST", `/api/orders/${created.json.id}/void`);
   assert.equal(status, 200);
   assert.equal(json.status, "voided");
+});
+
+test("manager can refund an order", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "REF-MGR",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status, json } = await call(app, "POST", `/api/orders/${created.json.id}/refund`, undefined, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.status, "refunded");
+});
+
+test("cashier cannot refund an order (403)", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "REF-CASH",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status } = await call(app, "POST", `/api/orders/${created.json.id}/refund`, undefined, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can void an order", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "VOID-MGR",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status, json } = await call(app, "POST", `/api/orders/${created.json.id}/void`, undefined, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.status, "voided");
+});
+
+test("cashier cannot void an order (403)", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "VOID-CASH",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status } = await call(app, "POST", `/api/orders/${created.json.id}/void`, undefined, "cashier");
+  assert.equal(status, 403);
 });
 
 test("order.created fires with the correct payload shape", async () => {
