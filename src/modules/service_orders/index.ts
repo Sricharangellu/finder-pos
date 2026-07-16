@@ -28,6 +28,10 @@ CREATE INDEX IF NOT EXISTS service_orders_customer_idx
 
 export const serviceOrdersModule: PosModule = {
   name: "service_orders",
+  // Routes are top-level resource names (router.get("/service-orders", …)); mount
+  // at /api/v1 like store_locations, not the default /api/v1/service_orders which
+  // 404s the client's hyphenated path (MSW masks it in dev).
+  mountPath: "/api/v1",
   migrations: [CREATE_SERVICE_ORDERS],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = serviceOrdersService(db, events);

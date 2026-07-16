@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — route-mount drift sweep) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 4) |
+| Queue item | Mock-vs-real drift sweep: customer-invoices/service-orders/product-batches registered top-level hyphenated routes but shipped without mountPath → 404 in prod (mock-masked). Added mountPath /api/v1 (store_locations convention); name unchanged (migrations safe). Removed 51 gitignored ` 2.` collision dupes blocking local tsc. |
+| Files/areas expected | `src/modules/{customer_invoices,service_orders,product_batches}/index.ts` + NEW customer_invoices/{route-mount.test.ts,test-request.ts}. NOT in any B/C claim (C owns quotes/gateway/sso/verticals; B owns shared/payments/orchestration). |
+| Started | 2026-07-16 |
+| Status | RELEASED — mountPath fix + mount test (2/2), typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-16T034500Z-route-mount-drift.md |
+| Blockers | none |
+
 ## Active Claim (Claude session D — unbounded-list pagination + movements route drift)
 
 | Field | Value |

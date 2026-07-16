@@ -59,6 +59,11 @@ CREATE SEQUENCE IF NOT EXISTS customer_invoice_seq START 1000;
 
 export const customerInvoicesModule: PosModule = {
   name: "customer_invoices",
+  // Routes are top-level resource names (router.get("/customer-invoices", …)),
+  // matching the store_locations convention — so this must mount at /api/v1, not
+  // the default /api/v1/customer_invoices (which 404s the client's hyphenated
+  // path while MSW masks it in dev). name kept as-is so migrations are unaffected.
+  mountPath: "/api/v1",
   migrations: [CREATE_CUSTOMER_INVOICES, CREATE_CUSTOMER_INVOICE_LINES, CREATE_INVOICE_SEQUENCE],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = customerInvoicesService(db, events);
