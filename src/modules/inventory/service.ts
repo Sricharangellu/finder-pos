@@ -810,37 +810,55 @@ export class InventoryService {
     reason: MovementReason,
     ref?: string,
   ): Promise<InventoryStock> {
-    return this.db.withTenant(tenantId).tx(async (tdb) => {
-      const now = Date.now();
-      const existing = await tdb.one<InventoryStock>(
-        "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
-        { tenantId, locationId, productId },
-      );
-      if (existing) {
-        const nextQty = Math.max(0, Number(existing.quantity_on_hand) + delta);
-        await tdb.query(
-          "UPDATE inventory_stock SET quantity_on_hand = @qty, updated_at = @now WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
-          { qty: nextQty, now, tenantId, locationId, productId },
-        );
-      } else {
-        const initQty = Math.max(0, delta);
-        // inventory_stock has a composite PK (tenant_id, location_id, product_id) — no id column.
-        await tdb.query(
-          `INSERT INTO inventory_stock (tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, average_cost_cents, reorder_level, reorder_quantity, updated_at)
-           VALUES (@tenantId, @locationId, @productId, @qty, 0, 0, 0, 0, @now)`,
-          { tenantId, locationId, productId, qty: initQty, now },
-        );
-      }
+    return this.db.withTenant(tenantId).tx((tdb) =>
+      this.adjustStockTx(tdb, tenantId, locationId, productId, delta, reason, ref),
+    );
+  }
+
+  /**
+   * Location-stock adjust against a caller-supplied transaction handle, so
+   * multi-leg operations (transfers) run atomically in ONE tx. FOR UPDATE locks
+   * the stock row so concurrent adjusts on the same (location, product)
+   * serialize (same read-modify-write race fixed on the product-level path).
+   */
+  private async adjustStockTx(
+    tdb: DB,
+    tenantId: string,
+    locationId: string,
+    productId: string,
+    delta: number,
+    reason: MovementReason,
+    ref?: string,
+  ): Promise<InventoryStock> {
+    const now = Date.now();
+    const existing = await tdb.one<InventoryStock>(
+      "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId FOR UPDATE",
+      { tenantId, locationId, productId },
+    );
+    if (existing) {
+      const nextQty = Math.max(0, Number(existing.quantity_on_hand) + delta);
       await tdb.query(
-        `INSERT INTO inventory_movements (id, tenant_id, product_id, delta, reason, ref, created_at)
-         VALUES (@id, @tenantId, @productId, @delta, @reason, @ref, @now)`,
-        { id: `mov_${uuidv7()}`, tenantId, productId, delta, reason, ref: ref ?? null, now },
+        "UPDATE inventory_stock SET quantity_on_hand = @qty, updated_at = @now WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
+        { qty: nextQty, now, tenantId, locationId, productId },
       );
-      return (await tdb.one<InventoryStock>(
-        "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
-        { tenantId, locationId, productId },
-      ))!;
-    });
+    } else {
+      const initQty = Math.max(0, delta);
+      // inventory_stock has a composite PK (tenant_id, location_id, product_id) — no id column.
+      await tdb.query(
+        `INSERT INTO inventory_stock (tenant_id, location_id, product_id, quantity_on_hand, quantity_committed, average_cost_cents, reorder_level, reorder_quantity, updated_at)
+         VALUES (@tenantId, @locationId, @productId, @qty, 0, 0, 0, 0, @now)`,
+        { tenantId, locationId, productId, qty: initQty, now },
+      );
+    }
+    await tdb.query(
+      `INSERT INTO inventory_movements (id, tenant_id, product_id, delta, reason, ref, created_at)
+       VALUES (@id, @tenantId, @productId, @delta, @reason, @ref, @now)`,
+      { id: `mov_${uuidv7()}`, tenantId, productId, delta, reason, ref: ref ?? null, now },
+    );
+    return (await tdb.one<InventoryStock>(
+      "SELECT * FROM inventory_stock WHERE tenant_id = @tenantId AND location_id = @locationId AND product_id = @productId",
+      { tenantId, locationId, productId },
+    ))!;
   }
 
   // ── Location-to-location transfers ─────────────────────────────────────────
@@ -870,36 +888,47 @@ export class InventoryService {
     }
     const now = Date.now();
     const id = `xfr_${uuidv7()}`;
-    const countRow = await this.db.one<{ n: number }>(
-      "SELECT COUNT(*)::int AS n FROM inventory_transfers WHERE tenant_id = @tenantId",
-      { tenantId },
-    );
-    const transferNumber = `TRF-${String((countRow?.n ?? 0) + 1).padStart(4, "0")}`;
 
-    // Move stock: out of the source location, into the destination. Both legs
-    // land in the movement ledger with the transfer id as the reference.
-    await this.adjustStock(tenantId, input.fromLocationId, input.productId, -input.quantity, "adjustment", id);
-    await this.adjustStock(tenantId, input.toLocationId, input.productId, input.quantity, "adjustment", id);
+    // The two stock legs AND the transfer record commit together in ONE
+    // transaction. Previously they were three independent statements, so a
+    // crash/error between the source debit and the destination credit lost
+    // stock (left the source, never arrived). FOR UPDATE (in adjustStockTx)
+    // also serializes concurrent adjusts on each leg.
+    return this.db.withTenant(tenantId).tx(async (tdb) => {
+      // NOTE: transfer_number still uses COUNT(*)+1 (racy — can duplicate under
+      // concurrency). transfer_number is non-unique so this is cosmetic; the
+      // race-free doc-counter swap needs max-seeding and is a tracked follow-up.
+      const countRow = await tdb.one<{ n: number }>(
+        "SELECT COUNT(*)::int AS n FROM inventory_transfers WHERE tenant_id = @tenantId",
+        { tenantId },
+      );
+      const transferNumber = `TRF-${String((countRow?.n ?? 0) + 1).padStart(4, "0")}`;
 
-    const row: InventoryTransfer = {
-      id,
-      tenant_id: tenantId,
-      transfer_number: transferNumber,
-      from_location_id: input.fromLocationId,
-      to_location_id: input.toLocationId,
-      product_id: input.productId,
-      quantity: input.quantity,
-      status: "completed",
-      note: input.note ?? null,
-      created_at: now,
-      due_date: null,
-    };
-    await this.db.query(
-      `INSERT INTO inventory_transfers (id, tenant_id, transfer_number, from_location_id, to_location_id, product_id, quantity, status, note, created_at, due_date)
-       VALUES (@id, @tenant_id, @transfer_number, @from_location_id, @to_location_id, @product_id, @quantity, @status, @note, @created_at, @due_date)`,
-      row as unknown as Record<string, unknown>,
-    );
-    return row;
+      // Move stock: out of the source location, into the destination. Both legs
+      // land in the movement ledger with the transfer id as the reference.
+      await this.adjustStockTx(tdb, tenantId, input.fromLocationId, input.productId, -input.quantity, "adjustment", id);
+      await this.adjustStockTx(tdb, tenantId, input.toLocationId, input.productId, input.quantity, "adjustment", id);
+
+      const row: InventoryTransfer = {
+        id,
+        tenant_id: tenantId,
+        transfer_number: transferNumber,
+        from_location_id: input.fromLocationId,
+        to_location_id: input.toLocationId,
+        product_id: input.productId,
+        quantity: input.quantity,
+        status: "completed",
+        note: input.note ?? null,
+        created_at: now,
+        due_date: null,
+      };
+      await tdb.query(
+        `INSERT INTO inventory_transfers (id, tenant_id, transfer_number, from_location_id, to_location_id, product_id, quantity, status, note, created_at, due_date)
+         VALUES (@id, @tenant_id, @transfer_number, @from_location_id, @to_location_id, @product_id, @quantity, @status, @note, @created_at, @due_date)`,
+        row as unknown as Record<string, unknown>,
+      );
+      return row;
+    });
   }
 
   /** Mode-aware manual stock correction at a location (add | remove | set). */

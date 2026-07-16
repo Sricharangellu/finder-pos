@@ -8,12 +8,12 @@ the backlog freely; the loop treats your edits as authoritative.
 | Field | Value |
 |---|---|
 | loop_status | RUNNING (focus: INVENTORY subsystem hardening — Sri-directed 2026-07-16) |
-| last_iteration_utc | 2026-07-16T06:30:00Z |
+| last_iteration_utc | 2026-07-16T11:50:00Z |
 | runner | session D (local, VSCode) |
 | branch | feat/delivery-pipeline (PR #70) |
 | idle_streak | 0 |
-| loop_commits | 3 (batch since PR #66 merge; pause + notify at ≥15) |
-| focus | Inventory hardening. DONE: stock-adjust oversell race (FOR UPDATE + ON CONFLICT). NEXT: transfer atomicity, cycle-count variance, reserve/availability races. |
+| loop_commits | 4 (batch since PR #66 merge; pause + notify at ≥15) |
+| focus | Inventory hardening. DONE: (1) stock-adjust oversell race, (2) transfer atomicity + location-stock FOR UPDATE. NEXT: cycle-count variance posting, reserve/availability races, transfer-number doc-counter (needs max-seeding), cross-transfer deadlock ordering. |
 
 ### Why stopped
 Four systematic verification sweeps complete, all retail-core modules:
@@ -45,7 +45,8 @@ No autonomous high-value work remains. Further progress = feature development
 | 7 | 2026-07-16T05:45Z | 89b2e3b | module-wide authz sweep: reports POST /ar-aging/sweep (AR dunning mutation) + ecommerce PUT /products/:id/online (storefront publish) were unguarded → requireRole(manager); team verified guarded (in-handler requireManagement), orders/payments POS-by-design; 2 new 403 tests, reports 11/11 + ecommerce 9/9 + smoke 20/20 |
 | 8 | 2026-07-16T06:00Z | 7ce3e6e | authz sweep completed: notifications POST / was unguarded (cashier could post spoofed notifications) → requireRole(manager); internal event-driven creation bypasses route (proven); first tests for the module; 2/2 + smoke 20/20. 3 sweeps (drift/pagination/authz) now exhausted — loop winding down |
 | 9 | 2026-07-16T06:15Z | b89ae6b | tenant-scoping sweep across all service queries: VERIFIED CLEAN — no cross-tenant leaks (verify-then-mutate pattern is consistent; dynamic where-builders include tenant_id; RLS backstop). No fix needed. 4th sweep — loop stopped, then Sri redirected to INVENTORY |
-| 10 | 2026-07-16T06:30Z | (this) | INVENTORY: stock-adjust oversell race — adjust() was read-modify-write, concurrent sales lost updates (10 −6 −6 → 4 not 0). Added FOR UPDATE (matches FEFO path) + ON CONFLICT upsert. Deterministic concurrency test (2nd connection, lock barrier) — VERIFIED fails without fix. 25/25 inventory + smoke 20/20 |
+| 10 | 2026-07-16T06:30Z | e3523b5 | INVENTORY: stock-adjust oversell race — adjust() was read-modify-write, concurrent sales lost updates (10 −6 −6 → 4 not 0). Added FOR UPDATE (matches FEFO path) + ON CONFLICT upsert. Deterministic concurrency test (2nd connection, lock barrier) — VERIFIED fails without fix. 25/25 inventory + smoke 20/20 |
+| 11 | 2026-07-16T11:50Z | (this) | INVENTORY: transfer atomicity — createTransfer moved stock via 3 independent statements (2 separate adjustStock txns + INSERT); failure between legs lost stock. Extracted adjustStockTx(tdb) (+FOR UPDATE), wrapped whole transfer in ONE tx. Atomicity test (INT_MAX overflow forces 2nd-leg failure) — VERIFIED fails without fix (source lost 5). 27/27 + smoke 20/20 |
 
 ## Backlog (loop-selectable, in priority order)
 

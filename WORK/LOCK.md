@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — inventory hardening: transfer atomicity) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 2) |
+| Queue item | createTransfer moves stock via TWO separate adjustStock calls (each its own tx) + a separate INSERT — NOT atomic. A crash/error between legs loses stock (leaves source, never reaches dest). Fix: extract adjustStockTx(tdb,…) (with FOR UPDATE, same race as adjust()), run both legs + the transfer INSERT in ONE tx. Deferred (noted): COUNT(*)+1 transfer number → doc-counter (needs max-seeding; transfer_number is non-unique so race is cosmetic). |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW transfer atomicity test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — inventory hardening: stock-adjust oversell race) — RELEASED
 
 | Field | Value |
