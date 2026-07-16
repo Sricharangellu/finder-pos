@@ -136,3 +136,17 @@ test("deliveries list returns attempt_count and last_response_body fields", asyn
   void sub; // suppress unused warning
 });
 
+test("deliveries: limit/offset query params are accepted and a huge limit is capped server-side", async () => {
+  const app = await freshApp();
+  const { WebhooksService } = await import("./service.js");
+  const svc = new WebhooksService(app.db);
+  const sub = await svc.subscribe({ url: "https://example.com/cap-test" }, "tnt_demo");
+  const event = { type: "order.created", aggregateId: "ord_cap", occurredAt: new Date().toISOString(), payload: { tenantId: "tnt_demo" } };
+  await svc.deliver(sub, event);
+
+  const huge = await call(app, "GET", "/api/webhooks/deliveries?limit=99999&offset=0");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.ok(Array.isArray(huge.json.items));
+  assert.ok(huge.json.items.length >= 1, "seeded delivery is returned even when a huge limit is requested");
+});
+

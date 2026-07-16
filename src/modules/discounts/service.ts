@@ -121,9 +121,26 @@ export class DiscountsService {
     return d;
   }
 
-  async list(tenantId: string, status?: RuleStatus): Promise<Discount[]> {
-    if (status) return this.db.query<Discount>("SELECT * FROM discounts WHERE tenant_id = @t AND status = @s ORDER BY created_at DESC LIMIT 500", { t: tenantId, s: status });
-    return this.db.query<Discount>("SELECT * FROM discounts WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  async list(tenantId: string, opts: { status?: RuleStatus; limit?: number; offset?: number } = {}): Promise<{ items: Discount[]; total: number }> {
+    const limit = Math.min(opts.limit ?? 50, 500);
+    const offset = opts.offset ?? 0;
+
+    const conditions = ["tenant_id = @t"];
+    const params: Record<string, unknown> = { t: tenantId, limit, offset };
+    if (opts.status) {
+      conditions.push("status = @s");
+      params["s"] = opts.status;
+    }
+    const where = conditions.join(" AND ");
+
+    const [items, countRows] = await Promise.all([
+      this.db.query<Discount>(
+        `SELECT * FROM discounts WHERE ${where} ORDER BY created_at DESC LIMIT @limit OFFSET @offset`,
+        params,
+      ),
+      this.db.query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM discounts WHERE ${where}`, params),
+    ]);
+    return { items, total: countRows[0]?.n ?? 0 };
   }
 
   async get(id: string, tenantId: string): Promise<Discount> {
