@@ -62,9 +62,9 @@ test("sweepExpired pulls expired stock into the pool, reduces active stock, book
   await app.db.close();
 });
 
-async function call(app: App, method: string, path: string, body?: unknown, role = "manager") {
+async function call(app: App, method: string, path: string, body?: unknown) {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body, role);
+  return request(app.express, method, path, body);
 }
 
 async function seedExpired(app: App, product: string, qty = 5, cost = 300) {
