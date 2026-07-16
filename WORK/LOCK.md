@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, Sri-directed feature — pauses inventory loop) |
+| Queue item | Sri feature (full-stack): (1) Receive Stock — per-line Product Location selector replacing lot-code. (2) NEW Purchase cost-entry page — received products (final qty) flow in, enter cost, show reference prices (previous same-vendor cost, last purchase cost, our selling price); save updates product_costs + inventory valuation; top-bar toggle hides the reference columns. Building in slices: backend cost-entry endpoints → receive-location → frontend Purchase page. |
+| Files/areas expected | `src/modules/purchasing/{service,routes}.ts` (+ test) for cost-entry; `src/modules/purchasing/service.ts` + inventory event for receive-location; `web/app/(protected)/purchase/**` (new page); `web/app/(protected)/inventory/receive-stock/_components/ReceiveLinesCard.tsx`; web mocks/types. NOT session B (payments/shared/orchestration) or C (quotes/gateway/sso/verticals) files. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing (slice 1: backend cost-entry) |
+| Blockers | none |
+
 ## Active Claim (Claude session D — inventory hardening: transfer over-draw creates phantom stock) — RELEASED
 
 | Field | Value |

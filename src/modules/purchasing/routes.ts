@@ -121,6 +121,22 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json({ items: await service.vendors(tenantId(res)) });
   }));
 
+  // ── Purchase cost entry ─────────────────────────────────────────────────────
+  // Received PO lines awaiting cost confirmation, with reference prices.
+  router.get("/cost-entry", handler(async (_req, res) => {
+    res.json({ items: await service.getCostEntryQueue(tenantId(res)) });
+  }));
+
+  // Confirm a product's cost (manager+) — updates product_costs + revalues.
+  const costEntrySchema = z.object({
+    productId: z.string().min(1),
+    costCents: z.number().int().nonnegative(),
+  });
+  router.post("/cost-entry", mgr, handler(async (req, res) => {
+    const b = parseBody(costEntrySchema, req.body);
+    res.json(await service.submitProductCost(tenantId(res), b.productId, b.costCents));
+  }));
+
   // ── Vendor-360 detail views ────────────────────────────────────────────────
   router.get("/vendors/:id", handler(async (req, res) => {
     res.json(await service.vendorDetail(String(req.params.id), tenantId(res)));

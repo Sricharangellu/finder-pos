@@ -17,6 +17,24 @@ export type POStatus = "ordered" | "partially_received" | "received" | "cancelle
 export type VendorCreditType = "chargeback" | "credit_memo";
 export type ReturnReason = "damaged" | "expired" | "other";
 
+/** A received PO line awaiting cost confirmation on the Purchase page, with the
+ *  reference prices that inform the cost decision. */
+export interface CostEntryItem {
+  line_id: string;
+  product_id: string;
+  sku: string | null;
+  product_name: string;
+  received_qty: number;
+  po_cost_cents: number;                    // cost carried on the PO line (default)
+  po_id: string;
+  supplier_id: string;
+  supplier_name: string | null;
+  received_at: number | null;
+  selling_price_cents: number;              // our current selling price
+  last_purchase_cost_cents: number | null;  // last confirmed cost (any vendor)
+  prev_vendor_cost_cents: number | null;    // most recent cost from THIS vendor
+}
+
 /** One line being received. `qty` is required; the rest are the receive-time
  *  actuals captured at the desk (only known when goods physically arrive). */
 export interface ReceiveLineInput {
@@ -1042,6 +1060,63 @@ export class PurchasingService {
       }),
     );
     return history.filter((h) => h.history.length > 0);
+  }
+
+  // ── Purchase cost entry ──────────────────────────────────────────────────────
+  // Received PO lines flow into a costing worksheet: enter the true cost per
+  // product, with reference prices (previous cost from the SAME vendor, last
+  // purchase cost from any vendor, our selling price) to inform the decision.
+
+  async getCostEntryQueue(tenantId: string): Promise<CostEntryItem[]> {
+    return this.db.query<CostEntryItem>(
+      `SELECT pol.id                                   AS line_id,
+              pol.product_id                           AS product_id,
+              p.sku                                    AS sku,
+              COALESCE(p.name, pol.product_name)       AS product_name,
+              pol.received_qty                         AS received_qty,
+              pol.unit_cost_cents                      AS po_cost_cents,
+              po.id                                    AS po_id,
+              po.supplier_id                           AS supplier_id,
+              s.name                                   AS supplier_name,
+              po.received_at                           AS received_at,
+              COALESCE(p.price_cents, 0)               AS selling_price_cents,
+              pc.cost_cents                            AS last_purchase_cost_cents,
+              (SELECT pol2.unit_cost_cents
+                 FROM purchase_order_lines pol2
+                 JOIN purchase_orders po2 ON po2.id = pol2.po_id AND po2.tenant_id = pol2.tenant_id
+                WHERE pol2.product_id = pol.product_id AND pol2.tenant_id = pol.tenant_id
+                  AND po2.supplier_id = po.supplier_id AND po2.id <> po.id
+                  AND po2.status IN ('received','partially_received')
+                ORDER BY po2.received_at DESC NULLS LAST
+                LIMIT 1)                               AS prev_vendor_cost_cents
+         FROM purchase_order_lines pol
+         JOIN purchase_orders po ON po.id = pol.po_id AND po.tenant_id = pol.tenant_id
+         LEFT JOIN suppliers s   ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
+         LEFT JOIN products p    ON p.id = pol.product_id AND p.tenant_id = pol.tenant_id
+         LEFT JOIN product_costs pc ON pc.product_id = pol.product_id AND pc.tenant_id = pol.tenant_id
+        WHERE pol.tenant_id = @t
+          AND po.status IN ('received','partially_received')
+          AND pol.received_qty > 0
+        ORDER BY po.received_at DESC NULLS LAST, pol.id
+        LIMIT 200`,
+      { t: tenantId },
+    );
+  }
+
+  /** Set a product's confirmed cost (updates product_costs — the cost the
+   *  inventory grid & COGS read — and notifies inventory to revalue). */
+  async submitProductCost(tenantId: string, productId: string, costCents: number): Promise<{ product_id: string; cost_cents: number }> {
+    if (!Number.isInteger(costCents) || costCents < 0) {
+      throw new HttpError(400, "bad_request", "cost must be a non-negative integer (cents)");
+    }
+    const now = Date.now();
+    await this.db.query(
+      `INSERT INTO product_costs (tenant_id, product_id, cost_cents, updated_at) VALUES (@t,@p,@c,@now)
+       ON CONFLICT (tenant_id, product_id) DO UPDATE SET cost_cents = EXCLUDED.cost_cents, updated_at = EXCLUDED.updated_at`,
+      { t: tenantId, p: productId, c: costCents, now },
+    );
+    await this.events.publish("product.cost_updated", { tenantId, productId, costCents }, productId);
+    return { product_id: productId, cost_cents: costCents };
   }
 
   // ── Vendor quotes ────────────────────────────────────────────────────────────
