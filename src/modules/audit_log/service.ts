@@ -1,4 +1,5 @@
 import type { DB } from "../../shared/db.js";
+import { clampLimit, decodeCursor, encodeCursor, type CursorPage } from "../../shared/pagination.js";
 
 export interface AuditActor {
   id: string;
@@ -113,7 +114,7 @@ export class AuditLogService {
          FROM audit_log al
          LEFT JOIN users u ON u.id = al.actor_id AND u.tenant_id = al.tenant_id
          WHERE ${where}
-         ORDER BY al.occurred_at DESC
+         ORDER BY al.occurred_at DESC, al.id DESC
          LIMIT @limit OFFSET @offset`,
         params,
       ),
@@ -131,6 +132,60 @@ export class AuditLogService {
       total: countRows[0]?.n ?? 0,
       limit,
       offset,
+    };
+  }
+
+  /**
+   * Keyset-paginated listing (CODING_STANDARDS: cursor REQUIRED for unbounded
+   * append-heavy lists). Additive alongside list() — the offset path stays for
+   * existing clients; deep pages and the COUNT(*) scan are avoided here.
+   */
+  async listCursor(
+    tenantId: string,
+    opts: Omit<ListOptions, "offset"> & { cursor?: string } = {},
+  ): Promise<CursorPage<AuditEvent>> {
+    const limit = clampLimit(opts.limit, 20, 200);
+    const cur = decodeCursor(opts.cursor);
+
+    const conditions: string[] = ["al.tenant_id = @tenantId"];
+    const params: Record<string, unknown> = { tenantId, limit };
+
+    if (opts.resourceType) {
+      conditions.push("al.entity_type = @resourceType");
+      params["resourceType"] = opts.resourceType;
+    }
+    if (opts.action) {
+      conditions.push("al.action = @action");
+      params["action"] = opts.action;
+    }
+    if (opts.actor) {
+      conditions.push("u.email ILIKE @actor");
+      params["actor"] = `%${opts.actor}%`;
+    }
+    if (cur) {
+      conditions.push("(al.occurred_at, al.id) < (@curAt, @curId)");
+      params["curAt"] = cur.at;
+      params["curId"] = cur.id;
+    }
+
+    const rows = await this.db.query<AuditRow>(
+      `SELECT al.id, al.actor_id, u.email AS actor_email, u.role AS actor_role,
+              al.action, al.entity_type, al.entity_id,
+              al.before_state, al.after_state, al.occurred_at
+       FROM audit_log al
+       LEFT JOIN users u ON u.id = al.actor_id AND u.tenant_id = al.tenant_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY al.occurred_at DESC, al.id DESC
+       LIMIT @limit`,
+      params,
+    );
+
+    const events = rows.map(toEvent);
+    const last = events[events.length - 1];
+    return {
+      items: events,
+      nextCursor: events.length === limit && last ? encodeCursor({ at: last.created_at, id: last.id }) : null,
+      limit,
     };
   }
 }

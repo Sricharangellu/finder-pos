@@ -2,6 +2,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "../../shared/db.js";
 import type { EventBus } from "../../shared/events.js";
 import { HttpError } from "../../shared/http.js";
+import { clampLimit as clampCursorLimit, decodeCursor, toPage, type CursorPage } from "../../shared/pagination.js";
 
 export type MovementReason = "receiving" | "sale" | "adjustment" | "return" | "cycle_count";
 
@@ -596,11 +597,24 @@ export class InventoryService {
     return { items, nextCursor, limit };
   }
 
-  async movements(productId: string, tenantId: string): Promise<MovementRow[]> {
-    return this.db.query<MovementRow>(
-      "SELECT * FROM inventory_movements WHERE tenant_id = @tenantId AND product_id = @productId ORDER BY created_at DESC, id DESC",
-      { tenantId, productId },
+  /** Movement history for a product — keyset-paginated (the table is
+   *  append-only and unbounded; fetching everything was a scan). */
+  async movements(
+    productId: string,
+    tenantId: string,
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<CursorPage<MovementRow>> {
+    const limit = clampCursorLimit(opts.limit, 50, 200);
+    const cur = decodeCursor(opts.cursor);
+    const rows = await this.db.query<MovementRow>(
+      `SELECT * FROM inventory_movements
+       WHERE tenant_id = @tenantId AND product_id = @productId
+       ${cur ? "AND (created_at, id) < (@curAt, @curId)" : ""}
+       ORDER BY created_at DESC, id DESC
+       LIMIT @limit`,
+      { tenantId, productId, limit, ...(cur ? { curAt: cur.at, curId: cur.id } : {}) },
     );
+    return toPage(rows as unknown as Array<MovementRow & Record<string, unknown>>, limit, "created_at") as CursorPage<MovementRow>;
   }
 
   /**

@@ -20,6 +20,14 @@ export function registerRoutes(router: Router, service: AuditLogService): void {
       const resourceType = typeof req.query.resource_type === "string" ? req.query.resource_type || undefined : undefined;
       const action = typeof req.query.action === "string" ? req.query.action || undefined : undefined;
       const limit = readInt(req.query.limit, 20);
+      // Cursor mode (additive): presence of ?cursor switches to keyset
+      // pagination (empty value = first page) — stable under concurrent
+      // inserts and skips the COUNT(*) scan. Offset mode unchanged otherwise.
+      if (typeof req.query.cursor === "string") {
+        const cursor = req.query.cursor !== "" ? req.query.cursor : undefined;
+        res.json(await service.listCursor(tenantId(res), { actor, resourceType, action, limit, cursor }));
+        return;
+      }
       const offset = readInt(req.query.offset, 0);
       res.json(await service.list(tenantId(res), { actor, resourceType, action, limit, offset }));
     }),

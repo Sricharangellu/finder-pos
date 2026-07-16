@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — unbounded-list pagination + movements route drift)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, VSCode — loop iteration; CODING_STANDARDS cursor policy enforcement) |
+| Queue item | (1) REAL DRIFT BUG: web calls GET /inventory/movements?product_id= (InventoryTab, MovementsDrawer) which exists only in MSW mocks — real backend binds productId="movements" → empty array, so movements panels are silently blank in prod. Add the real query-param route (bounded + cursor). (2) inventory service.movements is unbounded (every movement ever per product) — bound + keyset-paginate via shared/pagination. (3) audit_log list: additive cursor mode (offset path unchanged for existing clients) + id tiebreaker on ORDER BY. |
+| Files/areas expected | `src/modules/inventory/{routes,service}.ts` + NEW pagination test; `src/modules/audit_log/{routes,service}.ts` + NEW pagination test; WORK audit + this LOCK. NO files claimed by sessions B (shared/events,outbox, payments, orchestration) or C (quotes, gateway, sso, verticals, app.ts). |
+| Started | 2026-07-15 |
+| Status | RELEASED — drift fixed: real GET /inventory/movements?product_id= route added (was mock-only; prod panels silently empty); movements() keyset-paginated (was unbounded); audit_log gains additive listCursor (offset path + total untouched) + id tiebreaker. 6 new tests (first ever for audit_log) + inventory 21 = 27/27 isolated, typecheck CLEAN, smoke 20/20. Audit: AUDIT_2026-07-15T173000Z-movements-drift-pagination.md |
+| Blockers | none |
+
 ## Active Claim (Claude session D — C-4 slice: scheduled uptime heartbeat)
 
 | Field | Value |
