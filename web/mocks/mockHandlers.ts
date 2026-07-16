@@ -314,6 +314,20 @@ export const mockHandlers = [
     const b = (await request.json()) as { name?: string; email?: string };
     return HttpResponse.json({ id: `sup_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", name: b.name, email: b.email ?? null, created_at: Date.now() }, { status: 201 });
   }),
+  // Purchase cost-entry — received lines awaiting cost confirmation.
+  http.get(`${V1}/purchasing/cost-entry`, async () => {
+    await lat();
+    const now = Date.now();
+    return HttpResponse.json({ items: [
+      { line_id: "pol_1", product_id: "prod_1", sku: "COF-001", product_name: "House Blend 1kg", received_qty: 24, po_cost_cents: 850, supplier_name: "Acme Coffee Co", received_at: now - 3600_000, selling_price_cents: 1499, last_purchase_cost_cents: 820, prev_vendor_cost_cents: 830 },
+      { line_id: "pol_2", product_id: "prod_2", sku: "TEA-014", product_name: "Earl Grey 500g", received_qty: 12, po_cost_cents: 640, supplier_name: "Tea Traders", received_at: now - 7200_000, selling_price_cents: 999, last_purchase_cost_cents: 600, prev_vendor_cost_cents: null },
+    ] });
+  }),
+  http.post(`${V1}/purchasing/cost-entry`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { productId?: string; costCents?: number };
+    return HttpResponse.json({ product_id: b.productId, cost_cents: b.costCents ?? 0 });
+  }),
   http.get(`${V1}/purchasing/orders`, async () => {
     await lat();
     const D = 86400000, now = Date.now();
