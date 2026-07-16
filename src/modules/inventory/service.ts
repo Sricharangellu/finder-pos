@@ -501,77 +501,90 @@ export class InventoryService {
     tenantId: string,
     ref?: string,
   ): Promise<InventoryRow> {
-    const result = await this.db.withTenant(tenantId).tx(async (tdb) => {
-      const now = Date.now();
-      // FOR UPDATE locks the stock row so concurrent adjusts on the same
-      // product serialize — without it this is a read-modify-write race and two
-      // simultaneous sales both read the same qty and the second write clobbers
-      // the first (lost update → oversell). Mirrors the FEFO lot path above.
-      const existing = await tdb.one<InventoryRow>(
-        "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId FOR UPDATE",
-        { tenantId, productId },
-      );
-
-      const currentQty = existing ? existing.stock_qty : 0;
-      const reorderPt = existing ? existing.reorder_pt : 0;
-      // Clamp at >= 0 so stock never goes negative.
-      const nextQty = Math.max(0, currentQty + delta);
-      // The movement ledger and event record the delta ACTUALLY applied, which
-      // differs from the requested delta whenever the clamp floors stock at 0.
-      const appliedDelta = nextQty - currentQty;
-
-      if (existing) {
-        await tdb.query(
-          "UPDATE inventory SET stock_qty = @stock_qty, updated_at = @updated_at WHERE tenant_id = @tenant_id AND product_id = @product_id",
-          { tenant_id: tenantId, product_id: productId, stock_qty: nextQty, updated_at: now },
-        );
-      } else if (delta >= 0) {
-        // Only create an inventory row when adding stock (receiving). Sales on
-        // untracked products don't create a row — they pass through the
-        // reservation check silently (untracked = unlimited).
-        // ON CONFLICT covers the first-receive race: if a concurrent tx created
-        // the row between our (unlocked, absent) read and this insert, add our
-        // delta to the committed value instead of failing on the PK.
-        await tdb.query(
-          `INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at)
-           VALUES (@product_id, @tenant_id, @stock_qty, @reorder_pt, @updated_at)
-           ON CONFLICT (tenant_id, product_id)
-           DO UPDATE SET stock_qty = GREATEST(0, inventory.stock_qty + @delta), updated_at = @updated_at`,
-          { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now, delta },
-        );
-      } else {
-        // Negative delta on untracked product: skip row creation, record movement only.
-      }
-
-      await tdb.query(
-        `INSERT INTO inventory_movements (id, tenant_id, product_id, delta, reason, ref, created_at)
-         VALUES (@id, @tenant_id, @product_id, @delta, @reason, @ref, @created_at)`,
-        {
-          id: `mov_${uuidv7()}`,
-          tenant_id: tenantId,
-          product_id: productId,
-          delta: appliedDelta,
-          reason,
-          ref: ref ?? null,
-          created_at: now,
-        },
-      );
-
-      return {
-        row: { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now },
-        appliedDelta,
-        nextQty,
-      };
-    });
-
+    const result = await this.db.withTenant(tenantId).tx((tdb) =>
+      this.adjustTx(tdb, productId, delta, reason, tenantId, ref),
+    );
     // Publish AFTER commit so subscribers (outbox) observe a durable change.
     await this.events.publish(
       "inventory.adjusted",
       { productId, delta: result.appliedDelta, reason, stockQty: result.nextQty },
       productId,
     );
-
     return result.row;
+  }
+
+  /**
+   * Product-level stock adjust against a caller-supplied transaction handle, so
+   * multi-step operations (cycle-count close) apply many adjustments atomically
+   * in ONE tx. Does NOT publish the event — the caller publishes after commit.
+   */
+  private async adjustTx(
+    tdb: DB,
+    productId: string,
+    delta: number,
+    reason: MovementReason,
+    tenantId: string,
+    ref?: string,
+  ): Promise<{ row: InventoryRow; appliedDelta: number; nextQty: number }> {
+    const now = Date.now();
+    // FOR UPDATE locks the stock row so concurrent adjusts on the same product
+    // serialize — otherwise this is a read-modify-write race (lost update →
+    // oversell). Mirrors the FEFO lot path.
+    const existing = await tdb.one<InventoryRow>(
+      "SELECT * FROM inventory WHERE tenant_id = @tenantId AND product_id = @productId FOR UPDATE",
+      { tenantId, productId },
+    );
+
+    const currentQty = existing ? existing.stock_qty : 0;
+    const reorderPt = existing ? existing.reorder_pt : 0;
+    // Clamp at >= 0 so stock never goes negative.
+    const nextQty = Math.max(0, currentQty + delta);
+    // The movement ledger and event record the delta ACTUALLY applied, which
+    // differs from the requested delta whenever the clamp floors stock at 0.
+    const appliedDelta = nextQty - currentQty;
+
+    if (existing) {
+      await tdb.query(
+        "UPDATE inventory SET stock_qty = @stock_qty, updated_at = @updated_at WHERE tenant_id = @tenant_id AND product_id = @product_id",
+        { tenant_id: tenantId, product_id: productId, stock_qty: nextQty, updated_at: now },
+      );
+    } else if (delta >= 0) {
+      // Only create an inventory row when adding stock (receiving). Sales on
+      // untracked products don't create a row — they pass through the
+      // reservation check silently (untracked = unlimited).
+      // ON CONFLICT covers the first-receive race: if a concurrent tx created
+      // the row between our (unlocked, absent) read and this insert, add our
+      // delta to the committed value instead of failing on the PK.
+      await tdb.query(
+        `INSERT INTO inventory (product_id, tenant_id, stock_qty, reorder_pt, updated_at)
+         VALUES (@product_id, @tenant_id, @stock_qty, @reorder_pt, @updated_at)
+         ON CONFLICT (tenant_id, product_id)
+         DO UPDATE SET stock_qty = GREATEST(0, inventory.stock_qty + @delta), updated_at = @updated_at`,
+        { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now, delta },
+      );
+    } else {
+      // Negative delta on untracked product: skip row creation, record movement only.
+    }
+
+    await tdb.query(
+      `INSERT INTO inventory_movements (id, tenant_id, product_id, delta, reason, ref, created_at)
+       VALUES (@id, @tenant_id, @product_id, @delta, @reason, @ref, @created_at)`,
+      {
+        id: `mov_${uuidv7()}`,
+        tenant_id: tenantId,
+        product_id: productId,
+        delta: appliedDelta,
+        reason,
+        ref: ref ?? null,
+        created_at: now,
+      },
+    );
+
+    return {
+      row: { product_id: productId, tenant_id: tenantId, stock_qty: nextQty, reorder_pt: reorderPt, updated_at: now },
+      appliedDelta,
+      nextQty,
+    };
   }
 
   async list(query: ListInventoryQuery = {}, tenantId: string): Promise<{ items: InventoryRow[]; nextCursor: string | null; limit: number }> {
@@ -718,31 +731,50 @@ export class InventoryService {
   }
 
   async closeCycleCount(sessionId: string, tenantId: string): Promise<{ session: CycleCountSession; adjustments: number }> {
-    const session = await this.db.one<CycleCountSession>(
-      "SELECT * FROM cycle_count_sessions WHERE id = @id AND tenant_id = @t",
-      { id: sessionId, t: tenantId },
-    );
-    if (!session) throw new HttpError(404, "not_found", `cycle count session '${sessionId}' not found`);
-    if (session.status !== "open") throw new HttpError(409, "conflict", "session is already closed");
+    // The whole close is ONE transaction, and the session row is locked
+    // FOR UPDATE up front. Previously the open-check, the variance adjustments,
+    // and the status flip were separate statements: two concurrent closes both
+    // passed the open-check and applied EVERY variance twice (stock
+    // double-counted), and a mid-loop crash + retry double-posted too. With the
+    // lock, a second concurrent close blocks, then sees 'closed' and 409s — the
+    // adjustments apply exactly once.
+    const { session, applied } = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      const session = await tdb.one<CycleCountSession>(
+        "SELECT * FROM cycle_count_sessions WHERE id = @id AND tenant_id = @t FOR UPDATE",
+        { id: sessionId, t: tenantId },
+      );
+      if (!session) throw new HttpError(404, "not_found", `cycle count session '${sessionId}' not found`);
+      if (session.status !== "open") throw new HttpError(409, "conflict", "session is already closed");
 
-    const lines = await this.db.query<CycleCountLine>(
-      "SELECT * FROM cycle_count_lines WHERE session_id = @sid AND tenant_id = @t AND counted_qty IS NOT NULL AND variance != 0",
-      { sid: sessionId, t: tenantId },
-    );
+      const lines = await tdb.query<CycleCountLine>(
+        "SELECT * FROM cycle_count_lines WHERE session_id = @sid AND tenant_id = @t AND counted_qty IS NOT NULL AND variance != 0",
+        { sid: sessionId, t: tenantId },
+      );
 
-    let adjustments = 0;
-    for (const line of lines) {
-      if (line.variance === null || line.variance === 0) continue;
-      await this.adjust(line.product_id, line.variance, "cycle_count", tenantId, sessionId);
-      adjustments++;
+      const applied: Array<{ productId: string; appliedDelta: number; nextQty: number }> = [];
+      for (const line of lines) {
+        if (line.variance === null || line.variance === 0) continue;
+        const r = await this.adjustTx(tdb, line.product_id, line.variance, "cycle_count", tenantId, sessionId);
+        applied.push({ productId: line.product_id, appliedDelta: r.appliedDelta, nextQty: r.nextQty });
+      }
+
+      const now = Date.now();
+      await tdb.query(
+        "UPDATE cycle_count_sessions SET status = 'closed', closed_at = @now WHERE id = @id AND tenant_id = @t",
+        { now, id: sessionId, t: tenantId },
+      );
+      return { session: { ...session, status: "closed" as const, closed_at: now }, applied };
+    });
+
+    // Publish AFTER commit (preserves adjust()'s ordering for subscribers).
+    for (const a of applied) {
+      await this.events.publish(
+        "inventory.adjusted",
+        { productId: a.productId, delta: a.appliedDelta, reason: "cycle_count", stockQty: a.nextQty },
+        a.productId,
+      );
     }
-
-    const now = Date.now();
-    await this.db.query(
-      "UPDATE cycle_count_sessions SET status = 'closed', closed_at = @now WHERE id = @id AND tenant_id = @t",
-      { now, id: sessionId, t: tenantId },
-    );
-    return { session: { ...session, status: "closed", closed_at: now }, adjustments };
+    return { session, adjustments: applied.length };
   }
 
   async listCycleCounts(tenantId: string): Promise<CycleCountSession[]> {

@@ -2,6 +2,17 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — inventory hardening: cycle-count double-close) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 3) |
+| Queue item | closeCycleCount reads session → checks status=='open' → loops applying variance adjustments (each own tx) → THEN flips to closed — not atomic, not single-winner. Two concurrent closes both pass the open-check and apply every variance TWICE (stock double-counted); a mid-loop crash + retry double-posts too. Fix: extract adjustTx(tdb) from adjust(), wrap closeCycleCount in one tx with session FOR UPDATE (serializes → 2nd close 409s), publish events post-commit. |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW cycle-count double-close test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — inventory hardening: transfer atomicity) — RELEASED
 
 | Field | Value |
