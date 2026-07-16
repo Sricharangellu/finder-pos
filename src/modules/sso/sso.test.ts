@@ -12,9 +12,17 @@
  *   8. POST /sso/initiate returns 400 when SSO not configured
  *   9. POST /sso/callback with invalid state returns 400
  *  10. PUT /sso/config enabled=false then initiate returns 400
+ *  11. initiate reachable with no Authorization header at all
+ *  12. full initiate -> callback flow verifies the ID token signature and
+ *      succeeds when it matches the provider's published JWKS
+ *  13. callback rejects an ID token signed by the wrong key (forged/tampered)
+ *  14. callback rejects an ID token whose nonce doesn't match the one issued
+ *      at /initiate (replay/mix-up protection)
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
+import jwt from "jsonwebtoken";
 import { buildApp, type App } from "../../app.js";
 
 let __seq = 0;
@@ -39,6 +47,59 @@ const VALID_CONFIG = {
   scopes: "openid profile email",
   defaultRole: "cashier",
 };
+
+const DISCOVERY_DOC = {
+  issuer: "https://example.okta.com",
+  authorization_endpoint: "https://example.okta.com/authorize",
+  token_endpoint: "https://example.okta.com/token",
+  jwks_uri: "https://example.okta.com/jwks",
+};
+
+/** Builds a fake IdP: a real RSA keypair, its JWKS response, and a signer for
+ *  ID tokens. Used to prove verification actually checks the signature
+ *  instead of trusting a decoded-but-unverified token. */
+function makeFakeIdp() {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk = { ...(publicKey.export({ format: "jwk" }) as object), kid: "test-key-1", use: "sig", alg: "RS256" };
+  function signIdToken(nonce: string, opts: { signWithWrongKey?: boolean; email?: string } = {}) {
+    const signingKey = opts.signWithWrongKey
+      ? generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey
+      : privateKey;
+    return jwt.sign(
+      { email: opts.email ?? "newuser@example.com", nonce },
+      signingKey,
+      { algorithm: "RS256", keyid: "test-key-1", issuer: DISCOVERY_DOC.issuer, audience: VALID_CONFIG.clientId, expiresIn: "5m" },
+    );
+  }
+  return { jwk, signIdToken };
+}
+
+/** Mocks the 3 outbound fetch calls the OIDC flow makes: discovery, JWKS, and
+ *  token exchange. `getIdToken` is read lazily so the test can set the token
+ *  after seeing the nonce /initiate actually issued. */
+function mockOidcFetch(t: { mock: { method: (obj: object, name: string, impl: (...a: unknown[]) => unknown) => void } }, jwk: object, getIdToken: () => string | undefined) {
+  t.mock.method(globalThis, "fetch", async (...args: unknown[]) => {
+    const u = String(args[0]);
+    if (u === VALID_CONFIG.discoveryUrl) {
+      return new Response(JSON.stringify(DISCOVERY_DOC), { status: 200 });
+    }
+    if (u === DISCOVERY_DOC.jwks_uri) {
+      return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
+    }
+    if (u === DISCOVERY_DOC.token_endpoint) {
+      const idToken = getIdToken();
+      if (!idToken) throw new Error("test id_token not set before token exchange");
+      return new Response(JSON.stringify({ id_token: idToken, access_token: "at_test" }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch in test: ${u}`);
+  });
+}
+
+function nonceFromAuthorizationUrl(authorizationUrl: string): string {
+  const nonce = new URL(authorizationUrl).searchParams.get("nonce");
+  assert.ok(nonce, "authorizationUrl must include a nonce param");
+  return nonce!;
+}
 
 // ── 1. No config ──────────────────────────────────────────────────────────────
 test("GET /sso/config returns configured:false when not set", async () => {
@@ -99,10 +160,11 @@ test("DELETE /sso/config removes the config", async () => {
 });
 
 // ── 7. Initiate returns authorizationUrl ─────────────────────────────────────
-test("POST /sso/initiate returns authorizationUrl and state when SSO enabled", async () => {
+test("POST /sso/initiate returns authorizationUrl and state when SSO enabled", async (t) => {
+  const { jwk } = makeFakeIdp();
+  mockOidcFetch(t, jwk, () => undefined);
   const app = await freshApp();
   await call(app, "PUT", "/api/sso/config", VALID_CONFIG);
-  // /sso/initiate is public (no auth required) — pass tenantId in body.
   const { default: request } = await import("./test-request.js");
   const { status, json } = await request(app.express, "POST", "/api/v1/sso/initiate", {
     tenantId: "tnt_demo",
@@ -113,6 +175,8 @@ test("POST /sso/initiate returns authorizationUrl and state when SSO enabled", a
   assert.ok(typeof json.state === "string" && json.state.length > 0);
   assert.ok(json.authorizationUrl.includes("client_123"));
   assert.ok(json.authorizationUrl.includes(json.state));
+  assert.ok(json.authorizationUrl.startsWith(DISCOVERY_DOC.authorization_endpoint));
+  assert.ok(new URL(json.authorizationUrl).searchParams.get("nonce"), "must include a nonce");
 });
 
 // ── 8. Initiate returns 400 when not configured ───────────────────────────────
@@ -150,13 +214,10 @@ test("initiate returns 400 when SSO config exists but enabled=false", async () =
   assert.equal(status, 400);
 });
 
-// ── 11. regression: initiate/callback reachable with NO bearer token ────────
-// Every test above goes through test-request.ts, which always attaches a
-// Bearer token — so it never actually exercised the real pre-login scenario
-// (a user who is trying to log in has no token yet). Before the app.ts fix,
-// these routes sat behind makeAuthMiddleware and returned 401 for a tokenless
-// caller, making SSO login impossible in practice.
-test("POST /sso/initiate is reachable with no Authorization header at all", async () => {
+// ── 11. regression: initiate reachable with NO bearer token ──────────────────
+test("POST /sso/initiate is reachable with no Authorization header at all", async (t) => {
+  const { jwk } = makeFakeIdp();
+  mockOidcFetch(t, jwk, () => undefined);
   const app = await freshApp();
   await call(app, "PUT", "/api/sso/config", VALID_CONFIG);
 
@@ -177,4 +238,89 @@ test("POST /sso/initiate is reachable with no Authorization header at all", asyn
     });
   });
   assert.equal(status, 200);
+});
+
+// ── 12. full flow: signature verification succeeds against the real JWKS ────
+test("callback verifies the id_token signature against the provider's JWKS and provisions the user", async (t) => {
+  const { jwk, signIdToken } = makeFakeIdp();
+  let idToken: string | undefined;
+  mockOidcFetch(t, jwk, () => idToken);
+
+  const app = await freshApp();
+  await call(app, "PUT", "/api/sso/config", VALID_CONFIG);
+  const { default: request } = await import("./test-request.js");
+
+  const init = await request(app.express, "POST", "/api/v1/sso/initiate", {
+    tenantId: "tnt_demo",
+    redirectUri: "https://app.example.com/sso/callback",
+  }, "owner");
+  assert.equal(init.status, 200);
+  const nonce = nonceFromAuthorizationUrl(init.json.authorizationUrl);
+  idToken = signIdToken(nonce, { email: "newuser@example.com" });
+
+  const cb = await request(app.express, "POST", "/api/v1/sso/callback", {
+    state: init.json.state,
+    code: "auth_code_123",
+    redirectUri: "https://app.example.com/sso/callback",
+  }, "owner");
+  assert.equal(cb.status, 200, JSON.stringify(cb.json));
+  assert.ok(typeof cb.json.accessToken === "string" && cb.json.accessToken.length > 0);
+  assert.ok(typeof cb.json.refreshToken === "string");
+  assert.equal(cb.json.expiresIn, 900);
+
+  // JIT-provisioned: the new user's role should be the configured defaultRole (cashier).
+  const decoded = jwt.decode(cb.json.accessToken) as Record<string, unknown>;
+  assert.equal(decoded["role"], "cashier");
+  assert.equal(decoded["tenantId"], "tnt_demo");
+});
+
+// ── 13. rejects a forged/tampered id_token (wrong signing key) ──────────────
+test("callback rejects an id_token signed by a key not in the provider's JWKS", async (t) => {
+  const { jwk, signIdToken } = makeFakeIdp();
+  let idToken: string | undefined;
+  mockOidcFetch(t, jwk, () => idToken);
+
+  const app = await freshApp();
+  await call(app, "PUT", "/api/sso/config", VALID_CONFIG);
+  const { default: request } = await import("./test-request.js");
+
+  const init = await request(app.express, "POST", "/api/v1/sso/initiate", {
+    tenantId: "tnt_demo",
+    redirectUri: "https://app.example.com/sso/callback",
+  }, "owner");
+  const nonce = nonceFromAuthorizationUrl(init.json.authorizationUrl);
+  idToken = signIdToken(nonce, { signWithWrongKey: true });
+
+  const cb = await request(app.express, "POST", "/api/v1/sso/callback", {
+    state: init.json.state,
+    code: "auth_code_123",
+    redirectUri: "https://app.example.com/sso/callback",
+  }, "owner");
+  assert.equal(cb.status, 502);
+  assert.equal(cb.json.error.code, "oidc_token_error");
+});
+
+// ── 14. rejects a nonce mismatch (mix-up / replay) ───────────────────────────
+test("callback rejects an id_token whose nonce does not match the one issued at initiate", async (t) => {
+  const { jwk, signIdToken } = makeFakeIdp();
+  let idToken: string | undefined;
+  mockOidcFetch(t, jwk, () => idToken);
+
+  const app = await freshApp();
+  await call(app, "PUT", "/api/sso/config", VALID_CONFIG);
+  const { default: request } = await import("./test-request.js");
+
+  const init = await request(app.express, "POST", "/api/v1/sso/initiate", {
+    tenantId: "tnt_demo",
+    redirectUri: "https://app.example.com/sso/callback",
+  }, "owner");
+  idToken = signIdToken("a-completely-different-nonce");
+
+  const cb = await request(app.express, "POST", "/api/v1/sso/callback", {
+    state: init.json.state,
+    code: "auth_code_123",
+    redirectUri: "https://app.example.com/sso/callback",
+  }, "owner");
+  assert.equal(cb.status, 502);
+  assert.equal(cb.json.error.code, "oidc_token_error");
 });
