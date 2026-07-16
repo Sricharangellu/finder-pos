@@ -259,7 +259,7 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       const payload = event.payload as {
         tenantId?: string;
         poId?: string;
-        lines?: Array<{ productId: string; quantity: number; expiryDate?: number; lotCode?: string | null; unitCostCents?: number | null }>;
+        lines?: Array<{ productId: string; quantity: number; expiryDate?: number; lotCode?: string | null; unitCostCents?: number | null; locationId?: string | null }>;
       };
       const tenantId = payload.tenantId ?? "";
       const poId = payload.poId ?? event.aggregateId ?? "";
@@ -267,6 +267,11 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       if (!(await claimEventOnce(db, "inventory.receiving", event as DomainEvent))) return; // already applied
       for (const line of payload.lines ?? []) {
         await service.adjust(line.productId, line.quantity, "receiving", tenantId, poId);
+        // If a receiving location was chosen at the desk, credit that location's
+        // stock too (the product-level adjust above is the aggregate on-hand).
+        if (line.locationId) {
+          await service.adjustStock(tenantId, line.locationId, line.productId, line.quantity, "receiving", poId);
+        }
         // If the received line carries an expiry, record a lot for FEFO / near-expiry tracking.
         if (line.expiryDate) {
           await service.createLot(

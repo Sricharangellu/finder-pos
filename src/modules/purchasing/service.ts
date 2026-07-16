@@ -43,6 +43,7 @@ export interface ReceiveLineInput {
   expiryDate?: number;      // epoch ms — drives the inventory lot's shelf-life
   lotCode?: string;
   unitCostCents?: number;   // actual cost on the invoice, if it differs from PO
+  locationId?: string;      // stock location the goods are received into
 }
 
 export interface VendorReturn {
@@ -930,6 +931,7 @@ export class PurchasingService {
         unitCostCents: rl.unitCostCents ?? line.unit_cost_cents,
         expiryDate: rl.expiryDate ?? line.expiry_date ?? undefined,
         lotCode: rl.lotCode ?? line.lot_code ?? undefined,
+        locationId: rl.locationId ?? undefined,
       };
     });
 

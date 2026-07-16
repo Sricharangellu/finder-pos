@@ -2,7 +2,7 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
-## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page)
+## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page) — RELEASED
 
 | Field | Value |
 |---|---|

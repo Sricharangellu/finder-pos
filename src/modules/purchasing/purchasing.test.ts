@@ -504,3 +504,30 @@ test("cashier cannot submit a product cost (403)", async () => {
   // Reading the queue stays open.
   assert.equal((await call(app, "GET", "/api/purchasing/cost-entry", undefined, "cashier")).status, 200);
 });
+
+test("receiving into a location credits that location's stock", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Loc Vendor");
+  const productId = await makeProduct(app, "LOC-A", 500);
+
+  // Create a receiving location.
+  const loc = await call(app, "POST", "/api/inventory/locations", { code: "RCV-1", name: "Receiving Dock" }, "manager");
+  assert.equal(loc.status, 201, `location create failed: ${JSON.stringify(loc.json)}`);
+  const locationId = loc.json.id as string;
+
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: 8, unitCostCents: 200 }],
+  })).json;
+
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 8, locationId }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+
+  // The chosen location's stock reflects the receipt.
+  const locStock = await call(app, "GET", `/api/inventory/locations/${locationId}/stock`);
+  assert.equal(locStock.status, 200);
+  const row = (locStock.json.items as any[]).find((s) => s.product_id === productId);
+  assert.ok(row, "product appears in the receiving location's stock");
+  assert.equal(Number(row.quantity_on_hand), 8, "location credited the full received qty");
+});

@@ -313,6 +313,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
       expiryDate: z.number().int().positive().optional(),
       lotCode: z.string().min(1).max(120).optional(),
       unitCostCents: z.number().int().nonnegative().optional(),
+      locationId: z.string().min(1).optional(),
     })).optional(),
   });
 
@@ -330,6 +331,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
         ...(l.expiryDate !== undefined ? { expiryDate: l.expiryDate } : {}),
         ...(l.lotCode !== undefined ? { lotCode: l.lotCode } : {}),
         ...(l.unitCostCents !== undefined ? { unitCostCents: l.unitCostCents } : {}),
+        ...(l.locationId !== undefined ? { locationId: l.locationId } : {}),
       }));
     } else {
       // No lines specified: receive all open lines at full remaining quantity ("receive all" button).
