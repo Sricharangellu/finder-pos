@@ -369,6 +369,28 @@ export const mockHandlers = [
     ] });
   }),
 
+  // Expiry pool + sweep + dispositions.
+  http.get(`${V1}/inventory/expiry`, async () => {
+    await lat();
+    const now = Date.now(), D = 86400000;
+    return HttpResponse.json({ items: [
+      { id: "exp_1", product_id: "prod_2", product_name: "Wildflower Honey", lot_code: "L-2310", expiry_date: now - 3 * D, qty: 4, unit_cost_cents: 320, loss_cents: 1280, status: "pending" },
+      { id: "exp_2", product_id: "prod_5", product_name: "Fresh Cream 500ml", lot_code: "L-2401", expiry_date: now - 1 * D, qty: 9, unit_cost_cents: 180, loss_cents: 1620, status: "pending" },
+    ] });
+  }),
+  http.post(`${V1}/inventory/expiry/sweep`, async () => {
+    await lat();
+    return HttpResponse.json({ swept: 2, loss_cents: 2900, items: [] });
+  }),
+  http.post(`${V1}/inventory/expiry/:id/discard`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ id: params.id, status: "discarded" });
+  }),
+  http.post(`${V1}/inventory/expiry/:id/return-to-vendor`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ writeoff: { id: params.id, status: "returned", disposition_ref: "ret_mock" }, vendorReturn: { id: "ret_mock" } });
+  }),
+
   // ── Inventory: already-expired + value-at-risk ────────────────────────────
   http.get(`${V1}/inventory/expired`, async () => {
     await lat();
