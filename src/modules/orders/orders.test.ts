@@ -478,3 +478,29 @@ test("refund and void of a nonexistent order return 404", async () => {
   assert.equal(voidRes.status, 404);
   assert.equal(voidRes.json.error.code, "not_found");
 });
+
+test("timeline: derived events follow the order lifecycle", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, { sku: "TL-1", name: "Timeline Widget", price_cents: 1500 });
+  const { json: order } = await call(app, "POST", "/api/orders/", {
+    stateCode: "TX",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  // Fresh open order → exactly the created event.
+  const t1 = await call(app, "GET", `/api/orders/${order.id}/timeline`);
+  assert.equal(t1.status, 200);
+  assert.equal(t1.json.items.length, 1);
+  assert.equal(t1.json.items[0].type, "created");
+
+  // Voiding adds a voided event after created.
+  await call(app, "POST", `/api/orders/${order.id}/void`);
+  const t2 = await call(app, "GET", `/api/orders/${order.id}/timeline`);
+  assert.equal(t2.status, 200);
+  const types = t2.json.items.map((e: { type: string }) => e.type);
+  assert.deepEqual(types, ["created", "voided"]);
+
+  // Unknown order 404s.
+  const missing = await call(app, "GET", "/api/orders/ord_missing/timeline");
+  assert.equal(missing.status, 404);
+});

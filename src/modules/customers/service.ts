@@ -1013,4 +1013,123 @@ export class CustomersService {
       return { balanceCents: next };
     });
   }
+
+  /** Lightweight lookup for the merge dialog: name/email/phone substring match,
+   *  small bounded result. Matches web CustomerSearchResult (shared.tsx). */
+  async search(tenantId: string, q: string): Promise<{ items: Array<{ id: string; name: string; email: string; phone: string }> }> {
+    const term = q.trim();
+    if (!term) return { items: [] };
+    const items = await this.db.query<{ id: string; name: string; email: string; phone: string }>(
+      `SELECT id, name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone
+       FROM customers
+       WHERE tenant_id = @t
+         AND (name ILIKE @like OR email ILIKE @like OR phone ILIKE @like)
+       ORDER BY name ASC
+       LIMIT 10`,
+      { t: tenantId, like: `%${term}%` },
+    );
+    return { items };
+  }
+
+  /**
+   * Merge a duplicate customer into another. One transaction:
+   *  - both rows locked FOR UPDATE in a deterministic (sorted) order so two
+   *    concurrent merges can't deadlock;
+   *  - referencing rows (orders, invoices, quotes, sales orders) repointed;
+   *  - satellite rows moved — group memberships and per-product price overrides
+   *    only where the survivor doesn't already have the same row (survivor's
+   *    own data always wins a conflict);
+   *  - loyalty points and store credit balances added together;
+   *  - the duplicate row deleted, and `customer.merged` published so other
+   *    modules (verticals, analytics) can react without a hard dependency.
+   */
+  async merge(intoId: string, fromId: string, tenantId: string): Promise<Customer> {
+    if (intoId === fromId) {
+      throw new HttpError(400, "bad_request", "a customer cannot be merged into itself");
+    }
+    const merged = await this.db.withTenant(tenantId).tx(async (tdb) => {
+      // Deterministic lock order prevents A→B / B→A merge deadlocks.
+      const [firstId, secondId] = [intoId, fromId].sort();
+      const lock = async (id: string) =>
+        tdb.one<{ id: string; points: number; store_credit_cents: number }>(
+          "SELECT id, points, store_credit_cents FROM customers WHERE id = @id AND tenant_id = @t FOR UPDATE",
+          { id, t: tenantId },
+        );
+      const first = await lock(firstId);
+      const second = await lock(secondId);
+      const into = firstId === intoId ? first : second;
+      const from = firstId === fromId ? first : second;
+      if (!into) throw new HttpError(404, "not_found", `customer '${intoId}' not found`);
+      if (!from) throw new HttpError(404, "not_found", `customer '${fromId}' not found`);
+
+      // Repoint document history. (Same direct-table pattern the financials
+      // endpoints in this module already use.)
+      for (const table of ["orders", "customer_invoices", "quotations", "sales_orders"]) {
+        await tdb.query(
+          `UPDATE ${table} SET customer_id = @into WHERE tenant_id = @t AND customer_id = @from`,
+          { into: intoId, from: fromId, t: tenantId },
+        );
+      }
+
+      // Satellite data owned by this module.
+      for (const table of ["customer_addresses", "customer_contacts", "customer_notes"]) {
+        await tdb.query(
+          `UPDATE ${table} SET customer_id = @into WHERE tenant_id = @t AND customer_id = @from`,
+          { into: intoId, from: fromId, t: tenantId },
+        );
+      }
+      // Group memberships: move only where the survivor isn't already a member.
+      await tdb.query(
+        `UPDATE customer_group_members m SET customer_id = @into
+         WHERE m.tenant_id = @t AND m.customer_id = @from
+           AND NOT EXISTS (
+             SELECT 1 FROM customer_group_members e
+             WHERE e.tenant_id = @t AND e.customer_id = @into
+               AND e.customer_group_id = m.customer_group_id)`,
+        { into: intoId, from: fromId, t: tenantId },
+      );
+      await tdb.query(
+        "DELETE FROM customer_group_members WHERE tenant_id = @t AND customer_id = @from",
+        { from: fromId, t: tenantId },
+      );
+      // Price overrides: survivor's own override wins; move the rest.
+      await tdb.query(
+        `UPDATE customer_product_prices p SET customer_id = @into
+         WHERE p.tenant_id = @t AND p.customer_id = @from
+           AND NOT EXISTS (
+             SELECT 1 FROM customer_product_prices e
+             WHERE e.tenant_id = @t AND e.customer_id = @into
+               AND e.product_id = p.product_id)`,
+        { into: intoId, from: fromId, t: tenantId },
+      );
+      await tdb.query(
+        "DELETE FROM customer_product_prices WHERE tenant_id = @t AND customer_id = @from",
+        { from: fromId, t: tenantId },
+      );
+
+      // Balances add together; the duplicate row goes away.
+      await tdb.query(
+        `UPDATE customers
+         SET points = points + @pts, store_credit_cents = store_credit_cents + @credit, updated_at = @now
+         WHERE id = @into AND tenant_id = @t`,
+        { into: intoId, pts: Number(from.points), credit: Number(from.store_credit_cents), now: Date.now(), t: tenantId },
+      );
+      await tdb.query(
+        "DELETE FROM customers WHERE id = @from AND tenant_id = @t",
+        { from: fromId, t: tenantId },
+      );
+
+      return (await tdb.one<Customer>(
+        "SELECT * FROM customers WHERE id = @into AND tenant_id = @t",
+        { into: intoId, t: tenantId },
+      ))!;
+    });
+
+    void this.events.publish(
+      "customer.merged",
+      { tenantId, mergedIntoId: intoId, mergedFromId: fromId },
+      intoId,
+    );
+    return merged;
+  }
 }

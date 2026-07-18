@@ -1041,7 +1041,8 @@ export const handlers = [
     const filtered = q
       ? seed.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
       : seed;
-    return HttpResponse.json(filtered);
+    // Envelope matches the real API: GET /api/v1/customers/search → { items }
+    return HttpResponse.json({ items: filtered });
   }),
 
   // ── POST /api/v1/customers/:id/merge (Sprint 15) ─────────────────────────────

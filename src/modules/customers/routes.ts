@@ -115,12 +115,34 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     res.status(201).json(await service.createGroup(tenantId(res), body));
   }));
 
+  // GET /api/v1/customers/search?q= — merge-dialog lookup. Registered BEFORE
+  // /:id so the literal "search" segment is never captured as a customer id.
+  router.get(
+    "/search",
+    handler(async (req, res) => {
+      const q = String(req.query["q"] ?? "");
+      res.json(await service.search(tenantId(res), q));
+    }),
+  );
+
   router.get(
     "/:id",
     handler(async (req, res) => {
       const customer = await service.get(String(req.params.id), tenantId(res));
       if (!customer) throw notFound(`customer '${req.params.id}' not found`);
       res.json(customer);
+    }),
+  );
+
+  // POST /api/v1/customers/:id/merge — absorb a duplicate into :id. Destructive
+  // (the duplicate row is deleted), so manager+ only.
+  const mergeSchema = z.object({ merge_from_id: z.string().min(1) });
+  router.post(
+    "/:id/merge",
+    requireRole("manager"),
+    handler(async (req, res) => {
+      const body = parseBody(mergeSchema, req.body);
+      res.json(await service.merge(String(req.params.id), body.merge_from_id, tenantId(res)));
     }),
   );
 

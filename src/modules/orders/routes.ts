@@ -117,6 +117,14 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     }),
   );
 
+  // GET /:id/timeline — derived event history for the order-detail page.
+  router.get(
+    "/:id/timeline",
+    handler(async (req: Request, res: Response) => {
+      res.json(await service.timeline(String(req.params.id), tenantId(res)));
+    }),
+  );
+
   router.post(
     "/:id/refund",
     handler(async (req: Request, res: Response) => {

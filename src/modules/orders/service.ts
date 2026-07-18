@@ -636,6 +636,59 @@ export class OrdersService {
     void this.events.publish("order.split", { tenantId, originalOrderId: orderId, childCount: children.length }, orderId);
     return children;
   }
+
+  /**
+   * Derived order timeline for the order-detail page.
+   *
+   * There is no separate order_events table — events are reconstructed from
+   * what the schema actually records: the order row (created_at, terminal
+   * status + updated_at) and its payments. Consequences, stated honestly:
+   * the "completed" timestamp approximates to the last payment's time (the
+   * order row's updated_at moves again on refund/void), and the actor is
+   * "system" because orders/payments don't store the acting user yet. If a
+   * richer audit trail lands later, this derivation can switch to it without
+   * changing the response shape.
+   */
+  async timeline(
+    id: string,
+    tenantId: string,
+  ): Promise<{ items: Array<{ id: string; type: string; label: string; actor: string; ts: number; meta?: Record<string, unknown> }> }> {
+    const order = await this.getOrThrow(id, tenantId);
+    const items: Array<{ id: string; type: string; label: string; actor: string; ts: number; meta?: Record<string, unknown> }> = [
+      { id: `${id}_created`, type: "created", label: "Order created", actor: "system", ts: Number(order.created_at) },
+    ];
+
+    const payments = await this.db.query<{ id: string; method: string; amount_cents: number; status: string; created_at: number }>(
+      `SELECT id, method, amount_cents, status, created_at
+       FROM payments WHERE tenant_id = @t AND order_id = @id
+       ORDER BY created_at ASC`,
+      { t: tenantId, id },
+    );
+    for (const p of payments) {
+      items.push({
+        id: `${p.id}_payment`,
+        type: "payment",
+        label: `Payment ${p.status} (${p.method})`,
+        actor: "system",
+        ts: Number(p.created_at),
+        meta: { amount_cents: Number(p.amount_cents), method: p.method },
+      });
+    }
+
+    const lastPaymentTs = payments.length > 0 ? Number(payments[payments.length - 1]!.created_at) : Number(order.created_at);
+    if (order.status === "completed" || order.status === "refunded") {
+      items.push({ id: `${id}_completed`, type: "completed", label: "Order completed", actor: "system", ts: lastPaymentTs });
+    }
+    if (order.status === "refunded") {
+      items.push({ id: `${id}_refunded`, type: "refund", label: "Order refunded", actor: "system", ts: Number(order.updated_at) });
+    }
+    if (order.status === "voided") {
+      items.push({ id: `${id}_voided`, type: "voided", label: "Order voided", actor: "system", ts: Number(order.updated_at) });
+    }
+
+    items.sort((a, b) => a.ts - b.ts);
+    return { items };
+  }
 }
 
 function clampLimit(limit?: number): number {
