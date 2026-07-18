@@ -171,8 +171,14 @@ jobs:
         run: npm ci --include=dev
       - name: Build backend
         run: npx tsc -p tsconfig.json
+      # Diagnostic instrumentation (2026-07-18, tracking the e2e login flake
+      # documented in docs/architecture/PIPELINE.md): stdout/stderr was
+      # previously discarded — this step's own log capture ends the instant
+      # the backgrounded process starts, so nothing about later requests was
+      # ever visible. Redirect to a file and set LOG_LEVEL=debug so a future
+      # failure has real evidence instead of another blind guess.
       - name: Start backend (background)
-        run: node dist/src/server.js &
+        run: LOG_LEVEL=debug node dist/src/server.js > /tmp/backend.log 2>&1 &
       - name: Wait for backend
         run: |
           for i in $(seq 1 20); do
@@ -180,7 +186,17 @@ jobs:
             sleep 2
           done
           echo "❌ backend never became healthy on :3001"
+          cat /tmp/backend.log || true
           exit 1
+      # Correlates backend availability with the Playwright timeline: if the
+      # backend stalls, crashes, or restarts mid-run, this is the only place
+      # that would show it (no per-request access logging exists yet).
+      - name: Start backend health poller (background)
+        run: |
+          ( while true; do
+              printf '%s %s\n' "$(date -u +%H:%M:%S)" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:3001/healthz || echo timeout)" >> /tmp/backend-health.log
+              sleep 2
+            done ) &
       - name: Seed E2E demo data
         run: npx tsx scripts/seed-e2e.ts
         env:
@@ -237,6 +253,25 @@ jobs:
         with:
           name: playwright-report
           path: web/playwright-report/
+          retention-days: 7
+      # Diagnostic — print + upload the backend log and health-poll timeline
+      # regardless of outcome, so a green run establishes the healthy baseline
+      # and a red run has real evidence instead of another blind guess.
+      - name: Show backend log + health timeline
+        if: always()
+        run: |
+          echo "── backend.log (last 200 lines) ──"
+          tail -n 200 /tmp/backend.log || echo "(no backend.log)"
+          echo "── backend-health.log (last 60 samples) ──"
+          tail -n 60 /tmp/backend-health.log || echo "(no backend-health.log)"
+      - name: Upload backend log + health timeline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-diagnostics
+          path: |
+            /tmp/backend.log
+            /tmp/backend-health.log
           retention-days: 7
 
   # ─── DEV deploy (push to develop only) ─────────────────────────────────────
