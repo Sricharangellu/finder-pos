@@ -43,6 +43,40 @@ test("receive increases stock (201)", async () => {
   assert.equal(got.json.stockQty, 10);
 });
 
+// Regression: getReorderSuggestions() joined a table called `catalog_products`
+// with columns (reorder_quantity, preferred_vendor_id/name) that don't exist
+// anywhere in the schema — the real catalog table is `products`, and
+// preferred-vendor is tracked in catalog's `product_suppliers` table. This
+// made GET /inventory/reorder-suggestions 500 against a real database despite
+// being wired to two live pages (purchasing's Reorder tab, /inventory/reorder).
+test("reorder-suggestions: lists a product below its reorder point with preferred vendor (catalog_products regression)", async () => {
+  const app = await freshApp();
+
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-1", name: "Reorder Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201, `product create failed: ${JSON.stringify(product.json)}`);
+  const productId = product.json.id;
+
+  const supplier = await call(app, "POST", "/api/catalog/" + productId + "/suppliers", {
+    vendor_name: "Reorder Vendor", is_preferred: true,
+  });
+  assert.equal(supplier.status, 201, `supplier link failed: ${JSON.stringify(supplier.json)}`);
+
+  const receive = await call(app, "POST", `/api/inventory/${productId}/receive`, { quantity: 3 });
+  assert.equal(receive.status, 201, `receive failed: ${JSON.stringify(receive.json)}`);
+  const reorderPoint = await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 10 });
+  assert.equal(reorderPoint.status, 200, `set reorder-point failed: ${JSON.stringify(reorderPoint.json)}`);
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, `reorder-suggestions failed: ${JSON.stringify(json)}`);
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row, "expected product below reorder point to appear in suggestions");
+  assert.equal(row.stock_qty, 3);
+  assert.equal(row.reorder_pt, 10);
+  assert.equal(row.preferred_vendor_name, "Reorder Vendor");
+});
+
 test("manual adjust changes stock", async () => {
   const app = await freshApp();
   await call(app, "POST", "/api/inventory/prod_b/receive", { quantity: 5 });

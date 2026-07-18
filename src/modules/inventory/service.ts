@@ -543,10 +543,21 @@ export class InventoryService {
     return { on_hand: onHand, reserved, incoming, available: Math.max(0, onHand - reserved) };
   }
 
+  // NB: this previously joined a table called `catalog_products` with columns
+  // `reorder_quantity`/`preferred_vendor_id`/`preferred_vendor_name` — none of
+  // which exist anywhere in the schema (the real catalog table is `products`,
+  // no reorder_quantity column exists on it, and preferred-vendor is tracked
+  // per-product in the catalog module's `product_suppliers` table, added
+  // 2026-07-18). That made this endpoint 500 against a real database on every
+  // call despite being a live route wired to two shipped pages (purchasing's
+  // Reorder tab and /inventory/reorder) — invisible to typecheck (raw SQL) and
+  // to the gap-scanner (the path itself was never missing). Fixed to join the
+  // real tables; suggested_qty falls back to reorder_pt since no distinct
+  // "reorder quantity" concept exists yet (honest approximation, not invented).
   async getReorderSuggestions(tenantId: string): Promise<ReorderSuggestion[]> {
     const rows = await this.db.query<{
       product_id: string; name: string; sku: string | null;
-      stock_qty: number; reorder_pt: number; reorder_quantity: number;
+      stock_qty: number; reorder_pt: number;
       preferred_vendor_id: string | null; preferred_vendor_name: string | null;
     }>(
       `SELECT i.product_id,
@@ -554,15 +565,17 @@ export class InventoryService {
               p.sku,
               COALESCE(i.stock_qty, 0) AS stock_qty,
               i.reorder_pt,
-              COALESCE(p.reorder_quantity, 0) AS reorder_quantity,
-              p.preferred_vendor_id,
-              p.preferred_vendor_name
+              ps.supplier_id AS preferred_vendor_id,
+              s.name AS preferred_vendor_name
          FROM inventory i
-         JOIN catalog_products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
+         JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
+         LEFT JOIN product_suppliers ps
+           ON ps.tenant_id = i.tenant_id AND ps.product_id = i.product_id AND ps.is_preferred = true
+         LEFT JOIN suppliers s ON s.tenant_id = ps.tenant_id AND s.id = ps.supplier_id
         WHERE i.tenant_id = @tenantId
           AND i.reorder_pt > 0
           AND COALESCE(i.stock_qty, 0) <= i.reorder_pt
-        ORDER BY p.preferred_vendor_name NULLS LAST, p.name`,
+        ORDER BY s.name NULLS LAST, p.name`,
       { tenantId },
     );
     return rows.map((r) => ({
@@ -571,7 +584,7 @@ export class InventoryService {
       sku: r.sku,
       stock_qty: Number(r.stock_qty),
       reorder_pt: Number(r.reorder_pt),
-      suggested_qty: Number(r.reorder_quantity) > 0 ? Number(r.reorder_quantity) : Number(r.reorder_pt),
+      suggested_qty: Number(r.reorder_pt),
       preferred_vendor_id: r.preferred_vendor_id,
       preferred_vendor_name: r.preferred_vendor_name,
     }));

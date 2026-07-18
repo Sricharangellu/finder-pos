@@ -102,8 +102,19 @@ for (const file of readdirSync(IDENTITY_DIR)) {
 const FE_DIRS = ["web/app", "web/api-client", "web/hooks", "web/lib", "web/components", "web/contexts"];
 const FE_RE = /[`"'](\/api\/(?:v1|identity)\/[^`"']*)[`"']/g;
 
+// Catches a distinct incident class from the missing-route gap above: a call
+// site that forgets the /api/v1 (or /api/identity) prefix entirely. FE_RE
+// above only matches literals that already contain the prefix, so a bare path
+// like apiGet("/inventory/serials") is invisible to it — found 2026-07-18 in
+// inventory/serials/page.tsx, which called apiGet/apiPost/apiPatch without the
+// prefix and 404'd against the real API on every request. This regex targets
+// exactly those four API-client call sites so it doesn't flag unrelated
+// strings (hrefs, external URLs, etc.) elsewhere in the app.
+const FE_MISSING_PREFIX_RE = /\bapi(?:Get|Post|Patch|Put|Delete)(?:<[^>]*>)?\s*\(\s*[`"']([^`"']+)[`"']/g;
+
 /** path → Set<file> */
 const frontend = new Map();
+const missingPrefix = []; // { path, file }
 for (const d of FE_DIRS) {
   const dir = join(ROOT, d);
   if (!existsSync(dir)) continue;
@@ -114,6 +125,11 @@ for (const d of FE_DIRS) {
       const p = norm(m[1]);
       if (!frontend.has(p)) frontend.set(p, new Set());
       frontend.get(p).add(relative(ROOT, file));
+    }
+    for (const m of src.matchAll(FE_MISSING_PREFIX_RE)) {
+      if (!m[1].startsWith("/api/")) {
+        missingPrefix.push({ path: m[1], file: relative(ROOT, file) });
+      }
     }
   }
 }
@@ -167,16 +183,28 @@ if (stale.length) {
   for (const p of stale) console.warn(`  - ${p}`);
 }
 
-if (failures.length) {
-  console.error("\n✗ frontend calls with NO backend route (would 404 in production):");
-  for (const f of failures) console.error(`  - ${f.path}\n      called from: ${f.files.join(", ")}`);
+if (missingPrefix.length) {
+  console.error("\n✗ API-client calls missing the /api/v1 (or /api/identity) prefix (would 404):");
+  for (const f of missingPrefix) console.error(`  - "${f.path}"\n      called from: ${f.file}`);
   console.error(
-    "\nFix: implement the backend route (and matching MSW mock), or — only for a" +
-      "\ndeliberate UI-preview surface — add the path to tools/api-gap-allowlist.json" +
-      "\nWITH a matching entry on the board (WORK/FORWARD_PLAN.md or LOOP_STATE backlog)." +
-      "\nNever ship a page against mocks silently: that is how 10 modules 404'd in prod" +
-      "\nunnoticed (AUDIT_2026-07-18T005030Z).",
+    "\nFix: add the /api/v1 (or /api/identity) prefix to the call. This is the" +
+      "\nsame incident class as a missing route — the request just never reaches" +
+      "\nthe API at all.",
   );
+}
+
+if (failures.length || missingPrefix.length) {
+  if (failures.length) {
+    console.error("\n✗ frontend calls with NO backend route (would 404 in production):");
+    for (const f of failures) console.error(`  - ${f.path}\n      called from: ${f.files.join(", ")}`);
+    console.error(
+      "\nFix: implement the backend route (and matching MSW mock), or — only for a" +
+        "\ndeliberate UI-preview surface — add the path to tools/api-gap-allowlist.json" +
+        "\nWITH a matching entry on the board (WORK/FORWARD_PLAN.md or LOOP_STATE backlog)." +
+        "\nNever ship a page against mocks silently: that is how 10 modules 404'd in prod" +
+        "\nunnoticed (AUDIT_2026-07-18T005030Z).",
+    );
+  }
   process.exit(1);
 }
 

@@ -27,6 +27,11 @@ CREATE INDEX IF NOT EXISTS serial_numbers_tenant_serial_idx
 
 export const serialNumbersModule: PosModule = {
   name: "serial_numbers",
+  // routes.ts registers full paths ("/inventory/serials", …) expecting a root
+  // mount, not the default `/api/v1/${name}` — without this override every
+  // route registered at /api/v1/serial_numbers/inventory/serials, which the
+  // frontend (web/app/(protected)/inventory/serials/page.tsx) never called.
+  mountPath: "/api/v1",
   migrations: [CREATE_SERIAL_NUMBERS],
   register({ db, events, router }: { db: DB; events: EventBus; router: Router }) {
     const svc = serialNumbersService(db, events);

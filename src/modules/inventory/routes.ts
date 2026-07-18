@@ -318,6 +318,29 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // Single-segment GET routes below MUST be registered before the /:productId
+  // catch-all — Express matches GET routes in registration order, and
+  // "/:productId" matches any single path segment literally, so a route like
+  // GET /counts registered after it is unreachable (silently shadowed; the
+  // request hits the :productId handler with productId="counts" instead).
+  // Found 2026-07-18: GET /counts, GET /locations, and GET /reorder-suggestions
+  // were all previously registered after this handler and were 100% dead code
+  // — every request to any of the three real, shipped pages that call them
+  // (cycle counts, inventory locations, purchasing/inventory reorder alerts)
+  // silently got back a per-product stock row instead of the intended list.
+  router.get("/counts", handler(async (_req, res) => {
+    res.json({ items: await service.listCycleCounts(tenantId(res)) });
+  }));
+
+  router.get("/locations", handler(async (_req, res) => {
+    res.json({ items: await service.listLocations(tenantId(res)) });
+  }));
+
+  // BE-27: Reorder suggestions.
+  router.get("/reorder-suggestions", handler(async (_req, res) => {
+    res.json({ items: await service.getReorderSuggestions(tenantId(res)) });
+  }));
+
   router.get(
     "/:productId",
     handler(async (req, res) => {
@@ -395,10 +418,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
   );
 
   // BE-10: Cycle count sessions ─────────────────────────────────────────────
-  router.get("/counts", handler(async (_req, res) => {
-    res.json({ items: await service.listCycleCounts(tenantId(res)) });
-  }));
-
+  // (GET /counts is registered earlier, ahead of the /:productId catch-all.)
   router.post("/counts", mgr, handler(async (req, res) => {
     const body = parseBody(openCycleCountSchema, req.body);
     res.status(201).json(await service.openCycleCount(userId(res), tenantId(res), body.note));
@@ -425,10 +445,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     locationType: z.string().min(1).optional(),
   });
 
-  router.get("/locations", handler(async (_req, res) => {
-    res.json({ items: await service.listLocations(tenantId(res)) });
-  }));
-
+  // (GET /locations is registered earlier, ahead of the /:productId catch-all.)
   router.post("/locations", mgr, handler(async (req, res) => {
     const body = parseBody(createLocationSchema, req.body);
     res.status(201).json(await service.createLocation(tenantId(res), body));
@@ -438,12 +455,7 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     res.json({ items: await service.getStockByLocation(tenantId(res), String(req.params.id)) });
   }));
 
-  // BE-27: Reorder suggestions ─────────────────────────────────────────────
-  // Sub-path must be before any /:productId routes — already satisfied here.
-  router.get("/reorder-suggestions", handler(async (_req, res) => {
-    res.json({ items: await service.getReorderSuggestions(tenantId(res)) });
-  }));
-
+  // (GET /reorder-suggestions is registered earlier, ahead of /:productId.)
   const createPOSchema = z.object({
     lines: z.array(z.object({
       productId: z.string().min(1),
