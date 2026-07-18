@@ -160,14 +160,6 @@ jobs:
       NODE_ENV: test
       FINDER_BACKGROUND_JOBS: "false"
       PORT: 3001
-      # E2E flake root-cause fix: the golden-path suite shares one authenticated
-      # session across serial tests, but the backend rotates refresh tokens
-      # strict single-use (15s reuse grace). Playwright starts a fresh worker
-      # after any failure and replays the stored cookie — revoked minutes ago —
-      # so tests cascade to /login and the re-login waitForURL times out. Widen
-      # the reuse grace to cover the whole run so a replayed cookie stays valid.
-      # Scoped to this ephemeral CI backend only; prod never sets it (stays 15s).
-      REFRESH_REUSE_GRACE_MS: "900000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

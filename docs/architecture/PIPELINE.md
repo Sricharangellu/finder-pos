@@ -93,15 +93,30 @@ shared authenticated `storageState` cookie can already be revoked → the affect
 typically shows a handful of "flaky" plus 1–2 hard failures, all at the same login helper). It fails
 on `master` too — it is **not** caused by the pipeline.
 
-**Root-cause fix applied:** the E2E backend now runs with `REFRESH_REUSE_GRACE_MS=900000` (15 min,
-in the `e2e` job env only — prod stays at the 15 s default). The backend already supports this grace
-window; widening it to cover a full run means a replayed cookie from a restarted worker stays valid
-instead of stranding the session, so the cascade can't start. Rotation itself is unchanged, and its
-strict single-use property keeps its own unit coverage (run at the 15 s default).
+**Attempted fix (reverted):** tried setting `REFRESH_REUSE_GRACE_MS=900000` in the `e2e` job env
+(widening the backend's existing reuse-grace window so a replayed cookie from a restarted worker
+would stay valid). Verified against a live `develop` run — the result contradicted the hypothesis
+rather than confirming it:
 
-Until this is confirmed green across a few runs, `e2e` remains a **reported signal** — not in the
-deploy `needs` nor the required merge checks. Once stable, add `e2e` back to the deploy `needs` and
-the branch-protection required checks to make it a hard gate.
+| | baseline (`master`, no change) | with `REFRESH_REUSE_GRACE_MS=900000` |
+|---|---|---|
+| failed | 5–7 | **22** |
+| flaky (recovered on retry) | 10–11 | **1** |
+| passed | 10–11 | 5 |
+| runtime | 5.9–6.8 min | **11.1 min** |
+| failure spread | one helper line, one spec file | many unrelated spec files, two distinct error signatures |
+
+The low flaky count is the key signal: baseline retries mostly self-heal (a fresh Playwright worker
+gets a clean login); with the widened grace, retries stopped recovering — consistent with the grace
+window interfering with the worker-scoped session self-heal in `web/e2e/fixtures.ts`, though the
+exact mechanism isn't confirmed (no backend log capture in CI to inspect the `/login` calls during
+the run). **Reverted** — a fix that isn't proven to help and correlates with a 3–4× worse outcome
+isn't a fix. Root cause of the *original* flake (documented above) is still open.
+
+`e2e` remains a **reported signal only** — not in the deploy `needs` nor the required merge checks —
+until someone re-investigates with backend log visibility. Next evidence needed: capture backend
+stdout/stderr during a CI e2e run (currently backgrounded with no log redirect) to see the actual
+`/login` request/response sequence during a failure cascade.
 
 ## Local development
 
