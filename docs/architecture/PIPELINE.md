@@ -93,11 +93,15 @@ shared authenticated `storageState` cookie can already be revoked → the affect
 typically shows a handful of "flaky" plus 1–2 hard failures, all at the same login helper). It fails
 on `master` too — it is **not** caused by the pipeline.
 
-Because of this, `e2e` runs as a **reported signal** and is **not** in the deploy `needs` nor the
-required merge checks — otherwise the flake would block every promotion. Fix path (then re-gate):
-add a test-only flag that disables single-use refresh rotation for the E2E backend (removes the root
-cause), or make the shared-session self-heal fully deterministic. Track before adding `e2e` back to
-the deploy `needs`.
+**Root-cause fix applied:** the E2E backend now runs with `REFRESH_REUSE_GRACE_MS=900000` (15 min,
+in the `e2e` job env only — prod stays at the 15 s default). The backend already supports this grace
+window; widening it to cover a full run means a replayed cookie from a restarted worker stays valid
+instead of stranding the session, so the cascade can't start. Rotation itself is unchanged, and its
+strict single-use property keeps its own unit coverage (run at the 15 s default).
+
+Until this is confirmed green across a few runs, `e2e` remains a **reported signal** — not in the
+deploy `needs` nor the required merge checks. Once stable, add `e2e` back to the deploy `needs` and
+the branch-protection required checks to make it a hard gate.
 
 ## Local development
 
