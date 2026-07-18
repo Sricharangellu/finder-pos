@@ -12,6 +12,7 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATH_PREFIXES = [
   "/login",
+  "/signup",
   "/_next",
   "/favicon",
   "/icons",
