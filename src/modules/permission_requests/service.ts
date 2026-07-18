@@ -102,6 +102,24 @@ export class PermissionRequestsService {
     return { items: rows.map((r) => this.withRisk(r)) };
   }
 
+  /** Overrides granted to one member, newest first. `status` is computed
+   *  live: an 'active' row past its expires_at reads as 'expired' without
+   *  waiting for a sweep — the UI must never show a stale grant as active. */
+  async listOverridesForUser(tenantId: string, userId: string): Promise<{ items: PermissionOverride[] }> {
+    const items = await this.db.query<PermissionOverride>(
+      `SELECT id, tenant_id, user_id, permission_code, granted_by_user_id,
+              granted_by_name, source_request_id, starts_at, expires_at, created_at,
+              CASE WHEN status = 'active' AND expires_at IS NOT NULL AND expires_at < @now
+                   THEN 'expired' ELSE status END AS status
+       FROM permission_overrides
+       WHERE tenant_id = @tenantId AND user_id = @userId
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      { tenantId, userId, now: Date.now() },
+    );
+    return { items };
+  }
+
   async get(id: string, tenantId: string): Promise<Row> {
     const row = await this.db.one<PermissionRequest>(
       "SELECT * FROM permission_requests WHERE id = @id AND tenant_id = @tenantId",
