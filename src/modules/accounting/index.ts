@@ -151,6 +151,27 @@ export const accountingModule: PosModule = {
         { accountCode: "4000", creditCents: net },
       ], `POS payment for order ${p.orderId}`);
     });
+
+    // POS order refunded → reverse the recognized sale: revenue down, cash out.
+    // The mirror image of the payment.captured posting above. Without this the
+    // sale's Dr Cash / Cr Revenue stayed on the books after a full refund,
+    // overstating both cash and revenue — the ledger's only refund posting path
+    // was the accounting.entry_requested workflow, which writes to a journal
+    // schema that was never migrated and so silently failed on every refund.
+    // order.refunded is a full-order refund carrying the order total (the amount
+    // originally taken to Cash/Revenue on capture). Idempotent per order via
+    // hasPosting. Known v1 simplification (same as capture): the whole amount
+    // reverses out of Sales Revenue; the sales-tax split is a planned refinement
+    // once refund events carry a tax breakdown.
+    onBoth("order.refunded", async (event) => {
+      const p = event.payload as { tenantId: string; id: string; orderNumber?: string; totalCents: number };
+      const amount = p.totalCents;
+      if (!amount || amount <= 0) return;
+      await post("pos_refund", p.id, p.tenantId, [
+        { accountCode: "4000", debitCents: amount },
+        { accountCode: "1000", creditCents: amount },
+      ], `Refund for order ${p.orderNumber ?? p.id}`);
+    });
   },
 };
 
