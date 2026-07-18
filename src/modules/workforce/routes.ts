@@ -36,24 +36,24 @@ export function registerRoutes(router: Router, svc: WorkforceService): void {
 
   // ── Employees ──────────────────────────────────────────────────────────────
 
-  router.get("/workforce/employees", handler(async (_req, res) => {
+  router.get("/employees", handler(async (_req, res) => {
     const items = await svc.listEmployees(tid(res));
     res.json({ items, total: items.length });
   }));
 
-  router.post("/workforce/employees", mgr, handler(async (req, res) => {
+  router.post("/employees", mgr, handler(async (req, res) => {
     const body = parseBody(employeeSchema, req.body);
     res.status(201).json(await svc.createEmployee(tid(res), body));
   }));
 
-  router.patch("/workforce/employees/:id", mgr, handler(async (req, res) => {
+  router.patch("/employees/:id", mgr, handler(async (req, res) => {
     const body = parseBody(employeeSchema.partial(), req.body);
     res.json(await svc.updateEmployee(tid(res), String(req.params["id"]), body as Parameters<WorkforceService["updateEmployee"]>[2]));
   }));
 
   // ── Shifts ─────────────────────────────────────────────────────────────────
 
-  router.get("/workforce/shifts", handler(async (req, res) => {
+  router.get("/shifts", handler(async (req, res) => {
     const date_from = typeof req.query["date_from"] === "string" ? req.query["date_from"] : undefined;
     const date_to   = typeof req.query["date_to"]   === "string" ? req.query["date_to"]   : undefined;
     const employee_id = typeof req.query["employee_id"] === "string" ? req.query["employee_id"] : undefined;
@@ -61,34 +61,34 @@ export function registerRoutes(router: Router, svc: WorkforceService): void {
     res.json({ items, total: items.length });
   }));
 
-  router.post("/workforce/shifts", mgr, handler(async (req, res) => {
+  router.post("/shifts", mgr, handler(async (req, res) => {
     const body = parseBody(shiftSchema, req.body);
     res.status(201).json(await svc.createShift(tid(res), body));
   }));
 
-  router.patch("/workforce/shifts/:id", mgr, handler(async (req, res) => {
+  router.patch("/shifts/:id", mgr, handler(async (req, res) => {
     const body = parseBody(shiftSchema.partial().omit({ employee_id: true }), req.body);
     res.json(await svc.updateShift(tid(res), String(req.params["id"]), body));
   }));
 
-  router.delete("/workforce/shifts/:id", mgr, handler(async (req, res) => {
+  router.delete("/shifts/:id", mgr, handler(async (req, res) => {
     await svc.deleteShift(tid(res), String(req.params["id"]));
     res.status(204).end();
   }));
 
   // ── Time-off ───────────────────────────────────────────────────────────────
 
-  router.get("/workforce/time-off", handler(async (_req, res) => {
+  router.get("/time-off", handler(async (_req, res) => {
     const items = await svc.listTimeOff(tid(res));
     res.json({ items, total: items.length });
   }));
 
-  router.post("/workforce/time-off", handler(async (req, res) => {
+  router.post("/time-off", handler(async (req, res) => {
     const body = parseBody(timeOffSchema, req.body);
     res.status(201).json(await svc.createTimeOff(tid(res), body));
   }));
 
-  router.patch("/workforce/time-off/:id", mgr, handler(async (req, res) => {
+  router.patch("/time-off/:id", mgr, handler(async (req, res) => {
     const { status } = parseBody(z.object({ status: z.enum(["pending", "approved", "denied"]) }), req.body);
     res.json(await svc.updateTimeOffStatus(tid(res), String(req.params["id"]), status as TimeOffStatus));
   }));
@@ -105,7 +105,7 @@ export function registerRoutes(router: Router, svc: WorkforceService): void {
   });
 
   // GET  /workforce/time-entries?employeeId=&from=&to=&limit=
-  router.get("/workforce/time-entries", handler(async (req, res) => {
+  router.get("/time-entries", handler(async (req, res) => {
     const employeeId = typeof req.query.employeeId === "string" ? req.query.employeeId : undefined;
     const from  = typeof req.query.from  === "string" ? Number(req.query.from)  : undefined;
     const to    = typeof req.query.to    === "string" ? Number(req.query.to)    : undefined;
@@ -115,13 +115,13 @@ export function registerRoutes(router: Router, svc: WorkforceService): void {
   }));
 
   // POST /workforce/clock-in — start a new time entry
-  router.post("/workforce/clock-in", handler(async (req, res) => {
+  router.post("/clock-in", handler(async (req, res) => {
     const body = parseBody(clockInSchema, req.body);
     res.status(201).json(await svc.clockIn(body.employeeId, tid(res), body.notes));
   }));
 
   // POST /workforce/clock-out/:entryId — close an open time entry
-  router.post("/workforce/clock-out/:entryId", handler(async (req, res) => {
+  router.post("/clock-out/:entryId", handler(async (req, res) => {
     const body = parseBody(clockOutSchema, req.body);
     res.json(await svc.clockOut(String(req.params.entryId), tid(res), body.breakMinutes));
   }));

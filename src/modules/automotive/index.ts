@@ -4,6 +4,7 @@ import { handler, parseBody, notFound } from "../../shared/http.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireModule } from "../../gateway/auth.js";
 
 // ── BE-A1: Automotive — Vehicles + Work Orders ─────────────────────────────
 
@@ -81,10 +82,11 @@ export const automotiveModule: PosModule = {
   name: "automotive",
   migrations: [CREATE_VEHICLES, CREATE_WORK_ORDERS],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("work_orders"));
 
     // ── Vehicles ─────────────────────────────────────────────────────────────
 
-    router.get("/automotive/vehicles", handler(async (req, res) => {
+    router.get("/vehicles", handler(async (req, res) => {
       const t = tid(res);
       const q = typeof req.query.q === "string" ? req.query.q : undefined;
       const where = q
@@ -95,7 +97,7 @@ export const automotiveModule: PosModule = {
       res.json({ items: await db.query(`SELECT * FROM vehicles ${where} ORDER BY created_at DESC LIMIT 200`, params) });
     }));
 
-    router.get("/automotive/vehicles/:id", handler(async (req, res) => {
+    router.get("/vehicles/:id", handler(async (req, res) => {
       const id = String(req.params["id"]);
       const vehicle = await db.one("SELECT * FROM vehicles WHERE id = @id AND tenant_id = @t", { id, t: tid(res) });
       if (!vehicle) { res.status(404).json({ error: { code: "not_found" } }); return; }
@@ -106,7 +108,7 @@ export const automotiveModule: PosModule = {
       res.json({ ...vehicle, workOrders: orders });
     }));
 
-    router.post("/automotive/vehicles", handler(async (req, res) => {
+    router.post("/vehicles", handler(async (req, res) => {
       const body = parseBody(vehicleSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -126,7 +128,7 @@ export const automotiveModule: PosModule = {
 
     // ── Work Orders ───────────────────────────────────────────────────────────
 
-    router.get("/automotive/work-orders", handler(async (req, res) => {
+    router.get("/work-orders", handler(async (req, res) => {
       const t      = tid(res);
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const where  = status ? "WHERE tenant_id = @t AND status = @s" : "WHERE tenant_id = @t";
@@ -141,7 +143,7 @@ export const automotiveModule: PosModule = {
       )});
     }));
 
-    router.post("/automotive/work-orders", handler(async (req, res) => {
+    router.post("/work-orders", handler(async (req, res) => {
       const body = parseBody(workOrderSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -161,7 +163,7 @@ export const automotiveModule: PosModule = {
       res.status(201).json(await db.one("SELECT * FROM work_orders WHERE id = @id", { id }));
     }));
 
-    router.patch("/automotive/work-orders/:id", handler(async (req, res) => {
+    router.patch("/work-orders/:id", handler(async (req, res) => {
       const id = String(req.params["id"]);
       const t  = tid(res);
       const wo = await db.one("SELECT * FROM work_orders WHERE id = @id AND tenant_id = @t", { id, t });

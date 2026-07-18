@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody, notFound } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -72,10 +72,11 @@ export const educationModule: PosModule = {
   name: "education",
   migrations: [CREATE_STUDENTS, CREATE_FEE_RECORDS],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("student_accounts"));
 
     // ── Students ──────────────────────────────────────────────────────────────
 
-    router.get("/education/students", handler(async (req, res) => {
+    router.get("/students", handler(async (req, res) => {
       const t      = tid(res);
       const q      = typeof req.query.q      === "string" ? req.query.q      : undefined;
       const course = typeof req.query.course === "string" ? req.query.course : undefined;
@@ -89,7 +90,7 @@ export const educationModule: PosModule = {
       )});
     }));
 
-    router.get("/education/students/:id", handler(async (req, res) => {
+    router.get("/students/:id", handler(async (req, res) => {
       const id      = String(req.params["id"]);
       const student = await db.one("SELECT * FROM students WHERE id = @id AND tenant_id = @t",
         { id, t: tid(res) });
@@ -104,7 +105,7 @@ export const educationModule: PosModule = {
       res.json({ ...student, fees, outstanding });
     }));
 
-    router.post("/education/students", handler(async (req, res) => {
+    router.post("/students", handler(async (req, res) => {
       const body = parseBody(studentSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -121,7 +122,7 @@ export const educationModule: PosModule = {
       res.status(201).json(await db.one("SELECT * FROM students WHERE id = @id", { id }));
     }));
 
-    router.patch("/education/students/:id", handler(async (req, res) => {
+    router.patch("/students/:id", handler(async (req, res) => {
       const id   = String(req.params["id"]);
       const t    = tid(res);
       const body = req.body as Record<string, unknown>;
@@ -140,7 +141,7 @@ export const educationModule: PosModule = {
 
     // ── Fee Records ────────────────────────────────────────────────────────────
 
-    router.post("/education/students/:id/fees", requireRole("manager"), handler(async (req, res) => {
+    router.post("/students/:id/fees", requireRole("manager"), handler(async (req, res) => {
       const body      = parseBody(feeSchema, req.body);
       const studentId = String(req.params["id"]);
       const t         = tid(res);
@@ -158,7 +159,7 @@ export const educationModule: PosModule = {
     }));
 
     // Collect payment for a fee
-    router.post("/education/fees/:id/collect", handler(async (req, res) => {
+    router.post("/fees/:id/collect", handler(async (req, res) => {
       const id  = String(req.params["id"]);
       const t   = tid(res);
       const now = Date.now();

@@ -11,6 +11,8 @@ import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
+import { SsoService } from "./modules/sso/service.js";
+import { registerPublicRoutes as registerSsoPublicRoutes } from "./modules/sso/routes.js";
 import {
   requestIdMiddleware,
   rateLimitMiddleware,
@@ -296,6 +298,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     rateLimitMiddleware({ capacity: 5, refillRate: 0.05, redis }),
   );
   app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
+
+  // ── SSO pre-login handshake — must be reachable BEFORE a token exists, so it
+  // cannot go through the auth-gated /api/v1 router below (that would make SSO
+  // login impossible: no token yet -> 401 -> can never get a token). Mounted
+  // at the same /api/v1/sso path the frontend already calls; Express matches
+  // this registration first, so /config (auth-gated, registered later via the
+  // domain-modules loop) is unaffected. Same brute-force posture as identity login.
+  const ssoPublicRouter = Router();
+  registerSsoPublicRoutes(ssoPublicRouter, new SsoService(db));
+  app.use("/api/v1/sso", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), ssoPublicRouter);
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).

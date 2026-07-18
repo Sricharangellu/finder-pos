@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody, notFound } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -65,10 +65,11 @@ export const hospitalityModule: PosModule = {
   name: "hospitality",
   migrations: [CREATE_ROOMS, CREATE_ROOM_CHARGES],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("room_billing"));
 
     // ── Rooms ─────────────────────────────────────────────────────────────────
 
-    router.get("/hospitality/rooms", handler(async (req, res) => {
+    router.get("/rooms", handler(async (req, res) => {
       const t      = tid(res);
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const where  = status ? "WHERE tenant_id = @t AND status = @s" : "WHERE tenant_id = @t";
@@ -80,7 +81,7 @@ export const hospitalityModule: PosModule = {
       )});
     }));
 
-    router.post("/hospitality/rooms", requireRole("manager"), handler(async (req, res) => {
+    router.post("/rooms", requireRole("manager"), handler(async (req, res) => {
       const body = parseBody(roomSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -96,7 +97,7 @@ export const hospitalityModule: PosModule = {
       res.status(201).json(await db.one("SELECT * FROM rooms WHERE id = @id", { id }));
     }));
 
-    router.patch("/hospitality/rooms/:id/status", handler(async (req, res) => {
+    router.patch("/rooms/:id/status", handler(async (req, res) => {
       const id     = String(req.params["id"]);
       const t      = tid(res);
       const status = z.enum(["available", "occupied", "checkout", "cleaning", "maintenance"]).parse(
@@ -111,7 +112,7 @@ export const hospitalityModule: PosModule = {
 
     // ── Room Charges ─────────────────────────────────────────────────────────
 
-    router.get("/hospitality/rooms/:id/charges", handler(async (req, res) => {
+    router.get("/rooms/:id/charges", handler(async (req, res) => {
       const id = String(req.params["id"]);
       const t  = tid(res);
       res.json({ items: await db.query(
@@ -120,7 +121,7 @@ export const hospitalityModule: PosModule = {
       )});
     }));
 
-    router.post("/hospitality/rooms/:id/charge", handler(async (req, res) => {
+    router.post("/rooms/:id/charge", handler(async (req, res) => {
       const roomId = String(req.params["id"]);
       const t      = tid(res);
       const room   = await db.one("SELECT id FROM rooms WHERE id = @id AND tenant_id = @t", { id: roomId, t });
@@ -140,7 +141,7 @@ export const hospitalityModule: PosModule = {
     }));
 
     // Settle all outstanding charges for a room
-    router.post("/hospitality/rooms/:id/settle", requireRole("manager"), handler(async (req, res) => {
+    router.post("/rooms/:id/settle", requireRole("manager"), handler(async (req, res) => {
       const id  = String(req.params["id"]);
       const t   = tid(res);
       const now = Date.now();

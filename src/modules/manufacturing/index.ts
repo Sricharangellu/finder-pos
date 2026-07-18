@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody, notFound } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -59,10 +59,11 @@ export const manufacturingModule: PosModule = {
   name: "manufacturing",
   migrations: [CREATE_PRODUCTION_ORDERS, CREATE_BOM_LINES],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("production_orders"));
 
     // ── Production Orders ──────────────────────────────────────────────────────
 
-    router.get("/manufacturing/orders", handler(async (req, res) => {
+    router.get("/orders", handler(async (req, res) => {
       const t      = tid(res);
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const where  = status ? "WHERE tenant_id = @t AND status = @s" : "WHERE tenant_id = @t";
@@ -74,7 +75,7 @@ export const manufacturingModule: PosModule = {
       )});
     }));
 
-    router.get("/manufacturing/orders/:id", handler(async (req, res) => {
+    router.get("/orders/:id", handler(async (req, res) => {
       const id = String(req.params["id"]);
       const po = await db.one("SELECT * FROM production_orders WHERE id = @id AND tenant_id = @t",
         { id, t: tid(res) });
@@ -86,7 +87,7 @@ export const manufacturingModule: PosModule = {
       res.json({ ...po, bom: lines });
     }));
 
-    router.post("/manufacturing/orders", requireRole("manager"), handler(async (req, res) => {
+    router.post("/orders", requireRole("manager"), handler(async (req, res) => {
       const body = parseBody(createSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -112,7 +113,7 @@ export const manufacturingModule: PosModule = {
     }));
 
     // Advance status: draft → in_progress → completed
-    router.patch("/manufacturing/orders/:id/status", requireRole("manager"), handler(async (req, res) => {
+    router.patch("/orders/:id/status", requireRole("manager"), handler(async (req, res) => {
       const id     = String(req.params["id"]);
       const t      = tid(res);
       const status = z.enum(["in_progress", "completed", "cancelled"]).parse(
@@ -131,7 +132,7 @@ export const manufacturingModule: PosModule = {
     }));
 
     // Record actual consumption for a BOM line
-    router.patch("/manufacturing/bom-lines/:id/consume", requireRole("manager"), handler(async (req, res) => {
+    router.patch("/bom-lines/:id/consume", requireRole("manager"), handler(async (req, res) => {
       const id  = String(req.params["id"]);
       const t   = tid(res);
       const qty = z.number().nonnegative().parse((req.body as Record<string, unknown>).qtyConsumed);
