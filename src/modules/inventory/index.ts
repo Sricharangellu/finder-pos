@@ -3,6 +3,8 @@ import type { DomainEvent } from "../../shared/types.js";
 import { claimEventOnce } from "../../shared/outbox.js";
 import { InventoryService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { PipelineViewsService } from "./pipeline-views.js";
+import { registerPipelineRoutes } from "./pipeline-routes.js";
 import { dropLegacyNoTenant } from "../../shared/migrate.js";
 import { PurchasingService } from "../purchasing/index.js";
 
@@ -257,6 +259,10 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
   register({ db, events, router, outbox }) {
     const service = new InventoryService(db, events);
     const purchasing = new PurchasingService(db, events);
+    // Registered before registerRoutes() so /pipeline/* is matched ahead of
+    // the /:productId catch-all inside it (same reasoning as the 2026-07-18
+    // route-shadowing fix for /counts, /locations, /reorder-suggestions).
+    registerPipelineRoutes(router, new PipelineViewsService(db, purchasing));
     registerRoutes(router, service, purchasing);
 
     // order.created -> decrement stock for each line (reason 'sale', ref = order id).
