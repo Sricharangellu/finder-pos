@@ -60,11 +60,21 @@ No autonomous high-value work remains. Further progress = feature development
 | requirePermission granularity on sync/webhook mutation routes | DONE (iter 6, AUDIT_2026-07-16T042500Z) | sync mutations were UNGUARDED → added requireRole manager/owner; webhooks verified already owner-guarded (no gap) |
 | Web client adoption of error.details for field-level form errors | CANDIDATE (low priority) | shared/http.ts details added fd2dd2a |
 | PROJECT_STATUS.md stale internal refs cleanup | CANDIDATE (low, docs-only) | orchestration/README.md notes the ROADMAP retirement |
+| Catalog product-detail endpoints (16 mock-only paths: analytics, audit-log, pricing/tiers, suppliers, stock, sales, returns, …) | CANDIDATE (high — biggest retail-core mock-only surface; allowlisted in tools/api-gap-allowlist.json) | AUDIT_2026-07-18T005030Z §2 |
+| Team time-tracking endpoints (clock-in/out, time-entries, permission-overrides/requests) | DONE (2026-07-18 follow-up session — time_entries table, atomic clock in/out, self-or-mgmt guard; tests written, run via CI) | AUDIT_2026-07-18T005030Z addendum |
+| Customers /search + /:id/merge; orders /:id/timeline | DONE (2026-07-18 — transactional merge w/ sorted locks + customer.merged event; derived timeline; tests written, run via CI) | AUDIT_2026-07-18T005030Z addendum |
+| settings/custom-roles FE↔BE path mismatch (backend at /api/v1/custom-roles) | RECLASSIFIED → NEEDS-SRI: contract mismatch (color+feature-keys vs permissions vocab), not a path fix | AUDIT_2026-07-18T005030Z addendum §7 |
+| Notifications digest/preferences/rules; workflows approval-chains/run-history; purchasing EDI + vendor-history; inventory pipeline/errors pages | CANDIDATE (build or label Preview; allowlisted meanwhile) | AUDIT_2026-07-18T005030Z §2 |
+| API gap-scan guardrail | DONE (2026-07-18 — tools/api-gap-scan.mjs in CI hygiene job + npm run verify; allowlist board-tied, shrink-only) | AUDIT_2026-07-18T005030Z addendum §6 |
 
 ## NEEDS-SRI (out of loop scope — decisions/actions only Sri can take)
 
 | Item | What's needed |
 |---|---|
+| ~~Merge `29831bd`~~ → fixes PORTED to feat/delivery-pipeline (2026-07-18) | Remaining for Sri: session C's clean-arch quotes pilot still lives only on `origin/feat/clean-arch-pilot-quotes` — review/merge separately; expect trivial same-change conflicts on the 10 vertical route files |
+| Custom-roles / permissions-page contract | Decide the permission model: FE permissions matrix ({name,color,features} + bulk /settings/permissions) vs backend custom_roles ({name,permissions} fixed vocab, no color). Until then the paths stay allowlisted (AUDIT addendum §7) |
+| Ecommerce storefront auth | DECIDED 2026-07-18: gated as Preview in the UI (`NEXT_PUBLIC_STORE_AUTH_ENABLED=1` re-enables). Build a real customer-auth backend when the storefront is prioritized |
+| Run `npm test` locally | This session's new tests (team clock, customers search/merge, orders timeline, 10 vertical regressions, SSO public route) were typecheck-verified only — the Cowork sandbox can't execute the esbuild/embedded-postgres harness. CI will run them on push |
 | C-3 deploy note | Confirm prod DB cert chain (or set PG_CA_CERT / PG_SSL_NO_VERIFY) BEFORE merging PR #66 |
 | C-2 completion | Confirm CRON_SECRET set in Vercel env |
 | C-1 restore drill | Run a backup-restore drill against real infra |

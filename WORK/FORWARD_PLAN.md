@@ -1,7 +1,14 @@
 # Ascend Forward Plan (authoritative)
 
-Last reviewed: 2026-07-05
+Last reviewed: 2026-07-18 (FE↔BE gap scan — see `WORK/audits/AUDIT_2026-07-18T005030Z-fe-be-gap-audit.md`)
 Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
+
+> **RESOLVED 2026-07-18 (was STANDING CRITICAL):** the 2026-07-15 API-audit fixes
+> were PORTED to `feat/delivery-pipeline` same-day (double-prefix in 10 modules,
+> SSO public mount, `requireModule` isolation — without the clean-arch pilot).
+> A CI guardrail now prevents recurrence: `npm run gap:scan` fails on any FE call
+> with no backend route (see AUDIT_2026-07-18T005030Z addendum). Still open for
+> Sri: merge session C's quotes pilot branch, and merge PR #70 to deploy all of it.
 
 > Sequencing is **phase-based, not time-based**. A phase is complete when its exit
 > criteria pass — never by calendar. Point-in-time verification results live in the
@@ -570,6 +577,18 @@ Needed:
 - AR/AP aging only if the data model is truly wired.
 
 ### 4. Frontend integration
+
+**Gap scan done 2026-07-18** (`AUDIT_2026-07-18T005030Z-fe-be-gap-audit.md`), and
+the first remediation wave shipped same-day (see the audit's addendum): the
+double-prefix/SSO/requireModule fixes are ported, team time-tracking + customers
+search/merge + orders timeline are real endpoints now, storefront auth is gated
+Preview, and `npm run gap:scan` enforces parity in CI from here on. Remaining
+mock-only surfaces (all allowlisted + tracked): catalog product-detail tabs (16
+paths, next biggest win), inventory pipeline/errors (13), notifications
+prefs/rules (4), purchasing EDI (6), workflows approval-chains (3), settings
+b2b/permissions/custom-roles (contract decision — NEEDS-SRI), plus the
+by-design Preview verticals (golf/pricing/warehouse/documents/promotions).
+174 backend paths remain unsurfaced by any page (map for future UI work).
 
 Needed:
 
