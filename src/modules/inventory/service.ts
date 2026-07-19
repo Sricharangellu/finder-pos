@@ -559,6 +559,7 @@ export class InventoryService {
       product_id: string; name: string; sku: string | null;
       stock_qty: number; reorder_pt: number;
       preferred_vendor_id: string | null; preferred_vendor_name: string | null;
+      last_unit_cost_cents: number | null; last_ordered_at: number | null; last_ordered_qty: number | null;
     }>(
       `SELECT i.product_id,
               COALESCE(p.name, '') AS name,
@@ -566,12 +567,27 @@ export class InventoryService {
               COALESCE(i.stock_qty, 0) AS stock_qty,
               i.reorder_pt,
               ps.supplier_id AS preferred_vendor_id,
-              s.name AS preferred_vendor_name
+              s.name AS preferred_vendor_name,
+              lastpo.unit_cost_cents AS last_unit_cost_cents,
+              lastpo.created_at AS last_ordered_at,
+              lastpo.quantity AS last_ordered_qty
          FROM inventory i
          JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
          LEFT JOIN product_suppliers ps
            ON ps.tenant_id = i.tenant_id AND ps.product_id = i.product_id AND ps.is_preferred = true
          LEFT JOIN suppliers s ON s.tenant_id = ps.tenant_id AND s.id = ps.supplier_id
+         -- Most recent PO line for this product, across any supplier — powers the
+         -- frontend's ReorderTab "last ordered" columns (web/app/(protected)/
+         -- purchasing/_components/shared.ts's ReorderSuggestion type), which this
+         -- endpoint previously omitted entirely (contract drift found 2026-07-19).
+         LEFT JOIN LATERAL (
+           SELECT pol.unit_cost_cents, pol.quantity, po.created_at
+             FROM purchase_order_lines pol
+             JOIN purchase_orders po ON po.tenant_id = pol.tenant_id AND po.id = pol.po_id
+            WHERE pol.tenant_id = i.tenant_id AND pol.product_id = i.product_id
+            ORDER BY po.created_at DESC
+            LIMIT 1
+         ) lastpo ON true
         WHERE i.tenant_id = @tenantId
           AND i.reorder_pt > 0
           AND COALESCE(i.stock_qty, 0) <= i.reorder_pt
@@ -587,6 +603,9 @@ export class InventoryService {
       suggested_qty: Number(r.reorder_pt),
       preferred_vendor_id: r.preferred_vendor_id,
       preferred_vendor_name: r.preferred_vendor_name,
+      last_unit_cost_cents: r.last_unit_cost_cents != null ? Number(r.last_unit_cost_cents) : null,
+      last_ordered_at: r.last_ordered_at != null ? Number(r.last_ordered_at) : null,
+      last_ordered_qty: r.last_ordered_qty != null ? Number(r.last_ordered_qty) : null,
     }));
   }
 
@@ -1169,6 +1188,9 @@ export interface ReorderSuggestion {
   suggested_qty: number;
   preferred_vendor_id: string | null;
   preferred_vendor_name: string | null;
+  last_unit_cost_cents: number | null;
+  last_ordered_at: number | null;
+  last_ordered_qty: number | null;
 }
 
 function clampLimit(limit?: number): number {

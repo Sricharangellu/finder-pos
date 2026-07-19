@@ -77,6 +77,62 @@ test("reorder-suggestions: lists a product below its reorder point with preferre
   assert.equal(row.preferred_vendor_name, "Reorder Vendor");
 });
 
+// Regression: web/app/(protected)/purchasing/_components/shared.ts's
+// ReorderSuggestion type (used by ReorderTab.tsx) expects last_unit_cost_cents/
+// last_ordered_at/last_ordered_qty, but getReorderSuggestions() never returned
+// them (contract drift found 2026-07-19 while building the Phase 0 wave).
+// Fixed with a real LATERAL join onto each product's most recent PO line.
+test("reorder-suggestions: reports the most recent PO line's cost/date/qty", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-LASTPO-1", name: "Reorder Last PO Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 5 });
+
+  const supplier = await call(app, "POST", "/api/purchasing/suppliers", { name: "Last PO Supplier" });
+  assert.equal(supplier.status, 201, JSON.stringify(supplier.json));
+
+  const po1 = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supplier.json.id, lines: [{ productId, quantity: 8, unitCostCents: 111 }],
+  });
+  assert.equal(po1.status, 201, JSON.stringify(po1.json));
+
+  // A second, later PO should win as "most recent" — proves ORDER BY created_at
+  // DESC LIMIT 1 in the LATERAL join, not just "any" PO line.
+  const po2 = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supplier.json.id, lines: [{ productId, quantity: 20, unitCostCents: 222 }],
+  });
+  assert.equal(po2.status, 201, JSON.stringify(po2.json));
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, JSON.stringify(json));
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row, "expected the product below reorder point in suggestions");
+  assert.equal(row.last_unit_cost_cents, 222);
+  assert.equal(row.last_ordered_qty, 20);
+  assert.ok(typeof row.last_ordered_at === "number" && row.last_ordered_at > 0);
+});
+
+test("reorder-suggestions: last_unit_cost_cents/last_ordered_at/last_ordered_qty are null when the product has never been ordered", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-NOPO-1", name: "Never Ordered Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 5 });
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200);
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row);
+  assert.equal(row.last_unit_cost_cents, null);
+  assert.equal(row.last_ordered_qty, null);
+  assert.equal(row.last_ordered_at, null);
+});
+
 test("manual adjust changes stock", async () => {
   const app = await freshApp();
   await call(app, "POST", "/api/inventory/prod_b/receive", { quantity: 5 });
