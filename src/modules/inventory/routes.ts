@@ -199,6 +199,43 @@ export function registerRoutes(router: Router, service: InventoryService, purcha
     }),
   );
 
+  // ── Expiry pool ─────────────────────────────────────────────────────────────
+  // The expiry sheet: stock swept out of active inventory, pending disposition.
+  router.get("/expiry", handler(async (_req, res) => {
+    res.json({ items: await service.listExpiryPool(tenantId(res)) });
+  }));
+
+  // Sweep all past-expiry stock out of active inventory into the pool (manager+).
+  router.post("/expiry/sweep", mgr, handler(async (_req, res) => {
+    res.json(await service.sweepExpired(tenantId(res)));
+  }));
+
+  // Discard an expiry item — the loss (booked on sweep) stands (manager+).
+  router.post("/expiry/:id/discard", mgr, handler(async (req, res) => {
+    res.json(await service.disposeExpiry(String(req.params.id), tenantId(res), "discarded"));
+  }));
+
+  // Return an expiry item to the vendor — creates a purchasing vendor return
+  // (optionally a vendor credit) and resolves the pool item (manager+).
+  const returnSchema = z.object({ supplierId: z.string().min(1).optional(), createCredit: z.boolean().optional() });
+  router.post("/expiry/:id/return-to-vendor", mgr, handler(async (req, res) => {
+    const t = tenantId(res);
+    const body = parseBody(returnSchema, req.body ?? {});
+    const item = await service.getExpiry(String(req.params.id), t);
+    if (item.status !== "pending") throw badRequest("this expiry item has already been disposed");
+    const vendorReturn = await purchasing.createReturn(
+      {
+        supplierId: body.supplierId,
+        reason: "expired",
+        lines: [{ productId: item.product_id, quantity: item.qty, unitCostCents: item.unit_cost_cents, ...(item.lot_id ? { lotId: item.lot_id } : {}) }],
+        createCredit: body.createCredit ?? Boolean(body.supplierId),
+      },
+      t,
+    );
+    const writeoff = await service.disposeExpiry(String(req.params.id), t, "returned", vendorReturn.id);
+    res.json({ writeoff, vendorReturn });
+  }));
+
   // Location-to-location transfers — before /:productId so "transfers" isn't an id.
   router.get(
     "/transfers",

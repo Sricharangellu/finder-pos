@@ -1,5 +1,12 @@
 <!-- Ascend PR checklist — aligned with AGENTS.md (canonical rules) + WORK/FORWARD_PLAN.md. Delete lines that don't apply. -->
 
+## Promotion target (forward-only: feature/* → develop → staging → master)
+
+<!-- Tick the base branch this PR targets. See docs/architecture/PIPELINE.md. -->
+- [ ] `develop` — feature/fix work → deploys DEV
+- [ ] `staging` — promoting develop → deploys TESTING
+- [ ] `master` — promoting staging (release) / hotfix → deploys PROD
+
 ## What & why
 
 <!-- One or two sentences: the queue item / defect, and the user-visible effect. -->

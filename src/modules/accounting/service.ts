@@ -90,6 +90,7 @@ const DEFAULT_COA: Array<{ code: string; name: string; type: AccountType }> = [
   { code: "5000", name: "Cost of Goods Sold", type: "expense" },
   { code: "5100", name: "Shipping Expense", type: "expense" },
   { code: "5200", name: "Operating Expenses", type: "expense" },
+  { code: "5300", name: "Spoilage & Shrinkage", type: "expense" },
 ];
 
 export class AccountingService {

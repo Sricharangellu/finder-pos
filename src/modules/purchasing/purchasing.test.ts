@@ -446,3 +446,88 @@ test("requisition list filters by status and paginates with a cursor", async () 
   const page2 = await call(app, "GET", `/api/purchasing/requisitions?limit=2&cursor=${encodeURIComponent(page1.json.nextCursor)}`);
   assert.equal(page2.json.items.length, 1);
 });
+
+// ─── Purchase cost entry (session D feature) ──────────────────────────────────
+
+async function receivePO(app: App, supplierId: string, productId: string, qty: number, unitCostCents: number) {
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    lines: [{ productId, quantity: qty, unitCostCents }],
+  })).json;
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+  return po;
+}
+
+test("cost-entry queue surfaces received lines with reference prices; submit updates cost", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Reference Vendor");
+  const productId = await makeProduct(app, "COST-A", 1000); // selling price 1000
+
+  // Two receipts from the SAME vendor for the same product.
+  await receivePO(app, supplierId, productId, 6, 250); // older
+  await receivePO(app, supplierId, productId, 4, 300); // newer
+
+  const queue = await call(app, "GET", "/api/purchasing/cost-entry");
+  assert.equal(queue.status, 200);
+  const rows = (queue.json.items as any[]).filter((r) => r.product_id === productId);
+  assert.ok(rows.length >= 2, "both received lines appear in the queue");
+
+  // The newest line (cost 300) should reference the older same-vendor cost (250).
+  const newest = rows.find((r) => r.po_cost_cents === 300);
+  assert.ok(newest, "newest receipt present");
+  assert.equal(newest.selling_price_cents, 1000, "shows our selling price");
+  assert.equal(newest.supplier_name, "Reference Vendor", "shows the vendor");
+  assert.equal(newest.received_qty, 4, "shows the final received qty");
+  assert.equal(newest.prev_vendor_cost_cents, 250, "shows the previous cost from the same vendor");
+
+  // Confirm a cost — updates product_costs (the last-purchase-cost reference).
+  const submit = await call(app, "POST", "/api/purchasing/cost-entry", { productId, costCents: 275 });
+  assert.equal(submit.status, 200);
+  assert.equal(submit.json.cost_cents, 275);
+
+  const after = await call(app, "GET", "/api/purchasing/cost-entry");
+  const afterRow = (after.json.items as any[]).find((r) => r.product_id === productId);
+  assert.equal(afterRow.last_purchase_cost_cents, 275, "last purchase cost reflects the confirmed cost");
+});
+
+test("cashier cannot submit a product cost (403)", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Vendor X");
+  const productId = await makeProduct(app, "COST-B", 500);
+  await receivePO(app, supplierId, productId, 2, 100);
+
+  const denied = await call(app, "POST", "/api/purchasing/cost-entry", { productId, costCents: 120 }, "cashier");
+  assert.equal(denied.status, 403);
+  // Reading the queue stays open.
+  assert.equal((await call(app, "GET", "/api/purchasing/cost-entry", undefined, "cashier")).status, 200);
+});
+
+test("receiving into a location credits that location's stock", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Loc Vendor");
+  const productId = await makeProduct(app, "LOC-A", 500);
+
+  // Create a receiving location.
+  const loc = await call(app, "POST", "/api/inventory/locations", { code: "RCV-1", name: "Receiving Dock" }, "manager");
+  assert.equal(loc.status, 201, `location create failed: ${JSON.stringify(loc.json)}`);
+  const locationId = loc.json.id as string;
+
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: 8, unitCostCents: 200 }],
+  })).json;
+
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 8, locationId }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+
+  // The chosen location's stock reflects the receipt.
+  const locStock = await call(app, "GET", `/api/inventory/locations/${locationId}/stock`);
+  assert.equal(locStock.status, 200);
+  const row = (locStock.json.items as any[]).find((s) => s.product_id === productId);
+  assert.ok(row, "product appears in the receiving location's stock");
+  assert.equal(Number(row.quantity_on_hand), 8, "location credited the full received qty");
+});

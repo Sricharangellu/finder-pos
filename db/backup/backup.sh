@@ -46,14 +46,27 @@ LOG_PREFIX="[backup.sh ${TIMESTAMP}]"
 # ---------------------------------------------------------------------------
 # Validate
 # ---------------------------------------------------------------------------
-if [[ -z "${DATABASE_URL:-}" ]]; then
-    echo "${LOG_PREFIX} ERROR: DATABASE_URL is not set." >&2
-    exit 1
-fi
+# --verify is a local file check (pg_restore --list on an already-written
+# .pgdump) — it needs neither a DB connection nor pg_dump. Requiring
+# DATABASE_URL unconditionally here meant a bare `--verify` invocation with
+# only BACKUP_DIR set (exactly what .github/workflows/backup.yml's "Verify
+# backup integrity" step does) always failed before it could check anything,
+# regardless of whether the backup was actually corrupt.
+if [[ "$MODE" != "--verify" ]]; then
+    if [[ -z "${DATABASE_URL:-}" ]]; then
+        echo "${LOG_PREFIX} ERROR: DATABASE_URL is not set." >&2
+        exit 1
+    fi
 
-if ! command -v pg_dump &>/dev/null; then
-    echo "${LOG_PREFIX} ERROR: pg_dump not found on PATH." >&2
-    exit 1
+    if ! command -v pg_dump &>/dev/null; then
+        echo "${LOG_PREFIX} ERROR: pg_dump not found on PATH." >&2
+        exit 1
+    fi
+else
+    if ! command -v pg_restore &>/dev/null; then
+        echo "${LOG_PREFIX} ERROR: pg_restore not found on PATH." >&2
+        exit 1
+    fi
 fi
 
 mkdir -p "$BACKUP_DIR"

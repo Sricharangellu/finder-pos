@@ -78,10 +78,25 @@ interface Bucket {
   lastRefillMs: number;
 }
 
+/**
+ * `?? fallback` only catches null/undefined — a caller building options from
+ * `Number(process.env["X"] ?? default)` (several call sites in src/app.ts do
+ * exactly this for CI/tier overrides) silently produces NaN on a malformed
+ * env var, and NaN is neither null nor undefined, so `??` lets it through.
+ * Every downstream comparison against NaN (`tokens < 1`, `Math.min(NaN, ...)`)
+ * evaluates false/NaN, which fail-OPEN — a typo'd override would silently
+ * disable a brute-force limiter instead of erroring. Enforced once here, at
+ * the single point every caller funnels through, rather than duplicated at
+ * each call site (and safe against call sites added later too).
+ */
+function safeNumber(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 export function rateLimitMiddleware(options: RateLimitOptions = {}) {
-  const capacity = options.capacity ?? 60;
-  const refillRate = options.refillRate ?? 20; // tokens/sec
-  const windowMs = options.windowMs ?? 60_000;
+  const capacity = safeNumber(options.capacity, 60);
+  const refillRate = safeNumber(options.refillRate, 20); // tokens/sec
+  const windowMs = safeNumber(options.windowMs, 60_000);
   const keyFn = options.keyFn ?? ((req: Request) => {
     return extractClientIp(req);
   });

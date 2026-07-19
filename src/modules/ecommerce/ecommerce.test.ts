@@ -156,3 +156,35 @@ test("portal returns 404 for unknown customer", async () => {
   const r = await call(app, "GET", "/api/ecommerce/portal/cus_nonexistent/orders");
   assert.equal(r.status, 404);
 });
+
+// ─── Authorization: publishing to the storefront is manager+ (loop iter 7) ────
+import http from "node:http";
+import jwt from "jsonwebtoken";
+function callAsEcom(app: App, role: string, method: string, path: string, body?: unknown): Promise<{ status: number }> {
+  const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
+  const token = jwt.sign({ sub: "usr_role_test", tenantId: "tnt_demo", role }, secret, { expiresIn: "1h" });
+  const p = path.replace("/api/", "/api/v1/");
+  return new Promise((resolve, reject) => {
+    const server = http.createServer(app.express);
+    server.listen(0, () => {
+      const addr = server.address();
+      if (addr === null || typeof addr === "string") { server.close(); reject(new Error("bind fail")); return; }
+      const payload = body === undefined ? undefined : JSON.stringify(body);
+      const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+      if (payload) { headers["content-type"] = "application/json"; headers["content-length"] = String(Buffer.byteLength(payload)); }
+      const req = http.request({ host: "127.0.0.1", port: addr.port, method, path: p, headers }, (res) => {
+        res.on("data", () => {}); res.on("end", () => { server.close(); resolve({ status: res.statusCode ?? 0 }); });
+      });
+      req.on("error", (e) => { server.close(); reject(e); });
+      if (payload) req.write(payload); req.end();
+    });
+  });
+}
+
+test("cashier cannot publish a product to the storefront (403); manager can", async () => {
+  const app = await freshApp();
+  const prod = await call(app, "POST", "/api/catalog/", { sku: `EC-${Date.now()}`, name: "Store Widget", price_cents: 1000, category: "general" });
+  assert.equal(prod.status, 201);
+  assert.equal((await callAsEcom(app, "cashier", "PUT", `/api/ecommerce/products/${prod.json.id}/online`, { online: true })).status, 403);
+  assert.equal((await callAsEcom(app, "manager", "PUT", `/api/ecommerce/products/${prod.json.id}/online`, { online: true })).status, 200);
+});

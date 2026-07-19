@@ -314,6 +314,20 @@ export const mockHandlers = [
     const b = (await request.json()) as { name?: string; email?: string };
     return HttpResponse.json({ id: `sup_${Math.random().toString(36).slice(2, 10)}`, tenant_id: "tnt_demo", name: b.name, email: b.email ?? null, created_at: Date.now() }, { status: 201 });
   }),
+  // Purchase cost-entry — received lines awaiting cost confirmation.
+  http.get(`${V1}/purchasing/cost-entry`, async () => {
+    await lat();
+    const now = Date.now();
+    return HttpResponse.json({ items: [
+      { line_id: "pol_1", product_id: "prod_1", sku: "COF-001", product_name: "House Blend 1kg", received_qty: 24, po_cost_cents: 850, supplier_name: "Acme Coffee Co", received_at: now - 3600_000, selling_price_cents: 1499, last_purchase_cost_cents: 820, prev_vendor_cost_cents: 830 },
+      { line_id: "pol_2", product_id: "prod_2", sku: "TEA-014", product_name: "Earl Grey 500g", received_qty: 12, po_cost_cents: 640, supplier_name: "Tea Traders", received_at: now - 7200_000, selling_price_cents: 999, last_purchase_cost_cents: 600, prev_vendor_cost_cents: null },
+    ] });
+  }),
+  http.post(`${V1}/purchasing/cost-entry`, async ({ request }) => {
+    await lat();
+    const b = (await request.json()) as { productId?: string; costCents?: number };
+    return HttpResponse.json({ product_id: b.productId, cost_cents: b.costCents ?? 0 });
+  }),
   http.get(`${V1}/purchasing/orders`, async () => {
     await lat();
     const D = 86400000, now = Date.now();
@@ -353,6 +367,28 @@ export const mockHandlers = [
       { id: "lot_2", product_id: "prod_1", name: "Organic Dark Roast Beans", lot_code: "L-2402", expiry_date: now + 12 * D, qty_on_hand: 18, days_to_expiry: 12 },
       { id: "lot_3", product_id: "prod_4", name: "Ceramic Coffee Mug", lot_code: "L-2403", expiry_date: now + 27 * D, qty_on_hand: 4, days_to_expiry: 27 },
     ] });
+  }),
+
+  // Expiry pool + sweep + dispositions.
+  http.get(`${V1}/inventory/expiry`, async () => {
+    await lat();
+    const now = Date.now(), D = 86400000;
+    return HttpResponse.json({ items: [
+      { id: "exp_1", product_id: "prod_2", product_name: "Wildflower Honey", lot_code: "L-2310", expiry_date: now - 3 * D, qty: 4, unit_cost_cents: 320, loss_cents: 1280, status: "pending" },
+      { id: "exp_2", product_id: "prod_5", product_name: "Fresh Cream 500ml", lot_code: "L-2401", expiry_date: now - 1 * D, qty: 9, unit_cost_cents: 180, loss_cents: 1620, status: "pending" },
+    ] });
+  }),
+  http.post(`${V1}/inventory/expiry/sweep`, async () => {
+    await lat();
+    return HttpResponse.json({ swept: 2, loss_cents: 2900, items: [] });
+  }),
+  http.post(`${V1}/inventory/expiry/:id/discard`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ id: params.id, status: "discarded" });
+  }),
+  http.post(`${V1}/inventory/expiry/:id/return-to-vendor`, async ({ params }) => {
+    await lat();
+    return HttpResponse.json({ writeoff: { id: params.id, status: "returned", disposition_ref: "ret_mock" }, vendorReturn: { id: "ret_mock" } });
   }),
 
   // ── Inventory: already-expired + value-at-risk ────────────────────────────
@@ -2635,9 +2671,9 @@ mockHandlers.push(
     await lat();
     return HttpResponse.json({
       items: [
-        { id: "eco_1", so_number: "SO-00001", customer_id: "cust_1", customer_name: "Alice Johnson", status: "pending_approve", total_cents: 12500, store_id: "ecommerce", created_at: Date.now() - 3600000 },
-        { id: "eco_2", so_number: "SO-00002", customer_id: "cust_2", customer_name: "Bob Smith", status: "confirmed", total_cents: 8750, store_id: "ecommerce", created_at: Date.now() - 7200000 },
-        { id: "eco_3", so_number: "SO-00003", customer_id: "cust_3", customer_name: "Carol Davis", status: "invoiced", total_cents: 22000, store_id: "ecommerce", created_at: Date.now() - 86400000 },
+        { id: "eco_1", so_number: "SO-00001", customer_id: "cust_1", customer_name: "Alice Johnson", status: "pending_approve", fulfillment_status: "unfulfilled", total_cents: 12500, store_id: "ecommerce", created_at: Date.now() - 3600000 },
+        { id: "eco_2", so_number: "SO-00002", customer_id: "cust_2", customer_name: "Bob Smith", status: "confirmed", fulfillment_status: "shipped", total_cents: 8750, store_id: "ecommerce", created_at: Date.now() - 7200000 },
+        { id: "eco_3", so_number: "SO-00003", customer_id: "cust_3", customer_name: "Carol Davis", status: "invoiced", fulfillment_status: "delivered", total_cents: 22000, store_id: "ecommerce", created_at: Date.now() - 86400000 },
       ],
     });
   }),

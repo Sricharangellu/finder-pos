@@ -56,7 +56,7 @@ export class EcommerceService {
     const params: Record<string, unknown> = { t: tenantId, lim: limit };
     if (since !== undefined) { where.push("so.created_at >= @since"); params.since = since; }
     return this.db.query(
-      `SELECT so.id, so.so_number, so.customer_id, c.name AS customer_name, so.status, so.total_cents, so.store_id, so.created_at
+      `SELECT so.id, so.so_number, so.customer_id, c.name AS customer_name, so.status, so.fulfillment_status, so.total_cents, so.store_id, so.created_at
        FROM sales_orders so
        LEFT JOIN customers c ON c.id = so.customer_id AND c.tenant_id = so.tenant_id
        WHERE ${where.join(" AND ")}

@@ -121,6 +121,16 @@ export const accountingModule: PosModule = {
       ], `PO ${p.poId} received`);
     });
 
+    // Expired stock written off → spoilage expense up, inventory asset down.
+    onBoth("inventory.expiry_written_off", async (event) => {
+      const p = event.payload as { tenantId: string; writeoffId: string; lossCents?: number };
+      if (!p.lossCents || p.lossCents <= 0) return;
+      await post("expiry_writeoff", p.writeoffId, p.tenantId, [
+        { accountCode: "5300", debitCents: p.lossCents },
+        { accountCode: "1200", creditCents: p.lossCents },
+      ], `Expiry write-off ${p.writeoffId}`);
+    });
+
     // Vendor bill posted → GRNI relieved, AP recognized.
     onBoth("bill.created", async (event) => {
       const p = event.payload as { tenantId: string; billId: string; totalCents: number };

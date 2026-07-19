@@ -294,13 +294,29 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // per-IP limiter (≈20/min sustained, small burst) in front of the router.
   // Registration gets an extra-tight limiter (5 burst, ~3/min) to prevent
   // automated account creation.
+  // Thresholds are env-overridable (defaults below = unchanged behavior) so a
+  // single-IP test suite (e.g. CI's Playwright runner, which needs dozens of
+  // login/probe requests) can be configured without touching this security
+  // posture anywhere it isn't explicitly opted into.
   const identityRouter = Router();
   await identityModule.register({ db, events, router: identityRouter });
   app.use(
     "/api/identity/register",
-    rateLimitMiddleware({ capacity: 5, refillRate: 0.05, redis }),
+    rateLimitMiddleware({
+      capacity: Number(process.env["IDENTITY_REGISTER_RATE_CAPACITY"] ?? 5),
+      refillRate: Number(process.env["IDENTITY_REGISTER_RATE_REFILL"] ?? 0.05),
+      redis,
+    }),
   );
-  app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
+  app.use(
+    "/api/identity",
+    rateLimitMiddleware({
+      capacity: Number(process.env["IDENTITY_RATE_LIMIT_CAPACITY"] ?? 10),
+      refillRate: Number(process.env["IDENTITY_RATE_LIMIT_REFILL"] ?? 0.33),
+      redis,
+    }),
+    identityRouter,
+  );
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
