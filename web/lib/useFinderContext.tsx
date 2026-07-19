@@ -43,7 +43,7 @@ interface FinderContextValue extends PersistedFinderContext {
   setLocation: (outletId: string, registerId: string) => void;
 }
 
-const STORAGE_KEY = "finder_global_context_v1";
+const STORAGE_KEY = "ascend_global_context_v1";
 
 function currentWeek(): FinderDateRange {
   const now = new Date();

@@ -22,8 +22,8 @@ let _accessToken: string | null = null;
 let _expiresAt: number | null = null; // unix ms
 let _user: UserProfile | null = null;
 
-const USER_KEY = "finder_pos_user";
-const MOCK_REFRESH_KEY = "finder_pos_mock_refresh";
+const USER_KEY = "ascend_user";
+const MOCK_REFRESH_KEY = "ascend_mock_refresh";
 
 // ─── Public getters ───────────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ export function setSession(
     // send it back to the MSW handler after a page reload.
     const isMockSession =
       process.env.NODE_ENV === "development" ||
-      (() => { try { return localStorage.getItem("finder_pos_demo") === "1"; } catch { return false; } })();
+      (() => { try { return localStorage.getItem("ascend_demo") === "1"; } catch { return false; } })();
     if (isMockSession) {
       sessionStorage.setItem(MOCK_REFRESH_KEY, _refreshToken);
     }
@@ -160,7 +160,7 @@ async function doSilentRefresh(): Promise<boolean> {
     try {
       const isMockSession =
         process.env.NODE_ENV === "development" ||
-        localStorage.getItem("finder_pos_demo") === "1";
+        localStorage.getItem("ascend_demo") === "1";
       if (isMockSession) mockRefreshToken = sessionStorage.getItem(MOCK_REFRESH_KEY);
     } catch { /* localStorage blocked */ }
     const data = await apiPost<import("@/api-client/types").RefreshResponse>(

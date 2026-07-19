@@ -20,7 +20,7 @@ interface StoreAuthState {
   logout: () => Promise<void>;
 }
 
-const TOKEN_KEY = "finder_store_token";
+const TOKEN_KEY = "ascend_store_token";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 

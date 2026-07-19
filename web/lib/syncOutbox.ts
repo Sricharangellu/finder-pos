@@ -10,7 +10,7 @@
 
 import type { SyncQueueItem } from "@/api-client/types";
 
-const STORAGE_KEY = "finder_pos_sync_outbox";
+const STORAGE_KEY = "ascend_sync_outbox";
 
 function readQueue(): SyncQueueItem[] {
   if (typeof window === "undefined") return [];

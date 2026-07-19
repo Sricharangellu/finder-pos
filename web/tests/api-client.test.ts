@@ -114,7 +114,7 @@ describe("apiDownload", () => {
   });
 
   it("refreshes once on 401 before retrying a blob download", async () => {
-    localStorage.setItem("finder_pos_demo", "1");
+    localStorage.setItem("ascend_demo", "1");
     let exportCalls = 0;
     const seenAuthHeaders: string[] = [];
     server.use(
