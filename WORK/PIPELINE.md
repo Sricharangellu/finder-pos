@@ -35,6 +35,15 @@ Merge test: `feat/delivery-pipeline` → `staging` is **conflict-free**
 | web build proof | ✅ CI "Frontend — typecheck + lint + build" PASSED on PR #81 (2026-07-19) — the long-outstanding sandbox limitation is closed |
 | CI backend job | ❌→fix queued: PR #81 failed 177/706 tests from Postgres service-container /dev/shm exhaustion (Docker 64MB default; suite now 700+ tests). Fixed by `--shm-size=1g` in ci.yml (both jobs), this commit. NOT an application bug — first failure is a resource error, and the whole suite passes locally/pre-push. |
 
+## Progress log
+
+- 2026-07-19: PR #81 (`feat/delivery-pipeline` → `staging`) MERGED, all checks
+  green after the ci.yml shm fix (e0d0035). Verified: staging contains all
+  Phase-0 fixes; delivery branch has 0 unique commits left. Release **PR #82**
+  (`staging` → `master`, 88 commits) opened — **awaiting Sri's merge** per the
+  standing release policy. After merge: prod verify + browser smoke (runbook
+  steps 4–5), then back-merge master → staging → develop (step 6).
+
 ## Runbook (in order)
 
 1. **Sri, terminal:** `git push origin feat/delivery-pipeline` (picks up the
