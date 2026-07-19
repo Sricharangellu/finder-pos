@@ -1,0 +1,82 @@
+# Scheduled production database backup (standing critical C-1, first slice).
+#
+# db/backup/backup.sh was written for a self-hosted-Postgres-with-crontab
+# topology (a persistent host to cron on, a local BACKUP_DIR). Production is
+# Vercel serverless + Supabase-managed Postgres — there is no such host, so
+# nothing has ever actually invoked this script on a schedule. That gap is
+# the real reason C-1 ("restore drill never run") has stayed open: there was
+# nothing to drill against. This runs backup.sh daily from a GitHub-hosted
+# runner (which can reach the Supabase pooler externally, same as any other
+# client) and keeps the dump as a retained workflow artifact.
+#
+# Honest scope: this delivers RPO ≤ 24h via pg_dump, NOT the ≤5min RPO in
+# backup.sh's docstring — that number assumes WAL archiving, which is a stub
+# in backup.sh (`run_wal_archive`, not yet integrated with WAL-G/pgBackRest).
+# Closing that gap is a separate, larger piece of work. This is the floor,
+# not the ceiling — same framing as uptime.yml's C-4 slice.
+#
+# Setup required (Sri): set the repo secret PROD_DATABASE_URL to the
+# production Supabase connection string (Session pooler). The job SKIPS
+# cleanly (does not fail) until that secret exists, matching this pipeline's
+# existing pattern for not-yet-configured tiers.
+name: Database backup
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # daily, 09:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: none
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: pg_dump production → artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: vars.BACKUP_ENABLED != 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PROD_DATABASE_URL is configured
+        id: check
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          if [ -z "$PROD_DATABASE_URL" ]; then
+            echo "⚠️  PROD_DATABASE_URL secret not set — skipping (see this workflow's header)."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install postgresql-client (pg_dump)
+        if: steps.check.outputs.configured == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Run backup
+        if: steps.check.outputs.configured == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          BACKUP_DIR: ${{ runner.temp }}/backup
+          BACKUP_S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
+        run: |
+          chmod +x db/backup/backup.sh
+          ./db/backup/backup.sh --full
+      - name: Verify backup integrity
+        if: steps.check.outputs.configured == 'true'
+        env:
+          BACKUP_DIR: ${{ runner.temp }}/backup
+        run: |
+          chmod +x db/backup/backup.sh
+          ./db/backup/backup.sh --verify
+      - name: Upload backup artifact
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/backup/*.pgdump
+          retention-days: 30

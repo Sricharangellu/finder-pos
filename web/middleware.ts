@@ -4,14 +4,20 @@ import type { NextRequest } from "next/server";
 /**
  * Security middleware — enforces auth and adds HTTP security headers.
  *
- * Auth: reads the non-httpOnly `finder_session_hint` cookie set by the backend
+ * Auth: reads the non-httpOnly session-hint cookie set by the backend
  * on login/refresh. If absent on a protected route, redirect to /login.
- * The actual refresh token lives in the httpOnly `finder_refresh` cookie —
- * unreadable by JavaScript, sent automatically by the browser to /refresh.
+ * The actual refresh token lives in an httpOnly cookie — unreadable by
+ * JavaScript, sent automatically by the browser to /refresh.
+ *
+ * Dual-read (rebrand Phase 1, step 2): the backend is dual-writing both
+ * `ascend_session_hint` (new) and `finder_session_hint` (old) — see
+ * WORK/FUNCTIONAL_REBRAND_PLAN.md. Prefer the new name, fall back to the old
+ * one so existing sessions that only have the old cookie keep working.
  */
 
 const PUBLIC_PATH_PREFIXES = [
   "/login",
+  "/signup",
   "/_next",
   "/favicon",
   "/icons",
@@ -25,7 +31,9 @@ export function middleware(request: NextRequest): NextResponse {
   // Allow public paths and API routes through without auth check.
   const isPublic = pathname === "/" || PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p));
   if (!isPublic) {
-    const sessionHint = request.cookies.get("finder_session_hint")?.value;
+    const sessionHint =
+      request.cookies.get("ascend_session_hint")?.value ??
+      request.cookies.get("finder_session_hint")?.value;
     if (!sessionHint) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);

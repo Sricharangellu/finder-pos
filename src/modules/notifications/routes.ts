@@ -1,6 +1,7 @@
 import type { Router, Response, Request } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound } from "../../shared/http.js";
+import { requireRole } from "../../gateway/auth.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import type { NotificationsService } from "./service.js";
 
@@ -48,8 +49,14 @@ export function registerRoutes(router: Router, service: NotificationsService): v
     }),
   );
 
+  // Manual notification creation is manager+ — otherwise any cashier could post
+  // spoofed notifications ("System: ...") to the tenant. Internal event-driven
+  // creation (notifications/index.ts) calls the service directly and bypasses
+  // this route, so it is unaffected. mark-read endpoints above stay open (a
+  // user acting on their own tenant's feed).
   router.post(
     "/",
+    requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(createSchema, req.body);
       const notif = await service.create(body, tenantId(res));

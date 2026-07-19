@@ -138,3 +138,18 @@ test("Redis tenant limiter uses a rolling window per tenant", async () => {
     Date.now = realNow;
   }
 });
+
+test("a malformed numeric override (NaN) falls back to the safe default instead of disabling the limiter", async () => {
+  // Mirrors how src/app.ts builds options from env vars: Number(process.env["X"] ?? default).
+  // A typo'd override (e.g. IDENTITY_RATE_LIMIT_CAPACITY="abc") produces NaN here, and NaN is
+  // neither null nor undefined, so a naive `options.capacity ?? 60` would let it through —
+  // every downstream comparison against NaN is false, which fails OPEN (unlimited requests).
+  const mw = rateLimitMiddleware({ capacity: Number("not-a-number"), refillRate: Number("also-not-a-number") });
+  const res = fakeRes();
+  let allowed = 0;
+  for (let i = 0; i < 65; i++) {
+    const err = await invoke(mw, fakeReq(), res);
+    if (!err) allowed++;
+  }
+  assert.equal(allowed, 60, "NaN capacity enforces the documented default (60), not unlimited");
+});

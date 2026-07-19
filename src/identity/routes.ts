@@ -30,14 +30,21 @@ function getCookie(req: Request, name: string): string | undefined {
 /** Set httpOnly refresh token cookie + non-httpOnly session hint for middleware. */
 function setAuthCookies(res: Response, refreshToken: string): void {
   res.cookie("finder_refresh", refreshToken, { ...COOKIE_BASE, httpOnly: true });
+  // Dual-write (rebrand Phase 1, step 1): also set the new cookie name alongside the old
+  // one with identical value/options. Do not remove the old-name cookie here — see
+  // WORK/FUNCTIONAL_REBRAND_PLAN.md Phase 1 for the soak/cutover sequencing.
+  res.cookie("ascend_refresh", refreshToken, { ...COOKIE_BASE, httpOnly: true });
   // Non-httpOnly hint: JavaScript and Next.js middleware can read it to know a session exists.
   res.cookie("finder_session_hint", "1", { ...COOKIE_BASE, httpOnly: false });
+  res.cookie("ascend_session_hint", "1", { ...COOKIE_BASE, httpOnly: false });
 }
 
 /** Clear both auth cookies on logout. */
 function clearAuthCookies(res: Response): void {
   res.clearCookie("finder_refresh", { ...COOKIE_BASE, httpOnly: true });
+  res.clearCookie("ascend_refresh", { ...COOKIE_BASE, httpOnly: true });
   res.clearCookie("finder_session_hint", { ...COOKIE_BASE, httpOnly: false });
+  res.clearCookie("ascend_session_hint", { ...COOKIE_BASE, httpOnly: false });
 }
 
 const registerDeviceSchema = z.object({
@@ -130,7 +137,8 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
     "/refresh",
     handler(async (req, res) => {
       // Accept token from httpOnly cookie (preferred) or request body (backward compat).
-      const cookieToken = getCookie(req, "finder_refresh");
+      // Dual-read: prefer the new cookie name, fall back to the old one.
+      const cookieToken = getCookie(req, "ascend_refresh") ?? getCookie(req, "finder_refresh");
       const rawBody = req.body as Record<string, unknown>;
       const bodyToken = typeof rawBody["refreshToken"] === "string" ? rawBody["refreshToken"] : undefined;
       const refreshToken = cookieToken ?? bodyToken;
@@ -146,7 +154,8 @@ export function registerIdentityRoutes(router: Router, service: IdentityService)
   router.post(
     "/logout",
     handler(async (req, res) => {
-      const cookieToken = getCookie(req, "finder_refresh");
+      // Dual-read: prefer the new cookie name, fall back to the old one.
+      const cookieToken = getCookie(req, "ascend_refresh") ?? getCookie(req, "finder_refresh");
       const rawBody = req.body as Record<string, unknown>;
       const bodyToken = typeof rawBody["refreshToken"] === "string" ? rawBody["refreshToken"] : undefined;
       const tokenToRevoke = cookieToken ?? bodyToken;

@@ -162,6 +162,8 @@ const NAV_TREE: NavSection[] = [
       { label: "Overview",      href: "/inventory",               featureGate: "inventory" },
       { label: "Pipeline",      href: "/inventory/pipeline",      featureGate: "inventory" },
       { label: "Receive Stock", href: "/inventory/receive-stock", featureGate: "inventory" },
+      { label: "Purchase",      href: "/purchase",                featureGate: "purchasing" },
+      { label: "Expiry",        href: "/inventory/expiry-pool",   featureGate: "inventory" },
       { label: "Warehouse",     href: "/warehouse",               featureGate: "inventory", partial: true },
       { label: "Delivery",      href: "/delivery",                featureGate: "shipping" },
       { label: "Purchasing",    href: "/purchasing",              featureGate: "purchasing" },

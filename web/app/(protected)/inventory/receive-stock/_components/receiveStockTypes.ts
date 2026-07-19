@@ -32,8 +32,15 @@ export interface ReceiveEntry {
   unitsPerCase: string;
   totalQty: number;
   expiryDate: string;
-  lotCode: string;
+  locationId: string;   // stock location this line is received into
   highlighted?: boolean;
+}
+
+/** A selectable stock location for the receiving desk. */
+export interface LocationOption {
+  id: string;
+  code: string;
+  name: string;
 }
 
 export interface PODocument {
@@ -60,7 +67,7 @@ export interface ReceiveLinePayload {
   lineId: string;
   qty: number;
   expiryDate?: number; // epoch ms
-  lotCode?: string;
+  locationId?: string;
 }
 
 /**
@@ -76,8 +83,7 @@ export function buildReceiveLines(entries: ReceiveEntry[]): ReceiveLinePayload[]
       const line: ReceiveLinePayload = { lineId: e.lineId, qty: e.totalQty };
       const expiryMs = e.expiryDate ? new Date(e.expiryDate).getTime() : NaN;
       if (Number.isFinite(expiryMs)) line.expiryDate = expiryMs;
-      const lot = e.lotCode.trim();
-      if (lot) line.lotCode = lot;
+      if (e.locationId) line.locationId = e.locationId;
       return line;
     });
 }

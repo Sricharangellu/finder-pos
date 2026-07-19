@@ -1,16 +1,20 @@
 /**
- * AUTO-GENERATED — do not hand-edit.
- *
- * Regenerate with:
+ * MANUALLY MAINTAINED — this is NOT auto-generated output, despite this
+ * file's own history claiming otherwise. Verified 2026-07-19: running
  *   npx openapi-typescript ../contracts/openapi.yaml -o api-client/types.ts
+ * produces openapi-typescript's raw `paths`/`operations`/`components` shape
+ * (~5,900 lines) — a different kind of file entirely from the hand-curated
+ * named interfaces below (`CatalogProduct`, `Bill`, `Employee`, etc., ~1,900
+ * lines). 218 files across web/app, web/components, web/hooks, and web/lib
+ * import named types from here. Running the command above and committing the
+ * result, as earlier comments in this file instructed, would break all of
+ * them at once — do NOT do that without a dedicated migration (either hand
+ * -curate semantic aliases on top of the generated `components["schemas"]`
+ * types, or accept this file as permanently hand-maintained and drop the
+ * generator association from contracts/openapi.yaml entirely).
  *
- * This file was seeded from the Wave 0 stub openapi.yaml.  When the Backend
- * agent publishes real paths, re-run the command above and commit the result.
- *
- * Until the generator can run (empty spec / no network), the types below are
- * authored to match the known contract surface described in
- * contracts/openapi.yaml + 00_EXECUTION_PROMPT_BOOK.md.  They will be
- * overwritten on the first successful generator run.
+ * Keep this file's shape in sync with contracts/openapi.yaml by hand when
+ * the backend contract changes; there is currently no automated drift check.
  */
 
 // ─── Error envelope ──────────────────────────────────────────────────────────
@@ -1039,6 +1043,8 @@ export interface OnlineOrder {
   /** display name returned by some handlers */
   customerName?: string;
   status: string;
+  /** delivery-pipeline stage: unfulfilled|picking|packed|shipped|delivered */
+  fulfillment_status?: string;
   total_cents?: number;
   /** camelCase alias some mock handlers return */
   totalCents?: number;

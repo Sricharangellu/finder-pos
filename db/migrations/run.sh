@@ -74,9 +74,19 @@ epoch_ms() {
 is_applied() {
     local fname="$1"
     local count
-    count=$(psql "$DATABASE_URL" --no-psqlrc -t -q \
-        -c "SELECT COUNT(*) FROM migrations_applied WHERE filename = '$fname';" \
-        | tr -d '[:space:]')
+    # -v + :'fname' (psql's own variable-substitution syntax) quotes the value
+    # as a SQL string literal, correctly escaping embedded quotes — not raw
+    # shell interpolation into the query text. filenames here always come from
+    # db/migrations/*.sql (CODEOWNERS-gated, not attacker input), so practical
+    # risk was low, but the string-splicing shape itself is worth not having.
+    # Verified: `:'var'` substitution only fires in psql's script-parsing mode
+    # (stdin/-f), NOT with -c (confirmed empirically against a real Postgres —
+    # -c passes the text through more directly and errors on bare `:`), so
+    # these use a heredoc via stdin instead of -c.
+    count=$(psql "$DATABASE_URL" --no-psqlrc -t -q -v fname="$fname" <<'SQL' | tr -d '[:space:]'
+SELECT COUNT(*) FROM migrations_applied WHERE filename = :'fname';
+SQL
+    )
     [[ "$count" -gt 0 ]]
 }
 
@@ -84,14 +94,16 @@ mark_applied() {
     local fname="$1"
     local ts
     ts=$(epoch_ms)
-    psql "$DATABASE_URL" --no-psqlrc -q \
-        -c "INSERT INTO migrations_applied (filename, applied_at) VALUES ('$fname', $ts) ON CONFLICT DO NOTHING;"
+    psql "$DATABASE_URL" --no-psqlrc -q -v fname="$fname" -v ts="$ts" <<'SQL'
+INSERT INTO migrations_applied (filename, applied_at) VALUES (:'fname', :'ts') ON CONFLICT DO NOTHING;
+SQL
 }
 
 unmark_applied() {
     local fname="$1"
-    psql "$DATABASE_URL" --no-psqlrc -q \
-        -c "DELETE FROM migrations_applied WHERE filename = '$fname';"
+    psql "$DATABASE_URL" --no-psqlrc -q -v fname="$fname" <<'SQL'
+DELETE FROM migrations_applied WHERE filename = :'fname';
+SQL
 }
 
 run_sql_file() {
@@ -118,7 +130,7 @@ apply_up() {
         files+=("$f")
     done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "*.sql" \
                 ! -name "*.down.sql" \
-                | sort -z)
+                -print0 | sort -z)
 
     if [[ ${#files[@]} -eq 0 ]]; then
         echo "  No migration files found in $SCRIPT_DIR"

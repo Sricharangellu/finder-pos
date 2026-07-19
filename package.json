@@ -4,8 +4,9 @@
   "description": "Ascend - Year 1 Foundation (modular monolith). Offline-first POS backend on Postgres.",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "start": "tsx --env-file-if-exists=.env src/server.ts",
+    "db:setup": "bash scripts/db-setup.sh",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx scripts/test.ts",

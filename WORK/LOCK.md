@@ -2,6 +2,94 @@
 
 Status: RELEASED — purchase requisitions shipped (draft→submit→approve→convert-to-PO); see AUDIT_2026-07-14T225200Z-purchase-requisitions.md; ACPA M1.4 event platform (session B); Clean Architecture pilot (quotes + gateway auth) (session C); SSO OIDC hardening (session D)
 
+## Active Claim (Claude session D — FEATURE: expiry management)
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, Sri-directed feature — loop stopped) |
+| Queue item | Expiry management (full-stack): automated sweep moves past-expiry lots out of active inventory into an expiry pool (expiry_writeoffs), books the total loss (Dr 5300 Spoilage / Cr 1200 Inventory via event), Upcoming-Expiry + Expiry-Pool pages, dispositions (discard / return-to-vendor via purchasing vendor-returns). Slices: (1) backend sweep+pool+journal, (2) dispositions, (3) frontend pages. Decisions: real journal, reuse vendor-returns, automated sweep + manual button. |
+| Files/areas expected | `src/modules/inventory/{index,service,routes}.ts` (+ test); `src/modules/accounting/{service,index}.ts` (chart + subscription); `web/app/(protected)/inventory/expiry/**` or ecommerce nav; web mocks/types. NOT session B/C files. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing (slice 1: sweep+pool+journal) |
+| Blockers | none |
+
+## Active Claim (Claude session D — inventory hardening: race-free transfer numbering) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 5; resumed after Sri feature) |
+| Queue item | createTransfer's transfer_number uses COUNT(*)+1 — the codebase's own banned pattern; concurrent transfers get duplicate numbers. Replace with the shared document_counters (nextDocNumber), seeded to the current transfer count on first use so numbering stays continuous. Deterministic barrier test (source-lock) proves duplicates without the fix. |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW/updated transfer test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
+## Active Claim (Claude session D — FEATURE: receive per-line location + purchase cost-entry page) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, Sri-directed feature — pauses inventory loop) |
+| Queue item | Sri feature (full-stack): (1) Receive Stock — per-line Product Location selector replacing lot-code. (2) NEW Purchase cost-entry page — received products (final qty) flow in, enter cost, show reference prices (previous same-vendor cost, last purchase cost, our selling price); save updates product_costs + inventory valuation; top-bar toggle hides the reference columns. Building in slices: backend cost-entry endpoints → receive-location → frontend Purchase page. |
+| Files/areas expected | `src/modules/purchasing/{service,routes}.ts` (+ test) for cost-entry; `src/modules/purchasing/service.ts` + inventory event for receive-location; `web/app/(protected)/purchase/**` (new page); `web/app/(protected)/inventory/receive-stock/_components/ReceiveLinesCard.tsx`; web mocks/types. NOT session B (payments/shared/orchestration) or C (quotes/gateway/sso/verticals) files. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing (slice 1: backend cost-entry) |
+| Blockers | none |
+
+## Active Claim (Claude session D — inventory hardening: transfer over-draw creates phantom stock) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 4) |
+| Queue item | createTransfer never validates source on-hand. adjustStockTx clamps the source debit at 0 but the destination gets the FULL credit, so transferring more than available creates phantom stock (100 from a loc with 10 → source 0, dest +100 = 90 conjured). Fix: lock + check source availability inside the tx; throw 409 insufficient_stock if quantity > on-hand. (Cross-transfer deadlock deferred — hard to test deterministically; noted.) |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW over-transfer test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
+## Active Claim (Claude session D — inventory hardening: cycle-count double-close) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 3) |
+| Queue item | closeCycleCount reads session → checks status=='open' → loops applying variance adjustments (each own tx) → THEN flips to closed — not atomic, not single-winner. Two concurrent closes both pass the open-check and apply every variance TWICE (stock double-counted); a mid-loop crash + retry double-posts too. Fix: extract adjustTx(tdb) from adjust(), wrap closeCycleCount in one tx with session FOR UPDATE (serializes → 2nd close 409s), publish events post-commit. |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW cycle-count double-close test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
+## Active Claim (Claude session D — inventory hardening: transfer atomicity) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — INVENTORY focus, iter 2) |
+| Queue item | createTransfer moves stock via TWO separate adjustStock calls (each its own tx) + a separate INSERT — NOT atomic. A crash/error between legs loses stock (leaves source, never reaches dest). Fix: extract adjustStockTx(tdb,…) (with FOR UPDATE, same race as adjust()), run both legs + the transfer INSERT in ONE tx. Deferred (noted): COUNT(*)+1 transfer number → doc-counter (needs max-seeding; transfer_number is non-unique so race is cosmetic). |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW transfer atomicity test. inventory unclaimed by B/C. |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
+## Active Claim (Claude session D — inventory hardening: stock-adjust oversell race) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop — Sri-directed INVENTORY subsystem focus) |
+| Queue item | inventory.adjust() is read-modify-write: SELECT stock_qty (no lock) → compute nextQty in JS → write absolute value. Concurrent adjusts on one product lose updates → oversell. (The FEFO lot path already uses FOR UPDATE; the main stock path didn't.) Fix: SELECT ... FOR UPDATE to serialize, + ON CONFLICT on the new-row INSERT for the first-receive race. Concurrency regression test via a 2nd DB connection. |
+| Files/areas expected | `src/modules/inventory/service.ts` + NEW concurrency test. inventory unclaimed by B/C. NOT payments/shared/orchestration (B), NOT quotes/gateway/sso (C). |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
+## Active Claim (Claude session D — authz sweep: reports + ecommerce mutation guards) — RELEASED
+
+| Field | Value |
+|---|---|
+| Agent/session | Claude session D (Fable 5, autonomous loop iter 7) |
+| Queue item | Extended the iter-6 authz sweep across all modules. Real gaps (excluding POS-by-design orders/payments, and B/C-claimed payments/quotes; team verified guarded via in-handler requireManagement): reports POST /ar-aging/sweep (mutates AR/dunning state) + ecommerce PUT /products/:id/online (storefront publishing) were UNGUARDED. Added requireRole("manager") to both. |
+| Files/areas expected | `src/modules/reports/routes.ts` + reports.test.ts; `src/modules/ecommerce/routes.ts` + ecommerce.test.ts. gateway/auth imported only (NOT edited — C). NOT payments/quotes/shared/orchestration (B/C). |
+| Started | 2026-07-16 |
+| Status | ACTIVE — implementing |
+| Blockers | none |
+
 ## Active Claim (Claude session D — sync mutation authorization) — RELEASED
 
 | Field | Value |

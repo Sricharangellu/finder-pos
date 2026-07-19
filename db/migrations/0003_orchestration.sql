@@ -288,19 +288,23 @@ ALTER TABLE event_outbox ENABLE ROW LEVEL SECURITY;
 --    service role that sets app.tenant_id before every query (same as the
 --    rest of the app via db.withTenant()).
 -- ---------------------------------------------------------------------------
-CREATE POLICY IF NOT EXISTS workflow_instances_tenant_isolation
+DROP POLICY IF EXISTS workflow_instances_tenant_isolation ON workflow_instances;
+CREATE POLICY workflow_instances_tenant_isolation
     ON workflow_instances
     USING (tenant_id = current_setting('app.tenant_id'));
 
-CREATE POLICY IF NOT EXISTS retry_state_tenant_isolation
+DROP POLICY IF EXISTS retry_state_tenant_isolation ON retry_state;
+CREATE POLICY retry_state_tenant_isolation
     ON retry_state
     USING (tenant_id = current_setting('app.tenant_id'));
 
-CREATE POLICY IF NOT EXISTS job_queue_tenant_isolation
+DROP POLICY IF EXISTS job_queue_tenant_isolation ON job_queue;
+CREATE POLICY job_queue_tenant_isolation
     ON job_queue
     USING (tenant_id = current_setting('app.tenant_id'));
 
-CREATE POLICY IF NOT EXISTS event_outbox_tenant_isolation
+DROP POLICY IF EXISTS event_outbox_tenant_isolation ON event_outbox;
+CREATE POLICY event_outbox_tenant_isolation
     ON event_outbox
     USING (tenant_id = current_setting('app.tenant_id'));
 
