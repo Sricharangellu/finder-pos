@@ -12,6 +12,14 @@
  *   without exposing the actual token.
  * - On mount, if the session hint cookie is present, the app silently calls
  *   /refresh (cookie sent automatically) to re-hydrate the in-memory token.
+ *
+ * Dual-write/dual-read (rebrand Phase 1, steps 1-2): the backend now sets
+ * both `ascend_refresh`/`ascend_session_hint` (new) and `finder_refresh`/
+ * `finder_session_hint` (old) alongside each other — see
+ * WORK/FUNCTIONAL_REBRAND_PLAN.md. This file mirrors that: it sets/clears
+ * both session-hint cookie names when it writes one directly, and reads the
+ * new name first, falling back to the old, so existing sessions carrying
+ * only the old cookie keep working.
  */
 
 import type { UserProfile, Role } from "@/api-client/types";
@@ -75,6 +83,7 @@ export function setSession(
       sessionStorage.setItem(MOCK_REFRESH_KEY, _refreshToken);
     }
     document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
+    document.cookie = "ascend_session_hint=1; Path=/; SameSite=Lax";
   }
 }
 
@@ -99,6 +108,7 @@ export function clearSession(): void {
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem(MOCK_REFRESH_KEY);
     document.cookie = "finder_session_hint=; Path=/; Max-Age=0; SameSite=Lax";
+    document.cookie = "ascend_session_hint=; Path=/; Max-Age=0; SameSite=Lax";
   }
 }
 
@@ -107,7 +117,11 @@ export function clearSession(): void {
 /** Returns true if the browser likely has a valid refresh cookie (session hint present). */
 export function hasSessionHint(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie.includes("finder_session_hint=");
+  // Dual-read: prefer the new cookie name, fall back to the old one.
+  return (
+    document.cookie.includes("ascend_session_hint=") ||
+    document.cookie.includes("finder_session_hint=")
+  );
 }
 
 export function getStoredUser(): UserProfile | null {
@@ -125,7 +139,8 @@ export function getStoredUser(): UserProfile | null {
 
 /**
  * Attempt a silent token refresh.
- * The httpOnly `finder_refresh` cookie is sent automatically by the browser.
+ * The httpOnly refresh cookie (`ascend_refresh`, or `finder_refresh` for
+ * sessions established before the rebrand) is sent automatically by the browser.
  * Returns true if the session is now valid.
  *
  * Guarded by the session hint cookie — if that cookie is absent the user is

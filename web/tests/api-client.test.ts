@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { apiDownload, apiPost, ApiResponseError } from "@/api-client/client";
 import type { LoginResponse } from "@/api-client/types";
-import { clearSession, setSession } from "@/lib/auth";
+import { clearSession, setSession, hasSessionHint } from "@/lib/auth";
 import { server } from "@/mocks/server";
 
 beforeEach(() => {
@@ -148,5 +148,104 @@ describe("apiDownload", () => {
     expect(exportCalls).toBe(2);
     expect(seenAuthHeaders[0]).toBe("Bearer expired-token");
     expect(seenAuthHeaders[1]).toMatch(/^Bearer mock-access-token\./);
+  });
+});
+
+describe("session-hint cookie — rebrand Phase 1 dual-write/dual-read", () => {
+  function clearAllSessionHintCookies(): void {
+    document.cookie = "finder_session_hint=; Path=/; Max-Age=0; SameSite=Lax";
+    document.cookie = "ascend_session_hint=; Path=/; Max-Age=0; SameSite=Lax";
+  }
+
+  it("setSession sets both the old and new session-hint cookie names", () => {
+    clearAllSessionHintCookies();
+    setSession("t", 900, "r", {
+      id: "u1",
+      email: "e@e.com",
+      name: "T",
+      role: "cashier",
+      tenantId: "t1",
+    });
+    expect(document.cookie).toContain("finder_session_hint=1");
+    expect(document.cookie).toContain("ascend_session_hint=1");
+  });
+
+  it("clearSession clears both the old and new session-hint cookie names", () => {
+    setSession("t", 900, "r", {
+      id: "u1",
+      email: "e@e.com",
+      name: "T",
+      role: "cashier",
+      tenantId: "t1",
+    });
+    expect(document.cookie).toContain("finder_session_hint=1");
+    expect(document.cookie).toContain("ascend_session_hint=1");
+
+    clearSession();
+    expect(document.cookie).not.toContain("finder_session_hint=1");
+    expect(document.cookie).not.toContain("ascend_session_hint=1");
+  });
+
+  it("hasSessionHint recognizes a session carrying ONLY the old finder_session_hint cookie (zero forced logout)", () => {
+    clearAllSessionHintCookies();
+    // Simulate a browser with a pre-rebrand session: only the old cookie name
+    // exists, the new one was never set (deploy predates this PR).
+    document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
+    expect(document.cookie).not.toContain("ascend_session_hint=1");
+    expect(hasSessionHint()).toBe(true);
+    clearAllSessionHintCookies();
+  });
+
+  it("hasSessionHint recognizes a session carrying ONLY the new ascend_session_hint cookie", () => {
+    clearAllSessionHintCookies();
+    // Simulate a browser that authenticated after the rebrand shipped fully
+    // (hypothetical post-cutover state) — old cookie absent, new one present.
+    document.cookie = "ascend_session_hint=1; Path=/; SameSite=Lax";
+    expect(document.cookie).not.toContain("finder_session_hint=1");
+    expect(hasSessionHint()).toBe(true);
+    clearAllSessionHintCookies();
+  });
+
+  it("refreshes once on 401 before retrying a blob download for a session carrying ONLY the old session-hint cookie", async () => {
+    clearAllSessionHintCookies();
+    localStorage.setItem("finder_pos_demo", "1");
+    let exportCalls = 0;
+    const seenAuthHeaders: string[] = [];
+    server.use(
+      http.get("*/api/v1/catalog/export", ({ request }) => {
+        exportCalls += 1;
+        seenAuthHeaders.push(request.headers.get("authorization") ?? "");
+        if (exportCalls === 1) {
+          return HttpResponse.json(
+            { error: { code: "unauthenticated", message: "Expired", requestId: "req_2" } },
+            { status: 401 },
+          );
+        }
+        return new HttpResponse("sku,name\nC-3,Cherry\n", {
+          status: 200,
+          headers: { "Content-Type": "text/csv" },
+        });
+      }),
+    );
+
+    setSession("expired-token-2", 900, "mock-refresh-token-dev", {
+      id: "u1",
+      email: "owner@example.com",
+      name: "Owner",
+      role: "owner",
+      tenantId: "t1",
+    });
+    // Override to only the OLD cookie name — proves the old-cookie-only path
+    // still triggers a successful silent refresh (no forced logout).
+    clearAllSessionHintCookies();
+    document.cookie = "finder_session_hint=1; Path=/; SameSite=Lax";
+
+    const blob = await apiDownload("/api/v1/catalog/export");
+    expect(await readBlob(blob)).toBe("sku,name\nC-3,Cherry\n");
+    expect(exportCalls).toBe(2);
+    expect(seenAuthHeaders[0]).toBe("Bearer expired-token-2");
+    expect(seenAuthHeaders[1]).toMatch(/^Bearer mock-access-token\./);
+
+    clearAllSessionHintCookies();
   });
 });
