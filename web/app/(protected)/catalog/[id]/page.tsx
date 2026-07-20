@@ -61,6 +61,14 @@ const TABS: { key: Tab; label: string; group: string }[] = [
 // Visual separators: show a small divider before the first tab of each new group
 const GROUP_BREAKS = new Set(["inventory", "activity", "content", "insights"]);
 
+// Group labels shown above the divider so the existing grouping is legible,
+// not just a silent line — the grouping itself already existed (TABS above),
+// it just wasn't surfaced anywhere in the rendered tab bar.
+const GROUP_LABELS: Record<string, string> = {
+  core: "Core", inventory: "Inventory", activity: "Activity",
+  content: "Content", insights: "Insights",
+};
+
 // ── Stock badge helper ────────────────────────────────────────────────────────
 
 function StockBadge({ total, reorderPoint }: { total: number; reorderPoint: number }) {
@@ -363,7 +371,12 @@ export default function ProductDetailPage() {
               return (
                 <div key={key} className="flex items-center">
                   {showDivider && (
-                    <div className="mx-1 h-5 w-px bg-slate-200 self-center" aria-hidden="true" />
+                    <div className="mx-1 flex items-center gap-2 self-stretch" aria-hidden="true">
+                      <div className="h-5 w-px bg-slate-200" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        {GROUP_LABELS[group]}
+                      </span>
+                    </div>
                   )}
                   <button
                     type="button"
