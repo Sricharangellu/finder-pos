@@ -13,14 +13,14 @@ commerce, Shopify for enterprise, Stripe for finance, SAP B1 for operations.
 
 ## Document map (read in this order)
 1. **This file** — authority, mission, execution loop.
-2. [ARCHITECTURE.md](ARCHITECTURE.md) — what the system is today.
+2. [ARCHITECTURE.md](../ARCHITECTURE.md) — what the system is today.
 3. [CTO_CHARTER.md](CTO_CHARTER.md) — decision rules, engineering economics.
 4. [ENGINEERING_ORG.md](ENGINEERING_ORG.md) — roles, review protocol, delivery standard.
 5. [DOMAIN_MODEL.md](DOMAIN_MODEL.md) — team → module ownership.
 6. [PLATFORM_ROADMAP.md](PLATFORM_ROADMAP.md) — levels 1–10 with real status.
 7. [ACPA_ROADMAP.md](ACPA_ROADMAP.md) — transformation migrations + epic backlog.
 8. [CODING_STANDARDS.md](CODING_STANDARDS.md) — repo idioms.
-9. [ADR/](ADR/) — architecture decision records. **Every significant decision
+9. [ADR/](../ADR/) — architecture decision records. **Every significant decision
    gets an ADR.** Check existing ADRs before re-deciding anything.
 
 ## Execution loop (every work cycle)

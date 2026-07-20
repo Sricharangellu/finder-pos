@@ -10,8 +10,9 @@
 >   canonical SQL in `db/migrations/`. The DDL below predates multi-tenancy —
 >   real tables all carry `tenant_id`.
 > - **Conventions** (pagination, versioning, errors, money, IDs):
->   `docs/architecture/CODING_STANDARDS.md`.
-> - **Domain model**: `docs/architecture/DOMAIN_MODEL.md`.
+>   `docs/architecture/DESIGN_PRINCIPLES.md`.
+> - **Domain model**: `docs/architecture/ARCHITECTURE.md` (team → module
+>   ownership table).
 >
 > Still true and enforced: module isolation (no cross-module TS imports),
 > integration via shared tables + EventBus events, integer-cents money.

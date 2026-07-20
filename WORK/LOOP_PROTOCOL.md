@@ -31,7 +31,7 @@ NEEDS-SRI list is out of scope for the loop.
    own history includes a "verified gap" that turned out to be already built.
 4. **Claim** in `WORK/LOCK.md` (session letter + exact files + explicit
    NOT-list covering other active claims).
-5. **Implement** per `docs/architecture/CODING_STANDARDS.md`. No new
+5. **Implement** per `docs/architecture/DESIGN_PRINCIPLES.md`. No new
    dependencies without recording the justification in the audit.
 6. **Gates** — all must pass before commit: `npx tsc --noEmit` clean; isolated
    real-PG tests for every touched module (single-file runs are authoritative;
