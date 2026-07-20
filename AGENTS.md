@@ -24,8 +24,40 @@ new instruction/status/pipeline/design files; update the mapped file instead.
 | Concern | The one file |
 |---|---|
 | Agent instructions & skills | `AGENTS.md` (this file) |
-| Design principles & architecture | `docs/architecture/ENGINEERING_CONSTITUTION.md` (+ ADRs under `docs/architecture/ADR/`) |
+| Orchestration: workflows, plans, agents, skills | `docs/architecture/ORCHESTRATION.md` |
+| Design principles | `docs/architecture/DESIGN_PRINCIPLES.md` |
+| Architecture | `docs/architecture/ARCHITECTURE.md` (+ ADRs under `docs/architecture/ADR/`) |
+| Gaps (what's actually still missing, code-verified) | `docs/architecture/GAPS.md` |
 | CI/CD & release pipeline | `docs/architecture/PIPELINE.md` (feature → develop → staging → master; master merges are Sri-only) |
+(2026-07-20 consolidation: `ENGINEERING_CONSTITUTION.md`, `CODING_STANDARDS.md`,
+`ENGINEERING_ORG.md`, `ACPA_ROADMAP.md`, `DOMAIN_MODEL.md`,
+`PLATFORM_ROADMAP.md`, `CTO_CHARTER.md`, and `orchestration/gaps/*.md` were
+folded into the four files above per Sri's directive — archived under
+`docs/architecture/_archive/` and `orchestration/_archive/`, not deleted.)
+
+**Branch rules (Sri directive, 2026-07-19, refined same day — binding, not optional):**
+
+- **NEVER branch from `master`.** Every new branch starts from `develop`
+  (`git checkout -b feature/<name> develop`). `master` is a release target,
+  not a starting point — branching from it re-creates the exact
+  skip-the-flow mistake this repo has already been corrected for twice.
+- **Feature branches correctly cut from `develop` do not have to be deleted
+  the instant they merge** — it's fine for a few to stay alive if work is
+  ongoing. What is NOT optional: **the production tree must always be
+  clean.** "Production tree" means `master` and the pipeline that feeds it
+  (`staging`, `develop`) — these three follow a strict, structural
+  merge/push process (PR only, never an ad-hoc push) and nothing else
+  accumulates on them.
+- **Keep `develop` ≥ `staging` ≥ `master` in sync at all times.** The moment
+  anything merges to `master`, back-merge it into `staging` and `develop` in
+  the same session — don't let the tiers drift apart. Before ending any
+  session that touched git, verify this invariant holds
+  (`git rev-list --count origin/master..origin/staging` and
+  `origin/master..origin/develop` should both be 0 right after a release).
+- Stale, fully-merged branches (already absorbed into `staging`) should
+  still be cleared out periodically so `git branch -r` stays legible — just
+  not treated as an immediate per-merge requirement for active `develop`
+  branches.
 | Orchestration: loop program | `WORK/LOOP_PROTOCOL.md` |
 | Orchestration: session lock | `WORK/LOCK.md` |
 | Project plan | `WORK/FORWARD_PLAN.md` |
@@ -35,10 +67,11 @@ new instruction/status/pipeline/design files; update the mapped file instead.
 Before making changes, read in order:
 
 1. `AGENTS.md`
-2. `docs/architecture/ENGINEERING_CONSTITUTION.md` — the engineering
-   constitution (architecture rules, ADRs, roadmap). Mandatory for any
-   architectural or cross-module work; update it (and add an ADR) whenever you
-   make a significant architectural or domain change.
+2. `docs/architecture/DESIGN_PRINCIPLES.md` and `docs/architecture/ARCHITECTURE.md` —
+   the engineering constitution + as-built architecture (rules, ADRs,
+   roadmap). Mandatory for any architectural or cross-module work; update
+   them (and add an ADR) whenever you make a significant architectural or
+   domain change.
 3. `WORK/LOOP_STATE.md` (current work state) and `WORK/FORWARD_PLAN.md` (plan)
 4. `WORK/LOCK.md`
 5. Latest relevant file in `WORK/audits/`
