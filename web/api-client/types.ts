@@ -18,11 +18,25 @@
  */
 
 // ─── Error envelope ──────────────────────────────────────────────────────────
+
+/** One per-field validation issue (backend `parseBody` → HttpError.details). */
+export interface ApiFieldIssue {
+  /** Dot-joined field path, e.g. "email" or "lines.0.qty"; "(root)" for whole-body issues. */
+  field: string;
+  message: string;
+}
+
 export interface ApiError {
   error: {
     code: string;
     message: string;
     requestId: string;
+    /**
+     * Structured per-field issues. Present on `validation_error` responses
+     * (400) from any endpoint using shared/http.ts `parseBody`; additive —
+     * `message` remains the flattened human-readable summary.
+     */
+    details?: ApiFieldIssue[];
   };
 }
 
