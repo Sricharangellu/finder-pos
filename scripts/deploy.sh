@@ -72,8 +72,13 @@ deploy_backend() {
   ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && npm run build && test -f dist/src/app.js )
   echo "→ Backend: deploying…"
   local url
+  # Newer Vercel CLI versions print a JSON summary to stdout instead of a
+  # plain URL line (progress text goes to stderr either way) — extract the
+  # URL by pattern instead of assuming a fixed "last line" shape, so this
+  # keeps working across CLI output format changes.
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \
-      npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" | tail -1 )
+      npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
+      | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
   echo "→ Backend deployed: $url"
   # Non-prod: pin the unique preview URL to a stable alias so the frontend can be
   # built against a durable backend origin (prod uses --prod's own alias).
@@ -103,8 +108,12 @@ deploy_frontend() {
   ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && BACKEND_URL="$BACKEND_URL" NEXT_PUBLIC_MOCK="$FRONTEND_MOCK_MODE" npm run build )
   echo "→ Frontend: deploying…"
   local url
+  # See the matching comment in deploy_backend: extract the URL by pattern,
+  # not by assuming a fixed "last line" shape (newer Vercel CLI versions
+  # print a JSON summary to stdout instead of a plain URL line).
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$FRONTEND_PID" \
-      npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" | tail -1 )
+      npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
+      | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
   echo "→ Frontend deployed: $url"
   if [[ "$DEPLOY_ENV" != "prod" && -n "${FRONTEND_ALIAS:-}" ]]; then
     echo "→ Frontend: aliasing $url → $FRONTEND_ALIAS"
