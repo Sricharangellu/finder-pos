@@ -116,7 +116,18 @@ deploy_frontend() {
 case "$TARGET" in
   backend)  deploy_backend ;;
   frontend) deploy_frontend ;;
-  both)     deploy_backend; deploy_frontend ;;
+  both)
+    # Run both independently — a backend failure (e.g. a bad DB/TLS config)
+    # must not silently skip the frontend deploy (and its alias update), and
+    # vice versa. Report both outcomes, then fail if either failed.
+    backend_status=0; frontend_status=0
+    deploy_backend || backend_status=$?
+    deploy_frontend || frontend_status=$?
+    if [[ $backend_status -ne 0 || $frontend_status -ne 0 ]]; then
+      echo "✗ backend exit=$backend_status frontend exit=$frontend_status"
+      exit 1
+    fi
+    ;;
   *) echo "usage: VERCEL_TOKEN=xxx DEPLOY_ENV=prod|testing|dev $0 [backend|frontend|both]"; exit 1 ;;
 esac
 echo "Done ($TARGET @ $DEPLOY_ENV)."
