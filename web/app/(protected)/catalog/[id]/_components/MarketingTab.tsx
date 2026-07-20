@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/Button";
 import { apiPatch, ApiResponseError } from "@/api-client/client";
+import { useCapabilities } from "@/contexts/CapabilitiesContext";
 import type { CatalogProduct } from "@/api-client/types";
 
 const FIELD = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-[#111] outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
@@ -41,6 +42,13 @@ export function MarketingTab({
   product: CatalogProduct;
   onSaved: (p: CatalogProduct) => void;
 }) {
+  // Regulated-product compliance is a module, not a hardcoded panel: tenants
+  // outside regulated verticals disable the `compliance` module and never see
+  // tobacco/MSA fields. moduleEnabled is deliberately fail-open — compliance
+  // is core to Ascend's specialty-retail market, so it shows unless opted out.
+  const { moduleEnabled } = useCapabilities();
+  const complianceEnabled = moduleEnabled("compliance");
+
   // Loyalty
   const [loyaltyMode, setLoyaltyMode] = useState<"default" | "custom">("default");
   const [customLoyaltyPct, setCustomLoyaltyPct] = useState("5.00");
@@ -154,6 +162,7 @@ export function MarketingTab({
       </Section>
 
       {/* ── Compliance ────────────────────────────────────────────────── */}
+      {complianceEnabled && (
       <Section title="Compliance">
         {complianceError && (
           <p role="alert" className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{complianceError}</p>
@@ -218,6 +227,7 @@ export function MarketingTab({
           </div>
         </div>
       </Section>
+      )}
 
     </div>
   );

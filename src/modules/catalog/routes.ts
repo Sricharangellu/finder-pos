@@ -1,4 +1,4 @@
-import type { Router, Request, Response } from "express";
+import type { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { CatalogService, ProductStatus, TaxClass, VariantChannel, VariantSortMode, PriceTarget, PriceOp } from "./service.js";
@@ -6,6 +6,7 @@ import { VARIANT_SORT_MODES, PRICE_OPS } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
 import { requireRole } from "../../gateway/auth.js";
 import { parseCsv, toCsv } from "../../shared/csv.js";
+import type { DB } from "../../shared/db.js";
 
 const taxClassSchema = z.enum(["standard", "exempt"]);
 const statusSchema = z.enum(["active", "draft", "archived"]);
@@ -262,7 +263,69 @@ const importSchema = z.object({
     .max(2000),
 });
 
+// ── Retail package isolation (strict business-package separation) ─────────────
+// Wholesale-only pricing lives on the shared product entity for wholesale/hybrid
+// tenants, but must never surface for tenants without the `wholesale` capability:
+// not in any catalog response, and not writable through any catalog input. UI
+// hiding is not a boundary (the capabilities context deliberately fails open), so
+// the API is scrubbed here — a retail user should never learn these fields exist.
+// Data is untouched: columns keep their values; only the API surface is scoped.
+const WHOLESALE_ONLY_FIELDS: readonly string[] = [
+  "wholesale_price_cents",
+  "enterprise_price_cents",
+  "customer_specific",
+];
+
+/** Recursively remove wholesale-only keys from a response/request payload. */
+function scrubWholesaleDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(scrubWholesaleDeep);
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      if (WHOLESALE_ONLY_FIELDS.includes(key)) continue;
+      out[key] = scrubWholesaleDeep(val);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Router-level guard: one indexed lookup per request (same cost class as
+ * requirePlan). Fail-closed — if the capability cannot be confirmed, the tenant
+ * is treated as retail-only and the fields are scrubbed. Inputs are stripped
+ * silently (a 400 naming the field would reveal that it exists).
+ */
+function wholesaleFieldIsolation() {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const auth = res.locals["auth"] as AuthPayload | undefined;
+    const db = res.locals["db"] as DB | undefined;
+    let wholesaleEnabled = false;
+    if (auth?.tenantId && db) {
+      try {
+        const row = await db.one<{ enabled: boolean | number }>(
+          "SELECT enabled FROM tenant_capabilities WHERE tenant_id = @t AND capability = 'wholesale' LIMIT 1",
+          { t: auth.tenantId },
+        );
+        wholesaleEnabled = row ? row.enabled === true || row.enabled === 1 : false;
+      } catch {
+        wholesaleEnabled = false;
+      }
+    }
+    if (!wholesaleEnabled) {
+      if (req.body !== null && typeof req.body === "object") {
+        req.body = scrubWholesaleDeep(req.body);
+      }
+      const json = res.json.bind(res);
+      res.json = ((body: unknown) => json(scrubWholesaleDeep(body))) as typeof res.json;
+    }
+    next();
+  };
+}
+
 export function registerRoutes(router: Router, service: CatalogService): void {
+  router.use(wholesaleFieldIsolation());
+
   // Bulk import / upsert by SKU (owner/manager only). For catalog onboarding.
   router.post(
     "/import",
