@@ -426,7 +426,7 @@ async function main() {
   console.log(`  Products: ${products.length}`);
   console.log(`  Customers: ${customers.length}`);
   console.log(`  Orders: ${orders.length} (${orders.filter(o => o.status === "completed").length} completed, ${orders.filter(o => o.status === "open").length} open)`);
-  console.log(`\nLogin: owner@finder-pos.dev / FinderDemo!2026`);
+  console.log(`\nLogin: owner@ascend.dev / AscendDemo!2026`);
   } finally {
     await db.close();
   }

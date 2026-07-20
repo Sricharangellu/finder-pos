@@ -1,6 +1,8 @@
 import type { PosModule } from "../types.js";
 import { CatalogService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { CatalogDetailViewsService } from "./detail-views.js";
+import { registerDetailRoutes } from "./detail-routes.js";
 import { dropLegacyNoTenant } from "../../shared/migrate.js";
 
 // Mirrors db/migrations/0002_commerce.sql — db/ is the canonical DDL owner.
@@ -208,6 +210,53 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS wholesale_price_cents BIGINT;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS enterprise_price_cents BIGINT;
 `;
 
+// MAP = Minimum Advertised Price (compliance floor for online/ad listings),
+// distinct from wholesale/enterprise account pricing above.
+const ALTER_PRODUCTS_MAP_PRICE = `
+ALTER TABLE products ADD COLUMN IF NOT EXISTS map_price_cents BIGINT;
+`;
+
+// Product ↔ supplier associations (many-to-many): a product can be sourced
+// from several vendors at different costs/lead times, with one marked
+// preferred. References the existing `suppliers` table (purchasing module);
+// the product-detail Suppliers tab creates suppliers by name on the fly (see
+// CatalogService.upsertSupplierByName), so this table only needs the FK.
+const CREATE_PRODUCT_SUPPLIERS = `
+CREATE TABLE IF NOT EXISTS product_suppliers (
+  id             TEXT PRIMARY KEY,
+  tenant_id      TEXT NOT NULL,
+  product_id     TEXT NOT NULL,
+  supplier_id    TEXT NOT NULL,
+  vendor_sku     TEXT,
+  cost_cents     BIGINT,
+  lead_time_days INTEGER,
+  moq            INTEGER,
+  case_pack      INTEGER,
+  is_preferred   BOOLEAN NOT NULL DEFAULT false,
+  notes          TEXT,
+  created_at     BIGINT NOT NULL,
+  updated_at     BIGINT NOT NULL,
+  UNIQUE (tenant_id, product_id, supplier_id)
+);
+CREATE INDEX IF NOT EXISTS product_suppliers_product_idx ON product_suppliers (tenant_id, product_id);
+`;
+
+// Quantity-break pricing ("buy N+, pay X"). Distinct from product_tier_prices
+// (sales module) which prices by CUSTOMER tier, not order quantity.
+const CREATE_PRODUCT_PRICE_TIERS = `
+CREATE TABLE IF NOT EXISTS product_price_tiers (
+  id          TEXT PRIMARY KEY,
+  tenant_id   TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  min_qty     INTEGER NOT NULL,
+  price_cents BIGINT NOT NULL,
+  label       TEXT,
+  created_at  BIGINT NOT NULL,
+  CONSTRAINT product_price_tiers_min_qty_positive CHECK (min_qty > 0)
+);
+CREATE INDEX IF NOT EXISTS product_price_tiers_product_idx ON product_price_tiers (tenant_id, product_id, min_qty);
+`;
+
 export const catalogModule: PosModule = {
   name: "catalog",
   migrations: [
@@ -227,6 +276,9 @@ export const catalogModule: PosModule = {
     ALTER_PRODUCTS_EXPIRY,
     ALTER_PRODUCTS_XLSX_FIELDS,
     ALTER_PRODUCTS_TIERED_PRICING,
+    ALTER_PRODUCTS_MAP_PRICE,
+    CREATE_PRODUCT_SUPPLIERS,
+    CREATE_PRODUCT_PRICE_TIERS,
     `
 CREATE TABLE IF NOT EXISTS product_images (
   id          TEXT PRIMARY KEY,
@@ -283,6 +335,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS product_units_code_idx ON product_units (tenan
     // Idempotent demo seed (only runs when the table is empty for tnt_demo).
     await service.seed();
     registerRoutes(router, service);
+    registerDetailRoutes(router, new CatalogDetailViewsService(db, service));
   },
 };
 

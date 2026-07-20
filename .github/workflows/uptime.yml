@@ -29,19 +29,19 @@ jobs:
       - name: Backend liveness (/healthz)
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
-            https://finder-pos-backend.vercel.app/healthz \
+            https://ascendhq-api.vercel.app/healthz \
             || (echo "❌ /healthz failed" && exit 1)
       - name: Backend readiness (/readyz — DB reachable)
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
-            https://finder-pos-backend.vercel.app/readyz \
+            https://ascendhq-api.vercel.app/readyz \
             || (echo "❌ /readyz failed" && exit 1)
       - name: Auth boundary (/api/v1/flags must 401 unauthenticated)
         run: |
           http_status="$(curl -sS --max-time 15 --retry 2 --retry-delay 5 \
             -o /tmp/flags-response.json \
             -w '%{http_code}' \
-            https://finder-pos-backend.vercel.app/api/v1/flags)"
+            https://ascendhq-api.vercel.app/api/v1/flags)"
           if [ "$http_status" != "401" ]; then
             echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
             cat /tmp/flags-response.json
@@ -50,5 +50,5 @@ jobs:
       - name: Frontend reachable
         run: |
           curl -fsS --max-time 15 --retry 3 --retry-delay 5 \
-            https://finder-pos-frontend.vercel.app/ >/dev/null \
+            https://ascendhq-app.vercel.app/ >/dev/null \
             || (echo "❌ frontend failed" && exit 1)

@@ -16,9 +16,10 @@ async function call(
   method: string,
   path: string,
   body?: unknown,
+  role?: string,
 ): Promise<{ status: number; json: any }> {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body);
+  return request(app.express, method, path, body, role);
 }
 
 test("missing inventory row reports zeroed stock (no 404)", async () => {
@@ -41,6 +42,96 @@ test("receive increases stock (201)", async () => {
 
   const got = await call(app, "GET", "/api/inventory/prod_a");
   assert.equal(got.json.stockQty, 10);
+});
+
+// Regression: getReorderSuggestions() joined a table called `catalog_products`
+// with columns (reorder_quantity, preferred_vendor_id/name) that don't exist
+// anywhere in the schema — the real catalog table is `products`, and
+// preferred-vendor is tracked in catalog's `product_suppliers` table. This
+// made GET /inventory/reorder-suggestions 500 against a real database despite
+// being wired to two live pages (purchasing's Reorder tab, /inventory/reorder).
+test("reorder-suggestions: lists a product below its reorder point with preferred vendor (catalog_products regression)", async () => {
+  const app = await freshApp();
+
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-1", name: "Reorder Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201, `product create failed: ${JSON.stringify(product.json)}`);
+  const productId = product.json.id;
+
+  const supplier = await call(app, "POST", "/api/catalog/" + productId + "/suppliers", {
+    vendor_name: "Reorder Vendor", is_preferred: true,
+  });
+  assert.equal(supplier.status, 201, `supplier link failed: ${JSON.stringify(supplier.json)}`);
+
+  const receive = await call(app, "POST", `/api/inventory/${productId}/receive`, { quantity: 3 });
+  assert.equal(receive.status, 201, `receive failed: ${JSON.stringify(receive.json)}`);
+  const reorderPoint = await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 10 });
+  assert.equal(reorderPoint.status, 200, `set reorder-point failed: ${JSON.stringify(reorderPoint.json)}`);
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, `reorder-suggestions failed: ${JSON.stringify(json)}`);
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row, "expected product below reorder point to appear in suggestions");
+  assert.equal(row.stock_qty, 3);
+  assert.equal(row.reorder_pt, 10);
+  assert.equal(row.preferred_vendor_name, "Reorder Vendor");
+});
+
+// Regression: web/app/(protected)/purchasing/_components/shared.ts's
+// ReorderSuggestion type (used by ReorderTab.tsx) expects last_unit_cost_cents/
+// last_ordered_at/last_ordered_qty, but getReorderSuggestions() never returned
+// them (contract drift found 2026-07-19 while building the Phase 0 wave).
+// Fixed with a real LATERAL join onto each product's most recent PO line.
+test("reorder-suggestions: reports the most recent PO line's cost/date/qty", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-LASTPO-1", name: "Reorder Last PO Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 5 });
+
+  const supplier = await call(app, "POST", "/api/purchasing/suppliers", { name: "Last PO Supplier" });
+  assert.equal(supplier.status, 201, JSON.stringify(supplier.json));
+
+  const po1 = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supplier.json.id, lines: [{ productId, quantity: 8, unitCostCents: 111 }],
+  });
+  assert.equal(po1.status, 201, JSON.stringify(po1.json));
+
+  // A second, later PO should win as "most recent" — proves ORDER BY created_at
+  // DESC LIMIT 1 in the LATERAL join, not just "any" PO line.
+  const po2 = await call(app, "POST", "/api/purchasing/orders", {
+    supplierId: supplier.json.id, lines: [{ productId, quantity: 20, unitCostCents: 222 }],
+  });
+  assert.equal(po2.status, 201, JSON.stringify(po2.json));
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200, JSON.stringify(json));
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row, "expected the product below reorder point in suggestions");
+  assert.equal(row.last_unit_cost_cents, 222);
+  assert.equal(row.last_ordered_qty, 20);
+  assert.ok(typeof row.last_ordered_at === "number" && row.last_ordered_at > 0);
+});
+
+test("reorder-suggestions: last_unit_cost_cents/last_ordered_at/last_ordered_qty are null when the product has never been ordered", async () => {
+  const app = await freshApp();
+  const product = await call(app, "POST", "/api/catalog/", {
+    sku: "REORDER-NOPO-1", name: "Never Ordered Product", price_cents: 1000, raw_cost_price_cents: 500,
+  });
+  assert.equal(product.status, 201);
+  const productId = product.json.id;
+  await call(app, "PUT", `/api/inventory/${productId}/reorder-point`, { reorderPt: 5 });
+
+  const { status, json } = await call(app, "GET", "/api/inventory/reorder-suggestions");
+  assert.equal(status, 200);
+  const row = json.items.find((i: { product_id: string }) => i.product_id === productId);
+  assert.ok(row);
+  assert.equal(row.last_unit_cost_cents, null);
+  assert.equal(row.last_ordered_qty, null);
+  assert.equal(row.last_ordered_at, null);
 });
 
 test("manual adjust changes stock", async () => {
@@ -406,4 +497,136 @@ test("crash before dispatch: a pending receive is applied exactly once by the re
   await app.outbox.reconcile();
   got = await call(app, "GET", "/api/inventory/prod_lost");
   assert.equal(got.json.stockQty, 3);
+});
+
+// ── Role gate: manager+ required for stock-movement mutations ─────────────────
+//
+// NOTE: /api/inventory/deduct is deliberately NOT gated — TerminalInner.tsx
+// calls it automatically after every cashier-completed sale
+// (handleTenderSuccess), with the response silently swallowed
+// (.catch(() => {})). Gating it would not fail loudly; it would silently
+// stop inventory from decrementing after every routine cashier sale. See PR
+// review notes for the same reasoning on payments POST /.
+
+test("manager can receive stock", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_role_recv/receive", { quantity: 5 }, "manager");
+  assert.equal(status, 201);
+  assert.equal(json.stockQty, 5);
+});
+
+test("cashier cannot receive stock (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "POST", "/api/inventory/prod_role_recv2/receive", { quantity: 5 }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can adjust stock", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_adj/receive", { quantity: 5 }, "manager");
+  const { status, json } = await call(app, "POST", "/api/inventory/prod_role_adj/adjust", {
+    delta: 2,
+    reason: "adjustment",
+  }, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.stockQty, 7);
+});
+
+test("cashier cannot adjust stock (403)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_adj2/receive", { quantity: 5 }, "manager");
+  const { status } = await call(app, "POST", "/api/inventory/prod_role_adj2/adjust", {
+    delta: 2,
+    reason: "adjustment",
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can set the reorder point", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "PUT", "/api/inventory/prod_role_rp/reorder-point", {
+    reorderPt: 4,
+  }, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.reorderPt, 4);
+});
+
+test("cashier cannot set the reorder point (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "PUT", "/api/inventory/prod_role_rp2/reorder-point", {
+    reorderPt: 4,
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("cashier can deduct stock for a completed sale (unguarded — see NOTE above)", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/inventory/prod_role_deduct/receive", { quantity: 10 }, "manager");
+  const { status, json } = await call(app, "POST", "/api/inventory/deduct", {
+    lines: [{ product_id: "prod_role_deduct", qty: 3 }],
+  }, "cashier");
+  assert.equal(status, 200);
+  assert.equal(json.ok, true);
+
+  const stock = await call(app, "GET", "/api/inventory/prod_role_deduct");
+  assert.equal(stock.json.stockQty, 7);
+});
+
+test("manager can create a location transfer", async () => {
+  const app = await freshApp();
+  // /receive writes the GLOBAL `inventory` table; /transfers reads the
+  // location-scoped `inventory_stock` table — seed stock at iloc_a via the
+  // location-aware /adjustments endpoint, not /receive, or the source
+  // location genuinely has 0 on hand regardless of global stock.
+  await call(app, "POST", "/api/inventory/adjustments", {
+    product_id: "prod_role_xfr",
+    location_id: "iloc_a",
+    delta: 10,
+    mode: "add",
+    reason: "cycle_count",
+  }, "manager");
+  const { status, json } = await call(app, "POST", "/api/inventory/transfers", {
+    from_location_id: "iloc_a",
+    to_location_id: "iloc_b",
+    product_id: "prod_role_xfr",
+    quantity: 3,
+  }, "manager");
+  assert.equal(status, 201, `transfer create failed: ${JSON.stringify(json)}`);
+  assert.ok(json.id.startsWith("xfr_"));
+});
+
+test("cashier cannot create a location transfer (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "POST", "/api/inventory/transfers", {
+    from_location_id: "iloc_a",
+    to_location_id: "iloc_b",
+    product_id: "prod_role_xfr2",
+    quantity: 3,
+  }, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can perform a location-level stock adjustment", async () => {
+  const app = await freshApp();
+  const { status, json } = await call(app, "POST", "/api/inventory/adjustments", {
+    product_id: "prod_role_locadj",
+    location_id: "iloc_a",
+    delta: 5,
+    mode: "add",
+    reason: "cycle_count",
+  }, "manager");
+  assert.equal(status, 201, `location adjustment failed: ${JSON.stringify(json)}`);
+  assert.equal(json.delta, 5);
+});
+
+test("cashier cannot perform a location-level stock adjustment (403)", async () => {
+  const app = await freshApp();
+  const { status } = await call(app, "POST", "/api/inventory/adjustments", {
+    product_id: "prod_role_locadj2",
+    location_id: "iloc_a",
+    delta: 5,
+    mode: "add",
+    reason: "cycle_count",
+  }, "cashier");
+  assert.equal(status, 403);
 });

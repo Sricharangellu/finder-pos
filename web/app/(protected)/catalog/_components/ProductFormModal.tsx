@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ApiResponseError } from "@/api-client/client";
 import { Button } from "@/components/Button";
+import { useCapabilities } from "@/contexts/CapabilitiesContext";
 import type { Product, Category, ProductStatus, TaxClass } from "@/api-client/types";
 import {
   buildProductCreateBody,
@@ -80,6 +81,13 @@ export function ProductFormModal({
   onSave: (body: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
+  const { capabilities } = useCapabilities();
+  // Strict package separation: the wholesale-price input renders only for
+  // wholesale/hybrid tenants (unknown = retail, fail closed). The backend
+  // strips the field for everyone else regardless.
+  const businessType = capabilities?.business?.type;
+  const wholesaleTenant = businessType === "wholesale" || businessType === "hybrid";
+
   const [form, setForm] = useState<ProductFormState>(initial ? productToForm(initial) : emptyForm());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -178,7 +186,9 @@ export function ProductFormModal({
 
           <FormSection
             title="Pricing"
-            description="Retail price is customer-facing. Cost, MSRP, wholesale, and vendor UPC stay internal."
+            description={wholesaleTenant
+              ? "Retail price is customer-facing. Cost, MSRP, wholesale, and vendor UPC stay internal."
+              : "Retail price is customer-facing. Cost, MSRP, and vendor UPC stay internal."}
           >
             <div>
               <label className={labelCls}>Sell price ($) {form.productKind !== "master" && <span className="text-red-500">*</span>}</label>
@@ -198,11 +208,13 @@ export function ProductFormModal({
               {fieldErrors.costInput && <p className="mt-1 text-xs text-red-600">{fieldErrors.costInput}</p>}
             </div>
 
-            <div>
-              <label className={labelCls}>Wholesale price ($)</label>
-              <input type="number" step="0.01" min="0" value={form.wholesaleInput} onChange={(e) => set("wholesaleInput", e.target.value)} placeholder="0.00" className={inputCls} />
-              {fieldErrors.wholesaleInput && <p className="mt-1 text-xs text-red-600">{fieldErrors.wholesaleInput}</p>}
-            </div>
+            {wholesaleTenant && (
+              <div>
+                <label className={labelCls}>Wholesale price ($)</label>
+                <input type="number" step="0.01" min="0" value={form.wholesaleInput} onChange={(e) => set("wholesaleInput", e.target.value)} placeholder="0.00" className={inputCls} />
+                {fieldErrors.wholesaleInput && <p className="mt-1 text-xs text-red-600">{fieldErrors.wholesaleInput}</p>}
+              </div>
+            )}
           </FormSection>
 
           <FormSection

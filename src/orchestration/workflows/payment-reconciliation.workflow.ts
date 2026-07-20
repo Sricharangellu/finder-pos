@@ -22,7 +22,12 @@ import type { Cents } from "../../shared/money.js";
  * Safety: never silently mutate financial records on error.
  * On failure the workflow emits payment.reconciliation_exception and halts.
  * No compensation needed — this is a read-mostly reporting workflow.
- * The only mutation (accounting post) is guarded by a separate AccountingPostingWorkflow.
+ *
+ * NOTE: this workflow (trigger payment.reconciliation_started) is not wired to
+ * any live path — the reconcile-payments job that would emit it is never
+ * enqueued. Its accounting.entry_requested emit below is inert (the consuming
+ * AccountingPostingWorkflow was retired; nothing subscribes to that event now).
+ * Left in place as unwired scaffolding; see the accounting-posting-drift audit.
  */
 
 const CASH_ACCOUNT = "1010";

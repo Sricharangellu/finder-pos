@@ -21,7 +21,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { apiGet } from "@/api-client/client";
 import type { CapabilitiesResponse, CapabilityModule } from "@/api-client/types";
 
-const CACHE_KEY = "finder_capabilities_v1";
+const CACHE_KEY = "ascend_capabilities_v1";
 const CACHE_TTL = 5 * 60 * 1000; // 5 min — same policy as the module-flags cache
 
 interface CapabilitiesState {

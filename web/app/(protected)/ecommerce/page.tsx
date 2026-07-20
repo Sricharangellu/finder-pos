@@ -19,7 +19,7 @@ interface StorefrontSettings {
   acceptOnlineOrders: boolean;
 }
 
-type Tab = "orders" | "settings";
+type Tab = "orders" | "delivery" | "settings";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +112,111 @@ function OrdersTab() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <Badge variant={statusBadge(order.status)}>{order.status}</Badge>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
+                      {formatMoney(orderTotal(order))}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                      {fmtDate(orderDate(order))}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      )}
+    </div>
+  );
+}
+
+// ── Tab: Delivery ─────────────────────────────────────────────────────────────
+// Online orders that have been shipped or delivered to the customer. Purely the
+// outbound side — no relation to inbound receiving / purchasing / billing.
+
+const SHIPPED_STATES = new Set(["shipped", "delivered"]);
+
+function fulfillmentBadge(s?: string): "green" | "blue" | "gray" {
+  if (s === "delivered") return "green";
+  if (s === "shipped") return "blue";
+  return "gray";
+}
+
+function DeliveryTab() {
+  const [orders, setOrders] = useState<OnlineOrder[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setError(null);
+        let items: OnlineOrder[] = [];
+        try {
+          const r = await apiGet<{ items: OnlineOrder[] }>("/api/v1/ecommerce/orders");
+          items = r.items ?? [];
+        } catch {
+          const r = await apiGet<{ items: OnlineOrder[] }>("/api/v1/sales/orders?type=ecommerce");
+          items = r.items ?? [];
+        }
+        // Only orders that have actually left the door.
+        setOrders(items.filter((o) => SHIPPED_STATES.has(o.fulfillment_status ?? "")));
+      } catch (e) {
+        setError(e instanceof ApiResponseError ? e.message : "Failed to load shipped orders");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-base font-semibold text-slate-950">Delivery</h2>
+        <p className="mt-0.5 text-sm text-slate-500">Online orders shipped or delivered to your customers.</p>
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700" role="alert">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <TableSkeleton headers={["Order #", "Customer", "Fulfillment", "Total", "Date"]} rows={8} />
+      ) : (
+      <Card noPadding>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Order #</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Fulfillment</th>
+                <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {orders.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                    No shipped online orders yet.
+                  </td>
+                </tr>
+              ) : (
+                orders.map((order) => (
+                  <tr key={order.id} className="hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold text-slate-700">
+                      {orderNumber(order)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-950">
+                      {order.customerName ?? order.customer_id ?? "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <Badge variant={fulfillmentBadge(order.fulfillment_status)}>{order.fulfillment_status ?? "—"}</Badge>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-950">
                       {formatMoney(orderTotal(order))}
@@ -262,8 +367,16 @@ function SettingsTab() {
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "orders", label: "Online Orders" },
+  { id: "delivery", label: "Delivery" },
   { id: "settings", label: "Storefront Settings" },
 ];
+
+// Tab → deep-link path (each tab is bookmarkable).
+const TAB_PATH: Record<Tab, string> = {
+  orders: "/ecommerce/orders",
+  delivery: "/ecommerce/delivery",
+  settings: "/ecommerce/shipping",
+};
 
 export default function EcommercePage() {
   const pathname = usePathname();
@@ -289,7 +402,7 @@ export default function EcommercePage() {
                 type="button"
                 onClick={() => {
                   setActiveTab(tab.id);
-                  router.replace(tab.id === "orders" ? "/ecommerce/orders" : "/ecommerce/shipping", { scroll: false });
+                  router.replace(TAB_PATH[tab.id], { scroll: false });
                 }}
                 aria-current={activeTab === tab.id ? "page" : undefined}
                 className={[
@@ -307,6 +420,7 @@ export default function EcommercePage() {
 
         {/* Tab panels */}
         {activeTab === "orders" && <OrdersTab />}
+        {activeTab === "delivery" && <DeliveryTab />}
         {activeTab === "settings" && <SettingsTab />}
       </div>
     </EnterpriseShell>
@@ -315,5 +429,6 @@ export default function EcommercePage() {
 
 function ecommerceTabFromPath(pathname: string): Tab {
   if (pathname.endsWith("/shipping")) return "settings";
+  if (pathname.endsWith("/delivery")) return "delivery";
   return "orders";
 }

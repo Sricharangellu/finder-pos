@@ -120,7 +120,7 @@ export function storeLocationsService(db: DB, events: EventBus) {
     async deleteLocation(id: string, tenantId: string): Promise<void> {
       await this.getLocation(id, tenantId);
       await db.query(
-        `DELETE FROM product_locations WHERE location_id = @id AND tenant_id = @tenantId`,
+        `DELETE FROM store_location_products WHERE location_id = @id AND tenant_id = @tenantId`,
         { id, tenantId }
       );
       await db.query(
@@ -133,7 +133,7 @@ export function storeLocationsService(db: DB, events: EventBus) {
       return db.query<ProductLocation>(
         `SELECT pl.*, sl.aisle, sl.shelf, sl.bin, sl.label,
                 p.name AS product_name, p.sku AS product_sku
-         FROM product_locations pl
+         FROM store_location_products pl
          JOIN store_locations sl ON sl.id = pl.location_id AND sl.tenant_id = pl.tenant_id
          JOIN products p ON p.id = pl.product_id AND p.tenant_id = pl.tenant_id
          WHERE pl.tenant_id = @tenantId
@@ -148,10 +148,10 @@ export function storeLocationsService(db: DB, events: EventBus) {
       const id = uuidv7();
       const now = Date.now();
       const [row] = await db.query<ProductLocation>(
-        `INSERT INTO product_locations (id, tenant_id, product_id, location_id, qty_at_location, notes, created_at, updated_at)
+        `INSERT INTO store_location_products (id, tenant_id, product_id, location_id, qty_at_location, notes, created_at, updated_at)
          VALUES (@id, @tenantId, @productId, @locationId, @qty, @notes, @now, @now)
          ON CONFLICT (tenant_id, product_id, location_id)
-         DO UPDATE SET qty_at_location = @qty, notes = COALESCE(@notes, product_locations.notes), updated_at = @now
+         DO UPDATE SET qty_at_location = @qty, notes = COALESCE(@notes, store_location_products.notes), updated_at = @now
          RETURNING *`,
         { id, tenantId, productId: input.product_id, locationId: input.location_id, qty: input.qty_at_location ?? 0, notes: input.notes ?? null, now }
       );
@@ -170,7 +170,7 @@ export function storeLocationsService(db: DB, events: EventBus) {
 
     async removeProductLocation(productId: string, locationId: string, tenantId: string): Promise<void> {
       await db.query(
-        `DELETE FROM product_locations WHERE product_id=@productId AND location_id=@locationId AND tenant_id=@tenantId`,
+        `DELETE FROM store_location_products WHERE product_id=@productId AND location_id=@locationId AND tenant_id=@tenantId`,
         { productId, locationId, tenantId }
       );
     },

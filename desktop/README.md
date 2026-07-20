@@ -1,7 +1,7 @@
 # Ascend — Desktop App
 
 A minimal desktop wrapper around the live Ascend web app
-(`https://finder-pos-frontend.vercel.app`). It's a standard Electron app —
+(`https://ascendhq-app.vercel.app`). It's a standard Electron app —
 opening it gives you the same product in its own window (no browser tabs/UI
 chrome), with your data stored on the live backend exactly as it is on the
 web.
@@ -19,7 +19,7 @@ web.
 4. Launch it. First run: macOS Gatekeeper will warn the app is from an
    unidentified developer (it isn't code-signed/notarized). Right-click the
    app → **Open** to bypass this once.
-5. Log in with `owner@finder-pos.dev` / `FinderDemo!2026` (or your own
+5. Log in with `owner@ascend.dev` / `AscendDemo!2026` (or your own
    account).
 
 ## Other platforms

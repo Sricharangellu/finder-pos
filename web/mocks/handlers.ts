@@ -39,7 +39,7 @@ const ROOT = "*";
 
 const MOCK_USER: UserProfile = {
   id: "usr_01hx0000000000000000000001",
-  email: "cashier@finder-pos.dev",
+  email: "cashier@ascend.dev",
   name: "Demo Cashier",
   role: "cashier",
   tenantId: "ten_01hx0000000000000000000001",
@@ -1041,7 +1041,8 @@ export const handlers = [
     const filtered = q
       ? seed.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
       : seed;
-    return HttpResponse.json(filtered);
+    // Envelope matches the real API: GET /api/v1/customers/search → { items }
+    return HttpResponse.json({ items: filtered });
   }),
 
   // ── POST /api/v1/customers/:id/merge (Sprint 15) ─────────────────────────────
@@ -1060,7 +1061,7 @@ export const handlers = [
       tenantId: "tnt_demo",
       role: "owner",
       name: "Demo Owner",
-      email: "owner@finder-pos.dev",
+      email: "owner@ascend.dev",
     });
   }),
 

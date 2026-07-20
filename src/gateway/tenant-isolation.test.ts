@@ -163,6 +163,24 @@ test("tenant isolation: API layer + RLS backstop (real Postgres)", async () => {
   );
   assert.equal(jobs.length, 1, "'system' rows must stay visible in a scope");
 
+  // 6. Regression: the generic per-table RLS migration (src/modules/rls/
+  //    index.ts) scans information_schema for ANY table with a tenant_id
+  //    column and is registered LAST in src/modules/index.ts specifically so
+  //    it covers tables created by modules built after it was written. Prove
+  //    that still holds for a table that didn't exist when this test was
+  //    first written — notification_alert_rules, added during the 2026-07-19
+  //    Phase 0 wave — using the same leaky-query pattern as step 2.
+  await db.query(
+    `INSERT INTO notification_alert_rules (id, tenant_id, name, trigger, condition, channels, enabled, fires_count, created_at)
+     VALUES ('rule_iso_a', @t, 'Iso Rule A', 'low_stock', 'qty < 5', '[]', true, 0, 1)`,
+    { t: TENANT_A },
+  );
+  const leakyRuleSql = "SELECT id FROM notification_alert_rules WHERE id = 'rule_iso_a'"; // forgot tenant_id!
+  const ruleInB = await runWithTenant(TENANT_B, () => appDb.query(leakyRuleSql));
+  assert.equal(ruleInB.length, 0, "RLS must hide another tenant's alert rule even without a WHERE tenant_id clause");
+  const ruleInA = await runWithTenant(TENANT_A, () => appDb.query(leakyRuleSql));
+  assert.equal(ruleInA.length, 1, "RLS must still show the owning tenant its own alert rule");
+
   await appDb.close();
   await db.close();
 });

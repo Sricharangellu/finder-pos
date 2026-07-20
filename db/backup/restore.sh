@@ -28,7 +28,8 @@
 # DR DRILL CHECKLIST (run quarterly, record in RTO log)
 #   1. Run this script against a restore-test database.
 #   2. Run migrations (db/migrations/run.sh up).
-#   3. Run smoke tests (npm run smoke -- --env restore-test).
+#   3. Run smoke tests (DATABASE_URL=<restore-test-db> npm run smoke — scripts/
+#      smoke.ts takes no CLI flags; it only reads DATABASE_URL from the env).
 #   4. Record: start time, backup timestamp, end time → RTO.
 #   5. RTO must be ≤ 30 minutes.
 # =============================================================================
@@ -106,6 +107,18 @@ print(' '.join(parts))
 "
 }
 
+# Hostname only, for the confirmation prompt — a wrong-database restore is
+# most often caused by DATABASE_URL silently pointing at the wrong tier
+# (prod vs. testing), so the operator needs the host in front of them right
+# before they confirm, not buried in a connection string.
+parse_host() {
+    python3 -c "
+from urllib.parse import urlparse
+u = urlparse('$DATABASE_URL')
+print(u.hostname or '(unknown host)')
+"
+}
+
 list_backups() {
     echo "${LOG_PREFIX} Available backups in ${BACKUP_DIR}:"
     find "$BACKUP_DIR" -name "finder_pos_*.pgdump" | sort | while read -r f; do
@@ -116,7 +129,16 @@ list_backups() {
 }
 
 confirm_restore() {
-    if $FORCE; then return 0; fi
+    # Target is always logged, even under --force, so an unattended/DR-drill
+    # invocation still leaves an audit trail of what it pointed at.
+    local dbname="$1" host="$2"
+    echo "${LOG_PREFIX} Target database: ${dbname}"
+    echo "${LOG_PREFIX} Target host:     ${host}"
+
+    if $FORCE; then
+        echo "${LOG_PREFIX} --force set — skipping interactive confirmation."
+        return 0
+    fi
     echo ""
     echo "  ┌─────────────────────────────────────────────────────────┐"
     echo "  │  WARNING: This will DROP and re-create the database!    │"
@@ -124,10 +146,18 @@ confirm_restore() {
     echo "  │  Only proceed during a confirmed incident window.       │"
     echo "  └─────────────────────────────────────────────────────────┘"
     echo ""
-    echo -n "  Type 'yes' to continue: "
+    echo "  About to restore into:"
+    echo "    database : ${dbname}"
+    echo "    host     : ${host}"
+    echo ""
+    # Require the operator to type the exact database name, not a generic
+    # "yes" — a wrong-database restore is a copy/paste DATABASE_URL mistake,
+    # and a generic confirmation doesn't force anyone to actually read the
+    # target above it. Typing the name does.
+    echo -n "  Type the database name (${dbname}) to continue: "
     read -r answer
-    if [[ "$answer" != "yes" ]]; then
-        echo "${LOG_PREFIX} Aborted by operator."
+    if [[ "$answer" != "$dbname" ]]; then
+        echo "${LOG_PREFIX} Aborted — typed name did not match target database '${dbname}'."
         exit 1
     fi
 }
@@ -163,12 +193,14 @@ run_restore() {
 
     local dbname
     dbname=$(parse_dbname)
+    local host
+    host=$(parse_host)
     # shellcheck disable=SC2046
     local pg_flags
     pg_flags=$(parse_host_port_user)
 
     if $DRY_RUN; then
-        echo "${LOG_PREFIX} DRY RUN — would restore $backup_file → database: $dbname"
+        echo "${LOG_PREFIX} DRY RUN — would restore $backup_file → database: $dbname @ $host"
         echo "${LOG_PREFIX} Command:"
         echo "  pg_restore --dbname='$DATABASE_URL' --jobs=$RESTORE_JOBS \\"
         echo "    --clean --if-exists --no-owner --no-acl --verbose \\"
@@ -176,7 +208,7 @@ run_restore() {
         return
     fi
 
-    confirm_restore
+    confirm_restore "$dbname" "$host"
 
     local t_start
     t_start=$(date +%s)
@@ -188,6 +220,18 @@ run_restore() {
     # --clean --if-exists: drops existing objects before recreating
     # --no-owner:          skip ownership commands (app role differs from backup role)
     # --no-acl:            skip GRANT/REVOKE (re-applied by provisioning)
+    #
+    # pg_restore's own exit code is captured independently of the filtered
+    # display below — piping straight into `grep | head` and trailing that
+    # with `|| true` (the previous form of this) meant grep's own "zero
+    # matches" exit code (1, entirely possible on a clean restore with no
+    # error/warning lines) got conflated with, and then unconditionally
+    # masked, any REAL pg_restore failure. A failed restore would still print
+    # "RESTORE COMPLETE" and a passing RTO — false confidence in exactly the
+    # script whose own docstring says it's for a real incident or a DR drill.
+    local restore_log
+    restore_log="$(mktemp)"
+    set +e
     pg_restore \
         --dbname="$DATABASE_URL" \
         --jobs="$RESTORE_JOBS" \
@@ -196,7 +240,17 @@ run_restore() {
         --no-owner \
         --no-acl \
         --verbose \
-        "$backup_file" 2>&1 | grep -E "(restoring|error|warning)" | head -50 || true
+        "$backup_file" > "$restore_log" 2>&1
+    local restore_status=$?
+    set -e
+    grep -E "(restoring|error|warning)" "$restore_log" | head -50 || true
+
+    if [[ "$restore_status" -ne 0 ]]; then
+        echo "${LOG_PREFIX} ━━━ RESTORE FAILED (pg_restore exit ${restore_status}) ━━━" >&2
+        echo "${LOG_PREFIX} Full log: $restore_log" >&2
+        exit 1
+    fi
+    rm -f "$restore_log"
 
     local t_end
     t_end=$(date +%s)

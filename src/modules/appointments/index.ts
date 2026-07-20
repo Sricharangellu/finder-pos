@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -51,8 +51,9 @@ export const appointmentsModule: PosModule = {
   name: "appointments",
   migrations: [CREATE_APPOINTMENTS],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("appointments"));
     // List — filter by date range, employee, or customer
-    router.get("/appointments", handler(async (req, res) => {
+    router.get("", handler(async (req, res) => {
       const t          = tid(res);
       const from       = typeof req.query.from === "string" ? Number(req.query.from) : undefined;
       const to         = typeof req.query.to   === "string" ? Number(req.query.to)   : undefined;
@@ -82,7 +83,7 @@ export const appointmentsModule: PosModule = {
     }));
 
     // Create
-    router.post("/appointments", handler(async (req, res) => {
+    router.post("", handler(async (req, res) => {
       const body = parseBody(schema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -101,7 +102,7 @@ export const appointmentsModule: PosModule = {
     }));
 
     // Update
-    router.patch("/appointments/:id", handler(async (req, res) => {
+    router.patch("/:id", handler(async (req, res) => {
       const body = parseBody(patchSchema, req.body);
       const t    = tid(res);
       const sets: string[] = ["updated_at = @now"];
@@ -118,7 +119,7 @@ export const appointmentsModule: PosModule = {
     }));
 
     // Delete
-    router.delete("/appointments/:id", requireRole("manager"), handler(async (req, res) => {
+    router.delete("/:id", requireRole("manager"), handler(async (req, res) => {
       await db.query(
         "DELETE FROM appointments WHERE id = @id AND tenant_id = @t",
         { id: String(req.params["id"]), t: tid(res) },

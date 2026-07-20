@@ -21,8 +21,19 @@ CREATE TABLE IF NOT EXISTS store_locations (
 CREATE INDEX IF NOT EXISTS store_locations_tenant_idx ON store_locations (tenant_id, aisle, shelf);
 `;
 
+// NOTE: this is intentionally NOT named `product_locations` — the `fulfillment`
+// module (registered earlier in src/modules/index.ts) already owns a table by
+// that exact name with a completely different, incompatible schema (single
+// pick-location per product: PRIMARY KEY (tenant_id, product_id), no `id`/
+// `qty_at_location`/`notes`/`created_at` columns). Because migrations run as
+// `CREATE TABLE IF NOT EXISTS`, whichever module registers first wins the
+// race and every query from the other module 500s on missing columns — this
+// exact collision pattern previously took down the `quotes` module (vs.
+// `sales`'s `quotations` table). Use a distinct name to store aisle/shelf/bin
+// placement with per-location quantity, separate from fulfillment's single
+// pick-location assignment.
 const CREATE_PRODUCT_LOCATIONS = `
-CREATE TABLE IF NOT EXISTS product_locations (
+CREATE TABLE IF NOT EXISTS store_location_products (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,
   product_id TEXT NOT NULL,
@@ -33,8 +44,8 @@ CREATE TABLE IF NOT EXISTS product_locations (
   updated_at BIGINT NOT NULL,
   UNIQUE (tenant_id, product_id, location_id)
 );
-CREATE INDEX IF NOT EXISTS product_locations_product_idx ON product_locations (tenant_id, product_id);
-CREATE INDEX IF NOT EXISTS product_locations_location_idx ON product_locations (tenant_id, location_id);
+CREATE INDEX IF NOT EXISTS store_location_products_product_idx ON store_location_products (tenant_id, product_id);
+CREATE INDEX IF NOT EXISTS store_location_products_location_idx ON store_location_products (tenant_id, location_id);
 `;
 
 export const storeLocationsModule: PosModule = {

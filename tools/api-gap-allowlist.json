@@ -1,0 +1,42 @@
+{
+  "_readme": [
+    "Known, DELIBERATE frontend→backend gaps tolerated by tools/api-gap-scan.mjs.",
+    "Every entry must correspond to a board item (WORK/FORWARD_PLAN.md §4 or",
+    "WORK/LOOP_STATE.md backlog) or a documented Preview vertical (Ascend is",
+    "retail-first; these ship UI-only by design, per ae79907).",
+    "The scan warns when a path here gains a real backend route — remove it then.",
+    "Adding to this file to silence the scan WITHOUT a board entry is forbidden;",
+    "that is exactly the failure mode of AUDIT_2026-07-18T005030Z."
+  ],
+  "prefixes": [
+    "/api/v1/golf/",
+    "/api/v1/pricing/",
+    "/api/v1/warehouse/",
+    "/api/v1/documents",
+    "/api/v1/promotions",
+    "/api/v1/ecommerce/auth/"
+  ],
+  "paths": [
+    "/api/v1/catalog/:p/credits",
+    "/api/v1/catalog/categories/:p/products",
+    "/api/v1/catalog/categories/:p/products/:p",
+    "/api/v1/ecommerce/products/:p",
+    "/api/v1/inventory/errors",
+    "/api/v1/inventory/errors/:p",
+    "/api/v1/inventory/errors/summary",
+    "/api/v1/inventory/pipeline/issues",
+    "/api/v1/inventory/pipeline/issues/:p",
+    "/api/v1/inventory/pipeline/receiving",
+    "/api/v1/inventory/pipeline/receiving/:p/update",
+    "/api/v1/inventory/pipeline/summary",
+    "/api/v1/inventory/returns",
+    "/api/v1/inventory/supplier-returns",
+    "/api/v1/progress",
+    "/api/v1/restaurant/dashboard",
+    "/api/v1/settings/b2b",
+    "/api/v1/settings/custom-roles",
+    "/api/v1/settings/custom-roles/:p",
+    "/api/v1/settings/permissions",
+    "/api/v1/things"
+  ]
+}

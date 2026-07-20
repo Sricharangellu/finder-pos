@@ -57,7 +57,7 @@ function ReceiveModal({ onClose, onSaved }: ReceiveModalProps) {
     setSaving(true);
     setError(null);
     try {
-      const sn = await apiPost<SerialNumber>("/inventory/serials", {
+      const sn = await apiPost<SerialNumber>("/api/v1/inventory/serials", {
         product_id: productId.trim(),
         product_name: productName.trim() || null,
         product_sku: productSku.trim() || null,
@@ -170,7 +170,7 @@ function DetailModal({ sn, onClose, onUpdated }: DetailModalProps) {
   async function changeStatus(toStatus: SerialStatus) {
     setSaving(true);
     try {
-      const updated = await apiPatch<SerialNumber>(`/inventory/serials/${sn.id}`, {
+      const updated = await apiPatch<SerialNumber>(`/api/v1/inventory/serials/${sn.id}`, {
         status: toStatus,
         service_order_id: toStatus === "service" ? (serviceOrderId.trim() || null) : null,
       });
@@ -289,7 +289,7 @@ export default function SerialsPage() {
       const params = new URLSearchParams({ limit: "100", offset: "0" });
       if (tab !== "all") params.set("status", tab);
       if (search) params.set("q", search);
-      const data = await apiGet<SerialsResponse>(`/inventory/serials?${params}`);
+      const data = await apiGet<SerialsResponse>(`/api/v1/inventory/serials?${params}`);
       setSerials(data.items);
       setTotal(data.total);
     } finally {

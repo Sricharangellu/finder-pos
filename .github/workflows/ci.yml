@@ -1,15 +1,27 @@
 name: CI
 
-# ─── Trigger rules ─────────────────────────────────────────────────────────────
-# master  → full CI + deploy to PRODUCTION  (finder-pos-frontend.vercel.app)
-# staging → full CI + deploy to STAGING     (Vercel preview URL, isolated DB)
+# ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
+# develop → full CI + deploy to DEV      (Vercel preview, TESTING Supabase — shared)
+# staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
+# master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhq-app.vercel.app)
 # PRs     → full CI, no deploy
-# feature → no CI (local dev + pre-push hook)
+# feature → no CI (local dev + pre-push hook); PR into develop to run CI
+# Promotion is forward-only: feature/* → develop → staging → master.
 on:
   push:
-    branches: [master, staging]
+    branches: [develop, staging, master]
   pull_request:
-    branches: [master, staging]
+    branches: [develop, staging, master]
+
+# Least-privilege default for GITHUB_TOKEN: no job here needs to write to the
+# repo or comment on PRs (Vercel deploys use VERCEL_TOKEN, not GITHUB_TOKEN).
+# actions/checkout only needs read. deployments:write is kept because
+# deploy-dev/staging/production declare `environment:` blocks, which GitHub
+# uses to record deployment status/history against that token permission.
+# Matches uptime.yml / backup.yml, which already scope permissions down.
+permissions:
+  contents: read
+  deployments: write
 
 # ─── Shared test jobs (run on every trigger) ──────────────────────────────────
 jobs:
@@ -28,6 +40,7 @@ jobs:
             || echo "All mutation routes have role guards ✓"
       - name: No console.log/error in production source (modules + gateway)
         run: |
+          # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern below (AGENTS.md count)
           count=$(grep -rn --include="*.ts" "console\.\(log\|error\|warn\)" src/modules/ src/gateway/ \
             | grep -v "\.test\.ts" | wc -l | tr -d ' ')
           echo "Remaining console.* calls in modules/gateway: $count"
@@ -64,15 +77,54 @@ jobs:
       - name: Prevention agent — no dirty drift or stray modules
         run: npm run prevent:drift
 
+      - name: API gap scan — every frontend call has a backend route
+        # Guards against pages shipping on MSW mocks while the real API 404s
+        # (the AUDIT_2026-07-18T005030Z incident class). Deliberate Preview
+        # surfaces live in tools/api-gap-allowlist.json, each tied to a board
+        # entry. No deps; plain ESM on the runner's Node.
+        run: npm run gap:scan
+
       - name: One canonical agent-instruction file
         run: |
           # "1 file for all agents": exactly one root AGENTS.md; CLAUDE.md may
           # only exist as a short pointer to it. Guards against doc sprawl.
+          # shellcheck disable=SC2126 # grep|wc -l keeps this symmetric with the identical pattern above (console.* count)
           count=$(git ls-files | grep -E '(^|/)AGENTS\.md$' | wc -l | tr -d ' ')
           if [ "$count" != "1" ]; then
             echo "❌ Expected exactly one AGENTS.md, found $count:"; git ls-files | grep -E 'AGENTS\.md$'; exit 1
           fi
           echo "One canonical AGENTS.md ✓"
+
+      # Nothing previously validated workflow YAML itself — a typo in an `if:`
+      # expression or a job name drift in `needs:` fails silently (skipped, not
+      # red) until someone notices a deploy never ran. actionlint catches that
+      # class of mistake (and shell bugs inside `run:` blocks, via its bundled
+      # shellcheck integration) before merge.
+      - name: Lint workflow YAML (actionlint)
+        run: |
+          # Pinned to an immutable release tag, not `main` — piping a curl'd
+          # script from a mutable ref straight into bash is a supply-chain
+          # risk (a compromised or force-pushed main would run arbitrary code
+          # in CI on every PR). Bump ACTIONLINT_VERSION deliberately to update.
+          ACTIONLINT_VERSION=1.7.12
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
+          ./actionlint -color
+
+      # Shellcheck the standalone ops scripts (deploy/backup/restore/migration
+      # runner) — these run unattended in CI and, for restore.sh, by hand
+      # during an incident, so a quoting bug is exactly the kind of thing that
+      # should fail fast in review instead of at 2am during a restore.
+      # --severity=error only (not warning/style): two pre-existing warnings
+      # (scripts/deploy.sh:84 redundant env prefix, db/backup/restore.sh:168
+      # unused $pg_flags) are harmless and left as follow-up cleanup rather
+      # than gating CI on style-level findings.
+      - name: Shellcheck — deploy/backup/restore/migration scripts
+        run: |
+          shellcheck --severity=error \
+            scripts/deploy.sh \
+            db/backup/backup.sh \
+            db/backup/restore.sh \
+            db/migrations/run.sh
 
   backend:
     name: Backend — typecheck + test
@@ -85,7 +137,12 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finder_test
         ports: ["5432:5432"]
+        # --shm-size: Docker's default /dev/shm is 64MB; the backend suite is now
+        # 700+ tests and Postgres exhausts it mid-run ("could not resize shared
+        # memory segment ... No space left on device"), cascading into mass
+        # failures. 1g gives ample headroom (first hit: PR #81, 2026-07-19).
         options: >-
+          --shm-size=1g
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
@@ -128,6 +185,22 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  # ─── Docker build sanity check ─────────────────────────────────────────────
+  # Nothing previously exercised the Dockerfile at all — the node:20-alpine vs
+  # .nvmrc's node:24 drift found this session sat undetected indefinitely.
+  # Vercel (not Docker) is the actual deploy path, so this is deliberately a
+  # build-only sanity check (no push, no run/boot) — cheap, and it would have
+  # caught that exact drift automatically. NOT yet in any deploy `needs` or
+  # branch-protection required checks: this is its first-ever run in CI, and
+  # nothing should hard-gate on an unproven check (same reasoning applied to
+  # e2e earlier in this pipeline's history — prove it green first).
+  docker-build:
+    name: Docker build (sanity check, non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --target runtime -t ascend-backend:ci .
+
   # ─── E2E tests (master + staging pushes only, after backend + frontend pass) ─
   e2e:
     name: E2E tests (Playwright — golden paths)
@@ -142,7 +215,9 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finder_e2e
         ports: ["5432:5432"]
+        # --shm-size=1g: same shared-memory headroom as the backend job above.
         options: >-
+          --shm-size=1g
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
@@ -158,6 +233,19 @@ jobs:
       NODE_ENV: test
       FINDER_BACKGROUND_JOBS: "false"
       PORT: 3001
+      # Root cause of the login flake (confirmed via a Playwright trace DOM
+      # snapshot showing "Too many requests — slow down." on the login page):
+      # /api/identity is rate-limited per-IP (10 burst, 0.33/s refill — a
+      # brute-force guard, correct for prod). The whole suite runs from ONE CI
+      # runner IP and needs dozens of login/probe requests (global setup, every
+      # worker-restart self-heal login, login.spec.ts's 3 tests, every retry),
+      # which exhausts the bucket fast; once tripped, every spec needing auth
+      # fails simultaneously (matches the observed cross-spec cascade) until it
+      # slowly refills. See docs/architecture/PIPELINE.md. Defaults (10, 0.33)
+      # are unchanged everywhere this isn't explicitly set — prod security is
+      # untouched.
+      IDENTITY_RATE_LIMIT_CAPACITY: "1000"
+      IDENTITY_RATE_LIMIT_REFILL: "100"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -169,16 +257,32 @@ jobs:
         run: npm ci --include=dev
       - name: Build backend
         run: npx tsc -p tsconfig.json
+      # Diagnostic instrumentation (2026-07-18, tracking the e2e login flake
+      # documented in docs/architecture/PIPELINE.md): stdout/stderr was
+      # previously discarded — this step's own log capture ends the instant
+      # the backgrounded process starts, so nothing about later requests was
+      # ever visible. Redirect to a file and set LOG_LEVEL=debug so a future
+      # failure has real evidence instead of another blind guess.
       - name: Start backend (background)
-        run: node dist/src/server.js &
+        run: LOG_LEVEL=debug node dist/src/server.js > /tmp/backend.log 2>&1 &
       - name: Wait for backend
         run: |
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             curl -sf http://localhost:3001/healthz && exit 0
             sleep 2
           done
           echo "❌ backend never became healthy on :3001"
+          cat /tmp/backend.log || true
           exit 1
+      # Correlates backend availability with the Playwright timeline: if the
+      # backend stalls, crashes, or restarts mid-run, this is the only place
+      # that would show it (no per-request access logging exists yet).
+      - name: Start backend health poller (background)
+        run: |
+          ( while true; do
+              printf '%s %s\n' "$(date -u +%H:%M:%S)" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:3001/healthz || echo timeout)" >> /tmp/backend-health.log
+              sleep 2
+            done ) &
       - name: Seed E2E demo data
         run: npx tsx scripts/seed-e2e.ts
         env:
@@ -211,7 +315,7 @@ jobs:
         working-directory: web
       - name: Wait for frontend
         run: |
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             curl -sf http://localhost:3000/login >/dev/null && exit 0
             sleep 3
           done
@@ -227,81 +331,141 @@ jobs:
         working-directory: web
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
-          E2E_EMAIL: owner@finder-pos.dev
-          E2E_PASSWORD: FinderDemo!2026
-      - name: Upload Playwright report on failure
+          E2E_EMAIL: owner@ascend.dev
+          E2E_PASSWORD: AscendDemo!2026
+      # `--reporter=github` (above) only emits GH Actions annotations — it does
+      # NOT write an HTML report, so web/playwright-report/ has been empty on
+      # every past run and this upload was silently capturing nothing (found
+      # while investigating the login flake: no artifact was ever downloadable
+      # from a failed run). screenshot/video/trace are still written to
+      # web/test-results/ regardless of reporter — upload that instead, since
+      # it's the only place the actual browser evidence exists.
+      - name: Upload Playwright test-results (screenshots/video/trace) on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: web/playwright-report/
+          name: playwright-test-results
+          path: web/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+      # Diagnostic — print + upload the backend log and health-poll timeline
+      # regardless of outcome, so a green run establishes the healthy baseline
+      # and a red run has real evidence instead of another blind guess.
+      - name: Show backend log + health timeline
+        if: always()
+        run: |
+          echo "── backend.log (last 200 lines) ──"
+          tail -n 200 /tmp/backend.log || echo "(no backend.log)"
+          echo "── backend-health.log (last 60 samples) ──"
+          tail -n 60 /tmp/backend-health.log || echo "(no backend-health.log)"
+      - name: Upload backend log + health timeline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-diagnostics
+          path: |
+            /tmp/backend.log
+            /tmp/backend-health.log
           retention-days: 7
 
-  # ─── Staging deploy (push to staging branch only) ──────────────────────────
-  # Deploys to a Vercel PREVIEW URL (no --prod flag).
-  # Uses STAGING_DATABASE_URL and STAGING_JWT_SECRET secrets (isolated DB).
-  # Preview URL is unique per deployment — check Vercel dashboard for the URL.
-  deploy-staging:
-    name: Deploy → Staging (Vercel preview)
-    needs: [guard, backend, frontend]
+  # ─── DEV deploy (push to develop only) ─────────────────────────────────────
+  # Deploys BOTH projects as Vercel previews pointing at the TESTING backend
+  # (shared Supabase B). Repo variables carry the non-secret staging origins.
+  deploy-dev:
+    name: Deploy → Dev (Vercel preview)
+    # e2e runs in parallel as a reported signal but does NOT gate deploys — the
+    # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
+    # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
-    defaults:
-      run:
-        working-directory: web
+    # Skips (does not fail) until the testing tier is configured — set the repo
+    # variable STAGING_BACKEND_URL + Vercel Preview env vars to activate.
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push' && vars.STAGING_BACKEND_URL != ''
+    environment:
+      name: Preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Deploy dev (backend + frontend) → Vercel preview
+        run: ./scripts/deploy.sh both
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_ENV: dev
+          NEXT_PUBLIC_MOCK: "false"
+          # Dev shares the TESTING backend/DB (Supabase B). Set as repo variable.
+          BACKEND_URL: ${{ vars.STAGING_BACKEND_URL }}
+
+  # ─── TESTING deploy (push to staging only) ─────────────────────────────────
+  # Deploys BOTH projects as Vercel previews aliased to stable staging domains,
+  # pointing at the TESTING backend/DB (Supabase B). Then smoke-tests the alias.
+  deploy-staging:
+    name: Deploy → Testing (Vercel preview alias)
+    # e2e runs in parallel as a reported signal but does NOT gate deploys — the
+    # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
+    # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
+    needs: [guard, backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    # Skips (does not fail) until the testing tier is configured — set the repo
+    # variables STAGING_BACKEND_URL/_ALIAS/_FRONTEND_ALIAS + Vercel Preview env.
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push' && vars.STAGING_BACKEND_URL != ''
     environment:
       name: staging
-      url: ${{ steps.deploy.outputs.url }}
+      url: https://${{ vars.STAGING_FRONTEND_ALIAS }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
       - run: npm ci
-      # Deploy as Vercel preview (no --prod flag) → unique preview URL.
-      # Set STAGING env vars in Vercel dashboard under the staging environment.
-      - name: Deploy to Vercel staging
-        id: deploy
-        run: |
-          url=$(npx vercel --yes --token "$VERCEL_TOKEN" 2>&1 | tail -1)
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Staging URL: $url"
+      - name: Deploy testing (backend + frontend) → Vercel preview alias
+        run: ./scripts/deploy.sh both
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      - name: Staging smoke test
+          DEPLOY_ENV: testing
+          NEXT_PUBLIC_MOCK: "false"
+          BACKEND_URL: ${{ vars.STAGING_BACKEND_URL }}
+          BACKEND_ALIAS: ${{ vars.STAGING_BACKEND_ALIAS }}
+          FRONTEND_ALIAS: ${{ vars.STAGING_FRONTEND_ALIAS }}
+      - name: Testing smoke test
         run: |
           sleep 10
-          BACKEND_URL="${{ secrets.STAGING_BACKEND_URL }}"
-          curl -f --retry 3 --retry-delay 5 "${BACKEND_URL}/healthz" \
-            || echo "⚠️  Staging backend not reachable — check STAGING_BACKEND_URL secret"
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.STAGING_BACKEND_URL }}/healthz" \
+            || (echo "❌ testing backend /healthz failed — check STAGING_BACKEND_URL var + Vercel Preview env" && exit 1)
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.STAGING_BACKEND_URL }}/readyz" \
+            || (echo "❌ testing backend /readyz failed (DB not reachable — check Supabase B)" && exit 1)
 
-  # ─── Production deploy (push to master branch only) ────────────────────────
-  # Deploys to the PRODUCTION Vercel URL with --prod flag.
-  # Only runs after all test jobs pass AND only on master.
+  # ─── PROD deploy (push to master only) ─────────────────────────────────────
+  # Deploys BOTH projects to Vercel Production (--prod) against the PROD Supabase.
+  # Single deploy authority (deploy-prod.yml was removed to avoid double-deploys).
   deploy-production:
     name: Deploy → Production (Vercel --prod)
-    needs: [guard, backend, frontend]
+    # e2e runs in parallel as a reported signal but does NOT gate deploys — the
+    # golden-path suite has a known auth-rotation timing flake (see PIPELINE.md).
+    # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
+    needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    defaults:
-      run:
-        working-directory: web
     environment:
-      name: production
-      url: https://finder-pos-frontend.vercel.app
+      name: Production
+      url: https://ascendhq-app.vercel.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: npx vercel --prod --yes --token "$VERCEL_TOKEN"
+      - name: Deploy production (backend + frontend) → Vercel --prod
+        run: ./scripts/deploy.sh both
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_PROD }}
+          DEPLOY_ENV: prod
+          NEXT_PUBLIC_MOCK: "false"
 
   # ─── Production smoke test ─────────────────────────────────────────────────
   smoke-test:
@@ -315,26 +479,26 @@ jobs:
       - name: Health check — backend liveness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://finder-pos-backend.vercel.app/healthz \
+            https://ascendhq-api.vercel.app/healthz \
             || (echo "❌ /healthz failed" && exit 1)
       - name: Health check — backend readiness
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://finder-pos-backend.vercel.app/readyz \
+            https://ascendhq-api.vercel.app/readyz \
             || (echo "❌ /readyz failed" && exit 1)
       - name: Health check — feature flags auth boundary
         run: |
           http_status="$(curl -sS --retry 2 --retry-delay 5 \
-            -o /tmp/finder-flags-response.json \
+            -o /tmp/flags-response.json \
             -w '%{http_code}' \
-            https://finder-pos-backend.vercel.app/api/v1/flags)"
+            https://ascendhq-api.vercel.app/api/v1/flags)"
           if [ "$http_status" != "401" ]; then
             echo "❌ /api/v1/flags without auth returned $http_status, expected 401"
-            cat /tmp/finder-flags-response.json
+            cat /tmp/flags-response.json
             exit 1
           fi
       - name: Health check — frontend
         run: |
           curl -f --retry 3 --retry-delay 5 \
-            https://finder-pos-frontend.vercel.app/ \
+            https://ascendhq-app.vercel.app/ \
             || (echo "❌ frontend failed" && exit 1)

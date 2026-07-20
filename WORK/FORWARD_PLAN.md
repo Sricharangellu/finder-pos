@@ -1,7 +1,20 @@
 # Ascend Forward Plan (authoritative)
 
-Last reviewed: 2026-07-05
+Last reviewed: 2026-07-18 (FE↔BE gap scan — see `WORK/audits/AUDIT_2026-07-18T005030Z-fe-be-gap-audit.md`)
 Scope reviewed: `/Users/sri/Desktop/Desk/Finder/finder-pos`
+
+> **RESOLVED 2026-07-18 (was STANDING CRITICAL):** the 2026-07-15 API-audit fixes
+> were PORTED to `feat/delivery-pipeline` same-day (double-prefix in 10 modules,
+> SSO public mount, `requireModule` isolation — without the clean-arch pilot).
+> A CI guardrail now prevents recurrence: `npm run gap:scan` fails on any FE call
+> with no backend route (see AUDIT_2026-07-18T005030Z addendum). Still open for
+> Sri: merge session C's quotes pilot branch, and merge PR #70 to deploy all of it.
+
+> **STANDING TOP PRIORITY (Sri directive, 2026-07-18 evening):** "finish the
+> end-to-end application, make it priority, create loops, use existing agents,
+> do not stop until done." See **Phase 0** below — it supersedes every other
+> initiative in this document. `WORK/LOOP_STATE.md` loop_status is ACTIVE
+> against Phase 0's backlog.
 
 > Sequencing is **phase-based, not time-based**. A phase is complete when its exit
 > criteria pass — never by calendar. Point-in-time verification results live in the
@@ -571,6 +584,52 @@ Needed:
 
 ### 4. Frontend integration
 
+**Gap scan done 2026-07-18** (`AUDIT_2026-07-18T005030Z-fe-be-gap-audit.md`), and
+two remediation waves shipped same-day (see the audit's addendum): wave 1 —
+the double-prefix/SSO/requireModule fixes ported, team time-tracking + customers
+search/merge + orders timeline built, storefront auth gated Preview, and
+`npm run gap:scan` enforcing parity in CI from here on. Wave 2 — the catalog
+product-detail page (17 of 18 mock-only paths: stock/sales/purchases/invoices/
+returns/duplicate as real joins, reorder-suggestions/analytics/supplier-price-
+comparison as documented-approximation derived metrics, new CRUD for suppliers/
+pricing+tiers/expiry/images, and a real audit trail via GET /:id/audit-log —
+CatalogService didn't write to audit_log at all before this). In the process,
+also fixed a genuine table-name collision from wave 1 (team's time_entries vs
+workforce's pre-existing time_entries) and a pre-existing FE/BE field-name bug
+in the images tab that the gap-scanner can't catch (contract drift, not a
+missing path) — both caught by finally getting `npm test` running in the
+Cowork sandbox (see LOOP_STATE's NEEDS-SRI note on the esbuild fix).
+
+**Wave 3 (2026-07-18, 3rd follow-up):** inventory pipeline pending/history/
+reorder-alerts built as real joins (purchase_orders/lines/suppliers/products),
+reorder-alerts extending the tenant-wide reorder-suggestions signal with
+velocity/stockout/cost fields plus a working create-po action. Receiving,
+Issues, Errors, and the pipeline Overview funnel reclassified NEEDS-SRI —
+each implies an unbuilt subsystem (receiving sessions, an issue/error
+detection engine, a stage funnel that doesn't map onto the real POStatus
+enum), same call as catalog credits. Also found and fixed three unrelated
+live bugs while surveying this surface: (1) inventory's reorder-suggestions
+and serial_numbers both queried a nonexistent `catalog_products` table with
+nonexistent columns — 500'd on every call against real Postgres despite
+being wired to shipped pages; (2) a route-shadowing bug where GET
+/:productId (registered early in inventory/routes.ts) silently swallowed
+GET /counts, /locations, and /reorder-suggestions registered after it; (3)
+the inventory/serials page called the API with no /api/v1 prefix at all,
+and serial_numbers' module mount collided with inventory's own catch-all
+even after adding a mountPath — fixed by module registration order. The
+gap-scanner itself was hardened to catch bug class (3) going forward (it
+previously couldn't see a missing-prefix call at all). Full detail in the
+audit's addendum #3.
+
+Remaining mock-only surfaces (all allowlisted + tracked): catalog credits (1
+path — no backing concept anywhere in the schema, a design decision not
+plumbing), inventory pipeline receiving/issues/errors/summary (9 — needs a
+design decision, see above), notifications prefs/rules (4), purchasing EDI
+(6), workflows approval-chains (3), settings b2b/permissions/custom-roles
+(contract decision — NEEDS-SRI), plus the by-design Preview verticals
+(golf/pricing/warehouse/documents/promotions).
+174 backend paths remain unsurfaced by any page (map for future UI work).
+
 Needed:
 
 - Audit every page and classify it as live, mocked, partial, or static.
@@ -619,6 +678,197 @@ Needed:
 - Payment/webhook replay procedure.
 
 ## Recommended forward plan
+
+### Phase 0: Finish end-to-end, close the gap to deployment-ready — TOP PRIORITY (Sri directive 2026-07-18)
+
+**This phase supersedes every other initiative in this document until its exit
+criteria pass.** `WORK/LOOP_STATE.md` loop_status is ACTIVE against this phase;
+`FOUNDATION_HARDENING.md` and `FUNCTIONAL_REBRAND_PLAN.md` stay queued/paused
+unless a session explicitly claims them instead.
+
+Direct answer this phase exists to make true: as of 2026-07-18 the app is
+**not** working end-to-end for a real customer and is **not** deployment-ready
+(see the assessment folded into this section). The retail core (catalog,
+inventory, POS checkout, payments, orders, customers) is the most solid part
+and has real database-backed logic with test coverage, but three things stand
+between here and "customers can actually use this in production":
+
+1. **Remaining mock-only FE↔BE gaps.** Not yet built, tracked in
+   `tools/api-gap-allowlist.json`: notifications digest/preferences/rules (4
+   paths), purchasing EDI-imports + vendor-history (6 paths), workflows
+   approval-chains + run-history (3 paths). Catalog credits, inventory
+   pipeline receiving/issues/errors/summary (9 paths), and settings
+   custom-roles are correctly deferred to NEEDS-SRI (each needs a product
+   decision, not plumbing — do not build these without Sri's call). Ecommerce
+   storefront auth is correctly gated Preview until a real backend is built.
+2. **Security hardening that's code-addressable from this environment.**
+   **CORRECTED 2026-07-19**: the earlier blanket claim "MFA/device
+   verification pages are mocked" was overbroad. MFA itself
+   (`src/identity/service.ts`) is a real implementation — genuine TOTP via
+   `OTPAuth`, a real `user_mfa` table, real backup codes, and the login flow
+   genuinely requires the challenge when enabled; not a mock. The actual gap
+   is narrower and smaller: `/login/device-verification` and
+   `/login/security-alert` are self-documented mocks (their own code
+   comments already said so) showing hardcoded fake device data, and neither
+   is reachable from the real login flow today (nothing navigates to them) —
+   so they weren't silently masquerading as real to any actual user, but
+   they had no visible in-UI signal either. Fixed by adding a visible
+   "Preview" banner to both, matching the ecommerce-storefront treatment,
+   so they can't start masquerading if ever wired in later. Building a real
+   new-device-detection/security-event pipeline is a genuine new feature
+   (needs decisions on what triggers it, whether it blocks login, and what
+   notification/session-revocation behavior it should have) — NEEDS-SRI,
+   not built here, same class of decision as catalog's `/credits` gap.
+   Frontend auth otherwise has some demo/mock refresh-token
+   behavior that needs auditing against the real identity module.
+   **RLS SWEEP DONE 2026-07-19**: verified the design is generic and
+   self-covering, not something each new module has to wire up — src/
+   modules/rls/index.ts's migration dynamically scans
+   `information_schema.columns` for ANY table with a `tenant_id` column and
+   applies `ENABLE`/`FORCE ROW LEVEL SECURITY` + a tenant_isolation policy to
+   it, and that module is registered LAST in src/modules/index.ts
+   specifically so it runs after every other module's tables exist. The
+   backstop itself (shared/db.ts's `db.query()` auto-wrapping in a
+   transaction that sets `app.tenant_id` whenever an AsyncLocalStorage tenant
+   context is present, set globally by `tenantResolver` on every `/api/v1`
+   request) is also request-scoped, not per-module — no new module has to
+   opt in. Confirmed every table added this session (notification_
+   preferences/alert_rules/digest_config, edi_imports, approval_chains/
+   approval_chain_runs, workflow_run_history, product_suppliers/
+   price_tiers, and the rest from the catalog/inventory waves) has a
+   tenant_id column, and extended src/gateway/tenant-isolation.test.ts with
+   a live leaky-query proof against `notification_alert_rules` (a table that
+   didn't exist when that test was first written) — RLS still blocks a
+   cross-tenant read with no WHERE tenant_id clause. No fix was needed; this
+   confirms the defense-in-depth design holds without per-feature RLS work.
+3. **A fresh, honest audit before calling this phase done.** Every module
+   gets one of the required status labels (`Built and verified` /
+   `Built but not verified` / `UI-only` / `Mocked` / `Partial` / `Planned` /
+   `Not production-ready`) — no module may be called "done" without one.
+
+**Explicitly out of scope for this phase** (real infrastructure, not code —
+stays on the NEEDS-SRI list in LOOP_STATE.md): Redis provisioning for
+shared-instance rate limiting, a real backup/restore drill against production
+infra, Vercel environment variable configuration, production DB certificate
+chain verification, secret rotation. These require Sri's access to real
+infra/accounts and cannot be completed from a sandboxed coding session —
+flagging them honestly is the job here, not pretending to close them.
+
+Working method for this phase: one queue item per `WORK/LOCK.md` claim
+(never two sessions/agents on overlapping files); independent, non-
+overlapping items (e.g. notifications vs. purchasing EDI vs. workflows) may
+run as separate worktree-isolated agents in parallel and get merged back
+sequentially with full gates (`typecheck`, real-Postgres tests, `gap:scan`)
+run after each merge — never merged unverified, never merged concurrently.
+
+Exit criteria for Phase 0:
+
+- Every path in `tools/api-gap-allowlist.json` is either implemented and
+  removed from the allowlist, or has an explicit NEEDS-SRI entry in
+  `WORK/LOOP_STATE.md` explaining the product decision blocking it.
+  **MET** — `gap:scan` is clean (444 backend paths, 373 frontend paths, 21
+  allowlisted); every one of those 21 has an explicit NEEDS-SRI entry in
+  `WORK/LOOP_STATE.md` (see the current NEEDS-SRI table), not a silent
+  allowlist add.
+- MFA/device-verification UI either works against a real backend or is
+  removed/clearly labeled non-functional — no silent mock masquerading as a
+  security control.
+  **MET** — MFA (`src/identity/service.ts`) was confirmed a real
+  implementation (TOTP, backup codes, enforced in login) this session's
+  test run (`identity.test.ts`, 21/21 passing, incl. 3 MFA-specific tests).
+  `/login/device-verification` and `/login/security-alert` are labeled
+  Preview (fixed 2026-07-19, commit `b859ec6`) and unreachable from the real
+  login flow.
+- A fresh cross-tenant RLS regression test passes against every module
+  registered in `src/modules/index.ts` as of the audit date.
+  **MET** — `gateway/tenant-isolation.test.ts` passed (part of a 19/19
+  gateway-suite pass this session) and was extended 2026-07-19 (commit
+  `5b20519`) with a live leaky-query proof against a table created this
+  Phase-0 effort (`notification_alert_rules`); the RLS module's design
+  (dynamic `information_schema` scan + registered last in `modules/index.ts`)
+  is generic and self-covering, confirmed by inspection, not per-module opt-in.
+- `npm run verify` (hygiene + gap:scan + typecheck + test + smoke + frontend
+  typecheck/lint/build) passes clean in one run.
+  **PARTIALLY MET** — hygiene, gap:scan, backend typecheck, all 601 backend
+  tests (78/78 files), the 20-step Postgres smoke test, frontend typecheck,
+  and frontend lint all passed clean, run across many batched tool calls (not
+  literally one `npm run verify` invocation — this sandbox cannot sustain a
+  single call long enough for that). **`cd web && npm run build` could not be
+  completed in this sandbox** — a confirmed architectural limit (background
+  processes do not persist across tool calls; a plain `sleep` proved this
+  independently of the build itself), not a code or config problem. See
+  `AUDIT_2026-07-19T062148Z-phase0-verification.md` §2a for the full
+  investigation. This one item needs to be run once in CI or on a real
+  machine to close out fully.
+- A new dated audit in `WORK/audits/` states, module by module, which of the
+  seven honest status labels applies — replacing optimism with evidence.
+  **MET** — `WORK/audits/AUDIT_2026-07-19T062148Z-phase0-verification.md`,
+  covering all 51 modules registered in `src/modules/index.ts`.
+
+**Overall Phase 0 status: essentially done, one item open.** Four of five
+exit criteria are fully met with evidence above. The fifth (`npm run verify`
+passing "in one run") is met in substance — every stage that can run in this
+sandbox passed clean — except the frontend production build, which needs a
+CI or real-machine run to get the final confirmation; nothing found this
+session gives reason to expect it would fail there (typecheck and lint, the
+two parts of that pipeline that don't need one long-lived process, both
+passed clean). The retail core is real, tested, and proven end-to-end by the
+smoke test against real Postgres — this is not a demo. What remains before
+calling the whole platform (not just Phase 0) deployment-ready is the
+NEEDS-SRI list in the new audit's §5: a handful of product decisions (catalog
+credits, inventory pipeline receiving/issues/errors, custom-roles contract,
+real EDI parsing, approval-chain triggering) and a handful of real-infra
+items (Redis, backup drill, Vercel env, cert chain, PR merges) that no
+sandboxed session can close.
+
+#### Phase 0 continuation (2026-07-19, Sri: "continue on the phase0-verification audit")
+
+The verification audit's §3/§4 named seven real, mounted, gap-scan-clean
+modules as "Built but not verified" — thin-to-zero dedicated test coverage
+(quotes, loyalty, store_locations, product_batches, service_orders,
+customer_invoices, workforce). All seven now have real integration test
+coverage against embedded Postgres, each written by a dispatched subagent and
+independently re-verified by the coordinator (re-ran typecheck, gap:scan, and
+the actual test files myself — not just trusting agent self-reports).
+
+**This wave surfaced 4 more real production bugs**, all found purely by
+writing tests for code that had none — bringing the total for the whole
+Phase 0 effort to 8:
+
+- `quotes`' `quotations` table collided with `sales`' pre-existing,
+  incompatible `quotations` table (sales registers first in
+  `modules/index.ts`, so its schema always won) — **the quotes module was
+  100% non-functional**, every insert 500'd. Renamed to
+  `customer_quotations`/`customer_quotation_lines`. Also fixed a dead
+  `already_converted` guard reading a column nothing populates.
+- `store_locations`' `product_locations` table collided with `fulfillment`'s
+  pre-existing, incompatible table of the same name — same bug class, 3rd
+  occurrence this effort (1st: `team`/`workforce` on `time_entries`, fixed
+  2026-07-18). Renamed to `store_location_products`.
+- `customer_invoices`' `create()` used SQL placeholders that didn't match its
+  own params object's actual keys — `shared/db.ts` silently binds NULL for an
+  unmatched `@name` placeholder, so **every invoice creation with any lines
+  500'd** on a NOT NULL violation. Also fixed a status-update route bypassing
+  `parseBody()` and leaking raw 500s instead of 400s.
+- `workforce`'s `clockIn()` never validated `employeeId` against the
+  employees table (its sibling creators do) — a bogus id returned 201 and
+  created a permanently-invisible orphaned `time_entries` row while
+  permanently occupying that id's "already clocked in" slot, an unrecoverable
+  stuck state.
+
+`product_batches` and `service_orders` had no bugs — genuinely working as
+built, confirmed by 11 and 12 new tests respectively.
+
+Net: 113 new tests written across the 7 modules (26 + 61 + 27, per the
+iteration log in `WORK/LOOP_STATE.md` iterations 18-20), typecheck and
+gap:scan clean throughout, no regressions in any sibling module touched by
+the table renames. The recurring table-collision bug class (now found 3
+times) confirms module registration order in `src/modules/index.ts` remains
+a live footgun for any *new* module — worth a lint/CI check (grep every
+module's `CREATE TABLE IF NOT EXISTS` name for uniqueness across the whole
+`src/modules/` tree) rather than relying on manual test-writing to keep
+catching it after the fact. Not built this wave (would need its own
+scoping); flagged here as a candidate for the backlog.
 
 ### Phase 1: Truth and cleanup
 

@@ -34,55 +34,55 @@ export function registerRoutes(router: Router, svc: RestaurantService): void {
 
   // ── Tables ────────────────────────────────────────────────────────────────
 
-  router.get("/restaurant/tables", handler(async (req, res) => {
+  router.get("/tables", handler(async (req, res) => {
     const outletId = typeof req.query.outletId === "string" ? req.query.outletId : undefined;
     res.json({ items: await svc.listTables(tid(res), outletId) });
   }));
 
-  router.post("/restaurant/tables", mgr, handler(async (req, res) => {
+  router.post("/tables", mgr, handler(async (req, res) => {
     const body = parseBody(createTableSchema, req.body);
     res.status(201).json(await svc.createTable(tid(res), body));
   }));
 
-  router.patch("/restaurant/tables/:id/status", handler(async (req, res) => {
+  router.patch("/tables/:id/status", handler(async (req, res) => {
     const { status } = parseBody(z.object({ status: z.enum(["available","occupied","reserved","cleaning"]) }), req.body);
     res.json(await svc.setTableStatus(String(req.params["id"]), tid(res), status as TableStatus));
   }));
 
-  router.post("/restaurant/tables/:id/open-session", handler(async (req, res) => {
+  router.post("/tables/:id/open-session", handler(async (req, res) => {
     const body = parseBody(openSessionSchema, req.body);
     res.status(201).json(await svc.openSession(String(req.params["id"]), tid(res), { partySize: body.partySize ?? 1, serverId: body.serverId, notes: body.notes }));
   }));
 
-  router.post("/restaurant/sessions/:id/close", handler(async (req, res) => {
+  router.post("/sessions/:id/close", handler(async (req, res) => {
     res.json(await svc.closeSession(String(req.params["id"]), tid(res)));
   }));
 
   // ── Bar Tabs ───────────────────────────────────────────────────────────────
 
-  router.get("/restaurant/tabs", handler(async (req, res) => {
+  router.get("/tabs", handler(async (req, res) => {
     const status = req.query.status === "closed" ? "closed" : req.query.status === "open" ? "open" : undefined;
     res.json({ items: await svc.listTabs(tid(res), status as "open" | "closed" | undefined) });
   }));
 
-  router.post("/restaurant/tabs", handler(async (req, res) => {
+  router.post("/tabs", handler(async (req, res) => {
     const body = parseBody(openTabSchema, req.body);
     res.status(201).json(await svc.openTab(tid(res), body));
   }));
 
-  router.post("/restaurant/tabs/:id/add-round", handler(async (req, res) => {
+  router.post("/tabs/:id/add-round", handler(async (req, res) => {
     const { orderId } = parseBody(z.object({ orderId: z.string().min(1) }), req.body);
     await svc.addRoundToTab(String(req.params["id"]), orderId, tid(res));
     res.json({ ok: true });
   }));
 
-  router.post("/restaurant/tabs/:id/close", handler(async (req, res) => {
+  router.post("/tabs/:id/close", handler(async (req, res) => {
     res.json(await svc.closeTab(String(req.params["id"]), tid(res)));
   }));
 
   // ── BE-R4: Kitchen Display ────────────────────────────────────────────────
 
-  router.get("/restaurant/kitchen/queue", handler(async (req, res) => {
+  router.get("/kitchen/queue", handler(async (req, res) => {
     const outletId = typeof req.query.outletId === "string" ? req.query.outletId : undefined;
     const section  = typeof req.query.section  === "string" ? req.query.section  : undefined;
     const items = await svc.kitchenQueue(tid(res), outletId, section);
@@ -93,7 +93,7 @@ export function registerRoutes(router: Router, svc: RestaurantService): void {
     res.json({ items, grouped });
   }));
 
-  router.patch("/restaurant/kitchen/:lineId/bump", handler(async (req, res) => {
+  router.patch("/kitchen/:lineId/bump", handler(async (req, res) => {
     res.json(await svc.bumpKitchenLine(String(req.params["lineId"]), tid(res)));
   }));
 }

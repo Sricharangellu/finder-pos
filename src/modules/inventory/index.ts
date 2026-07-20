@@ -3,6 +3,8 @@ import type { DomainEvent } from "../../shared/types.js";
 import { claimEventOnce } from "../../shared/outbox.js";
 import { InventoryService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { PipelineViewsService } from "./pipeline-views.js";
+import { registerPipelineRoutes } from "./pipeline-routes.js";
 import { dropLegacyNoTenant } from "../../shared/migrate.js";
 import { PurchasingService } from "../purchasing/index.js";
 
@@ -94,6 +96,36 @@ export const inventoryModule: PosModule = {
      );`,
     `CREATE INDEX IF NOT EXISTS inventory_lots_expiry_idx ON inventory_lots (tenant_id, expiry_date) WHERE qty_on_hand > 0;
      CREATE INDEX IF NOT EXISTS inventory_lots_product_idx ON inventory_lots (tenant_id, product_id);`,
+    // Fields for the product-detail Expiry tab's manual lot entry (catalog
+    // module, see AUDIT_2026-07-18T005030Z): a human batch number distinct
+    // from lot_code, which location holds it, free-text notes, and updated_at
+    // for edits. Extending this table (rather than a parallel one) means
+    // manual entries are automatically visible to the Expiry Pool sweep above
+    // once they pass expiry_date — one source of truth for per-lot expiry.
+    `ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS batch_number TEXT;
+     ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS location_id TEXT;
+     ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS notes TEXT;
+     ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS updated_at BIGINT;`,
+    // Expiry sheet: stock swept out of active inventory because it expired, held
+    // in a quarantined pool pending disposition (discard or return-to-vendor).
+    // loss_cents = qty × unit_cost = the total loss booked to the ledger.
+    `CREATE TABLE IF NOT EXISTS expiry_writeoffs (
+       id            TEXT PRIMARY KEY,
+       tenant_id     TEXT NOT NULL,
+       product_id    TEXT NOT NULL,
+       product_name  TEXT,
+       lot_id        TEXT,
+       lot_code      TEXT,
+       expiry_date   BIGINT,
+       qty           INTEGER NOT NULL,
+       unit_cost_cents BIGINT NOT NULL DEFAULT 0,
+       loss_cents    BIGINT NOT NULL DEFAULT 0,
+       status        TEXT NOT NULL DEFAULT 'pending',   -- pending | discarded | returned
+       disposition_ref TEXT,                            -- vendor_return id when returned
+       created_at    BIGINT NOT NULL,
+       resolved_at   BIGINT
+     );`,
+    `CREATE INDEX IF NOT EXISTS expiry_writeoffs_status_idx ON expiry_writeoffs (tenant_id, status, created_at DESC);`,
     CREATE_CYCLE_COUNT_TABLES,
     `
 CREATE TABLE IF NOT EXISTS inventory_locations (
@@ -227,6 +259,10 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
   register({ db, events, router, outbox }) {
     const service = new InventoryService(db, events);
     const purchasing = new PurchasingService(db, events);
+    // Registered before registerRoutes() so /pipeline/* is matched ahead of
+    // the /:productId catch-all inside it (same reasoning as the 2026-07-18
+    // route-shadowing fix for /counts, /locations, /reorder-suggestions).
+    registerPipelineRoutes(router, new PipelineViewsService(db, purchasing));
     registerRoutes(router, service, purchasing);
 
     // order.created -> decrement stock for each line (reason 'sale', ref = order id).
@@ -259,7 +295,7 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       const payload = event.payload as {
         tenantId?: string;
         poId?: string;
-        lines?: Array<{ productId: string; quantity: number; expiryDate?: number; lotCode?: string | null; unitCostCents?: number | null }>;
+        lines?: Array<{ productId: string; quantity: number; expiryDate?: number; lotCode?: string | null; unitCostCents?: number | null; locationId?: string | null }>;
       };
       const tenantId = payload.tenantId ?? "";
       const poId = payload.poId ?? event.aggregateId ?? "";
@@ -267,6 +303,11 @@ CREATE INDEX IF NOT EXISTS inventory_transfers_tenant_idx ON inventory_transfers
       if (!(await claimEventOnce(db, "inventory.receiving", event as DomainEvent))) return; // already applied
       for (const line of payload.lines ?? []) {
         await service.adjust(line.productId, line.quantity, "receiving", tenantId, poId);
+        // If a receiving location was chosen at the desk, credit that location's
+        // stock too (the product-level adjust above is the aggregate on-hand).
+        if (line.locationId) {
+          await service.adjustStock(tenantId, line.locationId, line.productId, line.quantity, "receiving", poId);
+        }
         // If the received line carries an expiry, record a lot for FEFO / near-expiry tracking.
         if (line.expiryDate) {
           await service.createLot(

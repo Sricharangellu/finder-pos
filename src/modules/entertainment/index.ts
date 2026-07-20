@@ -1,7 +1,7 @@
 import type { PosModule, ModuleContext } from "../types.js";
 import { v7 as uuidv7 } from "uuid";
 import { handler, parseBody, notFound } from "../../shared/http.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireModule } from "../../gateway/auth.js";
 import { z } from "zod";
 import type { Response } from "express";
 import type { AuthPayload } from "../../gateway/auth.js";
@@ -65,10 +65,11 @@ export const entertainmentModule: PosModule = {
   name: "entertainment",
   migrations: [CREATE_EVENTS, CREATE_EVENT_TICKETS],
   register({ db, router }: ModuleContext) {
+    router.use(requireModule("tickets"));
 
     // ── Events ────────────────────────────────────────────────────────────────
 
-    router.get("/entertainment/events", handler(async (req, res) => {
+    router.get("/events", handler(async (req, res) => {
       const t      = tid(res);
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const where  = status ? "WHERE tenant_id = @t AND status = @s" : "WHERE tenant_id = @t";
@@ -80,7 +81,7 @@ export const entertainmentModule: PosModule = {
       )});
     }));
 
-    router.post("/entertainment/events", requireRole("manager"), handler(async (req, res) => {
+    router.post("/events", requireRole("manager"), handler(async (req, res) => {
       const body = parseBody(eventSchema, req.body);
       const t    = tid(res);
       const now  = Date.now();
@@ -100,7 +101,7 @@ export const entertainmentModule: PosModule = {
 
     // ── Tickets ───────────────────────────────────────────────────────────────
 
-    router.get("/entertainment/events/:id/tickets", handler(async (req, res) => {
+    router.get("/events/:id/tickets", handler(async (req, res) => {
       const id = String(req.params["id"]);
       const t  = tid(res);
       res.json({ items: await db.query(
@@ -110,7 +111,7 @@ export const entertainmentModule: PosModule = {
     }));
 
     // Sell tickets — atomic: check capacity, increment sold, insert tickets
-    router.post("/entertainment/events/:id/sell", handler(async (req, res) => {
+    router.post("/events/:id/sell", handler(async (req, res) => {
       const eventId = String(req.params["id"]);
       const t       = tid(res);
       const body    = parseBody(sellSchema, req.body);
@@ -152,7 +153,7 @@ export const entertainmentModule: PosModule = {
     }));
 
     // Redeem a ticket by QR code
-    router.post("/entertainment/tickets/redeem", handler(async (req, res) => {
+    router.post("/tickets/redeem", handler(async (req, res) => {
       const qrCode = z.string().min(1).parse((req.body as Record<string, unknown>).qrCode);
       const t      = tid(res);
       const ticket = await db.one<{ id: string; redeemed_at: number | null }>(

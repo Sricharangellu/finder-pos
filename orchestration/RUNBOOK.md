@@ -1,6 +1,6 @@
 # Ascend Operations Runbook
 
-Production URLs: https://finder-pos-backend.vercel.app · https://finder-pos-frontend.vercel.app
+Production URLs: https://ascendhq-api.vercel.app · https://ascendhq-app.vercel.app
 Health endpoints: `/healthz` (liveness) · `/readyz` (readiness + pool stats) · `/metrics` (Prometheus, bearer-gated)
 
 ---
@@ -26,7 +26,7 @@ Health endpoints: `/healthz` (liveness) · `/readyz` (readiness + pool stats) ·
 
 1. Check pool stats:
    ```bash
-   curl -s https://finder-pos-backend.vercel.app/readyz | jq .pool
+   curl -s https://ascendhq-api.vercel.app/readyz | jq .pool
    # { total, idle, waiting }
    ```
 
@@ -63,7 +63,7 @@ Health endpoints: `/healthz` (liveness) · `/readyz` (readiness + pool stats) ·
 
 1. Check response header: `X-Request-Id` — rate limit key is the extracted client IP.
 2. Check `TRUST_PROXY_DEPTH` in env. If behind Cloudflare + Vercel, set to `2`.
-3. Verify with: `curl -H "X-Forwarded-For: 1.2.3.4, 5.6.7.8" https://finder-pos-backend.vercel.app/healthz -v | grep x-request-id`
+3. Verify with: `curl -H "X-Forwarded-For: 1.2.3.4, 5.6.7.8" https://ascendhq-api.vercel.app/healthz -v | grep x-request-id`
 
 **Fix:**
 
@@ -89,7 +89,7 @@ Re-deploy after changing env var.
 2. Verify `STRIPE_WEBHOOK_SECRET` is set in Vercel environment variables.
 3. Test signature verification manually:
    ```bash
-   curl -X POST https://finder-pos-backend.vercel.app/api/stripe/webhook \
+   curl -X POST https://ascendhq-api.vercel.app/api/stripe/webhook \
      -H "stripe-signature: t=..." \
      -d '{"type":"payment_intent.succeeded",...}'
    ```

@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
-const E2E_EMAIL = process.env["E2E_EMAIL"] ?? "owner@finder-pos.dev";
-const E2E_PASSWORD = process.env["E2E_PASSWORD"] ?? "FinderDemo!2026";
+const E2E_EMAIL = process.env["E2E_EMAIL"] ?? "owner@ascend.dev";
+const E2E_PASSWORD = process.env["E2E_PASSWORD"] ?? "AscendDemo!2026";
 
 function isLoginPage(page: Page) {
   return new URL(page.url()).pathname === "/login";

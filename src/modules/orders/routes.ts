@@ -3,6 +3,7 @@ import { z } from "zod";
 import { handler, parseBody, notFound, badRequest } from "../../shared/http.js";
 import type { OrdersService, OrderStatus, CourseValue } from "./service.js";
 import type { AuthPayload } from "../../gateway/auth.js";
+import { requireRole } from "../../gateway/auth.js";
 import { sendEmail } from "../../shared/email.js";
 import { Money } from "../../shared/money.js";
 
@@ -56,6 +57,8 @@ function auth(res: Response): AuthPayload {
 }
 
 export function registerRoutes(router: Router, service: OrdersService): void {
+  const mgr = requireRole("manager");
+
   router.post(
     "/",
     handler(async (req: Request, res: Response) => {
@@ -117,8 +120,17 @@ export function registerRoutes(router: Router, service: OrdersService): void {
     }),
   );
 
+  // GET /:id/timeline — derived event history for the order-detail page.
+  router.get(
+    "/:id/timeline",
+    handler(async (req: Request, res: Response) => {
+      res.json(await service.timeline(String(req.params.id), tenantId(res)));
+    }),
+  );
+
   router.post(
     "/:id/refund",
+    mgr,
     handler(async (req: Request, res: Response) => {
       res.json(await service.refund(String(req.params.id), tenantId(res), auth(res).userId));
     }),
@@ -126,6 +138,7 @@ export function registerRoutes(router: Router, service: OrdersService): void {
 
   router.post(
     "/:id/void",
+    mgr,
     handler(async (req: Request, res: Response) => {
       res.json(await service.void(String(req.params.id), tenantId(res), auth(res).userId));
     }),

@@ -11,10 +11,10 @@ import type { Express } from "express";
  * and attaches a signed demo-tenant (tnt_demo / owner) bearer token. The harness
  * (scripts/test.ts) sets JWT_SECRET so authMiddleware can verify it.
  */
-function testAuthToken(): string {
+function testAuthToken(role: string): string {
   const secret = process.env.JWT_SECRET ?? "test-secret-finder-pos";
   return jwt.sign(
-    { sub: "usr_demo_owner", tenantId: "tnt_demo", role: "owner" },
+    { sub: `usr_demo_${role}`, tenantId: "tnt_demo", role },
     secret,
     { expiresIn: "1h" },
   );
@@ -36,6 +36,7 @@ export default function request(
   method: string,
   path: string,
   body?: unknown,
+  role: string = "owner",
 ): Promise<{ status: number; json: any }> {
   return new Promise((resolve, reject) => {
     const server = http.createServer(app);
@@ -48,7 +49,7 @@ export default function request(
       }
       const payload = body === undefined ? undefined : JSON.stringify(body);
       const headers: Record<string, string> = {
-        authorization: `Bearer ${testAuthToken()}`,
+        authorization: `Bearer ${testAuthToken(role)}`,
       };
       if (payload) {
         headers["content-type"] = "application/json";

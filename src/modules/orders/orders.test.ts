@@ -16,9 +16,10 @@ async function call(
   method: string,
   path: string,
   body?: unknown,
+  role?: string,
 ): Promise<{ status: number; json: any }> {
   const { default: request } = await import("./test-request.js");
-  return request(app.express, method, path, body);
+  return request(app.express, method, path, body, role);
 }
 
 /** Create a product through the catalog API; return its id. */
@@ -343,6 +344,76 @@ test("void sets status to voided", async () => {
   assert.equal(json.status, "voided");
 });
 
+test("manager can refund an order", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "REF-MGR",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status, json } = await call(app, "POST", `/api/orders/${created.json.id}/refund`, undefined, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.status, "refunded");
+});
+
+test("cashier cannot refund an order (403)", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "REF-CASH",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status } = await call(app, "POST", `/api/orders/${created.json.id}/refund`, undefined, "cashier");
+  assert.equal(status, 403);
+});
+
+test("manager can void an order", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "VOID-MGR",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status, json } = await call(app, "POST", `/api/orders/${created.json.id}/void`, undefined, "manager");
+  assert.equal(status, 200);
+  assert.equal(json.status, "voided");
+});
+
+test("cashier cannot void an order (403)", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, {
+    sku: "VOID-CASH",
+    name: "Widget",
+    price_cents: 2000,
+    category: "general",
+  });
+  const created = await call(app, "POST", "/api/orders/", {
+    stateCode: "CA",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  const { status } = await call(app, "POST", `/api/orders/${created.json.id}/void`, undefined, "cashier");
+  assert.equal(status, 403);
+});
+
 test("order.created fires with the correct payload shape", async () => {
   const app = await freshApp();
   const widget = await makeProduct(app, {
@@ -477,4 +548,30 @@ test("refund and void of a nonexistent order return 404", async () => {
   const voidRes = await call(app, "POST", "/api/orders/ord_missing/void");
   assert.equal(voidRes.status, 404);
   assert.equal(voidRes.json.error.code, "not_found");
+});
+
+test("timeline: derived events follow the order lifecycle", async () => {
+  const app = await freshApp();
+  const widget = await makeProduct(app, { sku: "TL-1", name: "Timeline Widget", price_cents: 1500 });
+  const { json: order } = await call(app, "POST", "/api/orders/", {
+    stateCode: "TX",
+    lines: [{ productId: widget, quantity: 1 }],
+  });
+
+  // Fresh open order → exactly the created event.
+  const t1 = await call(app, "GET", `/api/orders/${order.id}/timeline`);
+  assert.equal(t1.status, 200);
+  assert.equal(t1.json.items.length, 1);
+  assert.equal(t1.json.items[0].type, "created");
+
+  // Voiding adds a voided event after created.
+  await call(app, "POST", `/api/orders/${order.id}/void`);
+  const t2 = await call(app, "GET", `/api/orders/${order.id}/timeline`);
+  assert.equal(t2.status, 200);
+  const types = t2.json.items.map((e: { type: string }) => e.type);
+  assert.deepEqual(types, ["created", "voided"]);
+
+  // Unknown order 404s.
+  const missing = await call(app, "GET", "/api/orders/ord_missing/timeline");
+  assert.equal(missing.status, 404);
 });

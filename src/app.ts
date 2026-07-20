@@ -11,6 +11,8 @@ import { errorMiddleware } from "./shared/http.js";
 import { modules } from "./modules/index.js";
 import { parseCapabilitiesImpactQuery, SettingsService } from "./modules/settings/service.js";
 import { identityModule } from "./identity/index.js";
+import { SsoService } from "./modules/sso/service.js";
+import { registerPublicRoutes as registerSsoPublicRoutes } from "./modules/sso/routes.js";
 import {
   requestIdMiddleware,
   rateLimitMiddleware,
@@ -61,7 +63,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     }
 
     const WARNED_VARS: [string, string][] = [
-      ["APP_URL", "public URL of this service — email reset links will fall back to finder-pos.vercel.app"],
+      ["APP_URL", "public URL of this service — email reset links will fall back to ascendhq-api.vercel.app"],
       ["SENDGRID_API_KEY", "password reset and transactional emails will silently fail"],
       ["STRIPE_SECRET_KEY", "card payments will return 503 — configure Stripe or disable card tender"],
       ["REDIS_URL", "rate limiting uses in-memory state and will NOT be shared across instances — all replicas will have separate limits"],
@@ -151,9 +153,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
     rawOrigins.trim()
       ? new Set(rawOrigins.split(",").map((o) => o.trim()).filter(Boolean))
       : new Set([
+        // Rebrand Phase 3 (additive, not a cutover — see WORK/FUNCTIONAL_REBRAND_PLAN.md):
+        // both old and new frontend origins must accept CORS during the transition,
+        // since either could be the one the browser is actually loaded from.
         "https://finder-pos.vercel.app",
         "https://finder-pos-web.vercel.app",
         "https://finder-pos-frontend.vercel.app",
+        "https://ascend-pos-frontend.vercel.app",
+        "https://ascendhq-app.vercel.app",
       ]);
 
   app.use((req, res, next) => {
@@ -289,13 +296,39 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // per-IP limiter (≈20/min sustained, small burst) in front of the router.
   // Registration gets an extra-tight limiter (5 burst, ~3/min) to prevent
   // automated account creation.
+  // Thresholds are env-overridable (defaults below = unchanged behavior) so a
+  // single-IP test suite (e.g. CI's Playwright runner, which needs dozens of
+  // login/probe requests) can be configured without touching this security
+  // posture anywhere it isn't explicitly opted into.
   const identityRouter = Router();
   await identityModule.register({ db, events, router: identityRouter });
   app.use(
     "/api/identity/register",
-    rateLimitMiddleware({ capacity: 5, refillRate: 0.05, redis }),
+    rateLimitMiddleware({
+      capacity: Number(process.env["IDENTITY_REGISTER_RATE_CAPACITY"] ?? 5),
+      refillRate: Number(process.env["IDENTITY_REGISTER_RATE_REFILL"] ?? 0.05),
+      redis,
+    }),
   );
-  app.use("/api/identity", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), identityRouter);
+  app.use(
+    "/api/identity",
+    rateLimitMiddleware({
+      capacity: Number(process.env["IDENTITY_RATE_LIMIT_CAPACITY"] ?? 10),
+      refillRate: Number(process.env["IDENTITY_RATE_LIMIT_REFILL"] ?? 0.33),
+      redis,
+    }),
+    identityRouter,
+  );
+
+  // ── SSO pre-login handshake — must be reachable BEFORE a token exists, so it
+  // cannot go through the auth-gated /api/v1 router below (that would make SSO
+  // login impossible: no token yet -> 401 -> can never get a token). Mounted
+  // at the same /api/v1/sso path the frontend already calls; Express matches
+  // this registration first, so /config (auth-gated, registered later via the
+  // domain-modules loop) is unaffected. Same brute-force posture as identity login.
+  const ssoPublicRouter = Router();
+  registerSsoPublicRoutes(ssoPublicRouter, new SsoService(db));
+  app.use("/api/v1/sso", rateLimitMiddleware({ capacity: 10, refillRate: 0.33, redis }), ssoPublicRouter);
 
   // ── Auth + per-tenant tiered rate limit applied to all /api/v1/* routes.
   // makeAuthMiddleware handles both JWT sessions and API key tokens (fpk_ prefix).
@@ -363,7 +396,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<App> {
   // ── Root info
   app.get("/", (_req, res) => {
     res.json({
-      service: "finder-pos",
+      service: "ascend",
       status: "ok",
       storage: "postgres",
       modules: ["identity", ...modules.map((m) => m.name)],

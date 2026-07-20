@@ -101,3 +101,54 @@ test("loyalty: a redelivered payment.captured never double-awards points (ACPA M
   const after = (await call(app, "GET", `/api/customers/${cusId}`)).json.points;
   assert.equal(after, earned, "redelivery must not award points twice");
 });
+
+// ─── Search + merge ───────────────────────────────────────────────────────────
+
+test("search matches name/email substrings and returns the {items} envelope", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/customers/", { name: "Grace Hopper", email: "grace@navy.mil" });
+  await call(app, "POST", "/api/customers/", { name: "Graham Bell", email: "bell@labs.com" });
+
+  const byName = await call(app, "GET", "/api/customers/search?q=gra");
+  assert.equal(byName.status, 200);
+  assert.equal(byName.json.items.length, 2);
+
+  const byEmail = await call(app, "GET", "/api/customers/search?q=navy.mil");
+  assert.equal(byEmail.json.items.length, 1);
+  assert.equal(byEmail.json.items[0].name, "Grace Hopper");
+
+  const none = await call(app, "GET", "/api/customers/search?q=zzz-no-match");
+  assert.deepEqual(none.json.items, []);
+});
+
+test("merge absorbs the duplicate: balances add, notes move, duplicate row deleted", async () => {
+  const app = await freshApp();
+  const keep = (await call(app, "POST", "/api/customers/", { name: "Keep Me", email: "keep@x.dev" })).json;
+  const dupe = (await call(app, "POST", "/api/customers/", { name: "Dupe Me", email: "dupe@x.dev" })).json;
+
+  // Give the duplicate store credit and a note so the merge has data to move.
+  await call(app, "POST", `/api/customers/${dupe.id}/store-credit`, { deltaCents: 500, reason: "test" });
+  await call(app, "POST", `/api/customers/${dupe.id}/notes`, { note: "prefers email" });
+
+  const merged = await call(app, "POST", `/api/customers/${keep.id}/merge`, { merge_from_id: dupe.id });
+  assert.equal(merged.status, 200);
+  assert.equal(merged.json.id, keep.id);
+  assert.equal(Number(merged.json.store_credit_cents), 500);
+
+  // Duplicate is gone; its note now belongs to the survivor.
+  const gone = await call(app, "GET", `/api/customers/${dupe.id}`);
+  assert.equal(gone.status, 404);
+  const notes = await call(app, "GET", `/api/customers/${keep.id}/notes`);
+  assert.ok((notes.json.items as Array<{ note: string }>).some((n) => n.note === "prefers email"));
+});
+
+test("merge rejects self-merge and unknown customers", async () => {
+  const app = await freshApp();
+  const c = (await call(app, "POST", "/api/customers/", { name: "Solo", email: "solo@x.dev" })).json;
+
+  const self = await call(app, "POST", `/api/customers/${c.id}/merge`, { merge_from_id: c.id });
+  assert.equal(self.status, 400);
+
+  const missing = await call(app, "POST", `/api/customers/${c.id}/merge`, { merge_from_id: "cus_missing" });
+  assert.equal(missing.status, 404);
+});

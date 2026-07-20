@@ -121,6 +121,22 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.json({ items: await service.vendors(tenantId(res)) });
   }));
 
+  // ── Purchase cost entry ─────────────────────────────────────────────────────
+  // Received PO lines awaiting cost confirmation, with reference prices.
+  router.get("/cost-entry", handler(async (_req, res) => {
+    res.json({ items: await service.getCostEntryQueue(tenantId(res)) });
+  }));
+
+  // Confirm a product's cost (manager+) — updates product_costs + revalues.
+  const costEntrySchema = z.object({
+    productId: z.string().min(1),
+    costCents: z.number().int().nonnegative(),
+  });
+  router.post("/cost-entry", mgr, handler(async (req, res) => {
+    const b = parseBody(costEntrySchema, req.body);
+    res.json(await service.submitProductCost(tenantId(res), b.productId, b.costCents));
+  }));
+
   // ── Vendor-360 detail views ────────────────────────────────────────────────
   router.get("/vendors/:id", handler(async (req, res) => {
     res.json(await service.vendorDetail(String(req.params.id), tenantId(res)));
@@ -297,6 +313,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
       expiryDate: z.number().int().positive().optional(),
       lotCode: z.string().min(1).max(120).optional(),
       unitCostCents: z.number().int().nonnegative().optional(),
+      locationId: z.string().min(1).optional(),
     })).optional(),
   });
 
@@ -314,6 +331,7 @@ export function registerRoutes(router: Router, service: PurchasingService): void
         ...(l.expiryDate !== undefined ? { expiryDate: l.expiryDate } : {}),
         ...(l.lotCode !== undefined ? { lotCode: l.lotCode } : {}),
         ...(l.unitCostCents !== undefined ? { unitCostCents: l.unitCostCents } : {}),
+        ...(l.locationId !== undefined ? { locationId: l.locationId } : {}),
       }));
     } else {
       // No lines specified: receive all open lines at full remaining quantity ("receive all" button).
@@ -348,9 +366,19 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     ));
   }));
 
-  // PO price history
+  // PO price intelligence (invoiced / last-from-supplier / best-across-suppliers
+  // + suggested qty). Optional filters: from,to (received-at epoch ms), qtyBreak.
   router.get("/orders/:id/price-history", handler(async (req, res) => {
-    res.json({ items: await service.priceHistory(String(req.params.id), tenantId(res)) });
+    const num = (v: unknown): number | undefined => {
+      const n = Number(v);
+      return typeof v === "string" && v !== "" && Number.isFinite(n) ? n : undefined;
+    };
+    const opts = {
+      from: num(req.query["from"]),
+      to: num(req.query["to"]),
+      qtyBreak: num(req.query["qtyBreak"]),
+    };
+    res.json({ items: await service.priceHistory(String(req.params.id), tenantId(res), opts) });
   }));
 
   // PO documents

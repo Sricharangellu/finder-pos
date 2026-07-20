@@ -58,6 +58,17 @@ import { businessModule } from "./business/index.js";
 export const modules: PosModule[] = [
   sequencesModule, // must precede modules that seed a document_counters row
   catalogModule,
+  // serialNumbersModule must be registered (and thus app.use-mounted) before
+  // inventoryModule: its mountPath is "/api/v1" and it registers full paths
+  // starting with "/inventory/…" (e.g. "/inventory/serials"). inventoryModule
+  // mounts at "/api/v1/inventory" with a "/:productId" catch-all inside, which
+  // matches ANY single remaining path segment — including "serials". If
+  // inventory's app.use is registered first, Express matches its mount prefix
+  // first and the request never reaches this module's router at all. Found
+  // 2026-07-18: GET/POST/PATCH /api/v1/inventory/serials were 100% silently
+  // routed into inventory's per-product handlers instead (wrong shape, no
+  // error) until this was reordered.
+  serialNumbersModule,
   inventoryModule,
   ordersModule,
   paymentsModule,
@@ -92,7 +103,6 @@ export const modules: PosModule[] = [
   productBatchesModule,
   customerInvoicesModule,
   serviceOrdersModule,
-  serialNumbersModule,
   workforceModule,
   restaurantModule,
   appointmentsModule,

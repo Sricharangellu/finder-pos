@@ -19,7 +19,7 @@ interface HttpResult {
 const backendUrl = normalizeBaseUrl(
   process.argv[2] ?? process.env["OPS_BACKEND_URL"] ?? process.env["BACKEND_URL"] ?? "http://localhost:3001",
 );
-const allowedOrigin = process.env["OPS_ALLOWED_ORIGIN"] ?? "https://finder-pos-frontend.vercel.app";
+const allowedOrigin = process.env["OPS_ALLOWED_ORIGIN"] ?? "https://ascendhq-app.vercel.app";
 const blockedOrigin = process.env["OPS_BLOCKED_ORIGIN"] ?? "https://blocked.finder.invalid";
 const metricsToken = process.env["METRICS_TOKEN"] ?? process.env["OPS_METRICS_TOKEN"];
 const allowPublicMetrics = envFlag("OPS_ALLOW_PUBLIC_METRICS", false);

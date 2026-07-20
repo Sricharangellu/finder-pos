@@ -31,6 +31,12 @@ export default function SecurityAlertPage() {
           resetting your password right away. We&apos;ve also signed out any other active sessions.
         </p>
 
+        {/* Preview gate — no backend security-event pipeline exists yet; nothing
+            is actually recorded or signed out. See device-verification/page.tsx. */}
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-700/40 dark:bg-amber-700/10 dark:text-amber-300">
+          Preview: this event isn&apos;t actually recorded and no sessions are actually signed out yet.
+        </div>
+
         <dl className="mt-6 flex flex-col gap-2 rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm dark:border-danger-700/40 dark:bg-danger-700/10">
           <Row label="Device" value={MOCK_EVENT.browser} />
           <Row label="Location" value={MOCK_EVENT.location} />

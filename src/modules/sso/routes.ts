@@ -21,16 +21,44 @@ const UpsertBody = z.object({
   defaultRole: z.enum(ROLES).default("cashier"),
 });
 
-const InitiateBody = z.object({
+// `/initiate` and `/callback` are registered separately in src/app.ts, ahead of
+// the global `/api/v1` auth gate — see registerPublicRoutes() below. A caller
+// without a token can't reach anything behind makeAuthMiddleware, so a
+// pre-login SSO handshake can never be mounted through this module's normal
+// router (which is only reachable after auth already succeeded).
+export const InitiateBody = z.object({
   tenantId: z.string().min(1),
   redirectUri: z.string().url(),
 });
 
-const CallbackBody = z.object({
+export const CallbackBody = z.object({
   state: z.string().min(1),
   code: z.string().min(1),
   redirectUri: z.string().url(),
 });
+
+/** Public pre-login routes — mount before the `/api/v1` auth gate (see src/app.ts). */
+export function registerPublicRoutes(router: Router, service: SsoService): void {
+  // POST /api/v1/sso/initiate — returns the OIDC authorization URL for the given tenant.
+  router.post(
+    "/initiate",
+    handler(async (req, res) => {
+      const { tenantId: tid, redirectUri } = parseBody(InitiateBody, req.body);
+      const result = await service.initiateLogin(tid, redirectUri);
+      res.json(result);
+    }),
+  );
+
+  // POST /api/v1/sso/callback — exchanges an authorization code for an Ascend JWT.
+  router.post(
+    "/callback",
+    handler(async (req, res) => {
+      const body = parseBody(CallbackBody, req.body);
+      const tokens = await service.handleCallback(body.state, body.code, body.redirectUri);
+      res.json(tokens);
+    }),
+  );
+}
 
 export function registerRoutes(router: Router, service: SsoService): void {
   // GET /api/v1/sso/config — owner reads their IdP config (secret redacted)
@@ -71,25 +99,4 @@ export function registerRoutes(router: Router, service: SsoService): void {
     }),
   );
 
-  // POST /api/v1/sso/initiate — public (called before login redirect)
-  // Returns the OIDC authorization URL for the given tenant.
-  router.post(
-    "/initiate",
-    handler(async (req, res) => {
-      const { tenantId: tid, redirectUri } = parseBody(InitiateBody, req.body);
-      const result = await service.initiateLogin(tid, redirectUri);
-      res.json(result);
-    }),
-  );
-
-  // POST /api/v1/sso/callback — public (called by frontend after IdP redirect)
-  // Exchanges authorization code for Ascend JWT.
-  router.post(
-    "/callback",
-    handler(async (req, res) => {
-      const body = parseBody(CallbackBody, req.body);
-      const tokens = await service.handleCallback(body.state, body.code, body.redirectUri);
-      res.json(tokens);
-    }),
-  );
 }

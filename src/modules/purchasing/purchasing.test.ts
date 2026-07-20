@@ -446,3 +446,191 @@ test("requisition list filters by status and paginates with a cursor", async () 
   const page2 = await call(app, "GET", `/api/purchasing/requisitions?limit=2&cursor=${encodeURIComponent(page1.json.nextCursor)}`);
   assert.equal(page2.json.items.length, 1);
 });
+
+// ─── Purchase cost entry (session D feature) ──────────────────────────────────
+
+async function receivePO(app: App, supplierId: string, productId: string, qty: number, unitCostCents: number) {
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId,
+    lines: [{ productId, quantity: qty, unitCostCents }],
+  })).json;
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+  return po;
+}
+
+test("cost-entry queue surfaces received lines with reference prices; submit updates cost", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Reference Vendor");
+  const productId = await makeProduct(app, "COST-A", 1000); // selling price 1000
+
+  // Two receipts from the SAME vendor for the same product.
+  await receivePO(app, supplierId, productId, 6, 250); // older
+  await receivePO(app, supplierId, productId, 4, 300); // newer
+
+  const queue = await call(app, "GET", "/api/purchasing/cost-entry");
+  assert.equal(queue.status, 200);
+  const rows = (queue.json.items as any[]).filter((r) => r.product_id === productId);
+  assert.ok(rows.length >= 2, "both received lines appear in the queue");
+
+  // The newest line (cost 300) should reference the older same-vendor cost (250).
+  const newest = rows.find((r) => r.po_cost_cents === 300);
+  assert.ok(newest, "newest receipt present");
+  assert.equal(newest.selling_price_cents, 1000, "shows our selling price");
+  assert.equal(newest.supplier_name, "Reference Vendor", "shows the vendor");
+  assert.equal(newest.received_qty, 4, "shows the final received qty");
+  assert.equal(newest.prev_vendor_cost_cents, 250, "shows the previous cost from the same vendor");
+
+  // Confirm a cost — updates product_costs (the last-purchase-cost reference).
+  const submit = await call(app, "POST", "/api/purchasing/cost-entry", { productId, costCents: 275 });
+  assert.equal(submit.status, 200);
+  assert.equal(submit.json.cost_cents, 275);
+
+  const after = await call(app, "GET", "/api/purchasing/cost-entry");
+  const afterRow = (after.json.items as any[]).find((r) => r.product_id === productId);
+  assert.equal(afterRow.last_purchase_cost_cents, 275, "last purchase cost reflects the confirmed cost");
+});
+
+test("cashier cannot submit a product cost (403)", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Vendor X");
+  const productId = await makeProduct(app, "COST-B", 500);
+  await receivePO(app, supplierId, productId, 2, 100);
+
+  const denied = await call(app, "POST", "/api/purchasing/cost-entry", { productId, costCents: 120 }, "cashier");
+  assert.equal(denied.status, 403);
+  // Reading the queue stays open.
+  assert.equal((await call(app, "GET", "/api/purchasing/cost-entry", undefined, "cashier")).status, 200);
+});
+
+test("receiving into a location credits that location's stock", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Loc Vendor");
+  const productId = await makeProduct(app, "LOC-A", 500);
+
+  // Create a receiving location.
+  const loc = await call(app, "POST", "/api/inventory/locations", { code: "RCV-1", name: "Receiving Dock" }, "manager");
+  assert.equal(loc.status, 201, `location create failed: ${JSON.stringify(loc.json)}`);
+  const locationId = loc.json.id as string;
+
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: 8, unitCostCents: 200 }],
+  })).json;
+
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, {
+    lines: [{ lineId: po.lines[0].id, qty: 8, locationId }],
+  });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+
+  // The chosen location's stock reflects the receipt.
+  const locStock = await call(app, "GET", `/api/inventory/locations/${locationId}/stock`);
+  assert.equal(locStock.status, 200);
+  const row = (locStock.json.items as any[]).find((s) => s.product_id === productId);
+  assert.ok(row, "product appears in the receiving location's stock");
+  assert.equal(Number(row.quantity_on_hand), 8, "location credited the full received qty");
+});
+
+// ── Price intelligence (#41) ──────────────────────────────────────────────────
+
+const TEST_TENANT = "tnt_demo";
+
+/** Create a PO for one product, fully receive it, and optionally backdate the
+ *  received_at so date-range filters can be exercised. Returns the PO id. */
+async function makeReceivedPO(
+  app: App, supplierId: string, productId: string,
+  qty: number, unitCostCents: number, receivedAtMs?: number,
+): Promise<string> {
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: qty, unitCostCents }],
+  })).json;
+  const lines = po.lines.map((l: any) => ({ lineId: l.id, qty: l.quantity }));
+  const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, { lines });
+  assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+  if (receivedAtMs != null) {
+    await app.db.withTenant(TEST_TENANT).query(
+      "UPDATE purchase_orders SET received_at = @r WHERE id = @id AND tenant_id = @t",
+      { r: receivedAtMs, id: po.id, t: TEST_TENANT },
+    );
+  }
+  return po.id as string;
+}
+
+async function makeOrderedPO(app: App, supplierId: string, productId: string, qty: number, unitCostCents: number) {
+  return (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: qty, unitCostCents }],
+  })).json;
+}
+
+test("price intelligence surfaces invoiced, last-from-supplier and best-across-suppliers", async () => {
+  const app = await freshApp();
+  const supA = await makeSupplier(app, "Supplier A");
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-1", 1000);
+
+  await makeReceivedPO(app, supB, p, 10, 75); // cheapest, different supplier
+  await makeReceivedPO(app, supA, p, 10, 90); // last paid to supplier A
+
+  const cur = await makeOrderedPO(app, supA, p, 5, 100); // current PO, from A
+
+  const { status, json } = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  assert.equal(status, 200);
+  const item = json.items.find((i: any) => i.product_id === p);
+  assert.ok(item, "expected a price-intelligence item for the product");
+  assert.equal(item.invoiced_cents, 100);
+  assert.equal(item.ordered_qty, 5);
+  assert.equal(item.last_from_supplier.unit_cost_cents, 90);
+  assert.equal(item.best_across_suppliers.unit_cost_cents, 75);
+  assert.equal(item.best_across_suppliers.supplier_name, "Supplier B");
+});
+
+test("qty-break filter excludes small-lot history from best price", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-2", 1000);
+
+  await makeReceivedPO(app, supB, p, 10, 75); // full case
+  await makeReceivedPO(app, supB, p, 2, 60);  // odd-lot, cheaper per-unit
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+
+  const noFilter = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  assert.equal(noFilter.json.items.find((i: any) => i.product_id === p).best_across_suppliers.unit_cost_cents, 60);
+
+  const filtered = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history?qtyBreak=5`);
+  assert.equal(filtered.json.items.find((i: any) => i.product_id === p).best_across_suppliers.unit_cost_cents, 75);
+});
+
+test("date-range filter narrows price history by received date", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-3", 1000);
+  const D = 86_400_000, now = Date.now();
+
+  await makeReceivedPO(app, supB, p, 10, 50, now - 200 * D); // old & cheap
+  await makeReceivedPO(app, supB, p, 10, 90, now - 5 * D);   // recent
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+
+  const r = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history?from=${now - 30 * D}`);
+  const item = r.json.items.find((i: any) => i.product_id === p);
+  assert.equal(item.history.length, 1, "only the recent receipt should remain");
+  assert.equal(item.best_across_suppliers.unit_cost_cents, 90);
+});
+
+test("suggested qty reflects reorder point when stock and velocity are zero", async () => {
+  const app = await freshApp();
+  const supB = await makeSupplier(app, "Supplier B");
+  const p = await makeProduct(app, "PI-4", 1000);
+
+  await app.db.withTenant(TEST_TENANT).query(
+    "UPDATE products SET reorder_point = @rp WHERE id = @id AND tenant_id = @t",
+    { rp: 40, id: p, t: TEST_TENANT },
+  );
+
+  const cur = await makeOrderedPO(app, supB, p, 5, 100);
+  const r = await call(app, "GET", `/api/purchasing/orders/${cur.id}/price-history`);
+  const item = r.json.items.find((i: any) => i.product_id === p);
+  assert.equal(item.suggested_qty, 40); // reorder_point 40, stock 0, no velocity
+});

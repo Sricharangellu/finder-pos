@@ -18,7 +18,6 @@ export { CheckoutWorkflow } from "./workflows/checkout.workflow.js";
 export { OrderFulfillmentWorkflow } from "./workflows/order-fulfillment.workflow.js";
 export { PurchaseReceivingWorkflow } from "./workflows/purchasing-receiving.workflow.js";
 export { PaymentReconciliationWorkflow } from "./workflows/payment-reconciliation.workflow.js";
-export { AccountingPostingWorkflow } from "./workflows/accounting-posting.workflow.js";
 export { InventoryTransferWorkflow } from "./workflows/inventory-transfer.workflow.js";
 export { StockAdjustmentWorkflow } from "./workflows/stock-adjustment.workflow.js";
 export { RefundWorkflow } from "./workflows/refund.workflow.js";
@@ -86,7 +85,6 @@ export { syncEcommerceJob } from "./jobs/sync-ecommerce.job.js";
 // Compensations
 export { releaseInventoryCompensation } from "./compensations/release-inventory.compensation.js";
 export { voidPaymentCompensation } from "./compensations/void-payment.compensation.js";
-export { reverseLedgerEntryCompensation } from "./compensations/reverse-ledger-entry.compensation.js";
 export { cancelShipmentCompensation } from "./compensations/cancel-shipment.compensation.js";
 
 // Types
@@ -99,7 +97,6 @@ import { CheckoutWorkflow } from "./workflows/checkout.workflow.js";
 import { OrderFulfillmentWorkflow } from "./workflows/order-fulfillment.workflow.js";
 import { PurchaseReceivingWorkflow } from "./workflows/purchasing-receiving.workflow.js";
 import { PaymentReconciliationWorkflow } from "./workflows/payment-reconciliation.workflow.js";
-import { AccountingPostingWorkflow } from "./workflows/accounting-posting.workflow.js";
 import { InventoryTransferWorkflow } from "./workflows/inventory-transfer.workflow.js";
 import { StockAdjustmentWorkflow } from "./workflows/stock-adjustment.workflow.js";
 import { RefundWorkflow } from "./workflows/refund.workflow.js";
@@ -149,7 +146,13 @@ export function bootstrapOrchestration(db: DB, events: EventBus): OrchestrationB
   const runner = new WorkflowRunner(db, events);
 
   // ── 2. Register all workflows ───────────────────────────────────────────────
-  runner.register(AccountingPostingWorkflow);  // Must come first — others publish to its trigger
+  // NOTE: the double-entry ledger is posted by the accounting MODULE's event
+  // handlers (payment.captured, bill.*, purchase_order.received, order.refunded)
+  // writing the canonical journal_entries schema — NOT by a workflow. The former
+  // AccountingPostingWorkflow (trigger accounting.entry_requested) was retired:
+  // it wrote a journal_entries(reference_id)/journal_entry_lines schema no
+  // migration ever created, so every posting threw and was swallowed. See
+  // WORK/audits/AUDIT_2026-07-18T024400Z-accounting-posting-drift.md.
   runner.register(CheckoutWorkflow);
   runner.register(OrderFulfillmentWorkflow);
   runner.register(PurchaseReceivingWorkflow);

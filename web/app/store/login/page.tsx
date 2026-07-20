@@ -8,7 +8,7 @@ type Mode = "login" | "register";
 
 export default function StoreLoginPage() {
   const router = useRouter();
-  const { login, register } = useStoreAuth();
+  const { login, register, previewMode } = useStoreAuth();
 
   const [mode, setMode]         = useState<Mode>("login");
   const [name, setName]         = useState("");
@@ -67,8 +67,17 @@ export default function StoreLoginPage() {
           </p>
         </div>
 
+        {/* Preview gate — storefront customer auth has no backend yet */}
+        {previewMode && (
+          <div role="status" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <span className="font-semibold">Preview:</span> store accounts aren&apos;t
+            available yet on this deployment. Sign-in and registration are disabled
+            until customer accounts launch.
+          </div>
+        )}
+
         {/* Demo hint */}
-        {mode === "login" && (
+        {!previewMode && mode === "login" && (
           <div className="mb-5 rounded-xl border border-brand-600/20 bg-brand-600/5 px-4 py-3 text-xs text-brand-600">
             <span className="font-semibold">Demo accounts:</span><br />
             alice@demo.com / demo1234<br />
@@ -140,10 +149,12 @@ export default function StoreLoginPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || previewMode}
             className="mt-1 w-full rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-[#4849d0] disabled:opacity-50 transition-colors"
           >
-            {submitting
+            {previewMode
+              ? "Coming soon"
+              : submitting
               ? (mode === "login" ? "Signing in…" : "Creating account…")
               : (mode === "login" ? "Sign in" : "Create account")}
           </button>

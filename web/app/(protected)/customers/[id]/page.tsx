@@ -57,8 +57,8 @@ function MergeModal({
   useEffect(() => {
     if (!debouncedQ.trim()) { setResults([]); return; }
     setSearching(true);
-    apiGet<CustomerSearchResult[]>(`/api/v1/customers/search?q=${encodeURIComponent(debouncedQ)}`)
-      .then((r) => setResults(Array.isArray(r) ? r.filter((c) => c.id !== primary.id).slice(0, 5) : []))
+    apiGet<{ items: CustomerSearchResult[] }>(`/api/v1/customers/search?q=${encodeURIComponent(debouncedQ)}`)
+      .then((r) => setResults((r.items ?? []).filter((c) => c.id !== primary.id).slice(0, 5)))
       .catch(() => setResults([]))
       .finally(() => setSearching(false));
   }, [debouncedQ, primary.id]);

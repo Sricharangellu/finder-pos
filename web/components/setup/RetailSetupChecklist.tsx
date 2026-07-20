@@ -16,7 +16,7 @@ import Link from "next/link";
 import { apiGet } from "@/api-client/client";
 import { useCapabilities } from "@/contexts/CapabilitiesContext";
 
-const DISMISS_KEY = "finder_retail_setup_dismissed_v1";
+const DISMISS_KEY = "ascend_retail_setup_dismissed_v1";
 
 interface OutletsResponse {
   items: Array<{ id: string; registers?: Array<{ id: string }> }>;

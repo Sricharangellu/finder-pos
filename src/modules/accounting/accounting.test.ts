@@ -260,6 +260,70 @@ test("manual journal transactions must balance and use known accounts", async ()
   assert.equal(ok.json.items[0].doc_type, "manual");
 });
 
+// ─── Refund ledger reversal ───────────────────────────────────────────────────
+// A POS sale posts Dr Cash / Cr Revenue on payment.captured. A full refund must
+// post the mirror image (Dr Revenue / Cr Cash) so cash and revenue net back out;
+// without it the refunded sale stays on the books, overstating both. The only
+// prior refund-posting path (the accounting.entry_requested workflow) writes to a
+// journal schema that was never migrated, so refunds silently never posted.
+
+test("refunding a POS order reverses the sale in the ledger and rebalances the trial balance", async () => {
+  const app = await freshApp();
+  const tenantId = "tnt_demo"; // the auth helper's tenant
+  const orderId = "ord_refund_1";
+  const total = 12000; // $120 sale, tax-inclusive
+
+  // Sale: payment captured recognizes revenue and takes cash.
+  await app.events.publish("payment.captured", {
+    tenantId, id: "pay_refund_1", orderId, amountCents: total, changeCents: 0,
+  });
+
+  // Precondition: the sale posted Dr 1000 Cash / Cr 4000 Revenue.
+  const sale = await call(app, "GET", `/api/accounting/journal?docType=pos_payment&docId=pay_refund_1`);
+  assert.equal(sale.json.items.length, 2, "sale posted two legs");
+  const tbBefore = await call(app, "GET", "/api/accounting/trial-balance");
+  assert.equal(tbBefore.json.accounts.find((a: any) => a.account_code === "4000").balance_cents, -total, "revenue credited by the sale");
+  assert.equal(tbBefore.json.accounts.find((a: any) => a.account_code === "1000").balance_cents, total, "cash debited by the sale");
+
+  // Refund the whole order.
+  await app.events.publish("order.refunded", {
+    id: orderId, tenantId, orderNumber: "ON-1", totalCents: total,
+  });
+
+  // The refund must post the mirror reversal Dr 4000 Revenue / Cr 1000 Cash.
+  const refund = await call(app, "GET", `/api/accounting/journal?docType=pos_refund&docId=${orderId}`);
+  assert.equal(refund.status, 200);
+  assert.equal(refund.json.items.length, 2, "refund posted two legs (regression: was 0 — refunds never hit the ledger)");
+  const dr = refund.json.items.find((e: any) => e.debit_cents > 0);
+  const cr = refund.json.items.find((e: any) => e.credit_cents > 0);
+  assert.equal(dr.account_code, "4000", "revenue debited (reversed) on refund");
+  assert.equal(dr.debit_cents, total);
+  assert.equal(cr.account_code, "1000", "cash credited (paid out) on refund");
+  assert.equal(cr.credit_cents, total);
+  assert.equal(dr.entry_group, cr.entry_group, "one balanced transaction");
+
+  // Trial balance: sale + refund cancel, so cash and revenue net to zero and the
+  // ledger stays balanced.
+  const tb = await call(app, "GET", "/api/accounting/trial-balance");
+  assert.equal(tb.json.total_debit_cents, tb.json.total_credit_cents, "ledger balanced");
+  assert.equal(tb.json.accounts.find((a: any) => a.account_code === "4000").balance_cents, 0, "revenue nets to zero after refund");
+  assert.equal(tb.json.accounts.find((a: any) => a.account_code === "1000").balance_cents, 0, "cash nets to zero after refund");
+});
+
+test("refund ledger posting is idempotent (redelivery never double-reverses)", async () => {
+  const app = await freshApp();
+  const tenantId = "tnt_demo";
+  const orderId = "ord_refund_idem";
+
+  await app.events.publish("payment.captured", { tenantId, id: "pay_idem", orderId, amountCents: 5000, changeCents: 0 });
+  // Publish the same refund twice — a redelivered event must not post twice.
+  await app.events.publish("order.refunded", { id: orderId, tenantId, orderNumber: "ON-2", totalCents: 5000 });
+  await app.events.publish("order.refunded", { id: orderId, tenantId, orderNumber: "ON-2", totalCents: 5000 });
+
+  const refund = await call(app, "GET", `/api/accounting/journal?docType=pos_refund&docId=${orderId}`);
+  assert.equal(refund.json.items.length, 2, "exactly one balanced refund transaction despite duplicate delivery");
+});
+
 // ─── Transactional outbox (ACPA M1) ───────────────────────────────────────────
 
 test("normal flow: financial events are persisted and marked delivered", async () => {

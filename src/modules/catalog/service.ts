@@ -4,6 +4,7 @@ import type { EventBus } from "../../shared/events.js";
 import type { Cents } from "../../shared/money.js";
 import type { Page } from "../../shared/types.js";
 import { notFound, conflict, badRequest } from "../../shared/http.js";
+import { writeAudit } from "../../shared/audit.js";
 
 export type TaxClass = "standard" | "exempt";
 export type ProductStatus = "active" | "draft" | "archived";
@@ -285,6 +286,9 @@ export interface PriceHistoryEntry {
 
 interface MutationOptions {
   publishEvent?: boolean;
+  /** User id for the audit trail (product-detail Audit Log tab). Defaults to
+   *  "system" for internal/non-interactive callers (e.g. variant cascades). */
+  actorId?: string;
 }
 
 /**
@@ -521,6 +525,11 @@ export class CatalogService {
     if (options.publishEvent !== false) {
       await this.publishProductCreated(product);
     }
+
+    await writeAudit(this.db, {
+      tenantId, actorId: options.actorId ?? "system", action: "product.created",
+      entityType: "product", entityId: id, after: { sku: product.sku, name: product.name, price_cents: product.price_cents },
+    });
 
     return product;
   }
@@ -887,6 +896,22 @@ export class CatalogService {
       await this.publishProductUpdated(next, changed);
     }
 
+    // Audit trail (product-detail Audit Log tab): one row per update() call
+    // carrying only the fields that actually changed, before AND after —
+    // read side (CatalogDetailViewsService in detail-views.ts) flattens this
+    // into one entry per field. status -> "archived" is classified as an
+    // "archive" action at read time (archive() is just update() under the
+    // hood, so it needs no separate audit call here).
+    if (Object.keys(changed).length > 0) {
+      const before: Record<string, unknown> = {};
+      for (const key of Object.keys(changed)) before[key] = (current as unknown as Record<string, unknown>)[key];
+      await writeAudit(this.db, {
+        tenantId, actorId: options.actorId ?? "system",
+        action: changed.status === "archived" ? "product.archived" : "product.updated",
+        entityType: "product", entityId: id, before, after: changed,
+      });
+    }
+
     // Cascade a master product's category change to all its child variants, which
     // inherit it. Children have no children, so this recurses at most one level.
     if (changed.category !== undefined) {
@@ -906,8 +931,8 @@ export class CatalogService {
   }
 
   /** Soft delete: archive the product. */
-  async archive(id: string, tenantId: string): Promise<Product> {
-    return this.update(id, { status: "archived" }, tenantId);
+  async archive(id: string, tenantId: string, actorId?: string): Promise<Product> {
+    return this.update(id, { status: "archived" }, tenantId, { actorId });
   }
 
   /** BE-22: update regulated-product compliance fields (manager-gated at route level). */
@@ -921,6 +946,7 @@ export class CatalogService {
       restricted_states?: string[];
     },
     tenantId: string,
+    actorId = "system",
   ): Promise<Product> {
     const current = await this.getOrThrow(id, tenantId);
     const now = Date.now();
@@ -947,6 +973,12 @@ export class CatalogService {
     );
 
     await this.events.publish("product.updated", { id, tobacco_type, flavored, menthol, msa_reportable, restricted_states }, id);
+
+    await writeAudit(this.db, {
+      tenantId, actorId, action: "product.updated", entityType: "product", entityId: id,
+      before: { tobacco_type: current.tobacco_type, flavored: current.flavored, menthol: current.menthol, msa_reportable: current.msa_reportable, restricted_states: current.restricted_states },
+      after: { tobacco_type, flavored, menthol, msa_reportable, restricted_states },
+    });
 
     return {
       ...current,

@@ -8,7 +8,7 @@
  * /login.
  */
 
-import type { ApiError } from "./types";
+import type { ApiError, ApiFieldIssue } from "./types";
 import { getAccessToken } from "@/lib/auth";
 
 // ─── API Error class ──────────────────────────────────────────────────────────
@@ -19,11 +19,57 @@ export class ApiResponseError extends Error {
     message: string,
     public readonly requestId: string,
     public readonly status: number,
-    public readonly payload?: unknown
+    public readonly payload?: unknown,
+    /** Per-field validation issues from the backend (validation_error 400s). */
+    public readonly details?: ApiFieldIssue[]
   ) {
     super(message);
     this.name = "ApiResponseError";
   }
+}
+
+/** Runtime guard: only accept a well-formed issues array from the wire. */
+function parseFieldIssues(raw: unknown): ApiFieldIssue[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const issues = raw.filter(
+    (i): i is ApiFieldIssue =>
+      typeof i === "object" && i !== null &&
+      typeof (i as ApiFieldIssue).field === "string" &&
+      typeof (i as ApiFieldIssue).message === "string"
+  );
+  return issues.length > 0 ? issues : undefined;
+}
+
+/**
+ * Map an error to `{ fieldPath: message }` for inline form display.
+ * Returns `{}` for anything that isn't an ApiResponseError carrying details,
+ * so callers can use it unconditionally. First issue per field wins.
+ */
+export function fieldErrors(err: unknown): Record<string, string> {
+  if (!(err instanceof ApiResponseError) || !err.details) return {};
+  const out: Record<string, string> = {};
+  for (const issue of err.details) {
+    if (!(issue.field in out)) out[issue.field] = issue.message;
+  }
+  return out;
+}
+
+/**
+ * Human-readable message for an error banner. For validation errors with
+ * per-field details the flattened backend message duplicates what the inline
+ * field errors already show, so return a short summary instead.
+ */
+export function errorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof ApiResponseError)) return fallback;
+  // Only field-addressable issues get inline display; "(root)" (whole-body)
+  // issues have no input to highlight, so keep the backend's full message.
+  const inline = err.details?.filter((i) => i.field !== "(root)") ?? [];
+  if (inline.length > 0) {
+    return inline.length === 1
+      ? "Please fix the highlighted field."
+      : `Please fix the ${inline.length} highlighted fields.`;
+  }
+  return err.message;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -131,7 +177,8 @@ export async function apiFetch<TResponse>(
       err?.message ?? `HTTP ${response.status}`,
       err?.requestId ?? "",
       response.status,
-      json
+      json,
+      parseFieldIssues(err?.details)
     );
   }
 

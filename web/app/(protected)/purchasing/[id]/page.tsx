@@ -37,6 +37,8 @@ export default function PurchaseOrderDetailPage() {
   const [order, setOrder] = useState<PurchaseOrderDetail | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryItem[]>([]);
+  const [phFilters, setPhFilters] = useState<{ from: string; to: string; qtyBreak: string }>({ from: "", to: "", qtyBreak: "" });
+  const [phLoading, setPhLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DetailTab>("lines");
@@ -59,13 +61,28 @@ export default function PurchaseOrderDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    if (activeTab === "lines" && priceHistory.length === 0) {
-      void apiGet<{ items: PriceHistoryItem[] }>(`/api/v1/purchasing/orders/${id}/price-history`)
-        .then((h) => setPriceHistory(h.items ?? []))
-        .catch(() => { /* ignore */ });
+  const loadPriceHistory = useCallback(async () => {
+    const qs = new URLSearchParams();
+    if (phFilters.from) qs.set("from", String(new Date(phFilters.from).getTime()));
+    if (phFilters.to) qs.set("to", String(new Date(`${phFilters.to}T23:59:59`).getTime()));
+    if (phFilters.qtyBreak) qs.set("qtyBreak", phFilters.qtyBreak);
+    const q = qs.toString();
+    setPhLoading(true);
+    try {
+      const h = await apiGet<{ items: PriceHistoryItem[] }>(
+        `/api/v1/purchasing/orders/${id}/price-history${q ? `?${q}` : ""}`,
+      );
+      setPriceHistory(h.items ?? []);
+    } catch {
+      /* non-fatal — price intelligence is supplementary */
+    } finally {
+      setPhLoading(false);
     }
-  }, [activeTab, id, priceHistory.length]);
+  }, [id, phFilters]);
+
+  useEffect(() => {
+    if (activeTab === "lines") void loadPriceHistory();
+  }, [activeTab, loadPriceHistory]);
 
   const supplierName = (sid: string) => suppliers.find((s) => s.id === sid)?.name ?? sid;
 
@@ -172,7 +189,14 @@ export default function PurchaseOrderDetailPage() {
               </div>
 
               {activeTab === "lines" && (
-                <LinesTab order={order} priceHistory={priceHistory} goodsTotal={goodsTotal} />
+                <LinesTab
+                  order={order}
+                  priceHistory={priceHistory}
+                  goodsTotal={goodsTotal}
+                  filters={phFilters}
+                  onFiltersChange={setPhFilters}
+                  loading={phLoading}
+                />
               )}
               {activeTab === "receive" && (
                 <ReceiveTab orderId={id} order={order} canManage={canManage} onReceived={() => void load()} />

@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
-import { apiGet, apiPost, apiPatch, ApiResponseError } from "@/api-client/client";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+// Field names match the backend's ProductImage shape (src/modules/catalog/
+// service.ts) — image_url/alt_text, not url/alt.
 
 interface ProductImage {
   id: string;
   product_id: string;
-  url: string;
-  alt: string | null;
+  image_url: string;
+  alt_text: string | null;
   sort_order: number;
   is_primary: boolean;
   created_at: number;
@@ -54,7 +56,7 @@ export function ImagesTab({ productId }: { productId: string }) {
     try { new URL(urlInput.trim()); } catch { setUrlError("Enter a valid URL (e.g. https://…)"); return; }
     setBusy(true);
     try {
-      await apiPost(`/api/v1/catalog/${productId}/images`, { url: urlInput.trim(), alt: altInput.trim() || null });
+      await apiPost(`/api/v1/catalog/${productId}/images`, { imageUrl: urlInput.trim(), altText: altInput.trim() || null });
       setShowAdd(false); setUrlInput(""); setAltInput("");
       await load();
     } catch (e) {
@@ -75,7 +77,7 @@ export function ImagesTab({ productId }: { productId: string }) {
     if (!confirm("Remove this image from the product?")) return;
     setBusy(true);
     try {
-      await fetch(`/api/v1/catalog/${productId}/images/${img.id}`, { method: "DELETE" });
+      await apiDelete(`/api/v1/catalog/${productId}/images/${img.id}`);
       await load();
     } finally { setBusy(false); }
   };
@@ -158,8 +160,8 @@ export function ImagesTab({ productId }: { productId: string }) {
               <div className="aspect-square overflow-hidden bg-slate-50">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={img.url}
-                  alt={img.alt ?? "Product image"}
+                  src={img.image_url}
+                  alt={img.alt_text ?? "Product image"}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
@@ -177,7 +179,7 @@ export function ImagesTab({ productId }: { productId: string }) {
 
               {/* Actions overlay on hover */}
               <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-1 bg-white/95 p-2 shadow-md transition-transform group-hover:translate-y-0">
-                {img.alt && <p className="truncate text-[11px] text-slate-400">"{img.alt}"</p>}
+                {img.alt_text && <p className="truncate text-[11px] text-slate-400">"{img.alt_text}"</p>}
                 <div className="flex gap-1">
                   {!img.is_primary && (
                     <button

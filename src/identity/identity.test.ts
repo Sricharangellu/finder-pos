@@ -294,6 +294,146 @@ test("login sets refresh cookie with httpOnly and SameSite=Lax", async () => {
   assert.doesNotMatch(sessionHintCookie, /HttpOnly/i, "session hint remains JavaScript-readable");
   assert.match(sessionHintCookie, /SameSite=Lax/i, "session hint uses SameSite=Lax");
 
+  // Rebrand Phase 1 dual-write: the new cookie names must be set alongside the
+  // old ones, with the same attributes and the same token value.
+  const newRefreshCookie = setCookie.find((cookie) => cookie.startsWith("ascend_refresh=")) ?? "";
+  const newSessionHintCookie = setCookie.find((cookie) => cookie.startsWith("ascend_session_hint=")) ?? "";
+
+  assert.ok(newRefreshCookie, "login should also set the new ascend_refresh cookie");
+  assert.ok(newSessionHintCookie, "login should also set the new ascend_session_hint cookie");
+  assert.match(newRefreshCookie, /HttpOnly/i, "ascend_refresh cookie is httpOnly");
+  assert.match(newRefreshCookie, /SameSite=Lax/i, "ascend_refresh cookie uses SameSite=Lax");
+  assert.match(newRefreshCookie, /Path=\//i, "ascend_refresh cookie is scoped to the app");
+  assert.doesNotMatch(newSessionHintCookie, /HttpOnly/i, "ascend_session_hint remains JavaScript-readable");
+  assert.match(newSessionHintCookie, /SameSite=Lax/i, "ascend_session_hint cookie uses SameSite=Lax");
+
+  const oldValue = refreshCookie.split(";")[0]?.split("=")[1];
+  const newValue = newRefreshCookie.split(";")[0]?.split("=")[1];
+  assert.ok(oldValue && oldValue.length > 0, "old refresh cookie carries a token value");
+  assert.equal(newValue, oldValue, "ascend_refresh carries the identical refresh token value as finder_refresh");
+
+  await app.db.close();
+});
+
+test("logout clears both the old and new auth cookie names", async () => {
+  const app = await freshApp();
+
+  const tenantId = `ten_logout_${Date.now()}`;
+  const userId = `usr_logout_${Date.now()}`;
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'Logout Corp', 'logout-corp-${Date.now()}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'logout-owner@example.com', 'secret123', 'owner', ${Date.now()}, ${Date.now()})
+  `);
+
+  const login = await request(app.express, "POST", "/api/identity/login", {
+    email: "logout-owner@example.com",
+    password: "secret123",
+  });
+  assert.equal(login.status, 200);
+  const loginSetCookie = login.headers["set-cookie"];
+  assert.ok(Array.isArray(loginSetCookie));
+  const refreshToken = (loginSetCookie.find((c) => c.startsWith("finder_refresh=")) ?? "").split(";")[0]?.split("=")[1];
+  assert.ok(refreshToken, "captured refresh token from login");
+
+  const logout = await request(
+    app.express,
+    "POST",
+    "/api/identity/logout",
+    {},
+    { cookie: `finder_refresh=${refreshToken}` },
+  );
+  assert.equal(logout.status, 200);
+
+  const clearSetCookie = logout.headers["set-cookie"];
+  assert.ok(Array.isArray(clearSetCookie), "logout should clear auth cookies");
+  const clearedNames = ["finder_refresh", "ascend_refresh", "finder_session_hint", "ascend_session_hint"];
+  for (const name of clearedNames) {
+    const cleared = clearSetCookie.find((c) => c.startsWith(`${name}=`));
+    assert.ok(cleared, `logout clears the ${name} cookie`);
+    assert.match(cleared as string, /Expires=|Max-Age=0/i, `${name} clear-cookie header expires it`);
+  }
+
+  await app.db.close();
+});
+
+test("a request carrying ONLY the old finder_refresh cookie still authenticates via /refresh and /logout (zero forced logout)", async () => {
+  const app = await freshApp();
+
+  const tenantId = `ten_oldcookie_${Date.now()}`;
+  const userId = `usr_oldcookie_${Date.now()}`;
+  await app.db.exec(`
+    INSERT INTO tenants (id, name, slug, created_at, updated_at)
+    VALUES ('${tenantId}', 'Old Cookie Corp', 'old-cookie-corp-${Date.now()}', ${Date.now()}, ${Date.now()})
+  `);
+  await app.db.exec(`
+    INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
+    VALUES ('${userId}', '${tenantId}', 'old-cookie-owner@example.com', 'secret123', 'owner', ${Date.now()}, ${Date.now()})
+  `);
+
+  const login = await request(app.express, "POST", "/api/identity/login", {
+    email: "old-cookie-owner@example.com",
+    password: "secret123",
+  });
+  assert.equal(login.status, 200);
+
+  const setCookie = login.headers["set-cookie"];
+  assert.ok(Array.isArray(setCookie), "login should set auth cookies");
+  const refreshCookie = setCookie.find((cookie) => cookie.startsWith("finder_refresh=")) ?? "";
+  const oldRefreshToken = refreshCookie.split(";")[0]?.split("=")[1] ?? "";
+  assert.ok(oldRefreshToken, "captured the old-name refresh token value");
+
+  // Simulate a browser that has ONLY ever seen the old cookie name — e.g. a
+  // session established before this deploy shipped the new cookie names.
+  // No ascend_refresh cookie is sent at all.
+  const refreshRes = await request(
+    app.express,
+    "POST",
+    "/api/identity/refresh",
+    {},
+    { cookie: `finder_refresh=${oldRefreshToken}` },
+  );
+  assert.equal(refreshRes.status, 200, "old-cookie-only request must still authenticate on /refresh");
+  assert.ok(refreshRes.json?.accessToken, "refresh returns a fresh access token for an old-cookie-only session");
+
+  const rotatedSetCookie = refreshRes.headers["set-cookie"];
+  assert.ok(Array.isArray(rotatedSetCookie), "refresh should re-set auth cookies (rotation)");
+  const rotatedOldRefresh = rotatedSetCookie.find((cookie) => cookie.startsWith("finder_refresh=")) ?? "";
+  const rotatedNewRefresh = rotatedSetCookie.find((cookie) => cookie.startsWith("ascend_refresh=")) ?? "";
+  const rotatedOldValue = rotatedOldRefresh.split(";")[0]?.split("=")[1];
+  const rotatedNewValue = rotatedNewRefresh.split(";")[0]?.split("=")[1];
+  assert.ok(rotatedOldValue, "rotation re-sets the old-name cookie");
+  assert.ok(rotatedNewValue, "rotation also sets the new-name cookie going forward");
+  assert.equal(rotatedNewValue, rotatedOldValue, "rotated tokens match across old and new cookie names");
+
+  // Old-cookie-only /logout must also work end-to-end (200 ok + clears both cookie
+  // name generations). Note: revocation efficacy itself is unrelated to this PR —
+  // /logout is called anonymously by the frontend (no Authorization header), so
+  // token revocation there is pre-existing, orthogonal behavior; this test only
+  // proves the cookie-name dual-read/dual-clear works for an old-cookie-only request.
+  const logoutRes = await request(
+    app.express,
+    "POST",
+    "/api/identity/logout",
+    {},
+    { cookie: `finder_refresh=${rotatedOldValue}` },
+  );
+  assert.equal(logoutRes.status, 200);
+  assert.equal(logoutRes.json?.ok, true, "logout succeeds for an old-cookie-only request");
+  const logoutSetCookie = logoutRes.headers["set-cookie"];
+  assert.ok(Array.isArray(logoutSetCookie), "logout should clear auth cookies");
+  assert.ok(
+    logoutSetCookie.some((c) => c.startsWith("finder_refresh=")),
+    "logout clears the old-name refresh cookie",
+  );
+  assert.ok(
+    logoutSetCookie.some((c) => c.startsWith("ascend_refresh=")),
+    "logout also clears the new-name refresh cookie",
+  );
+
   await app.db.close();
 });
 

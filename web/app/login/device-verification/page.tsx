@@ -42,6 +42,13 @@ export default function DeviceVerificationPage() {
           We noticed a sign-in from a device or location we don&apos;t recognize. Please confirm this was you.
         </p>
 
+        {/* Preview gate — no backend device-trust/new-device detection exists yet.
+            This page is never reached from the real login flow today; the banner
+            exists so it can't silently masquerade as a real check if that changes. */}
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-700/40 dark:bg-amber-700/10 dark:text-amber-300">
+          Preview: device details below are illustrative — new-device detection isn&apos;t wired to a real backend yet.
+        </div>
+
         <dl className="mt-6 flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/60">
           <Row label="Device" value={MOCK_DEVICE.browser} />
           <Row label="Location" value={MOCK_DEVICE.location} />

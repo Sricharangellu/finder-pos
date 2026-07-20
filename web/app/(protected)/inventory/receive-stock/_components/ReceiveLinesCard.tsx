@@ -2,18 +2,20 @@
 
 import { Card } from "@/components/Card";
 import { formatMoney } from "@/lib/money";
-import type { PendingPO, ReceiveEntry } from "./receiveStockTypes";
+import type { PendingPO, ReceiveEntry, LocationOption } from "./receiveStockTypes";
 
 export function ReceiveLinesCard({
   entries,
   sortedEntries,
   selectedPO,
   onUpdateEntry,
+  locations,
 }: {
   entries: ReceiveEntry[];
   sortedEntries: ReceiveEntry[];
   selectedPO: PendingPO;
   onUpdateEntry: (lineId: string, patch: Partial<ReceiveEntry>) => void;
+  locations: LocationOption[];
 }) {
   return (
     <Card className="overflow-hidden p-0">
@@ -70,11 +72,15 @@ export function ReceiveLinesCard({
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Lot code</label>
-                    <input type="text" value={entry.lotCode}
-                      onChange={(e) => onUpdateEntry(entry.lineId, { lotCode: e.target.value })}
-                      placeholder="LOT-2026"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none" />
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Location</label>
+                    <select value={entry.locationId}
+                      onChange={(e) => onUpdateEntry(entry.lineId, { locationId: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                      <option value="">— select —</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>{loc.code} · {loc.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

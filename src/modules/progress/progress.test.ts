@@ -82,7 +82,9 @@ test("progress: system verification only passes when Ascend can prove it from te
     lines: [{ productId: p.json.id, quantity: 1 }],
   });
   assert.equal(order.status, 201);
-  const payment = await request(app, "POST", "/api/payments/", "cashier", {
+  // Payment capture now requires manager+ (money-movement gate), so this
+  // system-verification setup captures as "manager" rather than "cashier".
+  const payment = await request(app, "POST", "/api/payments/", "manager", {
     orderId: order.json.id,
     method: "cash",
     tenderedCents: order.json.total_cents,

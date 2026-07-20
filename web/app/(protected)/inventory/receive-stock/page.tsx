@@ -9,7 +9,7 @@ import { Badge } from "@/components/Badge";
 import { formatMoney } from "@/lib/money";
 import { apiGet, apiPost, ApiResponseError } from "@/api-client/client";
 import { computeTotal, receiveStatusBadge, docTypeLabel, fmtBytes, buildReceiveLines } from "./_components/receiveStockTypes";
-import type { PendingPO, ReceiveEntry, PODocument, SortMode } from "./_components/receiveStockTypes";
+import type { PendingPO, ReceiveEntry, PODocument, SortMode, LocationOption } from "./_components/receiveStockTypes";
 import { ReceiveLinesCard } from "./_components/ReceiveLinesCard";
 import { PendingPOsTable } from "./_components/PendingPOsTable";
 
@@ -19,6 +19,7 @@ export default function ReceiveStockPage() {
 
   const [pendingPOs, setPendingPOs] = useState<PendingPO[]>([]);
   const [suppliers, setSuppliers]   = useState<Array<{ id: string; name: string }>>([]);
+  const [locations, setLocations]   = useState<LocationOption[]>([]);
   const [selectedPOId, setSelectedPOId] = useState<string>("");
   const [selectedPO, setSelectedPO]     = useState<PendingPO | null>(null);
 
@@ -39,15 +40,17 @@ export default function ReceiveStockPage() {
 
   const loadList = useCallback(async () => {
     try {
-      const [ordersRes, suppliersRes] = await Promise.all([
+      const [ordersRes, suppliersRes, locationsRes] = await Promise.all([
         apiGet<{ items: PendingPO[] }>("/api/v1/purchasing/orders"),
         apiGet<{ items: Array<{ id: string; name: string }> }>("/api/v1/purchasing/suppliers"),
+        apiGet<{ items: LocationOption[] }>("/api/v1/inventory/locations"),
       ]);
       const pending = (ordersRes.items ?? []).filter(
         (o) => o.receive_status === "pending" || o.receive_status === "partial" || o.status === "ordered",
       );
       setPendingPOs(pending);
       setSuppliers(suppliersRes.items ?? []);
+      setLocations(locationsRes.items ?? []);
     } catch { /* ignore */ }
   }, []);
 
@@ -73,7 +76,7 @@ export default function ReceiveStockPage() {
             unitsPerCase: l.units_per_case != null ? String(l.units_per_case) : String(l.remaining_qty),
             totalQty: l.remaining_qty,
             expiryDate: l.expiry_date ? new Date(l.expiry_date).toISOString().slice(0, 10) : "",
-            lotCode: l.lot_code ?? "",
+            locationId: "",
           })),
       );
     } catch (e) {
@@ -241,7 +244,7 @@ export default function ReceiveStockPage() {
             {error   && <p role="alert"  className="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">{error}</p>}
             {success && <p role="status" className="rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-800 font-medium">{success}</p>}
 
-            <ReceiveLinesCard entries={entries} sortedEntries={sortedEntries} selectedPO={selectedPO} onUpdateEntry={updateEntry} />
+            <ReceiveLinesCard entries={entries} sortedEntries={sortedEntries} selectedPO={selectedPO} onUpdateEntry={updateEntry} locations={locations} />
 
             {/* Document upload */}
             <Card>

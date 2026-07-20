@@ -31,7 +31,7 @@ const nextConfig = {
     const backendUrl =
       process.env.BACKEND_URL ??
       (process.env.VERCEL_ENV
-        ? "https://finder-pos-backend.vercel.app"
+        ? "https://ascendhq-api.vercel.app"
         : "http://localhost:3001");
     return [
       { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },

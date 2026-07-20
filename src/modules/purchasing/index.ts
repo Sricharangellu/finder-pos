@@ -1,6 +1,8 @@
 import type { PosModule } from "../types.js";
 import { PurchasingService } from "./service.js";
 import { registerRoutes } from "./routes.js";
+import { EdiImportsService } from "./edi-imports.js";
+import { registerEdiRoutes } from "./edi-routes.js";
 
 const CREATE_SUPPLIERS = `
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -383,16 +385,50 @@ INSERT INTO document_counters (tenant_id, kind, val)
     FROM purchase_orders GROUP BY tenant_id
   ON CONFLICT (tenant_id, kind) DO NOTHING;`;
 
+// EDI imports (2026-07-18, Phase 0 gap-closure): status-tracked upload
+// records for the Purchasing > EDI Imports page. See edi-imports.ts for the
+// scope note on why validate/process are honest state-machine transitions
+// rather than real EDI parsing — the frontend never uploads file content.
+const CREATE_EDI_IMPORTS = `
+CREATE TABLE IF NOT EXISTS edi_imports (
+  id               TEXT PRIMARY KEY,
+  tenant_id        TEXT NOT NULL,
+  filename         TEXT NOT NULL,
+  format           TEXT NOT NULL,
+  supplier_id      TEXT,
+  supplier_name    TEXT NOT NULL,
+  file_size_bytes  BIGINT NOT NULL DEFAULT 0,
+  record_count     INTEGER NOT NULL DEFAULT 0,
+  status           TEXT NOT NULL DEFAULT 'queued',
+  uploaded_at      BIGINT NOT NULL,
+  processed_at     BIGINT,
+  po_count         INTEGER NOT NULL DEFAULT 0,
+  line_count       INTEGER NOT NULL DEFAULT 0,
+  error_count      INTEGER NOT NULL DEFAULT 0,
+  warnings         TEXT NOT NULL DEFAULT '[]',
+  errors           TEXT NOT NULL DEFAULT '[]',
+  created_po_ids   TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS edi_imports_tenant_idx ON edi_imports (tenant_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS edi_imports_tenant_status_idx ON edi_imports (tenant_id, status);
+`;
+
 /** Purchasing — suppliers, purchase orders, receiving. Receiving emits
  *  `purchase_order.received`; inventory listens and increments stock. */
 export const purchasingModule: PosModule = {
   name: "purchasing",
-  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS],
+  migrations: [CREATE_SUPPLIERS, CREATE_PURCHASE_ORDERS, CREATE_PO_LINES, ALTER_PO_LINES, ALTER_PO_RECEIVE_STATUS, CREATE_PRODUCT_COSTS, CREATE_VENDOR_CREDITS, CREATE_VENDOR_RETURNS, INDEXES, ALTER_PO_XLSX_FIELDS, ALTER_SUPPLIERS_VENDOR_FIELDS, ALTER_SUPPLIERS_VENDOR_360, ALTER_PO_LANDED_COSTS, CREATE_SUPPLIER_ADDRESSES, ADD_PO_LINE_FK, ADD_PURCHASING_UPDATED_AT_TRIGGERS, CREATE_PO_DOCUMENTS, CREATE_PO_APPROVALS, SEED_PO_COUNTER, CREATE_REQUISITIONS, CREATE_EDI_IMPORTS],
   async register({ db, events, router }) {
     const service = new PurchasingService(db, events);
+    const ediService = new EdiImportsService(db);
     registerRoutes(router, service);
+    registerEdiRoutes(router, ediService, db);
   },
 };
 
 export { PurchasingService } from "./service.js";
 export type { Supplier, PurchaseOrder, PurchaseOrderWithLines } from "./service.js";
+export { EdiImportsService } from "./edi-imports.js";
+export type { EdiImport, EdiStatus, EdiFormatDef } from "./edi-imports.js";
+export { getVendorHistory } from "./vendor-history.js";
+export type { VendorPOSummary } from "./vendor-history.js";

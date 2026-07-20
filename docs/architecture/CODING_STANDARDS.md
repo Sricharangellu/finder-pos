@@ -41,6 +41,20 @@ Match the surrounding code. These are the idioms the codebase actually uses.
 - Loading skeletons, empty states, `role="alert"` errors — every data view.
 - Money display via `formatMoney`; dates via `lib/date` helpers.
 
+## API parity (frontend ↔ backend ↔ mocks)
+- A frontend API call, its MSW mock, and its backend route are ONE unit of
+  work — never ship one without the other two. Mock paths AND response
+  envelopes must match the real route exactly.
+- `npm run gap:scan` (tools/api-gap-scan.mjs) diffs every FE path literal
+  against every registered backend route; it runs in CI and `npm run verify`
+  and fails on unexplained gaps.
+- Deliberate UI-preview surfaces require all three, in the same commit: an
+  entry in `tools/api-gap-allowlist.json`, a board entry (FORWARD_PLAN §4 or
+  LOOP_STATE backlog), and a visible "Preview" label in the UI.
+- The allowlist only shrinks: when a backend route ships for an allowlisted
+  path, the scanner warns — remove the entry in that same commit.
+- Context: AUDIT_2026-07-18T005030Z (10 modules 404'd in prod behind mocks).
+
 ## Testing
 - `node:test` + embedded Postgres; per-test schema isolation (`freshApp()`).
 - Drive the HTTP surface (`call(app, method, path, body, role?)`), assert the

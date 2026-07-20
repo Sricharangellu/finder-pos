@@ -238,6 +238,19 @@ export function workforceService(db: DB, _events: EventBus) {
     // ── Time clock (BE-40) ───────────────────────────────────────────────────
 
     async clockIn(employeeId: string, tenantId: string, notes?: string) {
+      // Verify the employee actually exists for this tenant. Without this
+      // check, a typo'd/bogus employeeId would silently insert an orphaned
+      // time_entries row: listTimeEntries INNER JOINs employees, so the row
+      // would never appear in any listing, and the subsequent duplicate-entry
+      // guard below would then block the bogus id from ever being clocked in
+      // again — an invisible, permanently "stuck" entry with no way to see or
+      // resolve it via the API. createShift/createTimeOff already validate
+      // employee existence the same way; clockIn should too.
+      const emp = await db.one<{ id: string }>(
+        "SELECT id FROM employees WHERE id = @employeeId AND tenant_id = @tenantId",
+        { employeeId, tenantId },
+      );
+      if (!emp) throw notFound("employee");
       // Prevent duplicate open entries
       const open = await db.one<{ id: string }>(
         "SELECT id FROM time_entries WHERE tenant_id = @tenantId AND employee_id = @employeeId AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1",

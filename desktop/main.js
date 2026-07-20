@@ -1,7 +1,7 @@
 const { app, BrowserWindow, shell, Menu } = require("electron");
 const path = require("path");
 
-const APP_URL = process.env.FINDER_APP_URL || "https://finder-pos-frontend.vercel.app";
+const APP_URL = process.env.FINDER_APP_URL || "https://ascendhq-app.vercel.app";
 
 function createWindow() {
   const win = new BrowserWindow({

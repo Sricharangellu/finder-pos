@@ -136,7 +136,7 @@ export function customerInvoicesService(db: DB, events: EventBus) {
               billing_address, status, subtotal_cents, tax_cents, discount_cents, total_cents, paid_cents,
               due_date, notes, created_at, updated_at)
            VALUES (@id, @tenantId, @invNum, @customerId, @customerName, @email, @phone,
-                   @address, 'draft', @subtotal, @tax, @discount, @total, 0,
+                   @address, 'draft', @subtotal_cents, @tax_cents, @discount_cents, @total_cents, 0,
                    @dueDate, @notes, @now, @now)`,
           {
             id, tenantId, invNum: invoiceNumber,

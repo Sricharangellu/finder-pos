@@ -17,6 +17,24 @@ export type POStatus = "ordered" | "partially_received" | "received" | "cancelle
 export type VendorCreditType = "chargeback" | "credit_memo";
 export type ReturnReason = "damaged" | "expired" | "other";
 
+/** A received PO line awaiting cost confirmation on the Purchase page, with the
+ *  reference prices that inform the cost decision. */
+export interface CostEntryItem {
+  line_id: string;
+  product_id: string;
+  sku: string | null;
+  product_name: string;
+  received_qty: number;
+  po_cost_cents: number;                    // cost carried on the PO line (default)
+  po_id: string;
+  supplier_id: string;
+  supplier_name: string | null;
+  received_at: number | null;
+  selling_price_cents: number;              // our current selling price
+  last_purchase_cost_cents: number | null;  // last confirmed cost (any vendor)
+  prev_vendor_cost_cents: number | null;    // most recent cost from THIS vendor
+}
+
 /** One line being received. `qty` is required; the rest are the receive-time
  *  actuals captured at the desk (only known when goods physically arrive). */
 export interface ReceiveLineInput {
@@ -25,6 +43,7 @@ export interface ReceiveLineInput {
   expiryDate?: number;      // epoch ms — drives the inventory lot's shelf-life
   lotCode?: string;
   unitCostCents?: number;   // actual cost on the invoice, if it differs from PO
+  locationId?: string;      // stock location the goods are received into
 }
 
 export interface VendorReturn {
@@ -912,6 +931,7 @@ export class PurchasingService {
         unitCostCents: rl.unitCostCents ?? line.unit_cost_cents,
         expiryDate: rl.expiryDate ?? line.expiry_date ?? undefined,
         lotCode: rl.lotCode ?? line.lot_code ?? undefined,
+        locationId: rl.locationId ?? undefined,
       };
     });
 
@@ -1016,32 +1036,179 @@ export class PurchasingService {
   // Returns the last 5 unit costs for each product on the given PO, sourced
   // from product_costs (which is updated on every receive).
 
-  async priceHistory(poId: string, tenantId: string) {
-    const lines = await this.db.query<{ product_id: string; product_name: string | null; unit_cost_cents: number }>(
-      "SELECT product_id, product_name, unit_cost_cents FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+  /**
+   * Per-line purchasing price intelligence for a PO. For each line it surfaces
+   * three reference prices — the current invoiced cost, the last cost paid to
+   * *this* supplier, and the best (lowest) cost across *all* suppliers — each
+   * with the date it applied, plus a suggested purchase quantity derived from
+   * the product's reorder point and recent sales velocity.
+   *
+   * History is drawn from received (or partially-received) POs and can be
+   * narrowed with `from`/`to` (received-at epoch ms) and `qtyBreak` (only count
+   * historical lines whose quantity ≥ the break, so per-case pricing isn't
+   * skewed by odd-lot buys). The `history` array is preserved for the existing
+   * sparkline UI. Part 2 of 3 (purchasing price intelligence).
+   */
+  async priceHistory(
+    poId: string,
+    tenantId: string,
+    opts: { from?: number; to?: number; qtyBreak?: number } = {},
+  ) {
+    const po = await this.db.one<{ supplier_id: string }>(
+      "SELECT supplier_id FROM purchase_orders WHERE id = @poId AND tenant_id = @t",
       { poId, t: tenantId },
     );
-    const history = await Promise.all(
+    if (!po) return [];
+
+    const lines = await this.db.query<{ product_id: string; product_name: string | null; unit_cost_cents: number; quantity: number }>(
+      "SELECT product_id, product_name, unit_cost_cents, quantity FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+      { poId, t: tenantId },
+    );
+
+    const from = opts.from ?? 0;
+    const to = opts.to ?? Number.MAX_SAFE_INTEGER;
+    const qtyBreak = opts.qtyBreak ?? 0;
+    const lookbackDays = 90;
+    const since = Date.now() - lookbackDays * 86_400_000;
+
+    const items = await Promise.all(
       lines.map(async (l) => {
-        const hist = await this.db.query<{ unit_cost_cents: number; received_at: number; po_id: string }>(
-          `SELECT pol.unit_cost_cents, po.received_at, po.id AS po_id
+        // All received prices for this product, newest first, within filters.
+        const hist = await this.db.query<{ unit_cost_cents: number; received_at: number; po_id: string; supplier_id: string | null; supplier_name: string | null }>(
+          `SELECT pol.unit_cost_cents, po.received_at, po.id AS po_id,
+                  po.supplier_id, s.name AS supplier_name
            FROM purchase_order_lines pol
-           JOIN purchase_orders po ON po.id = pol.po_id
+           JOIN purchase_orders po ON po.id = pol.po_id AND po.tenant_id = pol.tenant_id
+           LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
            WHERE pol.product_id = @productId AND pol.tenant_id = @t
              AND po.status IN ('received','partially_received')
-           ORDER BY po.received_at DESC NULLS LAST
-           LIMIT 5`,
-          { productId: l.product_id, t: tenantId },
+             AND po.received_at IS NOT NULL
+             AND po.received_at >= @from AND po.received_at <= @to
+             AND pol.quantity >= @qtyBreak
+           ORDER BY po.received_at DESC`,
+          { productId: l.product_id, t: tenantId, from, to, qtyBreak },
         );
+
+        const lastFromSupplierRow = hist.find((h) => h.supplier_id === po.supplier_id) ?? null;
+        // Best = lowest unit cost; tie broken by most recent (hist is DESC by date).
+        const bestRow = hist.reduce<typeof hist[number] | null>((best, h) => {
+          if (!best || h.unit_cost_cents < best.unit_cost_cents) return h;
+          return best;
+        }, null);
+
+        // Suggested purchase qty from reorder point + recent sales velocity.
+        const stats = await this.db.one<{ current_stock: number; reorder_point: number; reorder_quantity: number; lead_time_days: number; units_sold: number }>(
+          `SELECT COALESCE(inv.stock_qty, 0)        AS current_stock,
+                  COALESCE(p.reorder_point, 0)      AS reorder_point,
+                  COALESCE(p.reorder_quantity, 0)   AS reorder_quantity,
+                  COALESCE(p.lead_time_days, 7)     AS lead_time_days,
+                  COALESCE((
+                    SELECT SUM(ol.quantity)
+                    FROM order_lines ol
+                    JOIN orders o ON o.id = ol.order_id
+                    WHERE ol.product_id = p.id AND ol.tenant_id = p.tenant_id
+                      AND o.created_at >= @since
+                  ), 0)                             AS units_sold
+           FROM products p
+           LEFT JOIN inventory inv ON inv.product_id = p.id AND inv.tenant_id = p.tenant_id
+           WHERE p.id = @productId AND p.tenant_id = @t`,
+          { productId: l.product_id, t: tenantId, since },
+        );
+
+        const velocityPerDay = stats ? stats.units_sold / lookbackDays : 0;
+        // Target on-hand = reorder point + expected demand over the lead time.
+        let suggestedQty = 0;
+        if (stats) {
+          const target = stats.reorder_point + velocityPerDay * stats.lead_time_days;
+          suggestedQty = Math.max(0, Math.ceil(target - stats.current_stock));
+          // Respect a configured reorder lot size as a floor when we do reorder.
+          if (suggestedQty > 0 && stats.reorder_quantity > 0) {
+            suggestedQty = Math.max(suggestedQty, stats.reorder_quantity);
+          }
+        }
+
         return {
           product_id: l.product_id,
           product_name: l.product_name ?? l.product_id,
           sku: l.product_id,
-          history: hist,
+          ordered_qty: l.quantity,
+          invoiced_cents: l.unit_cost_cents,
+          last_from_supplier: lastFromSupplierRow
+            ? { unit_cost_cents: lastFromSupplierRow.unit_cost_cents, received_at: lastFromSupplierRow.received_at }
+            : null,
+          best_across_suppliers: bestRow
+            ? {
+                unit_cost_cents: bestRow.unit_cost_cents,
+                received_at: bestRow.received_at,
+                supplier_id: bestRow.supplier_id,
+                supplier_name: bestRow.supplier_name,
+              }
+            : null,
+          suggested_qty: suggestedQty,
+          velocity_per_day: Math.round(velocityPerDay * 100) / 100,
+          current_stock: stats?.current_stock ?? 0,
+          history: hist.slice(0, 5).map((h) => ({ unit_cost_cents: h.unit_cost_cents, received_at: h.received_at, po_id: h.po_id })),
         };
       }),
     );
-    return history.filter((h) => h.history.length > 0);
+    return items;
+  }
+
+  // ── Purchase cost entry ──────────────────────────────────────────────────────
+  // Received PO lines flow into a costing worksheet: enter the true cost per
+  // product, with reference prices (previous cost from the SAME vendor, last
+  // purchase cost from any vendor, our selling price) to inform the decision.
+
+  async getCostEntryQueue(tenantId: string): Promise<CostEntryItem[]> {
+    return this.db.query<CostEntryItem>(
+      `SELECT pol.id                                   AS line_id,
+              pol.product_id                           AS product_id,
+              p.sku                                    AS sku,
+              COALESCE(p.name, pol.product_name)       AS product_name,
+              pol.received_qty                         AS received_qty,
+              pol.unit_cost_cents                      AS po_cost_cents,
+              po.id                                    AS po_id,
+              po.supplier_id                           AS supplier_id,
+              s.name                                   AS supplier_name,
+              po.received_at                           AS received_at,
+              COALESCE(p.price_cents, 0)               AS selling_price_cents,
+              pc.cost_cents                            AS last_purchase_cost_cents,
+              (SELECT pol2.unit_cost_cents
+                 FROM purchase_order_lines pol2
+                 JOIN purchase_orders po2 ON po2.id = pol2.po_id AND po2.tenant_id = pol2.tenant_id
+                WHERE pol2.product_id = pol.product_id AND pol2.tenant_id = pol.tenant_id
+                  AND po2.supplier_id = po.supplier_id AND po2.id <> po.id
+                  AND po2.status IN ('received','partially_received')
+                ORDER BY po2.received_at DESC NULLS LAST
+                LIMIT 1)                               AS prev_vendor_cost_cents
+         FROM purchase_order_lines pol
+         JOIN purchase_orders po ON po.id = pol.po_id AND po.tenant_id = pol.tenant_id
+         LEFT JOIN suppliers s   ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
+         LEFT JOIN products p    ON p.id = pol.product_id AND p.tenant_id = pol.tenant_id
+         LEFT JOIN product_costs pc ON pc.product_id = pol.product_id AND pc.tenant_id = pol.tenant_id
+        WHERE pol.tenant_id = @t
+          AND po.status IN ('received','partially_received')
+          AND pol.received_qty > 0
+        ORDER BY po.received_at DESC NULLS LAST, pol.id
+        LIMIT 200`,
+      { t: tenantId },
+    );
+  }
+
+  /** Set a product's confirmed cost (updates product_costs — the cost the
+   *  inventory grid & COGS read — and notifies inventory to revalue). */
+  async submitProductCost(tenantId: string, productId: string, costCents: number): Promise<{ product_id: string; cost_cents: number }> {
+    if (!Number.isInteger(costCents) || costCents < 0) {
+      throw new HttpError(400, "bad_request", "cost must be a non-negative integer (cents)");
+    }
+    const now = Date.now();
+    await this.db.query(
+      `INSERT INTO product_costs (tenant_id, product_id, cost_cents, updated_at) VALUES (@t,@p,@c,@now)
+       ON CONFLICT (tenant_id, product_id) DO UPDATE SET cost_cents = EXCLUDED.cost_cents, updated_at = EXCLUDED.updated_at`,
+      { t: tenantId, p: productId, c: costCents, now },
+    );
+    await this.events.publish("product.cost_updated", { tenantId, productId, costCents }, productId);
+    return { product_id: productId, cost_cents: costCents };
   }
 
   // ── Vendor quotes ────────────────────────────────────────────────────────────

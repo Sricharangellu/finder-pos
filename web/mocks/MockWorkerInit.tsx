@@ -7,7 +7,7 @@
  *   - NODE_ENV === "development"
  *   - NEXT_PUBLIC_MOCK=true (build-time env var)
  *   - URL contains ?demo=1  (sets localStorage and activates demo mode)
- *   - localStorage["finder_pos_demo"] === "1" (persists across page loads)
+ *   - localStorage["ascend_demo"] === "1" (persists across page loads)
  *
  * In production without any of the above, this component renders children
  * immediately with no delay and the worker never starts.
@@ -15,9 +15,15 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
+// NEXT_PUBLIC_MOCK is the explicit switch (see web/next.config.mjs):
+//   "true"  → mocks on everywhere.
+//   "false" → mocks off everywhere, including local dev, so the app talks to
+//             the real backend (Supabase-backed). Required for real-backend runs.
+//   unset   → default on in development only.
 const ENV_MOCKS =
-  process.env.NODE_ENV === "development" ||
-  process.env.NEXT_PUBLIC_MOCK === "true";
+  process.env.NEXT_PUBLIC_MOCK === "true" ||
+  (process.env.NEXT_PUBLIC_MOCK !== "false" &&
+    process.env.NODE_ENV === "development");
 
 export default function MockWorkerInit({ children }: { children: ReactNode }) {
   // Production non-demo starts as ready; env mocks and demo mode block until worker registers.
@@ -40,13 +46,13 @@ export default function MockWorkerInit({ children }: { children: ReactNode }) {
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get("demo") === "1") {
-        localStorage.setItem("finder_pos_demo", "1");
+        localStorage.setItem("ascend_demo", "1");
         // Strip the ?demo param from the URL so it doesn't persist visually.
         const clean = new URL(window.location.href);
         clean.searchParams.delete("demo");
         window.history.replaceState(null, "", clean.toString());
       }
-      isDemo = localStorage.getItem("finder_pos_demo") === "1";
+      isDemo = localStorage.getItem("ascend_demo") === "1";
     } catch {
       // localStorage blocked (private browsing edge cases) — bail out.
     }

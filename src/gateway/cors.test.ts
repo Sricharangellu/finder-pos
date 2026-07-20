@@ -48,7 +48,7 @@ after(() => {
 });
 
 test("CORS: allowed origin receives Access-Control-Allow-Origin header", async () => {
-  const res = await request(server, "/healthz", "https://finder-pos-frontend.vercel.app");
+  const res = await request(server, "/healthz", "https://ascendhq-app.vercel.app");
   // In dev mode all origins are allowed; in test mode also. We verify the header is set.
   // The important thing is it's NOT a wildcard * when an origin is provided.
   assert.ok(
@@ -76,7 +76,7 @@ test("CORS: preflight OPTIONS returns 204 with correct headers", async () => {
         path: "/api/v1/catalog",
         method: "OPTIONS",
         headers: {
-          Origin: "https://finder-pos-frontend.vercel.app",
+          Origin: "https://ascendhq-app.vercel.app",
           "Access-Control-Request-Method": "GET",
         },
       },

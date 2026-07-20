@@ -41,7 +41,7 @@ export function serialNumbersService(db: DB, _events: EventBus) {
         db.query<SerialRow>(
           `SELECT sn.*, p.name AS product_name, p.sku AS product_sku
            FROM serial_numbers sn
-           LEFT JOIN catalog_products p
+           LEFT JOIN products p
              ON p.id = sn.product_id AND p.tenant_id = sn.tenant_id
            WHERE ${cond}
            ORDER BY sn.created_at DESC
@@ -51,7 +51,7 @@ export function serialNumbersService(db: DB, _events: EventBus) {
         db.query<{ n: number }>(
           `SELECT COUNT(*)::int AS n
            FROM serial_numbers sn
-           LEFT JOIN catalog_products p
+           LEFT JOIN products p
              ON p.id = sn.product_id AND p.tenant_id = sn.tenant_id
            WHERE ${cond}`,
           params
@@ -64,7 +64,7 @@ export function serialNumbersService(db: DB, _events: EventBus) {
       const row = await db.one<SerialRow>(
         `SELECT sn.*, p.name AS product_name, p.sku AS product_sku
          FROM serial_numbers sn
-         LEFT JOIN catalog_products p
+         LEFT JOIN products p
            ON p.id = sn.product_id AND p.tenant_id = sn.tenant_id
          WHERE sn.id = @id AND sn.tenant_id = @tenantId`,
         { id, tenantId }

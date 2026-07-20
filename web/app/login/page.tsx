@@ -46,7 +46,7 @@ function LoginContent() {
   const { status, login, completeMfaLogin, loginError, isLoading } = useAuth();
 
   const [email, setEmail] = useState(
-    isDemo || process.env.NODE_ENV === "development" ? "owner@finder-pos.dev" : ""
+    isDemo || process.env.NODE_ENV === "development" ? "owner@ascend.dev" : ""
   );
   const [password, setPassword] = useState(isDemo ? "demo" : "");
   const [showPassword, setShowPassword] = useState(false);

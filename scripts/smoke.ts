@@ -57,8 +57,8 @@ async function main() {
 
   // Authenticate as the seeded demo owner (tenant tnt_demo) — commerce routes require it.
   r = await api("POST", "/api/identity/login", {
-    email: "owner@finder-pos.dev",
-    password: "FinderDemo!2026",
+    email: "owner@ascend.dev",
+    password: "AscendDemo!2026",
   });
   assert.equal(r.status, 200);
   authToken = r.json.accessToken;
