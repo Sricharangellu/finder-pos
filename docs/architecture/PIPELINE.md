@@ -69,37 +69,51 @@ time, even if CI is green.
 - **push `master`** → `deploy-production` → `DEPLOY_ENV=prod scripts/deploy.sh both` (`--prod`) →
   `smoke-test` (`/healthz`, `/readyz`, `/api/v1/flags`→401, frontend 200).
 
-## Configuration (GitHub + Vercel + Supabase)
+## Configuration (GitHub + Vercel + Supabase + Render)
 
-**Status (2026-07-19): fully configured.** All items below are live, not aspirational.
+**Status (2026-07-20): PROD reconfigured onto Render, non-prod tiers currently DOWN, not
+aspirational-but-live.** The section below is the target state. What actually changed this pass:
+
+- **Production backend moved off Vercel serverless onto Render** (persistent process, no cold
+  starts — see `ARCHITECTURE.md`). `deploy-production`/`smoke-test` in `ci.yml` still deploy/probe a
+  Vercel backend — that path is now redundant for the backend half and needs reconciling; Render's own
+  git-integration auto-deploy on push to `master` is what actually ships prod today. Frontend still
+  deploys via Vercel (project `ascend_hq_web`, git-connected to `master`).
+- **`develop`/`staging` backend hosting is currently DOWN**, not merely unconfigured: the Vercel
+  projects `ci.yml`/`scripts/deploy.sh` target (formerly `finder-pos-backend`/`ascend-backend`) were
+  deleted this session. `https://ascend-backend-staging.vercel.app` returns `DEPLOYMENT_NOT_FOUND`
+  (verified 2026-07-20) — confirm this before assuming the smoke-test rows below still apply.
+- **Database topology is fixed at exactly 2 projects** (Sri directive, 2026-07-20, reconfirmed): one
+  Supabase project shared by `develop` **and** `staging`, one fully isolated for `master`/production.
+  `ci.yml`'s `deploy-dev` job previously carried a `DEV_DATABASE_URL` override that would have given
+  `develop` its **own third database**, contradicting this — removed; `develop` now falls back to the
+  same Preview-environment `DATABASE_URL` that `staging` uses, same as the design below always said.
 
 ### GitHub repo **secrets**
 | Name | Value |
 |---|---|
-| `VERCEL_TOKEN` | Vercel token with team-scope access |
+| `VERCEL_TOKEN` | Vercel token with team-scope access (frontend deploys) |
+| `VERCEL_TOKEN_PROD` | Legacy — only still used by `ci.yml`'s now-redundant Vercel backend prod deploy; candidate for removal once that job is reconciled with Render |
 
 ### GitHub repo **variables** (non-secret — Settings → Secrets and variables → Actions → Variables)
 | Name | Value | Used by |
 |---|---|---|
-| `STAGING_BACKEND_URL` | `https://finder-pos-backend-staging.vercel.app` | dev + testing frontend build target; testing smoke |
-| `STAGING_BACKEND_ALIAS` | `finder-pos-backend-staging.vercel.app` | testing backend alias |
-| `STAGING_FRONTEND_ALIAS` | `finder-pos-frontend-staging.vercel.app` | testing frontend alias + environment URL |
+| `STAGING_BACKEND_URL` | `https://ascend-backend-staging.vercel.app` (dead — project deleted) | dev + testing frontend build target; testing smoke |
+| `STAGING_BACKEND_ALIAS` | `ascend-backend-staging.vercel.app` (dead) | testing backend alias |
+| `STAGING_FRONTEND_ALIAS` | `ascend-frontend-staging.vercel.app` (dead) | testing frontend alias + environment URL |
 
-### Vercel — `finder-pos-backend` → Environment Variables
-- **Production:** `DATABASE_URL`=Supabase **A** pooler, `JWT_SECRET`=prod, `NODE_ENV=production`,
-  `PG_SSL=require`, `CRON_SECRET`, `WEBHOOK_SECRET_KEY` (already configured).
-- **Preview:** `DATABASE_URL`=Supabase **B** Session pooler, `JWT_SECRET`=staging-specific (distinct
-  from prod), `NODE_ENV=production`, `PG_SSL=require`, `CRON_SECRET`=staging-specific — configured.
-
-### Vercel — `finder-pos-frontend` → Environment Variables
-- **Preview:** `NEXT_PUBLIC_MOCK=false` — configured (build target passes `BACKEND_URL` via deploy.sh).
+Non-prod backend hosting needs to be rebuilt from scratch (NEEDS-SRI: Render, like prod, or a fresh
+Vercel project — pick one before re-activating `deploy-dev`/`deploy-staging`).
 
 ### Supabase
-- **A** = production project (existing). **B** = testing project (ref `lqaicxibgrlxwkvxsaji`), region
-  us-west-2.
-- Schema self-provisions on first backend boot (`buildApp` runs every module's migration) — confirmed:
-  B already has all 172 tables and the standard `tnt_demo` / `owner@finder-pos.dev` demo login,
-  created automatically the first time a backend connected to it. No manual seed step was needed.
+- **Production** = new isolated project created 2026-07-20 (ref `kplruangtivthgqudjwt`, region
+  `ca-central-1`), connected only from Render via the Session pooler with verified TLS
+  (`PG_CA_CERT_B64`). Never shared with any other tier.
+- **Testing** (shared by `develop` + `staging`) = the pre-existing project (ref `lqaicxibgrlxwkvxsaji`,
+  region us-west-2) already used for local/dev work — already has all ~172 tables and the standard
+  demo login self-provisioned; reuse it rather than paying for a third project.
+- Schema self-provisions on first backend boot (`buildApp` runs every module's migration) — no manual
+  seed step needed for either project.
 
 ## Rollback
 
