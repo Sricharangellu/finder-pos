@@ -172,27 +172,32 @@ just invisible.
 
 ## 7/8. New navigation hierarchy + redesigned Product Information Architecture
 
-The current 15 flat tabs already have an internal grouping
-(`core | inventory | activity | content | insights`,
-`catalog/[id]/page.tsx:43-59`) that the UI never surfaces. Recommendation:
-**expose that grouping as a two-level tab bar** (group → tab within group)
-rather than inventing a different taxonomy from the prompt's example — reusing
-existing groups is lower-risk and requires no route changes, just a UI
-restructure of the existing tab bar:
+**Correction after implementation (2026-07-20):** this section originally
+proposed a full two-level tab bar (group row → sub-tab row) before reading
+`catalog/[id]/page.tsx` closely. The actual code already has more grouping
+than assumed: a `GROUP_BREAKS`/divider mechanism from an earlier consolidation
+pass (the file's own comment: "14 tabs (down from 21)") renders a thin visual
+separator between groups — the real gap was that the divider was silent (no
+label), not that grouping was entirely absent. A full two-level bar would have
+been a materially bigger rewrite (new state for which group is expanded,
+new mobile/scroll behavior, retested click paths) for a smaller marginal gain
+than initially scoped — not justified once the existing code was actually
+read. **Shipped instead:** a small uppercase group label (Core / Inventory /
+Activity / Content / Insights) at each existing divider, same single-row tab
+bar, zero change to click behavior or `activeTab` state. This directly
+addresses the real finding ("nothing in the rendered UI shows the grouping")
+without the larger, less-justified rewrite.
 
 ```
-Product [name] ─────────────────────────────────────────────
-  Core        │ Overview · General · Variants · Categories
-  Commerce    │ Pricing · Purchasing (POs/Suppliers/Price-comparison)
-  Inventory   │ Inventory · Expiry
-  Content     │ Media · Compliance · Labels
-  Activity    │ Transactions (Sales/Returns/Credits/Invoices) · Analytics · Audit Log
+Product [name] ── Product Details · Master & Variants · Overview · Pricing · Categories
+  │ INVENTORY │ Inventory · Purchasing · Expiry
+  │ ACTIVITY  │ Transactions
+  │ CONTENT   │ Media · Online · Compliance · Labels
+  │ INSIGHTS  │ Analytics · Audit Log
 ```
 
-This reduces the tab bar from "15 flat items" to "5 groups, expand to see
-sub-items" — the exact cognitive-load reduction the prompt's Phase 3 example
-asks for, achieved by exposing structure Ascend's code already has rather than
-inventing new page boundaries.
+(One row, scrollable — the diagram above shows the grouping the labels now
+make visible, not a literal multi-row layout.)
 
 **Inventory nav fix** (§6): add the 4 orphaned pages to the sidebar under
 Inventory. No IA redesign needed there — the pages are fine, they're just
@@ -245,12 +250,12 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 
 | Phase | Work | Depends on |
 |---|---|---|
-| 1 | Remove 8 dead/duplicate routes; fix `/inventory/transfers` redirect; add 4 orphaned pages to nav | Nothing — ships immediately |
-| 2 | Build `DataGrid` component; adopt in `ProductsTab.tsx` (adds pagination — fixes the "can't reach product 51" issue) | Nothing — parallel to Phase 1 |
-| 3 | Adopt `DataGrid` in `inventory/page.tsx`, `promotions/page.tsx`, `pricing/page.tsx` | Phase 2 |
-| 4 | Two-level tab-bar restructure on `catalog/[id]/page.tsx` | Nothing — parallel, but sequenced after 1-3 to avoid churn on files being touched by pagination work |
+| 1 | Remove 6 dead/duplicate routes; fix `/inventory/transfers` redirect; add 4 orphaned pages to nav | Nothing — **shipped** (PR #106) |
+| 2 | `Pagination` component; adopted in `ProductsTab.tsx` (fixes the "can't reach product 51" issue) | Nothing — **shipped** (PR #106) |
+| 3 | Group labels on `catalog/[id]/page.tsx`'s existing tab-divider mechanism (corrected scope, see §7/8) | Nothing — **shipped** |
+| 4 | Extend pagination to `inventory/page.tsx`'s transfers/returns lists, `promotions/page.tsx`, `pricing/page.tsx` | Needs backend work first for most of these (transfers has no `limit`/`offset` support at all; purchasing orders uses cursor pagination, a different shape) — NOT a simple frontend adoption like Phase 2 was |
 | 5 | Batch/expiry data migration + cutover + old-route deprecation | Nothing blocking, but highest-risk — do last, alone, with its own verification pass |
-| — | Consolidate `Product`/`CatalogProduct` types | Can happen any time; touches both list and detail views, so do after Phase 2-3 land to avoid merge churn |
+| — | Consolidate `Product`/`CatalogProduct` types | Can happen any time; touches both list and detail views, so do after Phase 4 lands to avoid merge churn |
 
 ---
 
@@ -258,11 +263,12 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 
 | Priority | Items |
 |---|---|
-| **Critical** | Pagination on `ProductsTab`/`inventory` (Phase 2/3) — real usability ceiling on any catalog >50 items |
-| **High** | Dead-route removal + broken transfers redirect fix (Phase 1) — zero risk, ships today |
-| **High** | Batch/expiry unification (Phase 5) — real data-correctness/reconciliation risk |
-| **Medium** | Two-level tab-bar grouping (Phase 4) — real cognitive-load win, no correctness risk |
-| **Medium** | Nav visibility fixes for orphaned pages (Phase 1) |
+| **Critical** | Pagination on `ProductsTab` (Phase 2) — real usability ceiling on any catalog >50 items — **done** |
+| **High** | Dead-route removal + broken transfers redirect fix (Phase 1) — zero risk — **done** |
+| **High** | Batch/expiry unification (Phase 5) — real data-correctness/reconciliation risk — not started |
+| **Medium** | Tab-bar group labels (Phase 3) — real cognitive-load win, no correctness risk — **done** |
+| **Medium** | Nav visibility fixes for orphaned pages (Phase 1) — **done** |
+| **Medium** | Extend pagination to remaining list pages (Phase 4) — needs backend pagination work first, see roadmap |
 | **Low** | `Product`/`CatalogProduct` type consolidation — maintenance hygiene, no user-facing effect |
 | **Deferred (NEEDS-SRI)** | Everything in §5's table — no build without a business decision first |
 
@@ -272,10 +278,11 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 
 | Item | Complexity | Why |
 |---|---|---|
-| Dead-route removal + redirect fix | **Trivial** (hours) | Delete files, one-line redirect change, no tests needed beyond a build check |
-| Nav links for orphaned pages | **Trivial** (hours) | Config-only change in `EnterpriseShell.tsx` |
-| `DataGrid` component | **Medium** (days) | New component + adoption in 2-4 pages; needs its own test coverage for sort/filter/paginate logic |
-| Two-level tab bar | **Small-Medium** (a day or two) | Pure frontend restructure of existing tab rendering, no new data needed |
+| Dead-route removal + redirect fix | **Trivial** (hours) | Delete files, one-line redirect change, no tests needed beyond a build check — **done** |
+| Nav links for orphaned pages | **Trivial** (hours) | Config-only change in `EnterpriseShell.tsx` — **done** |
+| `Pagination` component + `ProductsTab` adoption | **Small** (under a day, smaller than originally estimated) | Backend already supported `limit`/`offset` — just needed a reusable control + wiring, not a full data-grid rewrite — **done** |
+| Tab-bar group labels | **Trivial** (under an hour, smaller than originally estimated) | Once the code was read, a full two-level bar wasn't justified — the existing divider mechanism just needed a label, not a rewrite — **done** |
+| Extend pagination to other list pages | **Medium** | Needs backend `limit`/`offset` added to `inventory` transfers/returns first (currently unbounded `listTransfers()`), and a decision on whether purchasing's cursor-based orders list gets its own paging UI treatment |
 | Batch/expiry unification | **Large** (the biggest item here) | Real data migration across tenants, a frontend cutover, an API deprecation window, and careful verification that nothing silently loses expiry data mid-migration |
 | Type consolidation | **Small** | Mechanical, but touches many call sites — needs a full typecheck pass |
 
