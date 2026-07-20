@@ -32,6 +32,7 @@ NEEDS-SRI list (the authoritative day-to-day backlog) as of this pass:
 | Custom-roles / permissions-page contract | Open | Frontend permissions matrix (`{name,color,features}`) vs backend `custom_roles` (`{name,permissions}` fixed vocab, no color) — a genuine contract mismatch, not a missing feature. Needs a decision on which model wins. |
 | E2 procurement: GRN / GRNI | Partial | Requisitions ✅ and 3-way match ✅ both shipped (this session). Goods-Received-Not-Invoiced tracking may already be partially covered by the 3-way match's `not_invoiced` variance flag — needs a specific check before calling this done or open. |
 | Ecommerce storefront auth | Decided, gated | `NEXT_PUBLIC_STORE_AUTH_ENABLED=1` re-enables; real customer-auth backend deferred until the storefront is prioritized. Not an oversight — a deliberate Preview gate. |
+| Product/inventory pages: dead routes, broken transfers redirect, duplicate batch/expiry models | Open — full review in [PRODUCT_MODULE_REVIEW.md](PRODUCT_MODULE_REVIEW.md) | 8 pure re-export/dead-redirect routes found (zero-risk to remove); `/inventory/transfers` redirects to a page with no transfers tab (broken); `product_batches` and `inventory_lots` are two independent, non-reconciling expiry data models. No shared enterprise data-table component exists — catalog/inventory list pages have no pagination UI despite backend support. |
 
 ## Known open criticals (operational floor, outrank feature work)
 

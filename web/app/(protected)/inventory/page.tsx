@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EnterpriseShell } from "@/components/EnterpriseShell";
 import { apiGet, apiPost } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
@@ -20,6 +21,11 @@ import { useToast } from "@/components/Toast";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type TabKey = "orders" | "transfers" | "returns";
+
+const TAB_KEYS: TabKey[] = ["orders", "transfers", "returns"];
+function isTabKey(v: string | null): v is TabKey {
+  return v !== null && (TAB_KEYS as string[]).includes(v);
+}
 
 interface StockMovement {
   id: string;
@@ -227,7 +233,9 @@ function NewMovementModal({ tab, onClose, onCreated }: { tab: TabKey; onClose: (
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("orders");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<TabKey>(isTabKey(initialTab) ? initialTab : "orders");
   const [data, setData]           = useState<StockMovement[]>([]);
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);

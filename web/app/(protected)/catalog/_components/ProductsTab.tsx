@@ -8,6 +8,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { Pagination, usePersistedPageSize } from "@/components/Pagination";
 import { apiGet, apiPost, apiPatch, apiDelete, ApiResponseError } from "@/api-client/client";
 import { formatMoney } from "@/lib/money";
 import type { Product, Category, ProductStatus, ProductsResponse } from "@/api-client/types";
@@ -126,6 +127,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const [sortCol, setSortCol] = useState("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = usePersistedPageSize("catalog-products-page-size", 50);
+
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
   const [showPrintLabels, setShowPrintLabels] = useState(false);
 
@@ -243,7 +247,7 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({ limit: "50", offset: "0" });
+      const params = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize) });
       if (filterStatus)   params.set("status",   filterStatus);
       if (filterCategory) params.set("category", filterCategory);
       if (debouncedQ)     params.set("q",        debouncedQ);
@@ -253,9 +257,13 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
     } catch (err) {
       setError(err instanceof ApiResponseError ? err.message : "Failed to load products.");
     } finally { setLoading(false); }
-  }, [filterStatus, filterCategory, debouncedQ]);
+  }, [filterStatus, filterCategory, debouncedQ, page, pageSize]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // A filter/page-size change can leave `page` pointing past the end of the
+  // new result set — reset to the first page rather than fetching an empty one.
+  useEffect(() => { setPage(0); }, [filterStatus, filterCategory, debouncedQ, pageSize]);
 
   useEffect(() => {
     if (searchParams.get("new") === "product") {
@@ -627,6 +635,9 @@ export function ProductsTab({ categories }: { categories: Category[] }) {
               ))}
             </div>
           </>
+        )}
+        {!loading && !error && total > 0 && (
+          <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} />
         )}
       </Card>
 
