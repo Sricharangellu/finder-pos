@@ -476,6 +476,18 @@ END;
 $$;
 `;
 
+// DEMO-1: Trial lifecycle — additive columns for nurture-email send tracking
+// (idempotency across job runs) plus widening the subscriptions.status CHECK
+// constraint to allow a soft 'expired' state once a trial lapses without the
+// tenant converting to a paid plan. Purely additive: existing rows/values are
+// untouched, and the constraint only gains an allowed value, never loses one.
+export const ADD_TRIAL_LIFECYCLE_TO_SUBSCRIPTIONS = `
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS nurture_day7_sent_at BIGINT;
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS nurture_day13_sent_at BIGINT;
+ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS chk_subscriptions_status;
+ALTER TABLE subscriptions ADD CONSTRAINT chk_subscriptions_status CHECK (status IN ('trialing','active','past_due','cancelled','paused','expired'));
+`;
+
 export const IDENTITY_MIGRATIONS = [
   CREATE_TENANTS_TABLE,
   CREATE_USERS_TABLE,
@@ -505,4 +517,5 @@ export const IDENTITY_MIGRATIONS = [
   CREATE_AUDIT_TRIGGER_FN,
   APPLY_AUDIT_TRIGGERS,
   CREATE_EVENT_OUTBOX_TABLE,
+  ADD_TRIAL_LIFECYCLE_TO_SUBSCRIPTIONS,
 ];

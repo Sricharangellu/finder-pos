@@ -20,6 +20,8 @@ export const QueueNames = {
   IDEMPOTENCY_EXPIRY: "idempotency_expiry",
   /** ACPA M1.4: daily retention sweep — purges delivered outbox rows and old consumption claims. */
   OUTBOX_RETENTION: "outbox_retention",
+  /** DEMO-1: Trial lifecycle sweep — nurture emails + soft-expiry, once a day. */
+  TRIAL_EXPIRY: "trial_expiry",
 } as const;
 // "outbox_relay" (DB-8) retired in ACPA M1.2 — the shared Outbox reconciler
 // owns redelivery; stale relay jobs are purged at bootstrap.

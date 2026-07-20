@@ -1032,6 +1032,209 @@ export class PurchasingService {
     return { id, po_id: poId, line_id: input.lineId ?? null, reason: input.reason, amount_cents: input.amountCents, created_at: now };
   }
 
+  // ── Vendor bills · 3-way match (#42) ─────────────────────────────────────────
+
+  /** Create a draft vendor bill (invoice) against a PO from structured line
+   *  entry. OCR auto-extract is stubbed for later — lines are entered/confirmed
+   *  by the user. The bill starts in `draft`; it must be approved before it can
+   *  be posted. */
+  async createBill(
+    poId: string,
+    tenantId: string,
+    input: {
+      invoiceNumber: string;
+      invoiceDate?: number | null;
+      documentId?: string | null;
+      taxCents?: number;
+      lines: Array<{ lineId?: string | null; productId: string; productName?: string | null; invoicedQty: number; invoicedUnitCostCents: number }>;
+    },
+  ) {
+    const po = await this.db.one<{ id: string }>(
+      "SELECT id FROM purchase_orders WHERE id = @poId AND tenant_id = @t",
+      { poId, t: tenantId },
+    );
+    if (!po) throw new HttpError(404, "not_found", `purchase order '${poId}' not found`);
+    if (!input.invoiceNumber?.trim()) throw new HttpError(400, "bad_request", "invoiceNumber is required");
+    if (!input.lines?.length) throw new HttpError(400, "bad_request", "at least one line is required");
+
+    const id = `bill_${uuidv7()}`;
+    const now = Date.now();
+    const subtotal = input.lines.reduce((s, l) => s + l.invoicedQty * l.invoicedUnitCostCents, 0);
+    const tax = input.taxCents ?? 0;
+    const total = subtotal + tax;
+
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        `INSERT INTO po_bills (id, tenant_id, po_id, invoice_number, invoice_date, document_id, subtotal_cents, tax_cents, total_cents, status, created_at, updated_at)
+         VALUES (@id, @t, @poId, @num, @date, @docId, @subtotal, @tax, @total, 'draft', @now, @now)`,
+        { id, t: tenantId, poId, num: input.invoiceNumber.trim(), date: input.invoiceDate ?? null, docId: input.documentId ?? null, subtotal, tax, total, now },
+      );
+      for (const l of input.lines) {
+        await tdb.query(
+          `INSERT INTO po_bill_lines (id, tenant_id, bill_id, line_id, product_id, product_name, invoiced_qty, invoiced_unit_cost_cents)
+           VALUES (@id, @t, @billId, @lineId, @productId, @productName, @qty, @cost)`,
+          { id: `bln_${uuidv7()}`, t: tenantId, billId: id, lineId: l.lineId ?? null, productId: l.productId, productName: l.productName ?? null, qty: l.invoicedQty, cost: l.invoicedUnitCostCents },
+        );
+      }
+    });
+    return this.getBill(id, tenantId);
+  }
+
+  async listBills(poId: string, tenantId: string) {
+    return this.db.query<{ id: string; po_id: string; invoice_number: string; invoice_date: number | null; total_cents: number; status: string; created_at: number }>(
+      "SELECT id, po_id, invoice_number, invoice_date, total_cents, status, created_at FROM po_bills WHERE po_id = @poId AND tenant_id = @t ORDER BY created_at DESC",
+      { poId, t: tenantId },
+    );
+  }
+
+  /** Return a bill with its 3-way match: for every PO line, ordered vs received
+   *  vs invoiced quantities and PO vs invoiced unit cost, with per-line and
+   *  total variance flags. Bill lines that don't map to a PO line surface as
+   *  `unexpected` rows. `match_status` is `variance` if anything is flagged. */
+  async getBill(billId: string, tenantId: string) {
+    const bill = await this.db.one<{ id: string; po_id: string; invoice_number: string; invoice_date: number | null; document_id: string | null; subtotal_cents: number; tax_cents: number; total_cents: number; status: string; created_at: number; updated_at: number }>(
+      "SELECT * FROM po_bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+
+    const billLines = await this.db.query<{ id: string; line_id: string | null; product_id: string; product_name: string | null; invoiced_qty: number; invoiced_unit_cost_cents: number }>(
+      "SELECT id, line_id, product_id, product_name, invoiced_qty, invoiced_unit_cost_cents FROM po_bill_lines WHERE bill_id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    const poLines = await this.db.query<{ id: string; product_id: string; product_name: string | null; quantity: number; received_qty: number; unit_cost_cents: number }>(
+      "SELECT id, product_id, product_name, quantity, COALESCE(received_qty, 0) AS received_qty, unit_cost_cents FROM purchase_order_lines WHERE po_id = @poId AND tenant_id = @t",
+      { poId: bill.po_id, t: tenantId },
+    );
+
+    const usedBillLineIds = new Set<string>();
+    const matchLines = poLines.map((pol) => {
+      const bl = billLines.find(
+        (b) => (b.line_id ? b.line_id === pol.id : b.product_id === pol.product_id) && !usedBillLineIds.has(b.id),
+      );
+      if (bl) usedBillLineIds.add(bl.id);
+      const invoicedQty = bl?.invoiced_qty ?? 0;
+      const invoicedUnit = bl?.invoiced_unit_cost_cents ?? 0;
+      const flags: string[] = [];
+      if (pol.received_qty < pol.quantity) flags.push("short_received");
+      if (bl && invoicedQty !== pol.received_qty) flags.push("qty_variance");
+      if (bl && invoicedUnit !== pol.unit_cost_cents) flags.push("price_variance");
+      if (!bl) flags.push("not_invoiced");
+      // What we should pay (received × PO price) vs what was invoiced.
+      const expectedCents = pol.received_qty * pol.unit_cost_cents;
+      const invoicedCents = invoicedQty * invoicedUnit;
+      return {
+        line_id: pol.id,
+        product_id: pol.product_id,
+        product_name: pol.product_name ?? pol.product_id,
+        ordered_qty: pol.quantity,
+        received_qty: pol.received_qty,
+        invoiced_qty: invoicedQty,
+        po_unit_cost_cents: pol.unit_cost_cents,
+        invoiced_unit_cost_cents: invoicedUnit,
+        expected_cents: expectedCents,
+        invoiced_cents: invoicedCents,
+        variance_cents: invoicedCents - expectedCents,
+        flags,
+        matched: flags.length === 0,
+      };
+    });
+
+    // Invoiced lines with no matching PO line are unexpected charges.
+    const unexpected = billLines
+      .filter((b) => !usedBillLineIds.has(b.id))
+      .map((b) => ({
+        line_id: null as string | null,
+        product_id: b.product_id,
+        product_name: b.product_name ?? b.product_id,
+        ordered_qty: 0,
+        received_qty: 0,
+        invoiced_qty: b.invoiced_qty,
+        po_unit_cost_cents: 0,
+        invoiced_unit_cost_cents: b.invoiced_unit_cost_cents,
+        expected_cents: 0,
+        invoiced_cents: b.invoiced_qty * b.invoiced_unit_cost_cents,
+        variance_cents: b.invoiced_qty * b.invoiced_unit_cost_cents,
+        flags: ["unexpected"],
+        matched: false,
+      }));
+
+    const lines = [...matchLines, ...unexpected];
+    const expectedTotal = matchLines.reduce((s, l) => s + l.expected_cents, 0);
+    const invoicedSubtotal = lines.reduce((s, l) => s + l.invoiced_cents, 0);
+    const totalVariance = bill.total_cents - expectedTotal; // includes tax + unexpected
+    const matchStatus = lines.every((l) => l.matched) && bill.subtotal_cents === expectedTotal ? "matched" : "variance";
+
+    return {
+      id: bill.id,
+      po_id: bill.po_id,
+      invoice_number: bill.invoice_number,
+      invoice_date: bill.invoice_date,
+      document_id: bill.document_id,
+      subtotal_cents: bill.subtotal_cents,
+      tax_cents: bill.tax_cents,
+      total_cents: bill.total_cents,
+      status: bill.status,
+      created_at: bill.created_at,
+      updated_at: bill.updated_at,
+      match: {
+        match_status: matchStatus,
+        expected_cents: expectedTotal,
+        invoiced_subtotal_cents: invoicedSubtotal,
+        total_variance_cents: totalVariance,
+        lines,
+      },
+    };
+  }
+
+  /** Approve or hold a draft bill. A held bill cannot be posted until it is
+   *  approved again; a posted bill is immutable. */
+  async setBillStatus(billId: string, tenantId: string, status: "approved" | "held") {
+    const bill = await this.db.one<{ status: string }>(
+      "SELECT status FROM po_bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+    if (bill.status === "posted") throw new HttpError(409, "already_posted", "a posted bill cannot be changed");
+    await this.db.query(
+      "UPDATE po_bills SET status = @status, updated_at = @now WHERE id = @id AND tenant_id = @t",
+      { status, now: Date.now(), id: billId, t: tenantId },
+    );
+    return this.getBill(billId, tenantId);
+  }
+
+  /** Post an approved bill. This is the gate: only an `approved` bill can post,
+   *  and posting also records the invoiced quantities onto the PO lines. */
+  async postBill(billId: string, tenantId: string) {
+    const bill = await this.db.one<{ status: string; po_id: string }>(
+      "SELECT status, po_id FROM po_bills WHERE id = @id AND tenant_id = @t",
+      { id: billId, t: tenantId },
+    );
+    if (!bill) throw new HttpError(404, "not_found", `bill '${billId}' not found`);
+    if (bill.status === "posted") throw new HttpError(409, "already_posted", "bill is already posted");
+    if (bill.status !== "approved") throw new HttpError(409, "not_approved", "bill must be approved before it can be posted");
+
+    const now = Date.now();
+    await this.db.withTenant(tenantId).tx(async (tdb) => {
+      await tdb.query(
+        "UPDATE po_bills SET status = 'posted', updated_at = @now WHERE id = @id AND tenant_id = @t",
+        { now, id: billId, t: tenantId },
+      );
+      const billLines = await tdb.query<{ line_id: string | null; invoiced_qty: number }>(
+        "SELECT line_id, invoiced_qty FROM po_bill_lines WHERE bill_id = @id AND tenant_id = @t",
+        { id: billId, t: tenantId },
+      );
+      for (const bl of billLines) {
+        if (!bl.line_id) continue;
+        await tdb.query(
+          "UPDATE purchase_order_lines SET billed_qty = @qty WHERE id = @lid AND tenant_id = @t",
+          { qty: bl.invoiced_qty, lid: bl.line_id, t: tenantId },
+        );
+      }
+    });
+    return this.getBill(billId, tenantId);
+  }
+
   // ── Vendor price history ─────────────────────────────────────────────────────
   // Returns the last 5 unit costs for each product on the given PO, sourced
   // from product_costs (which is updated on every receive).

@@ -9,6 +9,11 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function readInt(val: unknown, fallback: number): number {
+  const n = Number(val);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
 const subscribeSchema = z.object({
   url: z.string().url(),
   eventTypes: z.array(z.string().min(1)).optional(),
@@ -62,8 +67,10 @@ export function registerRoutes(router: Router, service: WebhooksService): void {
   router.get(
     "/deliveries",
     requireRole("owner"),
-    handler(async (_req, res) => {
-      res.json({ items: await service.deliveries(tenantId(res)) });
+    handler(async (req, res) => {
+      const limit = readInt(req.query.limit, 50);
+      const offset = readInt(req.query.offset, 0);
+      res.json({ items: await service.deliveries(tenantId(res), limit, offset) });
     }),
   );
 }

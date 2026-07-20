@@ -75,6 +75,64 @@ export interface BillingAdj {
   created_at: number;
 }
 
+export type BillStatus = "draft" | "approved" | "held" | "posted";
+
+export interface BillSummary {
+  id: string;
+  po_id: string;
+  invoice_number: string;
+  invoice_date: number | null;
+  total_cents: number;
+  status: BillStatus;
+  created_at: number;
+}
+
+export interface BillMatchLine {
+  line_id: string | null;
+  product_id: string;
+  product_name: string;
+  ordered_qty: number;
+  received_qty: number;
+  invoiced_qty: number;
+  po_unit_cost_cents: number;
+  invoiced_unit_cost_cents: number;
+  expected_cents: number;
+  invoiced_cents: number;
+  variance_cents: number;
+  flags: string[];
+  matched: boolean;
+}
+
+export interface BillDetail {
+  id: string;
+  po_id: string;
+  invoice_number: string;
+  invoice_date: number | null;
+  document_id: string | null;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  status: BillStatus;
+  created_at: number;
+  updated_at: number;
+  match: {
+    match_status: "matched" | "variance";
+    expected_cents: number;
+    invoiced_subtotal_cents: number;
+    total_variance_cents: number;
+    lines: BillMatchLine[];
+  };
+}
+
+/** Human labels for per-line 3-way-match variance flags. */
+export const BILL_FLAG_LABELS: Record<string, string> = {
+  short_received: "Short received",
+  qty_variance: "Qty ≠ received",
+  price_variance: "Price ≠ PO",
+  not_invoiced: "Not invoiced",
+  unexpected: "Not on PO",
+};
+
 export interface VendorCredit {
   id: string;
   supplier_id: string;

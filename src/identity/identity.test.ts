@@ -488,6 +488,39 @@ test("authn-protected route returns 401 with no token", async () => {
   await app.db.close();
 });
 
+test("authn-protected identity routes accept a valid token (regression: auth middleware was never mounted)", async () => {
+  const app = await freshApp();
+  const registered = await request(app.express, "POST", "/api/identity/register", {
+    storeName: "Me Route Test",
+    email: "me-route-test@example.com",
+    password: "correct-horse-battery-staple",
+  });
+  assert.equal(registered.status, 201, `register failed: ${JSON.stringify(registered.json)}`);
+  const token = registered.json.accessToken as string;
+  const expectedUserId = registered.json.user.id as string;
+  const expectedTenantId = registered.json.user.tenantId as string;
+
+  // Before the fix, /api/identity/me 401'd even with a valid token because
+  // no middleware in app.ts ever populated res.locals.auth for this router —
+  // only the route's own `if (!auth)` fallback ever ran, which always failed.
+  const me = await request(app.express, "GET", "/api/identity/me", undefined, {
+    authorization: `Bearer ${token}`,
+  });
+  assert.equal(me.status, 200, `expected 200, got ${me.status}: ${JSON.stringify(me.json)}`);
+  assert.equal(me.json.userId, expectedUserId);
+  assert.equal(me.json.tenantId, expectedTenantId);
+  assert.equal(me.json.role, "owner");
+
+  // Same root cause affected /devices — spot-check it too.
+  const devices = await request(app.express, "GET", "/api/identity/devices", undefined, {
+    authorization: `Bearer ${token}`,
+  });
+  assert.equal(devices.status, 200, `expected 200, got ${devices.status}: ${JSON.stringify(devices.json)}`);
+  assert.ok(Array.isArray(devices.json.items));
+
+  await app.db.close();
+});
+
 test("authMiddleware rejects missing Authorization header", async () => {
   const { authMiddleware } = await import("../gateway/auth.js");
   let nextError: unknown;

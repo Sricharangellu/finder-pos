@@ -683,7 +683,7 @@ Needed:
 
 **This phase supersedes every other initiative in this document until its exit
 criteria pass.** `WORK/LOOP_STATE.md` loop_status is ACTIVE against this phase;
-`FOUNDATION_HARDENING.md` and `FUNCTIONAL_REBRAND_PLAN.md` stay queued/paused
+`FOUNDATION_HARDENING.md` stays queued/paused (FUNCTIONAL_REBRAND_PLAN executed and removed 2026-07-19)
 unless a session explicitly claims them instead.
 
 Direct answer this phase exists to make true: as of 2026-07-18 the app is

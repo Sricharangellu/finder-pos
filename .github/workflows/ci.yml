@@ -1,7 +1,7 @@
 name: CI
 
 # ─── Trigger rules (3-tier promotion pipeline) ────────────────────────────────
-# develop → full CI + deploy to DEV      (Vercel preview, TESTING Supabase — shared)
+# develop → full CI + deploy to DEV      (Vercel preview, own dedicated Supabase)
 # staging → full CI + deploy to TESTING  (Vercel preview alias, TESTING Supabase)
 # master  → full CI + deploy to PROD      (Vercel --prod, PROD Supabase, ascendhq-app.vercel.app)
 # PRs     → full CI, no deploy
@@ -369,8 +369,13 @@ jobs:
           retention-days: 7
 
   # ─── DEV deploy (push to develop only) ─────────────────────────────────────
-  # Deploys BOTH projects as Vercel previews pointing at the TESTING backend
-  # (shared Supabase B). Repo variables carry the non-secret staging origins.
+  # Deploys BOTH projects as Vercel previews, sharing the SAME testing Supabase
+  # project as staging (Sri directive, 2026-07-20: exactly 2 databases — one
+  # shared by develop+staging, one isolated for prod — not three). No
+  # DATABASE_URL override here on purpose: the backend falls back to whatever
+  # is stored in the Vercel project's own Preview environment vars, which is
+  # the same value staging's deploy uses below. Repo variables carry the
+  # non-secret dev origins.
   deploy-dev:
     name: Deploy → Dev (Vercel preview)
     # e2e runs in parallel as a reported signal but does NOT gate deploys — the
@@ -378,11 +383,12 @@ jobs:
     # Re-add `e2e` here once that flake is fixed to make it a hard deploy gate.
     needs: [guard, backend, frontend, e2e]
     runs-on: ubuntu-latest
-    # Skips (does not fail) until the testing tier is configured — set the repo
-    # variable STAGING_BACKEND_URL + Vercel Preview env vars to activate.
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push' && vars.STAGING_BACKEND_URL != ''
+    # Skips (does not fail) until the dev tier is configured — set the repo
+    # variable DEV_BACKEND_URL to activate.
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push' && vars.DEV_BACKEND_URL != ''
     environment:
       name: Preview
+      url: https://${{ vars.DEV_FRONTEND_ALIAS }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -396,8 +402,16 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           DEPLOY_ENV: dev
           NEXT_PUBLIC_MOCK: "false"
-          # Dev shares the TESTING backend/DB (Supabase B). Set as repo variable.
-          BACKEND_URL: ${{ vars.STAGING_BACKEND_URL }}
+          BACKEND_URL: ${{ vars.DEV_BACKEND_URL }}
+          BACKEND_ALIAS: ${{ vars.DEV_BACKEND_ALIAS }}
+          FRONTEND_ALIAS: ${{ vars.DEV_FRONTEND_ALIAS }}
+      - name: Dev smoke test
+        run: |
+          sleep 10
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.DEV_BACKEND_URL }}/healthz" \
+            || (echo "❌ dev backend /healthz failed — check DEV_BACKEND_URL var + Vercel Preview env" && exit 1)
+          curl -fsS --retry 3 --retry-delay 5 "${{ vars.DEV_BACKEND_URL }}/readyz" \
+            || (echo "❌ dev backend /readyz failed (DB not reachable — check the shared testing Supabase project)" && exit 1)
 
   # ─── TESTING deploy (push to staging only) ─────────────────────────────────
   # Deploys BOTH projects as Vercel previews aliased to stable staging domains,

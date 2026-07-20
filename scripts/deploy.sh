@@ -10,9 +10,13 @@
 # Environment tiers (DEPLOY_ENV):
 #   prod     → Vercel Production (--prod). Uses the Production env vars in Vercel
 #              (prod Supabase). BACKEND_URL defaults to the prod backend domain.
-#   testing  → Vercel Preview. MUST point at the TESTING backend (Supabase B) via
-#              BACKEND_URL; aliased to stable staging domains when *_ALIAS set.
-#   dev      → Vercel Preview. Shares the TESTING backend/DB (per pipeline design).
+#   testing  → Vercel Preview. Points at the TESTING backend/DB (Supabase B, the
+#              project's stored Preview env vars); aliased to stable staging
+#              domains when *_ALIAS set.
+#   dev      → Vercel Preview. Own dedicated backend/DB when DATABASE_URL is
+#              supplied (overrides the project's stored Preview value for just
+#              this deployment via `vercel deploy --env`); falls back to the
+#              stored value (same DB as testing) if DATABASE_URL is unset.
 #
 # Env inputs:
 #   VERCEL_TOKEN      (required) Vercel token with team-scope access.
@@ -26,6 +30,15 @@
 #   NEXT_PUBLIC_MOCK  (optional) frontend mock switch. Defaults to "false" on every
 #                     tier now (all tiers run against a real backend). Prod refuses
 #                     any value other than "false".
+#   DATABASE_URL      (optional, non-prod only) overrides the backend deploy's
+#                     database connection for just this deployment, instead of
+#                     using the Vercel project's stored Preview value. Lets a
+#                     tier (e.g. dev) run against its own database without a
+#                     separate Vercel project. Requires PG_SSL=require and
+#                     PG_CA_CERT_B64 to also be set if the target DB needs
+#                     verified TLS (see src/shared/db.ts sslConfig()).
+#   PG_SSL            (optional) passed through alongside DATABASE_URL.
+#   PG_CA_CERT_B64    (optional) passed through alongside DATABASE_URL.
 #
 # Project/team IDs below are not secrets.
 set -euo pipefail
@@ -72,12 +85,23 @@ deploy_backend() {
   ( cd "$S" && npm install --no-audit --no-fund --loglevel=error && npm run build && test -f dist/src/app.js )
   echo "→ Backend: deploying…"
   local url
+  # Non-prod tiers may override the DB for just this deployment (e.g. dev
+  # running against its own database instead of the project's stored Preview
+  # value, which testing also uses) via `vercel deploy --env`, which takes
+  # precedence over the project's stored env vars for this deployment only.
+  local -a DB_ENV_ARGS=()
+  if [[ "$DEPLOY_ENV" != "prod" && -n "${DATABASE_URL:-}" ]]; then
+    echo "→ Backend: overriding DATABASE_URL for this deployment (dedicated DB)"
+    DB_ENV_ARGS+=(--env "DATABASE_URL=$DATABASE_URL")
+    [[ -n "${PG_SSL:-}" ]] && DB_ENV_ARGS+=(--env "PG_SSL=$PG_SSL")
+    [[ -n "${PG_CA_CERT_B64:-}" ]] && DB_ENV_ARGS+=(--env "PG_CA_CERT_B64=$PG_CA_CERT_B64")
+  fi
   # Newer Vercel CLI versions print a JSON summary to stdout instead of a
   # plain URL line (progress text goes to stderr either way) — extract the
   # URL by pattern instead of assuming a fixed "last line" shape, so this
   # keeps working across CLI output format changes.
   url=$( cd "$S" && VERCEL_ORG_ID="$TEAM" VERCEL_PROJECT_ID="$BACKEND_PID" \
-      npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" \
+      npx --yes vercel deploy $PROD_FLAG --archive=tgz --yes --token "$VERCEL_TOKEN" "${DB_ENV_ARGS[@]}" \
       | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1 )
   echo "→ Backend deployed: $url"
   # Non-prod: pin the unique preview URL to a stable alias so the frontend can be

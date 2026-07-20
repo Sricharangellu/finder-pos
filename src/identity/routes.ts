@@ -70,6 +70,9 @@ const registerSchema = z.object({
   storeName: z.string().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(8).max(128),
+  // Escape hatch for a future non-trial signup path reusing this endpoint
+  // (e.g. sales-assisted or paid signup). Defaults to starting a trial.
+  skipTrial: z.boolean().optional(),
 });
 
 const refreshSchema = z.object({

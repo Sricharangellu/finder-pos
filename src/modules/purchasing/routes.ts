@@ -416,6 +416,41 @@ export function registerRoutes(router: Router, service: PurchasingService): void
     res.status(201).json(await service.createBillingAdj(String(req.params.id), tenantId(res), b));
   }));
 
+  // PO bills · 3-way match (ordered vs received vs invoiced)
+  router.get("/orders/:id/bills", handler(async (req, res) => {
+    res.json({ items: await service.listBills(String(req.params.id), tenantId(res)) });
+  }));
+
+  router.post("/orders/:id/bills", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({
+      invoiceNumber: z.string().min(1),
+      invoiceDate: z.number().int().nullable().optional(),
+      documentId: z.string().min(1).nullable().optional(),
+      taxCents: z.number().int().nonnegative().optional(),
+      lines: z.array(z.object({
+        lineId: z.string().min(1).nullable().optional(),
+        productId: z.string().min(1),
+        productName: z.string().nullable().optional(),
+        invoicedQty: z.number().int().nonnegative(),
+        invoicedUnitCostCents: z.number().int().nonnegative(),
+      })).min(1),
+    }), req.body);
+    res.status(201).json(await service.createBill(String(req.params.id), tenantId(res), b));
+  }));
+
+  router.get("/bills/:billId", handler(async (req, res) => {
+    res.json(await service.getBill(String(req.params.billId), tenantId(res)));
+  }));
+
+  router.post("/bills/:billId/status", mgr, handler(async (req, res) => {
+    const b = parseBody(z.object({ status: z.enum(["approved", "held"]) }), req.body);
+    res.json(await service.setBillStatus(String(req.params.billId), tenantId(res), b.status));
+  }));
+
+  router.post("/bills/:billId/post", mgr, handler(async (req, res) => {
+    res.json(await service.postBill(String(req.params.billId), tenantId(res)));
+  }));
+
   // Vendor quotes
   router.get("/vendor-quotes", handler(async (_req, res) => {
     res.json({ items: await service.listVendorQuotes(tenantId(res)) });

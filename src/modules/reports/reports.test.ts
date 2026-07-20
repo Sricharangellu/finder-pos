@@ -411,3 +411,29 @@ test("cashier cannot trigger the AR-aging dunning sweep (403); manager can", asy
   assert.equal((await callAsRep(app, "cashier", "POST", "/api/reports/ar-aging/sweep")).status, 403);
   assert.equal((await callAsRep(app, "manager", "POST", "/api/reports/ar-aging/sweep")).status, 200);
 });
+
+test("top-products: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {
+  const app = await freshApp();
+
+  // Non-numeric limit must not reach the SQL layer as NaN (would previously 500).
+  const bad = await call(app, "GET", "/api/reports/top-products?limit=not-a-number");
+  assert.equal(bad.status, 200, `unexpectedly failed: ${JSON.stringify(bad.json)}`);
+  assert.ok(Array.isArray(bad.json.items));
+
+  // A huge limit must be capped server-side rather than passed through raw.
+  const huge = await call(app, "GET", "/api/reports/top-products?limit=99999");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.ok(Array.isArray(huge.json.items));
+});
+
+test("sales-by-product: a non-numeric limit falls back to the default instead of producing NaN, and a huge limit is capped", async () => {
+  const app = await freshApp();
+
+  const bad = await call(app, "GET", "/api/reports/sales-by-product?limit=abc");
+  assert.equal(bad.status, 200, `unexpectedly failed: ${JSON.stringify(bad.json)}`);
+  assert.ok(Array.isArray(bad.json.items));
+
+  const huge = await call(app, "GET", "/api/reports/sales-by-product?limit=99999");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.ok(Array.isArray(huge.json.items));
+});

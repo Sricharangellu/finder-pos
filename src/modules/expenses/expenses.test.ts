@@ -85,8 +85,7 @@ test("expenses: create/delete require manager+, list is readable, and delete wor
 
   // Owner deletes.
   r = await makeRequest(app, "DELETE", `/api/expenses/${id}`, "owner");
-  assert.equal(r.status, 200);
-  assert.equal(r.json.ok, true);
+  assert.equal(r.status, 204);
 
   r = await makeRequest(app, "GET", `/api/expenses/${id}`, "owner");
   assert.equal(r.status, 404, "deleted expense is gone");

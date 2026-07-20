@@ -144,10 +144,12 @@ export class WebhooksService {
     return rows.length > 0;
   }
 
-  async deliveries(tenantId: string, limit = 50): Promise<WebhookDelivery[]> {
+  async deliveries(tenantId: string, limit = 50, offset = 0): Promise<WebhookDelivery[]> {
+    const cappedLimit = Math.min(limit > 0 ? limit : 50, 200);
+    const safeOffset = offset > 0 ? offset : 0;
     return this.db.query<WebhookDelivery>(
-      "SELECT * FROM webhook_deliveries WHERE tenant_id = @tenantId ORDER BY created_at DESC LIMIT @limit",
-      { tenantId, limit },
+      "SELECT * FROM webhook_deliveries WHERE tenant_id = @tenantId ORDER BY created_at DESC LIMIT @limit OFFSET @offset",
+      { tenantId, limit: cappedLimit, offset: safeOffset },
     );
   }
 

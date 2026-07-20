@@ -23,6 +23,12 @@ const PUBLIC_PATH_PREFIXES = [
   "/icons",
   "/api",
   "/mockServiceWorker.js",
+  // next.config.mjs rewrites these to the backend too (health probes used by
+  // uptime monitors and deploy smoke tests) — without this, the auth gate
+  // intercepts them before the rewrite ever runs, redirecting probes to
+  // /login instead of proxying to the backend.
+  "/healthz",
+  "/readyz",
 ];
 
 export function middleware(request: NextRequest): NextResponse {

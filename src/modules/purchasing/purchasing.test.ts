@@ -634,3 +634,105 @@ test("suggested qty reflects reorder point when stock and velocity are zero", as
   const item = r.json.items.find((i: any) => i.product_id === p);
   assert.equal(item.suggested_qty, 40); // reorder_point 40, stock 0, no velocity
 });
+
+// ── Vendor bills · 3-way match (#42) ──────────────────────────────────────────
+
+/** Create a PO, receive `receiveQty` of its single line, return { po, lineId }. */
+async function makePoAndReceive(app: App, supplierId: string, productId: string, orderedQty: number, unitCostCents: number, receiveQty: number) {
+  const po = (await call(app, "POST", "/api/purchasing/orders", {
+    supplierId, lines: [{ productId, quantity: orderedQty, unitCostCents }],
+  })).json;
+  const lineId = po.lines[0].id as string;
+  if (receiveQty > 0) {
+    const r = await call(app, "POST", `/api/purchasing/orders/${po.id}/receive`, { lines: [{ lineId, qty: receiveQty }] });
+    assert.equal(r.status, 200, `receive failed: ${JSON.stringify(r.json)}`);
+  }
+  return { po, lineId };
+}
+
+test("3-way match flags short-received, qty and price variances", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const p = await makeProduct(app, "BILL-A", 1000);
+  const { po, lineId } = await makePoAndReceive(app, supplierId, p, 10, 300, 8); // ordered 10, received 8
+
+  const bill = (await call(app, "POST", `/api/purchasing/orders/${po.id}/bills`, {
+    invoiceNumber: "INV-1", lines: [{ lineId, productId: p, invoicedQty: 10, invoicedUnitCostCents: 320 }],
+  })).json;
+
+  assert.equal(bill.status, "draft");
+  assert.equal(bill.match.match_status, "variance");
+  const line = bill.match.lines[0];
+  assert.deepEqual([...line.flags].sort(), ["price_variance", "qty_variance", "short_received"]);
+  assert.equal(line.expected_cents, 8 * 300);   // received × PO price
+  assert.equal(line.invoiced_cents, 10 * 320);
+  assert.equal(line.variance_cents, 10 * 320 - 8 * 300);
+});
+
+test("3-way match reports matched when invoiced equals received at PO price", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const p = await makeProduct(app, "BILL-B", 1000);
+  const { po, lineId } = await makePoAndReceive(app, supplierId, p, 10, 300, 10);
+
+  const bill = (await call(app, "POST", `/api/purchasing/orders/${po.id}/bills`, {
+    invoiceNumber: "INV-2", lines: [{ lineId, productId: p, invoicedQty: 10, invoicedUnitCostCents: 300 }],
+  })).json;
+
+  assert.equal(bill.match.match_status, "matched");
+  assert.equal(bill.match.lines[0].matched, true);
+  assert.equal(bill.match.lines[0].flags.length, 0);
+  assert.equal(bill.match.total_variance_cents, 0);
+});
+
+test("bill cannot post until approved, and is immutable once posted", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const p = await makeProduct(app, "BILL-C", 1000);
+  const { po, lineId } = await makePoAndReceive(app, supplierId, p, 5, 200, 5);
+
+  const bill = (await call(app, "POST", `/api/purchasing/orders/${po.id}/bills`, {
+    invoiceNumber: "INV-3", lines: [{ lineId, productId: p, invoicedQty: 5, invoicedUnitCostCents: 200 }],
+  })).json;
+
+  // draft → cannot post
+  const early = await call(app, "POST", `/api/purchasing/bills/${bill.id}/post`, {});
+  assert.equal(early.status, 409);
+  assert.equal(early.json.error.code, "not_approved");
+
+  // approve → post
+  const approved = await call(app, "POST", `/api/purchasing/bills/${bill.id}/status`, { status: "approved" });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.json.status, "approved");
+
+  const posted = await call(app, "POST", `/api/purchasing/bills/${bill.id}/post`, {});
+  assert.equal(posted.status, 200);
+  assert.equal(posted.json.status, "posted");
+
+  // posted is immutable
+  const rechange = await call(app, "POST", `/api/purchasing/bills/${bill.id}/status`, { status: "held" });
+  assert.equal(rechange.status, 409);
+  assert.equal(rechange.json.error.code, "already_posted");
+});
+
+test("invoice line with no matching PO line is flagged unexpected", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app);
+  const pA = await makeProduct(app, "BILL-D", 1000);
+  const pB = await makeProduct(app, "BILL-E", 1000);
+  const { po, lineId } = await makePoAndReceive(app, supplierId, pA, 4, 250, 4);
+
+  const bill = (await call(app, "POST", `/api/purchasing/orders/${po.id}/bills`, {
+    invoiceNumber: "INV-4",
+    lines: [
+      { lineId, productId: pA, invoicedQty: 4, invoicedUnitCostCents: 250 },
+      { lineId: null, productId: pB, invoicedQty: 1, invoicedUnitCostCents: 999 }, // not on PO
+    ],
+  })).json;
+
+  assert.equal(bill.match.match_status, "variance");
+  const unexpected = bill.match.lines.find((l: any) => l.flags.includes("unexpected"));
+  assert.ok(unexpected, "expected an unexpected line");
+  assert.equal(unexpected.product_id, pB);
+  assert.equal(unexpected.invoiced_cents, 999);
+});

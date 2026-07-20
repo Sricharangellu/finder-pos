@@ -179,6 +179,26 @@ test("discount cannot exceed cart subtotal", async () => {
   assert.equal(json.netCents, 0);
 });
 
+test("list pagination: a huge ?limit is capped server-side instead of being passed through raw", async () => {
+  const app = await freshApp();
+
+  for (let i = 0; i < 3; i++) {
+    await call(app, "POST", "/api/discounts/", {
+      name: `Rule ${i}`,
+      ruleType: "simple",
+      discountType: "percent",
+      value: 5,
+      applyTo: "cart",
+      autoApplicable: true,
+    });
+  }
+
+  const huge = await call(app, "GET", "/api/discounts/?limit=99999");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.equal(huge.json.total, 3);
+  assert.equal(huge.json.items.length, 3, "capped limit still returns every matching row for a small dataset");
+});
+
 test("cashier cannot create discount (requires manager)", async () => {
   const app = await freshApp();
   const { status } = await call(app, "POST", "/api/discounts/", {

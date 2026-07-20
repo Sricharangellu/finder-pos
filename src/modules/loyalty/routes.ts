@@ -74,7 +74,7 @@ export function registerRoutes(router: Router, service: LoyaltyService, events: 
     handler(async (req, res) => {
       const ok = await service.deleteTier(String(req.params.id), tenantId(res));
       if (!ok) throw notFound(`tier '${req.params.id}' not found`);
-      res.json({ ok: true });
+      res.status(204).end();
     }),
   );
 
@@ -153,7 +153,7 @@ export function registerRoutes(router: Router, service: LoyaltyService, events: 
     handler(async (req, res) => {
       const ok = await service.deleteReward(String(req.params.id), tenantId(res));
       if (!ok) throw notFound(`reward '${req.params.id}' not found`);
-      res.json({ ok: true });
+      res.status(204).end();
     }),
   );
 }

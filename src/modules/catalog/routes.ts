@@ -499,7 +499,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       await service.deleteCategory(String(req.params.id), tenantId(res));
-      res.json({ ok: true });
+      res.status(204).end();
     }),
   );
 
@@ -533,7 +533,7 @@ export function registerRoutes(router: Router, service: CatalogService): void {
     requireRole("manager"),
     handler(async (req, res) => {
       await service.deleteImage(String(req.params.imageId), tenantId(res));
-      res.json({ ok: true });
+      res.status(204).end();
     }),
   );
 

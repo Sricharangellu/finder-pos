@@ -65,6 +65,9 @@ const giftcards = new Map<string, any>();
 // Billing: tracks payment-mutated bills/invoices, keyed by id, layered over the base seed rows below.
 const billsStore = new Map<string, any>();
 const invoicesStore = new Map<string, any>();
+// PO vendor bills (3-way match, #42): dev-only store keyed by bill id.
+const poBills = new Map<string, any>();
+let poBillSeq = 1;
 const BASE_BILLS: Record<string, any> = {
   // bil_1: 2% early-pay discount valid for 10 days — still active.
   bil_1: { id: "bil_1", tenant_id: "tnt_demo", supplier_id: "sup_acme", po_id: "po_1", bill_number: "BILL-00001", status: "open",    total_cents: 24000, paid_cents: 0,    due_date: Date.now() + 30 * 86400000, issued_at: Date.now() - 2 * 86400000, discount_pct: 2.00,  discount_date: Date.now() + 10 * 86400000, discount_applied_cents: 0 },
@@ -3325,6 +3328,70 @@ mockHandlers.push(
     list.push(adj);
     billingAdjs.set(String(params.id), list);
     return HttpResponse.json(adj, { status: 201 });
+  }),
+
+  // PO bills · 3-way match (#42). Dev store; the real backend computes the match
+  // against actual ordered/received quantities.
+  http.get(`${V1}/purchasing/orders/:id/bills`, async ({ params }) => {
+    await lat();
+    const items = [...poBills.values()]
+      .filter((b) => b.po_id === String(params.id))
+      .map((b) => ({ id: b.id, po_id: b.po_id, invoice_number: b.invoice_number, invoice_date: b.invoice_date, total_cents: b.total_cents, status: b.status, created_at: b.created_at }))
+      .sort((a, b) => b.created_at - a.created_at);
+    return HttpResponse.json({ items });
+  }),
+
+  http.post(`${V1}/purchasing/orders/:id/bills`, async ({ params, request }) => {
+    await lat();
+    const b = (await request.json()) as { invoiceNumber: string; invoiceDate?: number | null; documentId?: string | null; taxCents?: number; lines: Array<{ lineId?: string | null; productId: string; productName?: string | null; invoicedQty: number; invoicedUnitCostCents: number }> };
+    const now = Date.now();
+    const id = `bill_${poBillSeq++}`;
+    const subtotal = b.lines.reduce((s, l) => s + l.invoicedQty * l.invoicedUnitCostCents, 0);
+    const tax = b.taxCents ?? 0;
+    const total = subtotal + tax;
+    // Dev match: with no PO reference here, treat invoiced as expected (matched).
+    const lines = b.lines.map((l) => ({
+      line_id: l.lineId ?? null, product_id: l.productId, product_name: l.productName ?? l.productId,
+      ordered_qty: l.invoicedQty, received_qty: l.invoicedQty, invoiced_qty: l.invoicedQty,
+      po_unit_cost_cents: l.invoicedUnitCostCents, invoiced_unit_cost_cents: l.invoicedUnitCostCents,
+      expected_cents: l.invoicedQty * l.invoicedUnitCostCents, invoiced_cents: l.invoicedQty * l.invoicedUnitCostCents,
+      variance_cents: 0, flags: [] as string[], matched: true,
+    }));
+    const bill = {
+      id, po_id: String(params.id), invoice_number: b.invoiceNumber, invoice_date: b.invoiceDate ?? null,
+      document_id: b.documentId ?? null, subtotal_cents: subtotal, tax_cents: tax, total_cents: total,
+      status: "draft", created_at: now, updated_at: now,
+      match: { match_status: "matched", expected_cents: subtotal, invoiced_subtotal_cents: subtotal, total_variance_cents: tax, lines },
+    };
+    poBills.set(id, bill);
+    return HttpResponse.json(bill, { status: 201 });
+  }),
+
+  http.get(`${V1}/purchasing/bills/:billId`, async ({ params }) => {
+    await lat();
+    const bill = poBills.get(String(params.billId));
+    if (!bill) return HttpResponse.json({ error: { code: "not_found", message: "bill not found", requestId: rid() } }, { status: 404 });
+    return HttpResponse.json(bill);
+  }),
+
+  http.post(`${V1}/purchasing/bills/:billId/status`, async ({ params, request }) => {
+    await lat();
+    const bill = poBills.get(String(params.billId));
+    if (!bill) return HttpResponse.json({ error: { code: "not_found", message: "bill not found", requestId: rid() } }, { status: 404 });
+    if (bill.status === "posted") return HttpResponse.json({ error: { code: "already_posted", message: "a posted bill cannot be changed", requestId: rid() } }, { status: 409 });
+    const b = (await request.json()) as { status: "approved" | "held" };
+    bill.status = b.status; bill.updated_at = Date.now();
+    return HttpResponse.json(bill);
+  }),
+
+  http.post(`${V1}/purchasing/bills/:billId/post`, async ({ params }) => {
+    await lat();
+    const bill = poBills.get(String(params.billId));
+    if (!bill) return HttpResponse.json({ error: { code: "not_found", message: "bill not found", requestId: rid() } }, { status: 404 });
+    if (bill.status === "posted") return HttpResponse.json({ error: { code: "already_posted", message: "bill is already posted", requestId: rid() } }, { status: 409 });
+    if (bill.status !== "approved") return HttpResponse.json({ error: { code: "not_approved", message: "bill must be approved before it can be posted", requestId: rid() } }, { status: 409 });
+    bill.status = "posted"; bill.updated_at = Date.now();
+    return HttpResponse.json(bill);
   }),
 
   // Vendor credits: override GET to support poId filter and use shared store

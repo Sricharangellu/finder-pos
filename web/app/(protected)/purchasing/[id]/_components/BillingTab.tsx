@@ -7,6 +7,7 @@ import { apiGet, apiPost } from "@/api-client/client";
 import { formatMoney, parseToCents } from "@/lib/money";
 import { fmtDate } from "@/lib/date";
 import { fmtBytes, docTypeLabel, type BillingAdj, type PODocument, type PurchaseOrderDetail } from "./shared";
+import { BillsSection } from "./BillsSection";
 
 export function BillingTab({
   orderId,
@@ -178,6 +179,10 @@ export function BillingTab({
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border border-slate-200 p-4">
+        <BillsSection order={order} canManage={canManage} documents={documents} />
+      </div>
 
       <Modal open={landedOpen} onClose={() => setLandedOpen(false)} title="Landed Costs" size="sm"
         footer={
