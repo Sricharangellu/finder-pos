@@ -139,6 +139,17 @@ test("list deposits and get by id", async () => {
   assert.equal(got.json.total_cents, 10000);
 });
 
+test("list deposits: a huge ?limit is capped server-side instead of being passed through raw", async () => {
+  const app = await freshApp();
+  await call(app, "POST", "/api/accounting/accounts/seed", {});
+  await call(app, "POST", "/api/accounting/deposits", { totalCents: 1000 });
+  await call(app, "POST", "/api/accounting/deposits", { totalCents: 2000 });
+
+  const huge = await call(app, "GET", "/api/accounting/deposits?limit=99999");
+  assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
+  assert.equal(huge.json.items.length, 2, "capped limit still returns every matching row for a small dataset");
+});
+
 test("list deposits filtered by status", async () => {
   const app = await freshApp();
   await call(app, "POST", "/api/accounting/accounts/seed", {});

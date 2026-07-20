@@ -196,9 +196,19 @@ export class AccountingService {
     return { ...dep, items };
   }
 
-  async listDeposits(tenantId: string, status?: DepositStatus): Promise<BatchDeposit[]> {
-    if (status) return this.db.query<BatchDeposit>("SELECT * FROM batch_deposits WHERE tenant_id = @t AND status = @s ORDER BY created_at DESC LIMIT 500", { t: tenantId, s: status });
-    return this.db.query<BatchDeposit>("SELECT * FROM batch_deposits WHERE tenant_id = @t ORDER BY created_at DESC LIMIT 500", { t: tenantId });
+  async listDeposits(tenantId: string, opts: { status?: DepositStatus; limit?: number; offset?: number } = {}): Promise<BatchDeposit[]> {
+    const limit = Math.min(opts.limit ?? 500, 500);
+    const offset = opts.offset ?? 0;
+    if (opts.status) {
+      return this.db.query<BatchDeposit>(
+        "SELECT * FROM batch_deposits WHERE tenant_id = @t AND status = @s ORDER BY created_at DESC LIMIT @limit OFFSET @offset",
+        { t: tenantId, s: opts.status, limit, offset },
+      );
+    }
+    return this.db.query<BatchDeposit>(
+      "SELECT * FROM batch_deposits WHERE tenant_id = @t ORDER BY created_at DESC LIMIT @limit OFFSET @offset",
+      { t: tenantId, limit, offset },
+    );
   }
 
   async getDeposit(id: string, tenantId: string): Promise<BatchDeposit & { items: BatchDepositItem[] }> {

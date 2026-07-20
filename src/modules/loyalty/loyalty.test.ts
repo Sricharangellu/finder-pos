@@ -103,8 +103,7 @@ test("loyalty tiers: manager creates, lists, updates, deletes", async () => {
   assert.equal(Number(patch.json.discount_pct), 7.5);
 
   const del = await call(app, "DELETE", `/api/loyalty/tiers/${tier.id}`);
-  assert.equal(del.status, 200);
-  assert.deepEqual(del.json, { ok: true });
+  assert.equal(del.status, 204);
 
   const after = await call(app, "GET", "/api/loyalty/tiers");
   assert.equal(after.json.items.length, 0);
@@ -276,7 +275,7 @@ test("loyalty rewards: manager creates/updates/deletes, status filter works", as
   assert.equal(inactiveList.json.items.length, 1);
 
   const del = await call(app, "DELETE", `/api/loyalty/rewards/${rewardId}`);
-  assert.equal(del.status, 200);
+  assert.equal(del.status, 204);
   const missing = await call(app, "GET", `/api/loyalty/rewards`);
   assert.equal(missing.json.items.length, 0);
 });

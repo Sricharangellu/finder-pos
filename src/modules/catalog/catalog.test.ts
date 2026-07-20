@@ -260,7 +260,7 @@ test("category tree: create, nest, assign to product, and delete reparents child
 
   // Deleting the root reparents the child to null rather than orphaning it.
   const del = await call(app, "DELETE", `/api/catalog/categories/${root.json.id}`);
-  assert.equal(del.status, 200);
+  assert.equal(del.status, 204);
   const childAfter = await call(app, "GET", "/api/catalog/categories");
   const reparented = childAfter.json.items.find((c: any) => c.id === child.json.id);
   assert.equal(reparented.parent_id, null);

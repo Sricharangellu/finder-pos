@@ -9,6 +9,11 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function readInt(val: unknown, fallback: number): number {
+  const n = Number(val);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
 const createSchema = z.object({
   name: z.string().min(1),
   couponCode: z.string().min(1).optional(),
@@ -50,7 +55,9 @@ export function registerRoutes(router: Router, service: DiscountsService): void 
   }));
   router.get("/", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? (req.query.status as RuleStatus) : undefined;
-    res.json({ items: await service.list(tenantId(res), status) });
+    const limit = readInt(req.query.limit, 50);
+    const offset = readInt(req.query.offset, 0);
+    res.json(await service.list(tenantId(res), { status, limit, offset }));
   }));
   router.get("/:id", handler(async (req, res) => {
     res.json(await service.get(String(req.params.id), tenantId(res)));

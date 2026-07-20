@@ -8,6 +8,12 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+/** Parse+cap a `limit` query param; falls back to `fallback` on missing/invalid (NaN) input. */
+function cappedLimit(raw: unknown, fallback: number, max = 500): number {
+  const n = typeof raw === "string" ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), max) : fallback;
+}
+
 /** Map a `range` query param (today | 7d | 30d | all) to an epoch-ms lower bound. */
 function sinceFromRange(req: Request): number | undefined {
   const range = typeof req.query.range === "string" ? req.query.range : "all";
@@ -38,7 +44,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
   router.get(
     "/top-products",
     handler(async (req, res) => {
-      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+      const limit = cappedLimit(req.query.limit, 10);
       res.json({ items: await service.topProducts(tenantId(res), sinceFromRange(req), limit) });
     }),
   );
@@ -134,7 +140,7 @@ export function registerRoutes(router: Router, service: ReportsService): void {
 
   // GET /api/v1/reports/sales-by-product?range=…&limit=…
   router.get("/sales-by-product", handler(async (req, res) => {
-    const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
+    const limit = cappedLimit(req.query.limit, 20);
     const items = await service.salesByProduct(tenantId(res), sinceFromRange(req), limit);
     res.json({ items });
   }));

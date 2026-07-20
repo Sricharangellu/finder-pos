@@ -9,6 +9,11 @@ function tenantId(res: Response): string {
   return (res.locals["auth"] as AuthPayload).tenantId;
 }
 
+function readInt(val: unknown, fallback: number): number {
+  const n = Number(val);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
 const accountSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1),
@@ -100,7 +105,9 @@ export function registerRoutes(router: Router, service: AccountingService): void
   }));
   router.get("/deposits", handler(async (req, res) => {
     const status = typeof req.query.status === "string" ? (req.query.status as DepositStatus) : undefined;
-    res.json({ items: await service.listDeposits(tenantId(res), status) });
+    const limit = readInt(req.query.limit, 500);
+    const offset = readInt(req.query.offset, 0);
+    res.json({ items: await service.listDeposits(tenantId(res), { status, limit, offset }) });
   }));
   router.get("/deposits/:id", handler(async (req, res) => {
     res.json(await service.getDeposit(String(req.params.id), tenantId(res)));

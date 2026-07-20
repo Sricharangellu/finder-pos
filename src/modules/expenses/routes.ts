@@ -77,7 +77,7 @@ export function registerRoutes(router: Router, service: ExpensesService): void {
 
   // DELETE /api/v1/expenses/:id — correction (manager+). Audited in the service.
   router.delete("/:id", mgr, handler(async (req, res) => {
-    const removed = await service.remove(String(req.params.id), tenantId(res), actorId(res));
-    res.json({ ok: true, id: removed.id });
+    await service.remove(String(req.params.id), tenantId(res), actorId(res));
+    res.status(204).end();
   }));
 }
