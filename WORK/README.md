@@ -34,14 +34,19 @@ created anywhere else in the repo.
 | File | Kind | Write policy |
 |---|---|---|
 | `README.md` | Folder rules | Override only when the rules themselves change |
-| `RULES.md` | Build rules: prime directive, domain rules, definition of done, per-task prompt, readiness matrix | Matrix updated with new evidence only; rules change only on Sri's directive |
-| `WORK_STATE.md` | Live session state (active task, files in flight, decisions, next actions, blockers) | Override in place after every commit |
 | `LOCK.md` | Multi-agent coordination lock: active queue item, owner, files/areas, status | Update at session start and end; never ignore an active overlapping lock |
 | `FORWARD_PLAN.md` | Authoritative phase-based plan + release gates + audit prompt | Override only when the plan genuinely changes |
+| `LOOP_PROTOCOL.md` | Autonomous-loop program (re-read each wake) | Override only when the loop mechanics change |
+| `LOOP_STATE.md` | **THE single live work-updates file**: heartbeat, iteration log, backlog, NEEDS-SRI list, delivery/release status | Override in place every iteration; all status/pipeline/session updates go HERE — never a new file |
 | `FOUNDATION_HARDENING.md` | Queued whole-repo cleanup/consolidation/wiring initiative (run exclusively) | Update its progress log as sections complete |
-| `FUNCTIONAL_REBRAND_PLAN.md` | Queued initiative: rename remaining functional `finder_*`/`finder-pos.*` identifiers (cookies, storage keys, live URLs, demo creds) to Ascend — phased, zero-downtime sequence | Planning only until claimed; update in place as phases execute, never fork a variant |
 | `audits/AUDIT_<UTC-ISO>-<slug>.md` | Immutable audit snapshots + readiness matrices, archived under `WORK/audits/` | Append-only during its session; never edited after. **Name with a UTC timestamp + slug — NOT the next-free letter** (letters collide between parallel sessions) |
 
-Session read order is: `README.md` → `RULES.md` → `WORK_STATE.md` → `FORWARD_PLAN.md` →
-newest audit in `WORK/audits/`. Historical `WORK/AUDIT_*.md` references in older docs now
-resolve under `WORK/audits/`.
+Removed 2026-07-19 (Sri's consolidation directive — one entry point, one work-updates
+file): `RULES.md`/`WORK_STATE.md` (long gone; rows were stale), `FUNCTIONAL_REBRAND_PLAN.md`
+(executed — all four rebrand branches merged via PRs #76/#80 et al.; plan preserved in git
+history), `PIPELINE.md` (short-lived status file, content folded into `LOOP_STATE.md`;
+the pipeline *rulebook* is `docs/architecture/PIPELINE.md`).
+
+Session read order is: `README.md` → `AGENTS.md` (repo root — the single agent entry
+point) → `LOOP_STATE.md` → `FORWARD_PLAN.md` → newest audit in `WORK/audits/`.
+Historical `WORK/AUDIT_*.md` references in older docs now resolve under `WORK/audits/`.
