@@ -2,7 +2,7 @@ import type { Router, Response } from "express";
 import { z } from "zod";
 import { handler, parseBody, notFound } from "../../shared/http.js";
 import type { AuthPayload } from "../../gateway/auth.js";
-import { requireRole } from "../../gateway/auth.js";
+import { requireRole, requireCapability } from "../../gateway/auth.js";
 import type { CustomersService } from "./service.js";
 
 function tenantId(res: Response): string {
@@ -240,21 +240,25 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     isPrimary: z.boolean().optional(),
   });
 
-  router.get("/:id/contacts", handler(async (req, res) => {
+  // Business-account contacts are a wholesale (B2B) concept — strict package
+  // separation (WP 08): tenants without the wholesale capability get 403 and
+  // never learn the surface exists. Addresses/notes/loyalty stay open — those
+  // are retail-legitimate (delivery, ecommerce).
+  router.get("/:id/contacts", requireCapability("wholesale"), handler(async (req, res) => {
     res.json({ items: await service.listContacts(String(req.params.id), tenantId(res)) });
   }));
 
-  router.post("/:id/contacts", handler(async (req, res) => {
+  router.post("/:id/contacts", requireCapability("wholesale"), handler(async (req, res) => {
     const body = parseBody(addContactSchema, req.body);
     res.status(201).json(await service.addContact(String(req.params.id), tenantId(res), body));
   }));
 
-  router.patch("/:id/contacts/:contactId", handler(async (req, res) => {
+  router.patch("/:id/contacts/:contactId", requireCapability("wholesale"), handler(async (req, res) => {
     const body = parseBody(addContactSchema.partial(), req.body);
     res.json(await service.updateContact(String(req.params.contactId), tenantId(res), body));
   }));
 
-  router.delete("/:id/contacts/:contactId", handler(async (req, res) => {
+  router.delete("/:id/contacts/:contactId", requireCapability("wholesale"), handler(async (req, res) => {
     await service.deleteContact(String(req.params.contactId), tenantId(res));
     res.status(204).end();
   }));
@@ -329,8 +333,11 @@ export function registerRoutes(router: Router, service: CustomersService): void 
     priceCents: z.number().int().nonnegative(),
   });
 
+  // Customer-specific pricing is a wholesale (B2B) concept — the exact
+  // "customer price levels" strict retail separation forbids. Capability-gated
+  // like contacts above; retail tenants never see these routes exist.
   // GET  /:id/product-prices — list all overrides for this customer
-  router.get("/:id/product-prices", handler(async (req, res) => {
+  router.get("/:id/product-prices", requireCapability("wholesale"), handler(async (req, res) => {
     const rows = await service.listPriceOverrides(String(req.params.id), tenantId(res));
     res.json({ items: rows });
   }));
@@ -338,6 +345,7 @@ export function registerRoutes(router: Router, service: CustomersService): void 
   // POST /:id/product-prices — upsert a price override (manager only)
   router.post(
     "/:id/product-prices",
+    requireCapability("wholesale"),
     requireRole("manager"),
     handler(async (req, res) => {
       const body = parseBody(priceOverrideSchema, req.body);
@@ -354,6 +362,7 @@ export function registerRoutes(router: Router, service: CustomersService): void 
   // DELETE /:id/product-prices/:productId — remove a price override (manager only)
   router.delete(
     "/:id/product-prices/:productId",
+    requireCapability("wholesale"),
     requireRole("manager"),
     handler(async (req, res) => {
       await service.deletePriceOverride(
@@ -367,7 +376,7 @@ export function registerRoutes(router: Router, service: CustomersService): void 
 
   // GET /product-prices/lookup?customerId=&productId= — price resolution at POS
   // Returns the resolved price for a customer + product combination.
-  router.get("/product-prices/lookup", handler(async (req, res) => {
+  router.get("/product-prices/lookup", requireCapability("wholesale"), handler(async (req, res) => {
     const customerId = typeof req.query.customerId === "string" ? req.query.customerId : undefined;
     const productId  = typeof req.query.productId  === "string" ? req.query.productId  : undefined;
     if (!customerId || !productId) {
