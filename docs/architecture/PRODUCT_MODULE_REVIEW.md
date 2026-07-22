@@ -72,14 +72,26 @@ Cognitive-load problems that are real (not hypothetical Shopify-comparison items
 
 ## 3. Architecture recommendations
 
-1. **Unify the batch/expiry model.** `product_batches` and `inventory_lots` should
-   become one table. `inventory_lots` is the more complete model (already wired
-   to receive/FEFO/the Expiry Pool sweep/discard/return-to-vendor actions) —
-   migrate `product_batches`' rows into `inventory_lots` (mapping `batch_number`,
-   `qty`→`qty_on_hand`, `cost_cents`→`unit_cost_cents`), then retire
-   `product_batches` and its `/inventory/expiry` page, redirecting it to
-   `/inventory/expiry-pool`. This is a real data migration, not a UI trim —
-   estimate below.
+1. **Retire `/inventory/expiry`, do NOT migrate its data into `inventory_lots`
+   (corrected after investigation, 2026-07-21).** This section originally
+   proposed backfilling `product_batches` rows into `inventory_lots` as a
+   straightforward table merge. Reading `product_batches/service.ts` closely
+   before writing that migration surfaced a real risk it missed: `createBatch`
+   never touches `inventory_stock`/`inventory` at all — a "batch" created
+   through `/inventory/expiry` has **zero relationship to real on-hand
+   quantity anywhere else in the system**. `inventory_lots`, by contrast, is
+   the live operational ledger — its `qty_on_hand` is depleted by real sales
+   (FEFO), credited by the real receive pipeline, and swept into
+   `expiry_writeoffs` with accounting loss entries. Backfilling
+   `product_batches.qty` into `inventory_lots.qty_on_hand` would have injected
+   **phantom sellable stock** into the real depletion engine — quantities a
+   user typed into a form, not stock that was ever actually received. Sri
+   confirmed: retire the disconnected page (redirect `/inventory/expiry` →
+   `/inventory/expiry-pool`), leave the `product_batches` table and any
+   existing rows untouched (no data loss, no migration, no phantom-stock
+   risk). If a real need for a standalone batch-tracking feature resurfaces,
+   it should be built to actually credit `inventory_stock` on creation, not
+   merged into the FEFO engine's own ledger.
 2. **Build one shared `DataGrid` component** (sort, filter, pagination with a
    page-size selector, column visibility, row selection) to replace the
    4+ hand-rolled table implementations. This is the single highest-leverage
@@ -106,9 +118,9 @@ Cognitive-load problems that are real (not hypothetical Shopify-comparison items
 - **Fix the `/inventory/transfers` redirect** to point at `/inventory?tab=transfers`
   instead of `/operations` — a one-line, zero-risk correctness fix for a broken
   navigation path.
-- **Batch/expiry unification** (above) removes a real correctness risk: today,
-  writing off expired stock via one page does not update the number shown on a
-  different page for the same product, because they read different tables.
+- **Retiring `/inventory/expiry`** (above) removes a worse correctness risk
+  than "two pages disagree" — it was actively misleading users into thinking a
+  manually-entered batch quantity reflected real stock, when it never did.
 
 ---
 
@@ -153,9 +165,10 @@ future review, not fixed here.
 the real transfers tab instead of deleting the route (it's a reasonable URL
 for users to expect).
 
-**Consolidate (schema-level merge, bigger effort — see §12 roadmap):**
-`/inventory/expiry` (product_batches) into `/inventory/expiry-pool`
-(inventory_lots) once the batch/expiry unification (§3.1) ships.
+**Retire, don't merge (corrected 2026-07-21, see §3.1):** `/inventory/expiry`
+now redirects to `/inventory/expiry-pool`. No schema merge — `product_batches`
+was never tied to real stock, so there's nothing safe to merge; the table and
+its rows are left untouched, just no longer surfaced through this page.
 
 **Do NOT merge** (each already has a distinct real backend, despite living
 inside `/catalog/:id`'s 15 tabs): Pricing, Purchasing, Expiry, Media, Compliance,
@@ -209,22 +222,17 @@ unlinked.
 
 | Change | Migration shape |
 |---|---|
-| Batch/expiry unification | Additive `INSERT INTO inventory_lots (...) SELECT ... FROM product_batches` backfill (idempotent, matches the existing `inventory_stock` backfill pattern at `inventory/index.ts:190-212`), then stop writing to `product_batches` from the frontend. Table itself can be dropped in a LATER migration once confirmed unused — never drop-and-backfill in the same release. |
-| Everything else in this doc | **Zero schema changes.** Route removal, redirect fix, nav links, and the shared DataGrid component are all frontend-only. |
+| Everything in this doc, including the retired `/inventory/expiry` page | **Zero schema changes.** `product_batches` and its rows are left exactly as they were — no migration, no backfill, no drop. Route removal, redirect fixes, nav links, `Pagination`/keyset-cursor work, and tab-bar labels are all frontend/route-layer only. |
 
 ---
 
 ## 10. API changes
 
-**None required** for the safe cleanup (§6/§4 items) — all fixes are frontend
-routing/component work against existing endpoints.
-
-For the batch/expiry unification: `product_batches`' 5 routes
-(`GET/POST /product-batches*`, `PATCH/DELETE /product-batches/:id`) get
-deprecated (return a 410 pointing at the inventory module's `/expiry*` routes)
-after the data migration and frontend cutover, per [[DESIGN_PRINCIPLES]]'s
-additive-only API contract rule — never silently remove a route without a
-deprecation window.
+**None required anywhere in this doc.** The `product_batches` backend module
+(routes, service, table) is untouched — only the frontend page that surfaced
+it was retired. Its 5 routes remain live and unchanged in case anything else
+ever calls them directly; no deprecation window needed since nothing was
+removed from the API surface.
 
 ---
 
@@ -253,9 +261,9 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 | 1 | Remove 6 dead/duplicate routes; fix `/inventory/transfers` redirect; add 4 orphaned pages to nav | Nothing — **shipped** (PR #106) |
 | 2 | `Pagination` component; adopted in `ProductsTab.tsx` (fixes the "can't reach product 51" issue) | Nothing — **shipped** (PR #106) |
 | 3 | Group labels on `catalog/[id]/page.tsx`'s existing tab-divider mechanism (corrected scope, see §7/8) | Nothing — **shipped** |
-| 4 | Extend pagination to `inventory/page.tsx`'s transfers/returns lists, `promotions/page.tsx`, `pricing/page.tsx` | Needs backend work first for most of these (transfers has no `limit`/`offset` support at all; purchasing orders uses cursor pagination, a different shape) — NOT a simple frontend adoption like Phase 2 was |
-| 5 | Batch/expiry data migration + cutover + old-route deprecation | Nothing blocking, but highest-risk — do last, alone, with its own verification pass |
-| — | Consolidate `Product`/`CatalogProduct` types | Can happen any time; touches both list and detail views, so do after Phase 4 lands to avoid merge churn |
+| 4 | Keyset cursor pagination added to `inventory.listTransfers` (was a flat `LIMIT 200`, worse than catalog's gap — no pagination mechanism at all); shared "Load more" button wired across `/inventory`'s Orders/Transfers/Returns tabs, all three now the same envelope shape | Nothing — **shipped** (PR #108) |
+| 5 | ~~Batch/expiry data migration~~ → **retired `/inventory/expiry`, no migration** (corrected 2026-07-21, see §3.1): investigation before writing the migration found `product_batches` has zero connection to real stock — merging it into `inventory_lots` would have injected phantom sellable quantity into the live FEFO engine. Redirected the page instead; `product_batches` table/data untouched | Nothing — **shipped** |
+| — | Consolidate `Product`/`CatalogProduct` types | Can happen any time; touches both list and detail views. Only remaining item from this review with no fixed priority yet |
 
 ---
 
@@ -265,10 +273,10 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 |---|---|
 | **Critical** | Pagination on `ProductsTab` (Phase 2) — real usability ceiling on any catalog >50 items — **done** |
 | **High** | Dead-route removal + broken transfers redirect fix (Phase 1) — zero risk — **done** |
-| **High** | Batch/expiry unification (Phase 5) — real data-correctness/reconciliation risk — not started |
+| **High** | Retire `/inventory/expiry` (Phase 5, redefined) — was silently misleading users with phantom-stock-looking data — **done** |
 | **Medium** | Tab-bar group labels (Phase 3) — real cognitive-load win, no correctness risk — **done** |
 | **Medium** | Nav visibility fixes for orphaned pages (Phase 1) — **done** |
-| **Medium** | Extend pagination to remaining list pages (Phase 4) — needs backend pagination work first, see roadmap |
+| **Medium** | Keyset pagination for `inventory` transfers/returns + shared Load-more (Phase 4) — **done** |
 | **Low** | `Product`/`CatalogProduct` type consolidation — maintenance hygiene, no user-facing effect |
 | **Deferred (NEEDS-SRI)** | Everything in §5's table — no build without a business decision first |
 
@@ -282,8 +290,8 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
 | Nav links for orphaned pages | **Trivial** (hours) | Config-only change in `EnterpriseShell.tsx` — **done** |
 | `Pagination` component + `ProductsTab` adoption | **Small** (under a day, smaller than originally estimated) | Backend already supported `limit`/`offset` — just needed a reusable control + wiring, not a full data-grid rewrite — **done** |
 | Tab-bar group labels | **Trivial** (under an hour, smaller than originally estimated) | Once the code was read, a full two-level bar wasn't justified — the existing divider mechanism just needed a label, not a rewrite — **done** |
-| Extend pagination to other list pages | **Medium** | Needs backend `limit`/`offset` added to `inventory` transfers/returns first (currently unbounded `listTransfers()`), and a decision on whether purchasing's cursor-based orders list gets its own paging UI treatment |
-| Batch/expiry unification | **Large** (the biggest item here) | Real data migration across tenants, a frontend cutover, an API deprecation window, and careful verification that nothing silently loses expiry data mid-migration |
+| Keyset pagination for `inventory` transfers | **Small** (much smaller than originally estimated) | `listTransfers` just needed the same `shared/pagination.ts` pattern already used by `listMovements`/`listOrders`/`listReturns` — a few lines, not a redesign — **done** |
+| Retire `/inventory/expiry` | **Trivial** (much smaller than the original "Large" migration estimate) | Investigation revealed the "migration" would have been actively dangerous (phantom stock), not just large — the real fix was a redirect, zero data movement — **done** |
 | Type consolidation | **Small** | Mechanical, but touches many call sites — needs a full typecheck pass |
 
 ---
@@ -299,24 +307,38 @@ etc.) — none of them are being rewritten, only re-grouped in the parent tab ba
                2 parallel expiry systems that don't agree with each other
 ```
 
-**After (this roadmap, fully executed):**
+**After (shipped, PRs #106–#108 + the expiry retirement):**
 ```
-/catalog ──▶ /catalog/:id (5 grouped sections, DataGrid pagination throughout)
+/catalog ──▶ /catalog/:id (15 tabs, now labeled into 5 groups; ProductsTab
+              has real page-size pagination — was hard-capped at 50)
 /inventory ──▶ 9 real routes, all linked in nav, transfers redirect fixed,
-               ONE expiry system (inventory_lots / Expiry Pool)
+               transfers/orders/returns share one keyset-paginated envelope,
+               /inventory/expiry retired (redirects to the real system —
+               product_batches was never tied to actual stock, so there was
+               nothing safe to merge, only a misleading page to stop showing)
 ```
 
 ---
 
 ## 16. Final recommendation
 
-Ship Phase 1 (dead-route removal, redirect fix, nav links) immediately — it is
-zero-risk and directly answers "can this be merged/removed" with real,
-verified duplication, not guesswork. Follow with the `DataGrid` component
-(Phase 2-3) because it is the single highest-leverage fix for enterprise-scale
-catalogs and unblocks the page-size/density/column asks from the original
-prompt without inventing five separate implementations. Treat the batch/expiry
-unification as its own careful, isolated release given it is a real data
-migration. Defer Phase 17's larger feature wishlist to NEEDS-SRI — Ascend's
-current bottleneck, per this audit's actual evidence, is duplication and
-missing pagination, not a shortage of PLM/AI/kit-building features.
+Shipped in dependency order: Phase 1 (dead-route removal, redirect fix, nav
+links) first since it was zero-risk and answered "can this be merged/removed"
+with verified duplication, not guesswork. Then the `Pagination` component
+adopted in `ProductsTab` — the single highest-priority fix, since catalogs
+over 50 items had no way to reach the rest of their inventory at all. Then
+tab-bar group labels, corrected down from an originally-proposed full
+two-level rewrite once the existing code turned out to already have most of
+the needed structure. Then keyset pagination for `inventory` transfers, which
+turned out to have *no* pagination at all (worse than catalog's unused-support
+gap). The batch/expiry item is the clearest lesson from this review: the
+original recommendation (migrate `product_batches` into `inventory_lots`) was
+sound-looking from a schema comparison alone, but reading the actual service
+code before writing the migration surfaced that `product_batches` was never
+wired to real stock — merging it would have created phantom sellable
+inventory. The fix that shipped (retire the page, touch no data) was smaller,
+safer, and only findable by reading the code, not by comparing table shapes.
+Defer Phase 17's larger feature wishlist to NEEDS-SRI — Ascend's current
+bottleneck, per this audit's actual evidence, was duplication, missing
+pagination, and one actively misleading page, not a shortage of
+PLM/AI/kit-building features.
