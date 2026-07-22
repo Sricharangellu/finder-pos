@@ -1,0 +1,72 @@
+# Reports Module — Enterprise UX/Architecture Review
+
+Grounded, code-verified review of everything under `/reports`, `/reporting`,
+and the Reports backend module, on `develop` as of 2026-07-22. Same rigor as
+[`PRODUCT_MODULE_REVIEW.md`](PRODUCT_MODULE_REVIEW.md): every finding cites a
+real file/route/table, and the priority order is set by actual severity found
+in the code, not a generic enterprise-report checklist.
+
+---
+
+## 1. Findings, most severe first
+
+| # | Finding | Severity | Evidence |
+|---|---|---|---|
+| 1 | **`/reports/sales`'s three tabs (By Category / By Customer / By Product) render broken data on every row** — the frontend's expected field names don't match what the backend actually returns. `CategoryTable` reads `item.category`/`item.orderCount`/`item.qty`/`item.revenue`, but `GET /sales-by-category` returns `{key, name, units, revenueCents}` — **zero overlapping field names**. Every cell renders `undefined`, and `formatMoney(undefined)` renders `NaN`. Same class of bug on the Customer tab (`item.customer_id` used as both React key and a `/customers/undefined` link href) and the Product tab (`item.id` → `/catalog/undefined`, plus `item.sku`/`.category`/`.qty` all undefined — it's calling `/top-products`, whose real shape is `{productId, name, units, revenueCents}`, not the `/sales-by-product` endpoint the field names actually match). Only the revenue-trend chart at the top of the page is unaffected. | **Critical** | `web/app/(protected)/reports/sales/page.tsx:30-51,363-449` vs `src/modules/reports/service.ts:107-112` (`SalesByGroup`) and `web/api-client/types.ts:489-494` (`TopProduct`) |
+| 2 | **Finance page's "Aging" tab is unreachable dead code that also wastes a fetch.** Clicking "Aging" both sets local tab state and calls `router.replace("/reporting/ar-aging")` in the same handler — the navigation always wins, so the inline AR+AP combined view (`finance/page.tsx:483-499`, fed by `arAging`/`apAging` state fetched unconditionally on every page load) is never actually shown to the user. They're redirected instead to a page that shows **only AR**, silently dropping the AP half of what they were looking for. | **Critical** | `web/app/(protected)/finance/page.tsx:241-242,333,483-499` |
+| 3 | **All 8 dashboard KPI cards link to the same page/tab regardless of which metric was clicked.** Each `KpiCard` on the dashboard has a distinct `reportHref` (`?metric=revenue`, `?metric=sale_count`, etc. — `DashboardKpiSection.tsx:81-102`), but `/reports/sales` never reads `metric` from its URL at all — every click lands on the same default "By Category" tab. A 9th KPI card ("Avg Order Value") has no `reportHref` at all and links nowhere. | **High** | `web/app/(protected)/dashboard/_components/DashboardKpiSection.tsx:81-104`; confirmed no `useSearchParams`/`metric` handling anywhere in `reports/sales/page.tsx` |
+| 4 | **4 backend routes have no LIMIT/pagination at all** — always return the tenant's entire result set: `ar-aging`, `ap-aging`, `inventory-valuation`, `sales-by-customer`. Same class of gap as [[PRODUCT_MODULE_REVIEW]]'s `listTransfers` finding, but worse here — those had at least a flat cap; these have none. | **High** | `src/modules/reports/service.ts:458 (arAging), 496 (apAging), 649 (inventoryValuation), 534 (salesByCustomer)` — no `LIMIT` clause in any of the 4 |
+| 5 | **`daily_sales_summary` is read but never written** — the dashboard's 7-day sparkline queries this table (`service.ts:368-378`), but no code anywhere inserts into it; `aggregateDailySales()` (the only method that computes the relevant numbers) only returns them, never persists. The sparkline silently renders nothing (`Sparkline` returns `null` below 2 data points) — not a crash, but a permanently-empty feature with no error surfaced. Two sibling tables, `product_sales_summary` and `fiscal_periods`, have **zero references anywhere** outside their own `CREATE TABLE` statement — fully dead. | **Medium** (silently broken, not crashing) | `src/modules/reports/index.ts:6-58` (all 3 tables); `src/modules/reports/service.ts:368-378,755-775`; corroborated by `docs/ENTERPRISE_ARCHITECTURE.md:669-681`'s own "DB-9: CQRS read model" gap entry |
+| 6 | **Time Cards silently truncates at 500 rows with zero indication.** The route accepts no `limit` param at all; the service hardcodes `LIMIT 500` in SQL. A tenant with >500 time entries in a selected range loses rows with no "showing 500 of N" message, no warning, nothing. | **Medium** | `src/modules/reports/routes.ts:205-211`, `service.ts:813` |
+| 7 | **Inventory Valuation is fetched and rendered twice from the same unbounded query** — once embedded on `/reports` Overview (`InventoryValuationSection.tsx`, no `.slice()`, renders every row), once again as its own dedicated page at `/reports/inventory`. Same data, two separate fetches, no cache between them. | **Medium** | `reports/_components/InventoryValuationSection.tsx:11-19,63-79` vs `reports/inventory/page.tsx:100-102` |
+| 8 | **AR/AP aging fetched independently in 4 separate places**: the dedicated `/reports/ar-aging` page, its `/reporting/ar-aging` alias, `finance/page.tsx` (both AR+AP, unconditionally on load, feeding the dead tab from #2), and `accounting/page.tsx` (also both, unconditionally). No shared cache; 4x the query load for what's conceptually one dataset. | **Medium** | `reports/ar-aging/page.tsx:72`, `finance/page.tsx:241-242`, `accounting/page.tsx:60-63` |
+| 9 | **No page-size control anywhere in Reports**, matching the Catalog/Inventory pattern — but worse in 3 cases (see #4, no limit at all vs. an invisible cap). Cash Movement/Purchases/Register Closures hardcode `limit=200`/`100` as literal strings, not adjustable state. Three different hardcoded top-N values (4, 20, 50) exist across the Overview KPIs, the embedded product section, and the sales page, none exposed to the user. | **Medium** | `reports/cash-movement/page.tsx:36`, `reports/purchases/page.tsx:39`, `reports/register-closures/page.tsx:39`, `reports/page.tsx:119`, `SalesByProductSection.tsx` default, `reports/sales/page.tsx:185` |
+| 10 | **`reporting/*` is NOT dead code** — correction to the assumption carried over from the Product review. It's a deliberate, documented compatibility shim: `ReportsSubNav.tsx:5-8,26-29` has an explicit `canonical()` helper mapping every `/reporting/*` URL (including the one name mismatch, `closing`→`end-of-day`) back to its `/reports/*` equivalent so active-tab highlighting still works when a user lands on a legacy alias. 9 real call sites exist (8 dashboard KPI cards + 1 Finance page link) — all intentional, not orphaned. **No action needed here**; this review's job is done by confirming it, not "cleaning it up." | **Info, not a defect** | `web/components/reports/ReportsSubNav.tsx:5-29` |
+| 11 | **User-facing docs (`docs/core-workflows/reports.md`) describe a Reports nav structure that doesn't exist** (grouped Payments/Loyalty/Compliance sections — the real nav is flat, and no loyalty or MSA/compliance report exists anywhere in `web/` or `src/`), **claim server-side email export exists** (the real export is a client-side `Blob` download, `reportHelpers.tsx:2-14`), and **claim "scheduled reports" are unbuilt** when a fully-built, tested CRUD feature already exists — just filed under **Insights**, not **Reports** (`web/app/(protected)/insights/_components/ScheduledReportsTab.tsx`, `src/modules/insights/insights.test.ts:36-119`). | **Low** (docs accuracy, not app behavior) | `docs/core-workflows/reports.md` vs `ReportsSubNav.tsx:11-24`, `reportHelpers.tsx`, `insights/ScheduledReportsTab.tsx` |
+
+**What's already good and should NOT be touched:** the `requireRole("manager")` guard on `POST /ar-aging/sweep` (already fixed 2026-07-16 per `WORK/audits/AUDIT_2026-07-16T054500Z-authz-sweep-reports-ecommerce.md`), the bounded routes (`top-products`, `sales-by-product`, `hourly`, `revenue-trend`, `register-closures`, `cash-movement`, `purchases` — all correctly capped with `Math.min(limit, 500)` or `cappedLimit`), and the module's honest self-description as a live-OLTP read model (no false claims of a caching layer that doesn't exist).
+
+---
+
+## 2. Architecture recommendations
+
+1. **Fix `/reports/sales` first, alone, as its own release.** This is a live, currently-shipping data-correctness bug on a core sales report — every user who has opened that page's Category/Customer/Product tabs has seen broken cells. No architecture discussion needed here, just make the fetch call the endpoint whose shape actually matches what's rendered (or adjust the render to match the endpoint already being called — see §3 for the specific call per tab).
+2. **Do not build a `daily_sales_summary` population job speculatively.** The DB-9 gap in `ENTERPRISE_ARCHITECTURE.md` already correctly frames this as a future CQRS read-model project, not a quick fix — building the write path now would be scope creep beyond "fix what's broken." Leave it as a documented, silently-empty feature (already fails gracefully) until there's a measured dashboard-load-time problem that justifies it, per [[ascend-cto]]'s evidence-before-infrastructure doctrine.
+3. **Drop the two fully-dead tables' migrations only if a future pass confirms zero external dependency** — not in this review. `product_sales_summary`/`fiscal_periods` having zero code references is necessary but not sufficient evidence nothing reads them via a direct DB tool/export outside this codebase; flag, don't drop, without an explicit decision.
+4. **Add pagination to the 4 truly-unbounded routes** (`ar-aging`, `ap-aging`, `inventory-valuation`, `sales-by-customer`) using the same `shared/pagination.ts` keyset pattern already adopted for inventory transfers in the Product review — these are the closest thing to a "Critical" item here after the sales-page bug, since an unbounded query against a large tenant's full order/invoice history is a real production risk, not just a UX gap.
+
+---
+
+## 3. The `/reports/sales` fix, specifically
+
+Each tab currently calls the wrong endpoint for what it renders, or renders fields the right endpoint doesn't return:
+
+| Tab | Currently calls | Actually shaped like | Fix |
+|---|---|---|---|
+| By Category | `GET /sales-by-category` → `{key, name, units, revenueCents}` | Rendered fields (`category, orderCount, qty, revenue`) don't exist anywhere server-side | Rewrite `CategoryTable` to render the real shape (`name, units, revenueCents`) — there is no backend concept of `orderCount` per category today, so that column must be dropped, not invented |
+| By Customer | `GET /sales-by-customer` → `{key, name, units, revenueCents}` | `item.name` coincidentally matches; `item.customer_id`/`item.totalCents` don't exist | Use `key` (the actual identifier field) for the link href/React key instead of `customer_id`; use `revenueCents` instead of `totalCents` |
+| By Product | `GET /top-products?...&limit=50` → `{productId, name, units, revenueCents}` | Rendered fields (`id, sku, category, qty, revenue`) belong to a *different* endpoint (`/sales-by-product`) | Switch the fetch to `GET /sales-by-product` (already built, already used by `SalesByProductSection` on the Overview page with the exact field names this tab expects) instead of `/top-products` |
+
+This is a frontend-only fix (wrong fetch target / wrong field names) — no backend changes needed for any of the three tabs.
+
+---
+
+## 4. Priority matrix
+
+| Priority | Item |
+|---|---|
+| **Critical** | Fix `/reports/sales`'s 3 broken tabs (§3) |
+| **Critical** | Fix Finance page's dead "Aging" tab (stop the redirect from firing, or remove the inline block if the redirect is intentional — needs a call, see §5) |
+| **High** | Wire up or remove the dashboard KPI `?metric=` params (currently pure decoration) |
+| **High** | Add pagination to `ar-aging`, `ap-aging`, `inventory-valuation`, `sales-by-customer` |
+| **Medium** | Time Cards 500-row silent truncation — at minimum surface a "showing 500 of N" notice; ideally add real pagination |
+| **Medium** | De-duplicate the 4 independent AR/AP aging fetches (shared hook/cache) |
+| **Low** | Fix `docs/core-workflows/reports.md`'s inaccuracies |
+| **Deferred (NEEDS-SRI)** | `daily_sales_summary` population job — real work, needs a business case per §2.2 |
+| **No action** | `reporting/*` alias tree — confirmed intentional, not a defect |
+
+---
+
+## 5. Open question for Sri
+
+Finance page's "Aging" tab: is the intended behavior (a) navigate away to the dedicated AR-only page (in which case, delete the now-provably-dead inline AR+AP block and stop fetching `apAging`/`arAging` on every Finance page load), or (b) show the inline combined AR+AP view in place (in which case, remove the `router.replace` call)? This is a real product decision, not a bug with one obvious fix — both are currently half-implemented.

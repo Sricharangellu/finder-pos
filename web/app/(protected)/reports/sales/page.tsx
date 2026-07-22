@@ -27,27 +27,35 @@ interface RevenueTrendItem {
   orderCount: number;
 }
 
+// CategoryItem/CustomerItem both come from the same backend shape
+// (SalesByGroup: src/modules/reports/service.ts) — `key` is the group's
+// identifier (category name for one endpoint, customer id for the other).
+// There is no per-order-count concept in either query; don't invent one.
 interface CategoryItem {
-  category: string;
-  revenue: number;
-  qty: number;
-  orderCount: number;
+  key: string;
+  name: string;
+  units: number;
+  revenueCents: number;
 }
 
 interface CustomerItem {
-  customer_id: string;
+  key: string;
   name: string;
-  totalCents: number;
-  orderCount: number;
+  units: number;
+  revenueCents: number;
 }
 
+// Matches SalesByProductItem (GET /sales-by-product) — NOT /top-products,
+// whose shape (productId/name/units/revenueCents only) doesn't carry sku/
+// category at all. This tab needs those fields, so it must call the
+// endpoint that returns them.
 interface ProductItem {
-  id: string;
+  productId: string;
   sku: string;
   name: string;
   category: string;
-  revenue: number;
-  qty: number;
+  units: number;
+  revenueCents: number;
 }
 
 interface CategoryResponse {
@@ -182,7 +190,7 @@ export default function SalesReportPage() {
         const [catData, cusData, proData, trendData] = await Promise.all([
           apiGet<CategoryResponse>(`/api/v1/reports/sales-by-category?range=${range}`),
           apiGet<CustomerResponse>(`/api/v1/reports/sales-by-customer?range=${range}`),
-          apiGet<ProductResponse>(`/api/v1/reports/top-products?range=${range}&limit=50`),
+          apiGet<ProductResponse>(`/api/v1/reports/sales-by-product?range=${range}&limit=50`),
           apiGet<{ items: RevenueTrendItem[] }>(`/api/v1/reports/revenue-trend?range=30d`),
         ]);
         if (!cancelled) {
@@ -213,21 +221,20 @@ export default function SalesReportPage() {
   function handleExportCsv() {
     if (tab === "category") {
       downloadCsv(`sales-by-category-${range}.csv`, [
-        ["Category", "Orders", "Qty Sold", "Revenue"],
+        ["Category", "Qty Sold", "Revenue"],
         ...categories.map((c) => [
-          c.category,
-          String(c.orderCount),
-          String(c.qty),
-          formatMoney(c.revenue),
+          c.name,
+          String(c.units),
+          formatMoney(c.revenueCents),
         ]),
       ]);
     } else if (tab === "customer") {
       downloadCsv(`sales-by-customer-${range}.csv`, [
-        ["Customer", "Orders", "Total Spent"],
+        ["Customer", "Qty Sold", "Total Spent"],
         ...customers.map((c) => [
           c.name,
-          String(c.orderCount),
-          formatMoney(c.totalCents),
+          String(c.units),
+          formatMoney(c.revenueCents),
         ]),
       ]);
     } else {
@@ -237,8 +244,8 @@ export default function SalesReportPage() {
           p.sku,
           p.name,
           p.category,
-          String(p.qty),
-          formatMoney(p.revenue),
+          String(p.units),
+          formatMoney(p.revenueCents),
         ]),
       ]);
     }
@@ -321,7 +328,7 @@ export default function SalesReportPage() {
 
           <div className="p-5">
             {loading ? (
-              <TableSkeleton cols={tab === "category" ? 4 : tab === "customer" ? 3 : 5} />
+              <TableSkeleton cols={tab === "category" ? 3 : tab === "customer" ? 3 : 5} />
             ) : error ? (
               <p role="alert" className="text-sm text-red-600">
                 {error}
@@ -352,19 +359,17 @@ function CategoryTable({ items }: { items: CategoryItem[] }) {
         <thead>
           <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <th className="pb-2 pr-4">Category</th>
-            <th className="pb-2 pr-4 text-right">Orders</th>
             <th className="pb-2 pr-4 text-right">Qty Sold</th>
             <th className="pb-2 text-right">Revenue</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
-            <tr key={item.category} className="hover:bg-slate-50">
-              <td className="py-2.5 pr-4 font-medium text-slate-950">{item.category}</td>
-              <td className="py-2.5 pr-4 text-right text-slate-600">{item.orderCount}</td>
-              <td className="py-2.5 pr-4 text-right text-slate-600">{item.qty}</td>
+            <tr key={item.key} className="hover:bg-slate-50">
+              <td className="py-2.5 pr-4 font-medium text-slate-950">{item.name}</td>
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.units}</td>
               <td className="py-2.5 text-right font-semibold text-slate-950">
-                {formatMoney(item.revenue)}
+                {formatMoney(item.revenueCents)}
               </td>
             </tr>
           ))}
@@ -386,24 +391,24 @@ function CustomerTable({ items }: { items: CustomerItem[] }) {
         <thead>
           <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <th className="pb-2 pr-4">Customer</th>
-            <th className="pb-2 pr-4 text-right">Orders</th>
+            <th className="pb-2 pr-4 text-right">Qty Sold</th>
             <th className="pb-2 text-right">Total Spent</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
-            <tr key={item.customer_id} className="hover:bg-slate-50">
+            <tr key={item.key} className="hover:bg-slate-50">
               <td className="py-2.5 pr-4">
                 <Link
-                  href={`/customers/${item.customer_id}`}
+                  href={`/customers/${item.key}`}
                   className="font-medium text-slate-950 hover:text-slate-700 hover:underline"
                 >
                   {item.name}
                 </Link>
               </td>
-              <td className="py-2.5 pr-4 text-right text-slate-600">{item.orderCount}</td>
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.units}</td>
               <td className="py-2.5 text-right font-semibold text-slate-950">
-                {formatMoney(item.totalCents)}
+                {formatMoney(item.revenueCents)}
               </td>
             </tr>
           ))}
@@ -433,20 +438,20 @@ function ProductTable({ items }: { items: ProductItem[] }) {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50">
+            <tr key={item.productId} className="hover:bg-slate-50">
               <td className="py-2.5 pr-4 font-mono text-xs text-slate-500">{item.sku}</td>
               <td className="py-2.5 pr-4">
                 <Link
-                  href={`/catalog/${item.id}`}
+                  href={`/catalog/${item.productId}`}
                   className="font-medium text-slate-950 hover:text-slate-700 hover:underline"
                 >
                   {item.name}
                 </Link>
               </td>
               <td className="py-2.5 pr-4 text-slate-600">{item.category}</td>
-              <td className="py-2.5 pr-4 text-right text-slate-600">{item.qty}</td>
+              <td className="py-2.5 pr-4 text-right text-slate-600">{item.units}</td>
               <td className="py-2.5 text-right font-semibold text-slate-950">
-                {formatMoney(item.revenue)}
+                {formatMoney(item.revenueCents)}
               </td>
             </tr>
           ))}
