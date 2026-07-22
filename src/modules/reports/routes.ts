@@ -106,14 +106,17 @@ export function registerRoutes(router: Router, service: ReportsService): void {
     res.json({ items: await service.salesByCategory(tenantId(res), sinceFromRange(req)) });
   }));
 
-  // GET /api/v1/reports/sales-by-customer?range=…
+  // GET /api/v1/reports/sales-by-customer?range=…&limit=…
   router.get("/sales-by-customer", handler(async (req, res) => {
-    res.json({ items: await service.salesByCustomer(tenantId(res), sinceFromRange(req)) });
+    const limit = cappedLimit(req.query.limit, 200);
+    res.json({ items: await service.salesByCustomer(tenantId(res), sinceFromRange(req), limit) });
   }));
 
-  // GET /api/v1/reports/inventory-valuation — on-hand value at cost and retail.
-  router.get("/inventory-valuation", handler(async (_req, res) => {
-    res.json(await service.inventoryValuation(tenantId(res)));
+  // GET /api/v1/reports/inventory-valuation?limit=…&offset=… — on-hand value at cost and retail.
+  router.get("/inventory-valuation", handler(async (req, res) => {
+    const limit = cappedLimit(req.query.limit, 500);
+    const offset = typeof req.query.offset === "string" ? Math.max(0, Number(req.query.offset) || 0) : 0;
+    res.json(await service.inventoryValuation(tenantId(res), limit, offset));
   }));
 
   // GET /api/v1/reports/sales-by-rep?range=… — revenue grouped by sales rep.

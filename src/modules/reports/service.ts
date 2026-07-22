@@ -147,6 +147,10 @@ export interface Valuation {
   rows: ValuationRow[];
   totalCostCents: number;
   totalRetailCents: number;
+  /** Count of SKUs across the whole tenant (not just this page of `rows`) —
+   *  the cost/retail totals above are always computed over all of them,
+   *  never just the returned page. */
+  total: number;
 }
 
 export interface SalesByProductItem {
@@ -530,8 +534,12 @@ export class ReportsService {
     return rows.map((r) => ({ key: r.key, name: r.key, units: Number(r.units), revenueCents: Number(r.revenue) }));
   }
 
-  /** Revenue + order units grouped by customer (completed orders in window). */
-  async salesByCustomer(tenantId: string, sinceMs?: number): Promise<SalesByGroup[]> {
+  /** Revenue + order units grouped by customer (completed orders in window).
+   *  `limit` caps distinct customers returned — this had no bound at all
+   *  before (see docs/architecture/REPORTS_MODULE_REVIEW.md finding #4);
+   *  a tenant with many paying customers in the window could return an
+   *  arbitrarily large array with zero pagination anywhere in the stack. */
+  async salesByCustomer(tenantId: string, sinceMs?: number, limit = 200): Promise<SalesByGroup[]> {
     const since = sinceMs ?? 0;
     const rows = await this.db.query<{ key: string; name: string; units: number; revenue: number }>(
       `SELECT o.customer_id AS key, COALESCE(MAX(c.name), 'Walk-in') AS name,
@@ -539,8 +547,9 @@ export class ReportsService {
          FROM orders o
          LEFT JOIN customers c ON c.id = o.customer_id AND c.tenant_id = o.tenant_id
         WHERE o.tenant_id = @t AND o.status = 'completed' AND o.created_at >= @since AND o.customer_id IS NOT NULL
-        GROUP BY o.customer_id ORDER BY revenue DESC`,
-      { t: tenantId, since },
+        GROUP BY o.customer_id ORDER BY revenue DESC
+        LIMIT @limit`,
+      { t: tenantId, since, limit },
     );
     return rows.map((r) => ({ key: r.key, name: r.name, units: Number(r.units), revenueCents: Number(r.revenue) }));
   }
@@ -645,8 +654,13 @@ export class ReportsService {
     return { revenueCents, cogsCents, grossProfitCents, operatingExpensesCents, netIncomeCents };
   }
 
-  /** Inventory valuation at cost and retail (on-hand qty × cost / price). */
-  async inventoryValuation(tenantId: string): Promise<Valuation> {
+  /** Inventory valuation at cost and retail (on-hand qty × cost / price).
+   *  `limit`/`offset` page the returned `rows` only — cost/retail totals are
+   *  still summed over every SKU with stock, exactly as before (see
+   *  docs/architecture/REPORTS_MODULE_REVIEW.md finding #4: this used to
+   *  return every SKU with zero pagination, an unbounded payload for a
+   *  large multi-location catalog). */
+  async inventoryValuation(tenantId: string, limit = 500, offset = 0): Promise<Valuation> {
     const rows = await this.db.query<{ product_id: string; name: string; stock_qty: number; cost_cents: number | null; price_cents: number | null }>(
       `SELECT i.product_id, COALESCE(p.name, i.product_id) AS name, i.stock_qty,
               pc.cost_cents, p.price_cents
@@ -667,7 +681,7 @@ export class ReportsService {
       totalCost += costValue; totalRetail += retailValue;
       return { productId: r.product_id, name: r.name, stockQty: qty, costCents: cost, retailCents: retail, costValueCents: costValue, retailValueCents: retailValue };
     });
-    return { rows: out, totalCostCents: totalCost, totalRetailCents: totalRetail };
+    return { rows: out.slice(offset, offset + limit), totalCostCents: totalCost, totalRetailCents: totalRetail, total: out.length };
   }
 
   // ── Revenue trend ────────────────────────────────────────────────────────────

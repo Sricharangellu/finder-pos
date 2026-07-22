@@ -437,3 +437,70 @@ test("sales-by-product: a non-numeric limit falls back to the default instead of
   assert.equal(huge.status, 200, `unexpectedly failed: ${JSON.stringify(huge.json)}`);
   assert.ok(Array.isArray(huge.json.items));
 });
+
+test("inventory-valuation: limit/offset page the rows, but cost/retail totals still reflect every SKU with stock (regression: used to return everything, unbounded)", async () => {
+  const app = await freshApp();
+
+  for (let i = 0; i < 3; i++) {
+    const p = await call(app, "POST", "/api/catalog/", {
+      sku: `VAL-${i}`, name: `Valuation Widget ${i}`, price_cents: 1000, category: "general",
+    });
+    assert.equal(p.status, 201);
+    await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 5 });
+  }
+
+  const full = await call(app, "GET", "/api/reports/inventory-valuation");
+  assert.equal(full.status, 200);
+  assert.equal(full.json.rows.length, 3, "all 3 SKUs returned with no limit specified");
+  assert.equal(full.json.total, 3);
+  const fullRetail = full.json.totalRetailCents;
+  assert.ok(fullRetail > 0, "retail total should reflect all 3 SKUs' stock");
+
+  const paged = await call(app, "GET", "/api/reports/inventory-valuation?limit=1&offset=0");
+  assert.equal(paged.status, 200);
+  assert.equal(paged.json.rows.length, 1, "only 1 row returned when limit=1");
+  assert.equal(paged.json.total, 3, "total count still reflects all 3 SKUs");
+  assert.equal(
+    paged.json.totalRetailCents, fullRetail,
+    "totals must not shrink just because the returned row page did — they're computed over every SKU with stock, not just the page",
+  );
+
+  const secondPage = await call(app, "GET", "/api/reports/inventory-valuation?limit=1&offset=1");
+  assert.equal(secondPage.status, 200);
+  assert.notEqual(
+    secondPage.json.rows[0]?.productId, paged.json.rows[0]?.productId,
+    "offset actually moves to a different row, not a repeat of page 1",
+  );
+});
+
+test("sales-by-customer: limit caps the number of distinct customers returned (regression: used to have no limit at all)", async () => {
+  const app = await freshApp();
+
+  const p = await call(app, "POST", "/api/catalog/", {
+    sku: "CUST-LIM-1", name: "Customer Limit Widget", price_cents: 1000, category: "general",
+  });
+  assert.equal(p.status, 201);
+  await call(app, "POST", `/api/inventory/${p.json.id}/receive`, { quantity: 10 });
+
+  for (let i = 0; i < 3; i++) {
+    const c = await call(app, "POST", "/api/customers/", { name: `Customer ${i}` });
+    assert.equal(c.status, 201);
+    const o = await call(app, "POST", "/api/orders/", {
+      stateCode: "CA", customerId: c.json.id,
+      lines: [{ productId: p.json.id, quantity: 1 }],
+    });
+    assert.equal(o.status, 201, `order create failed: ${JSON.stringify(o.json)}`);
+    const pay = await call(app, "POST", "/api/payments/", {
+      orderId: o.json.id, method: "cash", tenderedCents: o.json.total_cents,
+    });
+    assert.equal(pay.status, 201, `payment failed: ${JSON.stringify(pay.json)}`);
+  }
+
+  const full = await call(app, "GET", "/api/reports/sales-by-customer?range=all");
+  assert.equal(full.status, 200);
+  assert.equal(full.json.items.length, 3, "all 3 paying customers returned with no limit specified");
+
+  const limited = await call(app, "GET", "/api/reports/sales-by-customer?range=all&limit=1");
+  assert.equal(limited.status, 200);
+  assert.equal(limited.json.items.length, 1, "only 1 customer returned when limit=1");
+});
