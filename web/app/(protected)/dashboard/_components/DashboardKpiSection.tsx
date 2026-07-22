@@ -73,35 +73,41 @@ export function DashboardKpiSection({
   sparkRev,
   sparkSales,
 }: Props) {
+  // Every card links to the same /reporting/sales report — that page has no
+  // per-metric view (its 3 tabs group by category/customer/product, not by
+  // metric), so a `?metric=` suffix implying per-KPI routing would be
+  // decoration with no destination to build, not a real omission. Dropped
+  // rather than left pointing nowhere.
   return (
     <section aria-label="Key performance indicators">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard title="Revenue" value={formatMoney(gross)} loading={loading}
           tone="green" icon={<IconDollar />} sparkline={sparkRev}
-          reportHref="/reporting/sales?metric=revenue" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Sale Count" value={saleCount.toLocaleString()} loading={loading}
           tone="blue" icon={<IconCart />} sparkline={sparkSales}
-          reportHref="/reporting/sales?metric=sale_count" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Gross Profit" value={formatMoney(grossProfit)} loading={loading}
           tone="green" icon={<IconDollar />}
-          reportHref="/reporting/sales?metric=gross_profit" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Customer Count" value={customerCount.toLocaleString()} loading={loading}
           tone="blue" icon={<IconPackage />}
-          reportHref="/reporting/sales?metric=customer_count" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Avg Sale Value" value={formatMoney(avgSaleValue)} loading={loading}
           tone="neutral" icon={<IconDollar />}
-          reportHref="/reporting/sales?metric=avg_sale_value" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Avg Items / Sale" value={avgItems.toFixed(1)} loading={loading}
           tone="neutral" icon={<IconCart />}
-          reportHref="/reporting/sales?metric=avg_items_per_sale" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Discounted (amt)" value={formatMoney(discountedAmt)} loading={loading}
           tone="amber" icon={<IconCreditCard />}
-          reportHref="/reporting/sales?metric=discounted" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Discounted (%)" value={`${discountedPct.toFixed(1)}%`} loading={loading}
           tone="amber" icon={<IconCreditCard />}
-          reportHref="/reporting/sales?metric=discounted_pct" />
+          reportHref="/reporting/sales" />
         <KpiCard title="Avg Order Value" value={formatMoney(avgSaleValue)} loading={loading}
-          tone="neutral" icon={<IconDollar />} />
+          tone="neutral" icon={<IconDollar />}
+          reportHref="/reporting/sales" />
       </div>
     </section>
   );
