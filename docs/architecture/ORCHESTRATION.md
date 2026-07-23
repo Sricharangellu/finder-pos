@@ -37,10 +37,13 @@ develop    ──PR──▶  staging   → deploy to TESTING (own DB, Supabase 
 staging    ──PR──▶  master    → deploy to PROD (Sri's explicit go-ahead only)
 ```
 
-- Hosting: frontend on Vercel (git-connected auto-deploy per environment);
-  production backend on Render (persistent process, real background
+- Hosting: frontend on Vercel; production backend on Render (persistent process, real background
   workers, no cold starts) as of this session — `develop`/`staging` backend
-  hosting is a live open item, not yet reconciled to match.
+  hosting is a live open item, not yet reconciled to match. **Unconfirmed as of 2026-07-23** (see
+  `PIPELINE.md`'s "Re-verification" note) — `scripts/deploy.sh` itself documents these Vercel
+  projects as NOT git-connected (manual CLI deploy only, which is what `ci.yml` actually runs), and
+  no Render deploy path exists in code for either frontend or backend. Confirm the real hosting
+  origin before relying on this line.
 - Database: Supabase Postgres. Production and testing tiers use separate
   projects; each tier's `DATABASE_URL`/`PG_CA_CERT_B64` are environment
   secrets, never hardcoded.

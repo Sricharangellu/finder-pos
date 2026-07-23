@@ -27,6 +27,12 @@ item (Level 5/E3 step 6, below) is **done for production**; `develop`/
 `staging` tiers still need their own real backend host to match (tracked as
 a live gap, not yet actioned).
 
+**Unconfirmed as of 2026-07-23** — see `PIPELINE.md`'s "Re-verification" note. `scripts/deploy.sh`
+has no Render deploy path, and none of the backend URLs this repo knows about serve a working
+instance of this app. Treat "prod is on Render" as an open claim to confirm, not a settled fact,
+until someone with dashboard access verifies the real origin and it gets wired into `deploy.sh`/
+`ci.yml`/`uptime.yml`.
+
 ## Load-bearing invariants
 
 - Money is integer cents everywhere (`src/shared/money.ts`).

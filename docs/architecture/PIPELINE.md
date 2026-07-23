@@ -105,6 +105,38 @@ aspirational-but-live.** The section below is the target state. What actually ch
 Non-prod backend hosting needs to be rebuilt from scratch (NEEDS-SRI: Render, like prod, or a fresh
 Vercel project — pick one before re-activating `deploy-dev`/`deploy-staging`).
 
+### Re-verification (2026-07-23) — the Render claim above is not confirmed from this repo
+
+Direct evidence gathered this pass, without Vercel/Render dashboard access:
+
+- **`scripts/deploy.sh` — the one mechanism `ci.yml` actually invokes to deploy — has zero Render
+  logic anywhere in it.** Every tier (`prod`/`testing`/`dev`) still deploys via the Vercel CLI to the
+  two hardcoded project IDs (`BACKEND_PID`/`FRONTEND_PID`). If production really is served from
+  Render today, that cutover happened entirely outside this repo (dashboard-only) and was never
+  reconciled into the code that's supposed to drive it — which matches this section's own
+  "needs reconciling" note, but means the claim can't be verified by reading the repo.
+- **All three backend URLs this doc has referenced for troubleshooting are dead, re-checked today:**
+  `ascendhq-api.vercel.app` (prod default) → `x-vercel-error: DEPLOYMENT_NOT_FOUND`.
+  `ascend-backend-staging.vercel.app` → same, `DEPLOYMENT_NOT_FOUND` (unchanged since 2026-07-20).
+  `ascend-backend.vercel.app` (the backend project's own auto-domain) → resolves, but to a bare
+  Express instance answering `Cannot GET /` / `Cannot GET /api/v1/flags` — i.e. a deployment with
+  none of this app's actual routes wired up, not our running backend.
+- **The production heartbeat (`.github/workflows/uptime.yml`) still probes `ascendhq-api.vercel.app`**
+  and has been failing on a ~15-minute schedule since at least 2026-07-22 as a result. Whether or not
+  Render is genuinely serving real traffic, this specific check has been alerting on a dead Vercel
+  target — treat every heartbeat failure since then as uninformative, not as evidence prod is down.
+- **The real Render URL, if one exists, is not recorded anywhere in this repository** — not in
+  `scripts/deploy.sh`, not in any workflow, not in any secret/variable name we could find. Whoever
+  did the cutover needs to supply it before any of the following can be reconciled:
+  1. Point `uptime.yml`'s backend probes at the real prod origin.
+  2. Either give `deploy.sh`/`ci.yml`'s `deploy-production` job a real Render deploy path, or remove
+     it if Render's own git integration is genuinely the sole deploy mechanism now (it isn't currently
+     a required branch-protection check, so it isn't blocking merges — but it is a guaranteed-red,
+     misleading status on every `master` push until this is resolved one way or the other).
+  3. Confirm whether the "new isolated Supabase project" (`kplruangtivthgqudjwt`, `ca-central-1`)
+     below is actually the one in use — the backend's known-working connection on file elsewhere is
+     the `us-west-2` project, which this doc calls out as the **testing** tier's database, not prod's.
+
 ### Supabase
 - **Production** = new isolated project created 2026-07-20 (ref `kplruangtivthgqudjwt`, region
   `ca-central-1`), connected only from Render via the Session pooler with verified TLS
