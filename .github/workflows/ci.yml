@@ -151,6 +151,13 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finder_test
       JWT_SECRET: ci-test-secret-not-for-production
       NODE_ENV: test
+      # Same class of problem as --shm-size above: a shared CI runner under load
+      # can starve a trivially-small query well past the 30s default meant to
+      # catch runaway production transactions (src/shared/db.ts). Observed
+      # 2026-07-23: "bills cursor pagination" — 5 rows, a plain keyset SELECT —
+      # hit statement_timeout at exactly 30176ms. Generous CI-only headroom;
+      # prod's 30s default (src/shared/db.ts) is untouched.
+      PG_TX_TIMEOUT_MS: "120000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
