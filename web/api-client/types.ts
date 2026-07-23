@@ -433,11 +433,17 @@ export interface PurchaseOrderLine {
 export interface PurchaseOrder {
   id: string;
   supplier_id: string;
+  po_number?: number | null;
   status: "ordered" | "received" | string;
+  approval_status?: "approved" | "pending" | "rejected";
+  approved_at?: number | null;
   total_cost_cents: number;
   created_at: number;
   received_at: number | null;
   lines?: PurchaseOrderLine[];
+  /** Present when the list was joined to suppliers (e.g. ?approvalStatus=pending). */
+  supplier_name?: string | null;
+  supplier_company?: string | null;
 }
 
 export interface PurchaseOrdersResponse {

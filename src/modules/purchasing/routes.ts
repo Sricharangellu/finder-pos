@@ -294,7 +294,11 @@ export function registerRoutes(router: Router, service: PurchasingService): void
   router.get("/orders", handler(async (req, res) => {
     const cursor = typeof req.query.cursor === "string" && req.query.cursor !== "" ? req.query.cursor : undefined;
     const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
-    res.json(await service.listOrders(tenantId(res), { cursor, limit }));
+    const approvalStatus =
+      req.query.approvalStatus === "pending" || req.query.approvalStatus === "approved" || req.query.approvalStatus === "rejected"
+        ? req.query.approvalStatus
+        : undefined;
+    res.json(await service.listOrders(tenantId(res), { cursor, limit, approvalStatus }));
   }));
 
   router.get("/orders/:id", handler(async (req, res) => {

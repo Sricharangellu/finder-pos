@@ -284,6 +284,28 @@ test("tiered approval: below auto limit approves, above waits and blocks receivi
   assert.equal(hist.json.items[1].actor_role, "manager");
 });
 
+test("GET /orders?approvalStatus=pending lists only pending POs, with supplier name joined", async () => {
+  const app = await freshApp();
+  const supplierId = await makeSupplier(app, "Pending Supply Co");
+  const productId = await makeProduct(app, "APR-PEND");
+  await call(app, "PUT", "/api/purchasing/approval-config",
+    { autoLimitCents: 100000, managerLimitCents: 1000000 }, "owner");
+
+  const auto = await makePO(app, supplierId, productId, 1, 10000); // $100 → auto-approved
+  const pending = await makePO(app, supplierId, productId, 10, 50000); // $5,000 → pending
+  assert.equal(auto.json.approval_status, "approved");
+  assert.equal(pending.json.approval_status, "pending");
+
+  const list = await call(app, "GET", "/api/purchasing/orders?approvalStatus=pending");
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.json.items.map((o: any) => o.id), [pending.json.id]);
+  assert.equal(list.json.items[0].supplier_name, "Pending Supply Co");
+
+  // Unfiltered list still returns both, unaffected by the join.
+  const all = await call(app, "GET", "/api/purchasing/orders");
+  assert.equal(all.json.items.length, 2);
+});
+
 test("owner tier: manager cannot approve a large PO, owner can", async () => {
   const app = await freshApp();
   const supplierId = await makeSupplier(app);

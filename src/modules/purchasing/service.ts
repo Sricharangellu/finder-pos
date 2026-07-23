@@ -181,6 +181,12 @@ export interface PurchaseOrder {
   received_at: number | null;
 }
 
+/** A PO joined to its supplier for display (e.g. the pending-approvals list). */
+export interface PurchaseOrderWithSupplier extends PurchaseOrder {
+  supplier_name: string | null;
+  supplier_company: string | null;
+}
+
 /** Approval state, orthogonal to the fulfillment status. Legacy rows default to 'approved'. */
 export type POApprovalStatus = "approved" | "pending" | "rejected";
 
@@ -769,20 +775,32 @@ export class PurchasingService {
     };
   }
 
-  async listOrders(tenantId: string, query: { cursor?: string; limit?: number } = {}): Promise<CursorPage<PurchaseOrder>> {
+  async listOrders(
+    tenantId: string,
+    query: { cursor?: string; limit?: number; approvalStatus?: POApprovalStatus } = {},
+  ): Promise<CursorPage<PurchaseOrderWithSupplier>> {
     const limit = clampLimit(query.limit);
     const cur = query.cursor
       ? (JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { at: number; id: string })
       : null;
-    const where = ["tenant_id = @tenantId"];
+    const where = ["po.tenant_id = @tenantId"];
     const params: Record<string, unknown> = { tenantId };
     if (cur) {
-      where.push("(created_at, id) < (@curAt, @curId)");
+      where.push("(po.created_at, po.id) < (@curAt, @curId)");
       params.curAt = cur.at;
       params.curId = cur.id;
     }
-    const items = await this.db.query<PurchaseOrder>(
-      `SELECT * FROM purchase_orders WHERE ${where.join(" AND ")} ORDER BY created_at DESC, id DESC LIMIT @limit`,
+    if (query.approvalStatus) {
+      where.push("po.approval_status = @approvalStatus");
+      params.approvalStatus = query.approvalStatus;
+    }
+    const items = await this.db.query<PurchaseOrderWithSupplier>(
+      `SELECT po.*, s.name AS supplier_name, s.company AS supplier_company
+         FROM purchase_orders po
+         LEFT JOIN suppliers s ON s.tenant_id = po.tenant_id AND s.id = po.supplier_id
+        WHERE ${where.join(" AND ")}
+        ORDER BY po.created_at DESC, po.id DESC
+        LIMIT @limit`,
       { ...params, limit },
     );
     const last = items[items.length - 1];

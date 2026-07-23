@@ -9,6 +9,9 @@ import { useFinderContext, type FinderDateRange } from "@/lib/useFinderContext";
 import { useRealtimeStream } from "@/hooks/useRealtimeStream";
 import { VerticalWidgets } from "@/components/dashboard/VerticalWidgets";
 import { RetailSetupChecklist } from "@/components/setup/RetailSetupChecklist";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { PendingApprovalsPanel } from "./_components/PendingApprovalsPanel";
+import { AdminShortcuts } from "./_components/AdminShortcuts";
 import { DashboardTopLists } from "./_components/DashboardTopLists";
 import { DashboardOperational } from "./_components/DashboardOperational";
 import { DashboardKpiSection } from "./_components/DashboardKpiSection";
@@ -105,6 +108,11 @@ function dateRangeForPreset(preset: FinderDateRange["preset"]): FinderDateRange 
 
 export default function DashboardPage() {
   const { storeId, outletId, dateRange, granularity, setDateRange, setGranularity } = useFinderContext();
+  const { role } = usePermissions();
+  // Mirrors the backend's own approver set (owner/admin unconditionally, manager
+  // up to their tier limit — enforced server-side either way) rather than
+  // owner-only, so the workspace never hides a control a manager can really use.
+  const isApprover = role === "owner" || role === "admin" || role === "manager";
   const range: Range = dateRange.preset === "today" ? "today" : dateRange.preset === "current_month" ? "30d" : "7d";
   const scope = new URLSearchParams({ store_id: storeId, outlet_id: outletId }).toString();
 
@@ -215,6 +223,14 @@ export default function DashboardPage() {
 
         {/* ── Retail setup checklist (auto-hides when complete or dismissed) ── */}
         <RetailSetupChecklist />
+
+        {/* ── Executive workspace: owner/admin/manager only ───────────────── */}
+        {isApprover && (
+          <div className="space-y-5 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <PendingApprovalsPanel />
+            <AdminShortcuts />
+          </div>
+        )}
 
         {/* ── Filter bar ───────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-table-border)] pb-4">
